@@ -80,6 +80,15 @@ describe('R4: stage fees paid while the stage was held', () => {
     expect((await ledgerOf(org)).heldFees).toEqual({ amount: '0.0000', payments: 0, deliveries: 0 });
   });
 
+  it('a self loop in the gate state is not an arrival', async () => {
+    const org = await rescueOrg(orgIds);
+    const id = await delivery(org, 1);
+    await transition(org, id, 'attestAsBuiltClean', 'final_approval', 'final_approval', at(0));
+    await payment(org, id, 'gate_b', '3000', at(1));
+    await transition(org, id, 'approveDesign', 'final_approval', 'shop_drawings', at(2));
+    expect((await ledgerOf(org)).heldFees.payments).toBe(0);
+  });
+
   it('skips a delivery with no recorded arrival at the gate (A10)', async () => {
     const org = await rescueOrg(orgIds);
     const id = await delivery(org, 1);

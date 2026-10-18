@@ -67,6 +67,15 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     expect((await stagesMoved(org)).stagesMoved).toEqual({ count: 0, deliveries: 0, followups: 0 });
   });
 
+  it('the chain ends at the FIRST advance: a reminder after it does not count', async () => {
+    const org = await rescueOrg(orgIds);
+    const id = await waitingAtConcept(org, 1);
+    await advance(org, id, 3);
+    await reminder(org, id, 'prepared', at(4));
+    await transition(org, id, 'confirmConcept', 'negotiation', 'design_3d', at(5));
+    expect((await stagesMoved(org)).stagesMoved.count).toBe(0);
+  });
+
   it('counts an email whose failure came after the cooldown', async () => {
     const org = await rescueOrg(orgIds);
     const id = await waitingAtConcept(org, 1);

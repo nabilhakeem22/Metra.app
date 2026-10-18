@@ -6,13 +6,13 @@ import 'server-only';
 //
 // The org's "limit firm figures" flag rides in the SAME statement, because a
 // role it narrows out (the accountant) can only be refused once it is known.
-// For that role the ledger arm sits behind the flag, so a refused accountant's
-// figures are never computed, not computed and dropped.
+// For that role every fact sits behind a one-time filter on the flag (`release`),
+// so a refused accountant's figures are never computed, not computed and dropped.
 import { sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { RangeMonths } from '../range';
 import { rangeStartSql } from '../queries/range-start';
-import { changeOrderFacts, heldFeeFacts, stagesMovedFacts } from './rescue-facts-sql';
+import { changeOrderFacts, heldFeeFacts, ledgerRows, stagesMovedFacts } from './rescue-facts-sql';
 import type { RescueLedgerRow } from './types';
 
 export interface RescueLedgerRead {
@@ -40,17 +40,25 @@ export async function loadRescueLedgerRows(
   const raw = (await withOrgContext(ctx, (tx) =>
     tx.execute(sql`
       with window_start as (select ${rangeStartSql(range)} as at),
+      ${ledgerRows()},
       ${heldFeeFacts()},
       ${changeOrderFacts()},
       ${stagesMovedFacts()},
+      org_flag as (
+        select o.restrict_firm_dashboard as restricted from public.organizations o
+         where o.id = nullif(current_setting('app.current_org_id', true), '')::uuid),
+      release as (
+        select not (${withheldWhenRestricted}::boolean and coalesce((select restricted from org_flag), true)) as released),
       facts as (
         select * from held_fee_facts
         union all select * from change_order_facts
         union all select * from stages_moved_facts),
       tagged as (
         select risk, engagement_id, amount, bucket_at, followups from facts
+         where (select released from release)
         union all
-        select 'collected', engagement_id, amount, bucket_at, followups from facts where risk in ('r3', 'r4')),
+        select 'collected', engagement_id, amount, bucket_at, followups from facts
+         where risk in ('r3', 'r4') and (select released from release)),
       ledger as (
         select risk,
                to_char(date_trunc('month', bucket_at), 'YYYY-MM') as month,
@@ -59,14 +67,9 @@ export async function loadRescueLedgerRows(
                case when risk = 'r2' then null else round(sum(amount), 4)::text end as amount,
                case when risk = 'r2' then sum(followups)::int end as followups
           from tagged
-         group by grouping sets ((risk, to_char(date_trunc('month', bucket_at), 'YYYY-MM')), (risk))),
-      org_flag as (
-        select o.restrict_firm_dashboard as restricted from public.organizations o
-         where o.id = nullif(current_setting('app.current_org_id', true), '')::uuid)
+         group by grouping sets ((risk, to_char(date_trunc('month', bucket_at), 'YYYY-MM')), (risk)))
       select f.restricted, l.risk, l.month, l.events, l.deliveries, l.amount, l.followups
-        from org_flag f
-        left join lateral (
-          select * from ledger where not (${withheldWhenRestricted}::boolean and f.restricted)) l on true
+        from org_flag f left join ledger l on true
        order by l.risk, l.month nulls first`),
   )) as unknown as RawRow[];
 

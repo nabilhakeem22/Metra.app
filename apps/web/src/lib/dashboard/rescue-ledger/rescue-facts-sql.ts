@@ -3,6 +3,13 @@ import 'server-only';
 // rescue, (risk, engagement_id, amount, bucket_at, followups). Composed into ONE
 // statement by `queries.ts`; every arm reads through the caller's RLS context.
 // `window_start` is a CTE the statement declares (`rangeStartSql`).
+//
+// The org's transitions and payments are read ONCE (`ledgerRows`) and every
+// rule joins those, because RLS checks membership per row VISITED: a per-alert
+// index probe of the transitions visited each one ten times over (measured,
+// 1,492 alerts: 164 ms of a 345 ms statement). The alerts are materialized
+// too, so each period key's pattern check and cast run once per alert, not once
+// per joined row.
 import { sql, type SQL } from 'drizzle-orm';
 import { REMINDER_EMAIL_COOLDOWN_MINUTES, REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/cooldown';
 import { WEEKLY_KEY as FOLLOWUP_ALERT_KEY } from '@/lib/automation/delivery-followup-writes';
@@ -13,6 +20,15 @@ const REMINDER_PREPARED = 'prepared';
 
 /** A follow up alert's period key: '{engagement uuid}:{ISO week}'. Checked before the cast. */
 const ALERT_PERIOD_KEY = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:';
+
+/** The org's whole transition and payment history, each scanned once. */
+export function ledgerRows(): SQL {
+  return sql`
+  org_transitions as materialized (
+    select id, engagement_id, trigger, from_state, to_state, decided_at from public.engagement_transitions),
+  org_payments as materialized (
+    select id, engagement_id, kind, amount, cleared_at from public.payment_events)`;
+}
 
 /**
  * R4, stage fees paid while the stage was held. Nothing logs the guard's
@@ -31,22 +47,21 @@ export function heldFeeFacts(): SQL {
       as g(trigger text, gate_state public.design_engagement_state, milestone_kind public.payment_event_kind)),
   gate_exits as (
     select t.engagement_id, g.milestone_kind, min(t.decided_at) as exit_at
-      from public.engagement_transitions t
-      join money_gates g on g.trigger = t.trigger
+      from org_transitions t join money_gates g on g.trigger = t.trigger
      group by t.engagement_id, g.milestone_kind),
   gate_holds as (
-    select x.engagement_id, x.milestone_kind, x.exit_at,
-           (select min(t.decided_at) from public.engagement_transitions t
-             where t.engagement_id = x.engagement_id
-               and t.to_state in (select g.gate_state from money_gates g where g.milestone_kind = x.milestone_kind)
-               and t.from_state is distinct from t.to_state
-               and t.decided_at <= x.exit_at) as entry_at
+    select x.engagement_id, x.milestone_kind, x.exit_at, min(t.decided_at) as entry_at
       from gate_exits x
-     where x.exit_at >= (select at from window_start)),
+      join money_gates g on g.milestone_kind = x.milestone_kind
+      join org_transitions t
+        on t.engagement_id = x.engagement_id and t.to_state = g.gate_state
+       and t.from_state is distinct from t.to_state and t.decided_at <= x.exit_at
+     where x.exit_at >= (select at from window_start)
+     group by x.engagement_id, x.milestone_kind, x.exit_at),
   held_fee_facts as (
     select 'r4'::text as risk, p.engagement_id, p.amount, h.exit_at as bucket_at, 0 as followups
       from gate_holds h
-      join public.payment_events p
+      join org_payments p
         on p.engagement_id = h.engagement_id and p.kind = h.milestone_kind
        and p.cleared_at > h.entry_at and p.cleared_at <= h.exit_at)`;
 }
@@ -63,7 +78,7 @@ export function changeOrderFacts(): SQL {
   revision_payments as (
     select p.id, p.engagement_id, p.cleared_at,
            sum(p.amount) over (partition by p.engagement_id order by p.cleared_at, p.id) as paid_so_far
-      from public.payment_events p
+      from org_payments p
      where p.kind = 'revision_co'),
   revision_cover as (
     select r.id, r.engagement_id, r.cleared_at,
@@ -89,23 +104,21 @@ export function changeOrderFacts(): SQL {
  */
 export function stagesMovedFacts(): SQL {
   return sql`
-  followup_alerts as (
-    select a.created_at,
+  followup_alerts as materialized (
+    select a.id, a.created_at,
            case when a.period_key ~* ${ALERT_PERIOD_KEY} then split_part(a.period_key, ':', 1)::uuid end as engagement_id
       from public.automation_run_log a
      where a.automation_key = ${FOLLOWUP_ALERT_KEY} and a.created_at >= (select at from window_start)),
-  alert_chains as (
-    select f.engagement_id, f.created_at as alert_at, n.id as advance_id, n.decided_at as advance_at
+  first_advances as (
+    select distinct on (f.id) f.engagement_id, f.created_at as alert_at,
+           n.id as advance_id, n.decided_at as advance_at, n.from_state, n.to_state
       from followup_alerts f
-     cross join lateral (
-       select t.id, t.decided_at, t.from_state, t.to_state from public.engagement_transitions t
-        where t.engagement_id = f.engagement_id and t.decided_at > f.created_at
-          and t.from_state is distinct from t.to_state
-        order by t.decided_at, t.id limit 1) n
-     where f.engagement_id is not null
-       and n.to_state is distinct from 'abandoned' and n.from_state is distinct from 'final_approval'),
+      join org_transitions n
+        on n.engagement_id = f.engagement_id and n.decided_at > f.created_at
+       and n.from_state is distinct from n.to_state
+     order by f.id, n.decided_at, n.id),
   acted_chains as (
-    select c.*, exists (
+    select c.advance_id, c.engagement_id, c.advance_at, exists (
              select 1 from public.audit_log r
               where r.entity = 'design_engagement' and r.entity_id = c.engagement_id
                 and r.at > c.alert_at and r.at < c.advance_at
@@ -116,7 +129,8 @@ export function stagesMovedFacts(): SQL {
                               and failed.after ->> 'reminder' = ${REMINDER_EMAIL_FAILED}
                               and failed.at >= r.at
                               and failed.at <= r.at + make_interval(mins => ${REMINDER_EMAIL_COOLDOWN_MINUTES}))))) as acted
-      from alert_chains c),
+      from first_advances c
+     where c.to_state is distinct from 'abandoned' and c.from_state is distinct from 'final_approval'),
   stages_moved_facts as (
     select 'r2'::text as risk, engagement_id, null::numeric as amount, max(advance_at) as bucket_at, count(*)::int as followups
       from acted_chains
