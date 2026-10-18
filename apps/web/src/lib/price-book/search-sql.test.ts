@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-const { MAX_SEARCH_WORDS, STRIPPED_MARKS, searchWords } = await import('./search-sql');
+const { STRIPPED_MARKS, searchWords } = await import('./search-sql');
 const { searchForm } = await import('./name-order');
 
 /** Every code point the SQL class lists, ranges expanded. */
@@ -30,9 +30,10 @@ describe('the SQL search folds as searchForm does', () => {
     }
   });
 
-  it('applies the typed words in searchForm form, at most MAX_SEARCH_WORDS of them', () => {
+  it('applies EVERY typed word in searchForm form, once each (a full bulletin name runs past 8 words, F3)', () => {
     expect(searchWords('  نحاس   معزول ٢  ')).toEqual(['نحاس', 'معزول', '2']);
     expect(searchWords('')).toEqual([]);
-    expect(searchWords('a b c d e f g h i j')).toHaveLength(MAX_SEARCH_WORDS);
+    const name = 'ألواح كلادينج، 4 مم سمك رقتين الألومينيوم 0.3 مم ألوان عادة';
+    expect(searchWords(name)).toEqual(['الواح', 'كلادينج،', '4', 'مم', 'سمك', 'رقتين', 'الالومينيوم', '0.3', 'الوان', 'عاده']);
   });
 });

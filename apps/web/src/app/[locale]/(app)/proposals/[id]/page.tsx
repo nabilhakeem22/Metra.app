@@ -27,8 +27,9 @@ export default async function ProposalBuilderPage({
   if (detail.status !== 'draft') redirect(`/proposals/${id}/view`);
 
   const t = await getTranslations('proposals');
-  // The picker asks for its items when it opens; the page only says there are any.
-  const hasPriceBook = await hasActiveCostItem(ctx);
+  // The picker asks for its items when it opens; the page only says there are any,
+  // and only to a role that may edit the draft (a reader cannot add a line).
+  const hasPriceBook = can(ctx.role, 'proposals_build', 'update') && (await hasActiveCostItem(ctx));
   const sectionLibrary = await listSections(ctx);
 
   // BOQ mode is decided HERE, from the row, never from the URL. Its Q- number is

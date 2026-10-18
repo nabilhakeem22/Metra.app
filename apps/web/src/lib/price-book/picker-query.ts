@@ -11,9 +11,14 @@ import { rankedSections } from './section-rank';
  * the code or either name), at most PICKER_LIMIT of them: grouped by section,
  * sections and items ordered by name in the page's language, items under a
  * retired section last. `count(*) over ()` counts every match in the same
- * statement, before the limit.
+ * statement, before the limit. The cost comes back only `withCost` (canSeeMargin).
  */
-export function searchPickerItems(ctx: OrgContext, query: string, locale: string): Promise<PickerSearch> {
+export function searchPickerItems(
+  ctx: OrgContext,
+  query: string,
+  locale: string,
+  withCost: boolean,
+): Promise<PickerSearch> {
   return withOrgContext(ctx, async (tx) => {
     const ranked = rankedSections(tx, locale);
     const rows = await tx
@@ -25,7 +30,7 @@ export function searchPickerItems(ctx: OrgContext, query: string, locale: string
         nameEn: costItems.nameEn,
         nameAr: costItems.nameAr,
         unit: costItems.unit,
-        defaultUnitCost: costItems.defaultUnitCost,
+        defaultUnitCost: withCost ? costItems.defaultUnitCost : sql<string | null>`null::text`,
         defaultUnitPrice: costItems.defaultUnitPrice,
         matched: sql<number>`(count(*) over ())::int`,
       })

@@ -112,6 +112,19 @@ describe('listPriceBookPage', () => {
     expect(await search('   ')).toHaveLength(4);
   });
 
+  it('a full bulletin name lists that item only, past 8 words (F3); a blank Arabic name reads as the English one (F6)', async () => {
+    const { orgId, ctx } = await studio();
+    const civil = await section(orgId, 'Cladding', 'كلادينج');
+    const wood = 'ألواح كلادينج، 4 مم سمك رقتين الألومينيوم 0.3 مم ألوان خشبية';
+    await items(orgId, civil, [
+      { code: 'CLAD-1', nameEn: 'Cladding panel, standard colours', nameAr: wood.replace('ألوان خشبية', 'ألوان عادة') },
+      { code: 'CLAD-2', nameEn: 'Cladding panel, wood colours', nameAr: wood },
+      { code: 'NBSP-1', nameEn: 'Aaa first in English', nameAr: ' 	' },
+    ]);
+    expect(codes(await listPriceBookPage(ctx, view({ query: wood }), 'ar-EG'))).toEqual(['CLAD-2']);
+    expect(codes(await listPriceBookPage(ctx, view({}), 'ar-EG'))).toEqual(['CLAD-2', 'CLAD-1', 'NBSP-1']);
+  });
+
   it('tells an empty book from a filter that matched nothing, and shows no other studio s items', async () => {
     const empty = await studio();
     expect(await listPriceBookPage(empty.ctx, view({}), 'en')).toMatchObject({ rows: [], matched: 0, hasAnyItem: false });

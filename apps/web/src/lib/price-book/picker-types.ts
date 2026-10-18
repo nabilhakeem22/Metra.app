@@ -14,7 +14,8 @@ export interface PickerItem {
   nameEn: string | null;
   nameAr: string | null;
   unit: string;
-  defaultUnitCost: string;
+  /** Null for a role that may not see cost (canSeeMargin): the save takes the cost from the price book. */
+  defaultUnitCost: string | null;
   defaultUnitPrice: string;
 }
 

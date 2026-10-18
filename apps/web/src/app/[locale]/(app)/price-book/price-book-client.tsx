@@ -70,9 +70,9 @@ export function PriceBookClient({ view, book, sections, canManage }: PriceBookCl
       <PriceBookToolbar
         q={navigation.query}
         onQChange={navigation.setQuery}
-        sectionFilter={view.sectionId ?? ALL_SECTIONS}
+        sectionFilter={navigation.sectionId ?? ALL_SECTIONS}
         onSectionFilterChange={(sectionId) => navigation.setSectionId(sectionId === ALL_SECTIONS ? null : sectionId)}
-        activeOnly={view.activeOnly}
+        activeOnly={navigation.activeOnly}
         onActiveOnlyChange={navigation.setActiveOnly}
         sections={sections}
         canManage={canManage}

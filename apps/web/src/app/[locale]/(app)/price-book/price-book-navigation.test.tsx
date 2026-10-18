@@ -1,7 +1,8 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { FIRST_VIEW, type PriceBookView } from '@/lib/price-book/page-params';
-import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { FIRST_VIEW, MAX_SEARCH_LENGTH, readPriceBookView, type PriceBookView } from '@/lib/price-book/page-params';
+import { messageAt, messagesFor, renderWithIntl } from '@/test/render-with-intl';
 import { PriceBookClient } from './price-book-client';
 import type { PriceBookItem, PriceBookPageData } from './types';
 import { SEARCH_PAUSE_MS } from './use-price-book-navigation';
@@ -80,5 +81,61 @@ describe('the paged price book', () => {
     show();
     const heading = screen.getByRole('heading', { name: 'Civil' });
     expect(heading.parentElement?.textContent).toContain('447');
+  });
+
+  // F1/F2/F4: what the studio typed and chose is authoritative while answers land late.
+  describe('with slow answers', () => {
+    const client = (view: PriceBookView) => (
+      <NextIntlClientProvider locale="en" messages={messagesFor('en')} timeZone="UTC">
+        <PriceBookClient view={view} book={BOOK} sections={SECTIONS} canManage={false} />
+      </NextIntlClientProvider>
+    );
+    const box = () => screen.getByPlaceholderText(messageAt('en', 'priceBook.search')) as HTMLInputElement;
+    const pause = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, SEARCH_PAUSE_MS + 50)); });
+    /** The view the server answers a request with, as the page reads it from the URL. */
+    const answer = (href: string) => readPriceBookView(Object.fromEntries(new URL(href, 'http://x').searchParams));
+
+    test('an older answer landing after a newer search was sent never rewrites the box (F1)', async () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      fireEvent.change(box(), { target: { value: 'gypsum ' } });
+      await pause();
+      fireEvent.change(box(), { target: { value: 'gypsum board' } });
+      await pause();
+      fireEvent.change(box(), { target: { value: 'gypsum board 12' } });
+      const [first, second] = router.replace.mock.calls.map(([href]) => href as string);
+      rerender(client(answer(first)));
+      expect(box().value).toBe('gypsum board 12');
+      rerender(client(answer(second)));
+      expect(box().value).toBe('gypsum board 12');
+      await pause();
+      expect(router.replace.mock.calls.at(-1)?.[0]).toBe('/price-book?q=gypsum+board+12');
+    });
+
+    test('back or forward to another view is adopted by the toolbar', () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      rerender(client({ ...FIRST_VIEW, query: 'tile', activeOnly: true, page: 2 }));
+      expect(box().value).toBe('tile');
+      expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    });
+
+    test('a filter chosen before its page arrives is kept by the search typed next, and moves at once (F2)', async () => {
+      render(client(FIRST_VIEW));
+      fireEvent.click(screen.getByRole('checkbox'));
+      expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+      fireEvent.change(box(), { target: { value: 'tile' } });
+      await pause();
+      expect(router.replace.mock.calls.map(([href]) => href)).toEqual(['/price-book?active=1', '/price-book?q=tile&active=1']);
+    });
+
+    test('a search past the length cap is cut in the URL only, never in the box (F4)', async () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      const long = 'gypsum '.padEnd(230, 'x');
+      fireEvent.change(box(), { target: { value: long } });
+      await pause();
+      const [href] = router.replace.mock.calls.at(-1) as [string];
+      expect(answer(href).query).toHaveLength(MAX_SEARCH_LENGTH);
+      rerender(client(answer(href)));
+      expect(box().value).toBe(long);
+    });
   });
 });

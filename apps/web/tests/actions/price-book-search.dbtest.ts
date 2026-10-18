@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { withOrgContext } from '@/lib/db/context';
 import { findExistingCodesCore } from '@/lib/price-book/import-existing';
 import { searchForm } from '@/lib/price-book/name-order';
+import { searchPriceBookPickerCore } from '@/lib/price-book/picker-core';
 import { hasActiveCostItem, searchPickerItems } from '@/lib/price-book/picker-query';
 import { PICKER_LIMIT } from '@/lib/price-book/picker-types';
 import { searchFormSql } from '@/lib/price-book/search-sql';
@@ -33,7 +34,7 @@ async function item(orgId: string, sectionId: string, code: string, nameEn: stri
   );
 }
 
-const MARKS = ['َ', 'ّ', 'ٰ', 'ۡ', 'ـ', '‏', '​', '؜', '­', '﻿', '́'];
+const MARKS = ['࢘', '࢟', 'َ', 'ّ', 'ٰ', 'ۡ', 'ـ', '‏', '​', '؜', '­', '﻿', '́'];
 const CORPUS = [
   'مواسير بولى بروبلين', 'مواسير بولی  بروبلين', 'مَوَاسِيـر بُولِي', 'أإآ ة ى ی ک', 'نحاس ٢ مم', 'نحاس ۲ مم', '٠١٢٣٤٥٦٧٨٩ ۰۱۲۳۴۵۶۷۸۹',
   'Gypsum BOARD', 'ﻻ ﷲ ﺑ', 'Café', 'café', 'MKT-finishing.glass_4mm', ...MARKS.map((mark) => `س${mark}ل`),
@@ -59,17 +60,45 @@ describe('searchPickerItems', () => {
     await item(orgId, civil, 'C-off', 'Board retired', 'لوح متوقف', false);
     await item(orgId, retired.id, 'O-1', 'Board old', 'لوح قديم');
 
-    const first = await searchPickerItems(ctx, '', 'en');
+    const first = await searchPickerItems(ctx, '', 'en', true);
     expect(first.items).toHaveLength(PICKER_LIMIT);
     expect(first.matched).toBe(41);
     expect(first.items.slice(0, 3).map((row) => row.code)).toEqual(['C-0', 'C-1', 'C-2']);
 
-    const one = await searchPickerItems(ctx, 'board 39', 'en');
+    const one = await searchPickerItems(ctx, 'board 39', 'en', true);
     expect(one.items.map((row) => row.code)).toEqual(['C-39']);
-    const lastOfAll = await searchPickerItems(ctx, 'old', 'en');
+    const lastOfAll = await searchPickerItems(ctx, 'old', 'en', true);
     expect(lastOfAll.items).toEqual([expect.objectContaining({ code: 'O-1', sectionId: null })]);
-    expect((await searchPickerItems(ctx, 'متوقف', 'ar-EG')).matched).toBe(0);
+    expect((await searchPickerItems(ctx, 'متوقف', 'ar-EG', true)).matched).toBe(0);
     expect(await hasActiveCostItem(ctx)).toBe(true);
+  });
+
+  it('only a role that may edit a draft is answered, and only a role that may see cost gets the cost', async () => {
+    const { orgId, ctx } = await studio();
+    await item(orgId, await raw.sectionId(orgId), 'C-1', 'Board', 'لوح');
+    const as = (role: 'owner' | 'project_manager' | 'viewer' | 'site_engineer' | 'accountant') => ({ ...ctx, role });
+    for (const role of ['viewer', 'site_engineer', 'accountant'] as const) {
+      expect(await searchPriceBookPickerCore(as(role), '', 'en')).toEqual({ ok: false, error: 'forbidden' });
+    }
+    expect(await searchPriceBookPickerCore(as('owner'), 'board', 'fr')).toEqual({ ok: false, error: 'malformed' });
+    const owner = await searchPriceBookPickerCore(as('owner'), 'board', 'en');
+    expect(owner.data?.items[0]).toMatchObject({ code: 'C-1', defaultUnitCost: '0.0000' });
+    expect((await searchPriceBookPickerCore(as('project_manager'), 'board', 'en')).data?.items[0]).toMatchObject({ defaultUnitCost: '0.0000' });
+    // With the margin hidden from PMs, a PM still picks the item; its cost stays in the price book.
+    await raw.query(`update public.organizations set hide_margin_from_pm = true where id = '${orgId}'`);
+    const pm = await searchPriceBookPickerCore(as('project_manager'), 'board', 'en');
+    expect(pm.data?.items[0]).toMatchObject({ code: 'C-1', defaultUnitCost: null, defaultUnitPrice: '0.0000' });
+  });
+
+  it('every typed word narrows: a full bulletin name finds that item, not its sibling (F3)', async () => {
+    const { orgId, ctx } = await studio();
+    const civil = await raw.sectionId(orgId);
+    const standard = 'ألواح كلادينج، 4 مم سمك رقتين الألومينيوم 0.3 مم ألوان عادة';
+    await item(orgId, civil, 'CLAD-1', 'Aluminium composite cladding panel, 4 mm, standard colours', standard);
+    await item(orgId, civil, 'CLAD-2', 'Aluminium composite cladding panel, 4 mm, wood colours', standard.replace('ألوان عادة', 'ألوان خشبية'));
+    expect((await searchPickerItems(ctx, standard, 'ar-EG', true)).items.map((row) => row.code)).toEqual(['CLAD-1']);
+    expect((await searchPickerItems(ctx, 'cladding panel 4 mm aluminium composite colours wood', 'en', true)).items.map((row) => row.code)).toEqual(['CLAD-2']);
+    expect((await searchPickerItems(ctx, 'cladding panel 4 mm aluminium composite colours wood zzzz', 'en', true)).matched).toBe(0);
   });
 
   it('a studio with no active item has no picker', async () => {
