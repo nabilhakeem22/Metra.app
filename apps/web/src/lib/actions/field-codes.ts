@@ -21,6 +21,9 @@ export const FIELD_CODE_PARAMS = {
   email_format: [],
   no_longer_exists: [],
   unprintable: [],
+  // A payment schedule whose rows do not add up to what they must (100 for
+  // percentages, the contract value for amounts).
+  schedule_sum_mismatch: ['expected', 'actual'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type FieldCode = keyof typeof FIELD_CODE_PARAMS;
