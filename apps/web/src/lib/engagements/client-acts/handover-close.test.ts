@@ -43,7 +43,8 @@ describe('a handover close that outlasts the wait', () => {
     const [held] = deps.hold.mock.calls[0];
     expect(deps.after.mock.calls[0][0]()).toBe(held);
     finish('closed');
-    await expect(held).resolves.toBe(true);
+    // The close ITSELF is held (R4 of the overnight round), not its 4 s answer.
+    await expect(held).resolves.toEqual({ closed: true });
   });
 
   it('holds nothing when the close settles within the wait', async () => {
