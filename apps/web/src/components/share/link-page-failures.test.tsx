@@ -31,7 +31,7 @@ const PROPOSAL = {
 } as unknown as PublicProposal;
 const CONTRACT = {
   number: 1, status: 'issued', title_ar: null, title_en: 'Fit-out', total: '114', advance_pct: '10',
-  retention_pct: '5', org: ORG, sections: [],
+  retention_pct: '5', org: ORG, sections: [], source: 'proposal', payment_schedule: [],
 } as unknown as PublicContract;
 const VARIATION = {
   number: 1, status: 'issued', title_ar: null, title_en: 'Doors', reason_ar: null, reason_en: null,

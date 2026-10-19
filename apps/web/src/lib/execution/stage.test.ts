@@ -80,9 +80,9 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
   ],
   ['everything paid, nothing left to bill', withContract({}), { stage: 'settled', next: null }],
   [
-    'F5: everything paid, the client over-billed',
+    'F5: everything paid, the client over-billed (refunds hidden in v1)',
     withContract({ finalAccountBalance: '-13640.0000' }),
-    { stage: 'settled', next: { kind: 'refund_due', amount: '13640.0000' } },
+    { stage: 'settled', next: null },
   ],
   ['final account outstanding', withContract(FINAL_ISSUED), { stage: 'final_account', next: { kind: 'record_payment' } }],
   [
@@ -142,10 +142,10 @@ describe('executionStage', () => {
     expect(kinds).toEqual(new Set(EXECUTION_NEXT_ACTION_KINDS));
   });
 
-  it('gives each live stage exactly one next action; settled only a refund', () => {
+  it('gives each live stage exactly one next action, and settled none', () => {
     for (const facts of signedGrid()) {
       const { stage, next } = stageOf(facts);
-      if (stage === 'settled') expect(next === null || next.kind === 'refund_due').toBe(true);
+      if (stage === 'settled') expect(next).toBeNull();
       else expect(EXECUTION_NEXT_ACTION_KINDS).toContain(next?.kind);
     }
   });
@@ -184,13 +184,14 @@ describe('executionStage', () => {
     }
   });
 
-  it('a refund is due only on a settled contract, for the size of the negative balance', () => {
+  it('owner decision Oct 19: a negative balance with nothing else open is settled, with no next action', () => {
     for (const facts of signedGrid()) {
-      const { stage, next } = stageOf(facts);
-      if (next?.kind !== 'refund_due') continue;
-      expect(stage).toBe('settled');
-      expect(facts.finalAccountBalance).toBe('-50');
-      expect(next.amount).toBe('50.0000');
+      const quiet =
+        facts.finalAccountOutstanding === null &&
+        facts.nextUnbilledMilestone === null &&
+        facts.pendingClaimCount + facts.unbilledVariationCount + facts.unpaidRequestCount + facts.openVariationCount === 0;
+      if (!quiet || facts.finalAccountBalance !== '-50') continue;
+      expect(stageOf(facts)).toEqual({ stage: 'settled', next: null });
     }
   });
 
@@ -245,10 +246,11 @@ describe('executionStage', () => {
       expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'prepare_final_account' } });
     });
 
-    it('a de-scope larger than the unbilled milestone surfaces the refund', () => {
+    it('a de-scope larger than the unbilled milestone settles (refunds hidden in v1)', () => {
       const facts = factsAfter([first, second], '-30000', third);
       // 124,000 - 37,200 - 99,200 = -12,400
-      expect(stageOf(facts)).toEqual({ stage: 'settled', next: { kind: 'refund_due', amount: '12400.0000' } });
+      expect(facts.finalAccountBalance).toBe('-12400.0000');
+      expect(stageOf(facts)).toEqual({ stage: 'settled', next: null });
     });
   });
 
@@ -297,12 +299,13 @@ describe('executionStage', () => {
       expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'prepare_final_account' } });
     });
 
-    it('an under-measured one surfaces the refund, and an exact one settles', () => {
+    it('an under-measured one and an exact one both settle (refunds hidden in v1)', () => {
       const under = { ...overMeasured, measuredLines: [{ ...overMeasured.measuredLines[0], measuredQty: '180' }] };
       const exact = { ...overMeasured, measuredLines: [{ ...overMeasured.measuredLines[0], measuredQty: '200' }] };
       const factsOf = (input: FinalAccountInput) =>
         contract({ billingBalance: billingBalance(input), finalAccountBalance: computeFinalAccount(input).balance });
-      expect(stageOf(factsOf(under))).toEqual({ stage: 'settled', next: { kind: 'refund_due', amount: '2480.0000' } });
+      expect(factsOf(under).finalAccountBalance).toBe('-2480.0000');
+      expect(stageOf(factsOf(under))).toEqual({ stage: 'settled', next: null });
       expect(stageOf(factsOf(exact))).toEqual({ stage: 'settled', next: null });
     });
   });

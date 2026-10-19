@@ -10,10 +10,11 @@
 // it, so a de-scope never steers the studio into over-billing. A contract is
 // settled only when nothing is owed either way: no unpaid request, no pending
 // claim, no open change order and no balance left to bill.
-// Settled has no next action, except a refund the studio owes an over-billed
-// client (credit notes are out of scope; this only surfaces it).
+// Settled has no next action. A negative balance (the client was billed more
+// than the final value) is settled too: refunds are hidden in v1 (owner
+// decision, Oct 19), and the final account card still shows the figures.
 import type { ContractStatus } from '@metra/db';
-import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 
 export const EXECUTION_STAGES = [
   'no_boq',
@@ -41,15 +42,14 @@ export const EXECUTION_NEXT_ACTION_KINDS = [
   'await_variation_answer',
   'prepare_final_account',
   'review_final_account',
-  'refund_due',
 ] as const;
 
 export type ExecutionNextActionKind = (typeof EXECUTION_NEXT_ACTION_KINDS)[number];
 
-/** The one thing to do next; a refund carries what the studio owes the client. */
-export type ExecutionNextAction =
-  | { kind: Exclude<ExecutionNextActionKind, 'refund_due'> }
-  | { kind: 'refund_due'; amount: string };
+/** The one thing to do next. */
+export interface ExecutionNextAction {
+  kind: ExecutionNextActionKind;
+}
 
 /** What the cockpit knows about the delivery's BOQ contract. */
 export interface ExecutionContractFacts {
@@ -76,7 +76,7 @@ export interface ExecutionContractFacts {
   /**
    * What is left to bill WITH measured residuals: `computeFinalAccount(...).balance`.
    * The END STATE reads it, once nothing is left to bill, unpaid, claimed or
-   * open: above 0 prepare the final account, below 0 a refund, 0 settled.
+   * open: above 0 prepare the final account, otherwise settled.
    * Once a final account request is issued, both balances come from the issued
    * final account's figures (its final value minus every issued request).
    */
@@ -94,16 +94,11 @@ export interface ExecutionStageResult {
   next: ExecutionNextAction | null;
 }
 
-function step(stage: ExecutionStage, kind: Exclude<ExecutionNextActionKind, 'refund_due'>): ExecutionStageResult {
+function step(stage: ExecutionStage, kind: ExecutionNextActionKind): ExecutionStageResult {
   return { stage, next: { kind } };
 }
 
-/** End state on the full balance: nothing owed by the client; below 0 a refund owed to them. */
-function settled(contract: ExecutionContractFacts): ExecutionStageResult {
-  const balance4 = parseMoney4(contract.finalAccountBalance);
-  if (balance4 >= 0n) return { stage: 'settled', next: null };
-  return { stage: 'settled', next: { kind: 'refund_due', amount: formatMoney4(-balance4) } };
-}
+const SETTLED: ExecutionStageResult = { stage: 'settled', next: null };
 
 /** Steering: the next milestone still fits in what is left to bill, measurements aside. */
 function milestoneWithinBalance(contract: ExecutionContractFacts): boolean {
@@ -114,7 +109,7 @@ function milestoneWithinBalance(contract: ExecutionContractFacts): boolean {
 /**
  * No final account request yet: claims first, then billing and waiting (the
  * steering, on `billingBalance`), then the end state on the FULL balance:
- * the final account while it would bill more, settled or a refund otherwise.
+ * the final account while it would bill more, settled otherwise.
  */
 function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
   if (contract.pendingClaimCount > 0) return step('in_progress', 'review_payment_claim');
@@ -123,7 +118,7 @@ function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
   if (contract.unpaidRequestCount > 0) return step('in_progress', 'record_payment');
   if (contract.openVariationCount > 0) return step('in_progress', 'await_variation_answer');
   if (parseMoney4(contract.finalAccountBalance) > 0n) return step('in_progress', 'prepare_final_account');
-  return settled(contract);
+  return SETTLED;
 }
 
 /** The final account request is issued: settled only once every request and claim is
@@ -139,7 +134,7 @@ function finalAccount(contract: ExecutionContractFacts, outstanding: string): Ex
   // Not reachable through the cores (a final account refuses open orders), but
   // settled must never be said while one waits.
   if (contract.openVariationCount > 0) return step('final_account', 'await_variation_answer');
-  return settled(contract);
+  return SETTLED;
 }
 
 export function executionStage(facts: ExecutionFacts): ExecutionStageResult {

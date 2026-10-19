@@ -8,68 +8,22 @@ import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
+import { isUuid } from '@/lib/uuid';
+import type { PublicContract, PublicSectionLinesPage } from './public-types';
 
-export interface PublicContractLine {
-  id: string;
-  description_ar: string | null;
-  description_en: string | null;
-  qty: string;
-  unit: string;
-  unit_price: string;
-  discount_pct: string;
-  line_total: string;
-  sort_order: number;
-}
+export type {
+  PublicContract,
+  PublicContractLine,
+  PublicContractSection,
+  PublicScheduleRow,
+  PublicSectionLinesPage,
+} from './public-types';
 
-export interface PublicContractSection {
-  id: string;
-  title_ar: string | null;
-  title_en: string | null;
-  section_subtotal: string;
-  sort_order: number;
-  lines: PublicContractLine[];
-}
+/** The furthest a "show more" may start, the SQL's own clamp. */
+const MAX_LINE_OFFSET = 100_000;
 
-export interface PublicContract {
-  id: string;
-  number: number;
-  status: string;
-  title_ar: string | null;
-  title_en: string | null;
-  currency: string;
-  signature_date: string | null;
-  start_date: string | null;
-  end_date: string | null;
-  retention_pct: string;
-  retention_release_terms_ar: string | null;
-  retention_release_terms_en: string | null;
-  advance_pct: string;
-  advance_recovery_method: string;
-  payment_terms_days: number | null;
-  payment_schedule_mode: string;
-  penalty_ar: string | null;
-  penalty_en: string | null;
-  defects_liability_days: number | null;
-  scope_inclusions_ar: string | null;
-  scope_inclusions_en: string | null;
-  scope_exclusions_ar: string | null;
-  scope_exclusions_en: string | null;
-  terms_ar: string | null;
-  terms_en: string | null;
-  discount_pct: string;
-  tax_rate: string;
-  supervision_pct: string;
-  subtotal: string;
-  discount_amount: string;
-  taxable_base: string;
-  tax_amount: string;
-  supervision_amount: string;
-  original_value: string;
-  total: string;
-  share_expires_at: string | null;
-  org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
-  sections: PublicContractSection[];
-}
+/** The lines a section opens with on /c (plan A20); the rest load on demand. */
+const OPENING_LINES_PER_SECTION = 50;
 
 export async function getContractByToken(
   rawToken: string,
@@ -82,11 +36,58 @@ export async function getContractByToken(
   );
 }
 
-/** A stable content hash of the acknowledged document (the "PDF hash" per A5). */
+/**
+ * The snapshot as the page opens it: at most the first 50 lines per section,
+ * whatever the SQL sent (every line until DB step B caps it there), so the page
+ * a client downloads does not grow with the contract. "Show more" continues
+ * from the 51st, the SDF's own order.
+ */
+export function withOpeningLines(contract: PublicContract): PublicContract {
+  return {
+    ...contract,
+    sections: contract.sections.map((section) => ({
+      ...section,
+      lines: section.lines.slice(0, OPENING_LINES_PER_SECTION),
+    })),
+  };
+}
+
+/**
+ * Up to 100 lines of one section of the token's contract, from `offset`. Null,
+ * uniformly, for an unknown token, a contract not issued or signed, or a
+ * section that is not one of THAT contract's (no oracle about other contracts).
+ */
+export async function getContractSectionLinesByToken(
+  rawToken: string,
+  sectionId: unknown,
+  offset: unknown,
+): Promise<PublicSectionLinesPage | null> {
+  const token = normalizeRawToken(rawToken);
+  if (!token || typeof sectionId !== 'string' || !isUuid(sectionId)) return null;
+  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_LINE_OFFSET) {
+    return null;
+  }
+  const hash = hashShareToken(token);
+  return readSdfJson<PublicSectionLinesPage>(
+    sql`select public.app_contract_section_lines_by_token(${hash}, ${sectionId}::uuid, ${offset}::int) as data`,
+  );
+}
+
+/**
+ * A stable content hash of the acknowledged document (the "PDF hash" per A5).
+ *
+ * Over the snapshot WITHOUT its per-section `lines`, which `lines_digest`
+ * already covers in full (every line's client-visible fields and the schedule,
+ * computed in SQL). So the hash says the same thing whether the snapshot
+ * carries every line (DB step A) or the first 50 per section (step B), and it
+ * changes when any line or schedule row does.
+ */
 export function contractPayloadHash(contract: PublicContract): string {
-  return createHash('sha256')
-    .update(JSON.stringify(contract))
-    .digest('hex');
+  const document = {
+    ...contract,
+    sections: contract.sections.map(({ lines: _covered, ...section }) => section),
+  };
+  return createHash('sha256').update(JSON.stringify(document)).digest('hex');
 }
 
 /** The contract acknowledgement surface. An alias, not a narrower union: a code

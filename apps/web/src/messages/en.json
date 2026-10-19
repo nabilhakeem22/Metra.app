@@ -478,7 +478,8 @@
       "no_longer_exists": "That choice no longer exists; it may have been deleted. Pick another one.",
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting.",
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
-      "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
+      "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
+      "date_in_future": "That day has not come yet. Pick today or an earlier day."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -519,11 +520,11 @@
     "date_in_future": "That date is in the future. Pick today or an earlier day.",
     "amount_too_large": "That amount is larger than Metra can hold. Check the number of digits and enter it again.",
     "last_primary_contact": "This is the primary contact of the client. Make another contact primary first, then remove this one.",
-    "contract_exists": "A contract was already generated from this proposal. Open it from the contracts list.",
+    "contract_exists": "A contract was already generated from this document. Open it from the contracts list.",
     "proposal_not_accepted": "The proposal has not been accepted yet. Record the acceptance first, then generate the contract.",
     "contract_not_draft": "This contract was already issued, so it cannot be edited. Refresh the page to see its current state.",
     "contract_not_issued": "The contract has not been issued yet. Issue it first, then try again.",
-    "contract_not_signable": "This contract cannot be terminated in its current state. Refresh the page to see where it stands.",
+    "contract_not_signable": "This contract can no longer take this step in its current state. Refresh the page to see where it stands.",
     "variation_not_draft": "This variation order is no longer a draft, so it cannot be edited. Refresh the page to see its current state.",
     "variation_not_internal_approved": "The variation order is not approved internally yet. Approve it first, then issue it.",
     "engagement_title_required": "The delivery has no title. Write one in Arabic or English; one of them is enough.",
@@ -1628,7 +1629,20 @@
       "heading": "Contract",
       "originalValue": "Original value",
       "advancePct": "Advance %",
-      "retentionPct": "Retention %"
+      "retentionPct": "Retention %",
+      "worksValue": "Works value",
+      "vat": "VAT ({rate})",
+      "supervision": "Supervision fee ({rate})",
+      "schedule": {
+        "title": "Payment schedule",
+        "note": "Each amount is a share of the contract value, VAT included."
+      },
+      "lines": {
+        "showMore": "Show more lines ({count} left)",
+        "provisional": "Provisional",
+        "gone": "These lines can no longer be shown. Please refresh the page.",
+        "loadFailed": "We could not load these lines. Please check your connection and try again."
+      }
     },
     "lines": {
       "show": "Show lines ({count})",
@@ -2727,7 +2741,8 @@
         "no_longer_exists": "This choice is no longer available. Please choose another one.",
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting.",
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
-        "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
+        "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
+        "date_in_future": "That day has not come yet. Please choose today or an earlier day."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",

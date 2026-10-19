@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the same one its log line carries.
 
 vi.mock('server-only', () => ({}));
-vi.mock('./request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
+vi.mock('@/lib/share/request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
 vi.mock('@/lib/share/portal-rate-limit', () => ({ portalActAllowed: async () => true, portalReadAllowed: async () => true }));
 
 const LEAKY = Object.assign(
