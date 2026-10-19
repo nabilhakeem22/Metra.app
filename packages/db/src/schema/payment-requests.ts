@@ -68,8 +68,11 @@ export const paymentRequests = pgTable(
     // The target of the 3-column FKs from payments and claims: a payment can only
     // be recorded against a request of ITS OWN contract.
     unique('payment_requests_org_contract_id_unique').on(t.orgId, t.contractId, t.id),
-    check('payment_requests_amount_positive', sql`amount > 0`),
-    check('payment_requests_tax_amount_range', sql`tax_amount >= 0 and tax_amount <= amount`),
+    check('payment_requests_amount_positive', sql`amount > 0 and amount <> 'NaN'`),
+    check(
+      'payment_requests_tax_amount_range',
+      sql`tax_amount >= 0 and tax_amount <= amount and tax_amount <> 'NaN'`,
+    ),
     check('payment_requests_due_after_issue', sql`due_on >= issued_on`),
     check('payment_requests_note_length', sql`char_length(note) <= 500`),
     // CASE over kind::text, so a kind appended to the enum later must name

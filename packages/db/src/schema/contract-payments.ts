@@ -49,7 +49,7 @@ export const contractPayments = pgTable(
   },
   (t) => [
     unique('contract_payments_org_id_id_unique').on(t.orgId, t.id),
-    check('contract_payments_amount_positive', sql`amount > 0`),
+    check('contract_payments_amount_positive', sql`amount > 0 and amount <> 'NaN'`),
     check(
       'contract_payments_text_length',
       sql`char_length(method) <= 40 and char_length(reference) <= 120 and char_length(note) <= 500`,

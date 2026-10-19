@@ -1,5 +1,5 @@
 {
-  "id": "0cfbcc4e-1c17-4718-82e7-4769e6fe7883",
+  "id": "470db401-d728-4b1d-bccd-3d8ba119de94",
   "prevId": "7be106b2-1466-4280-abd4-8ab66335806f",
   "version": "7",
   "dialect": "postgresql",
@@ -5973,6 +5973,23 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "contract_lines_section_same_contract_fk": {
+          "name": "contract_lines_section_same_contract_fk",
+          "tableFrom": "contract_lines",
+          "tableTo": "contract_sections",
+          "columnsFrom": [
+            "org_id",
+            "contract_id",
+            "section_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "contract_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "contract_lines_costItem_same_org_fk": {
           "name": "contract_lines_costItem_same_org_fk",
           "tableFrom": "contract_lines",
@@ -7941,7 +7958,7 @@
         },
         "contract_payment_milestones_value_positive": {
           "name": "contract_payment_milestones_value_positive",
-          "value": "value > 0"
+          "value": "value > 0 and value <> 'NaN'"
         }
       },
       "isRLSEnabled": false
@@ -8262,11 +8279,11 @@
       "checkConstraints": {
         "payment_requests_amount_positive": {
           "name": "payment_requests_amount_positive",
-          "value": "amount > 0"
+          "value": "amount > 0 and amount <> 'NaN'"
         },
         "payment_requests_tax_amount_range": {
           "name": "payment_requests_tax_amount_range",
-          "value": "tax_amount >= 0 and tax_amount <= amount"
+          "value": "tax_amount >= 0 and tax_amount <= amount and tax_amount <> 'NaN'"
         },
         "payment_requests_due_after_issue": {
           "name": "payment_requests_due_after_issue",
@@ -8504,7 +8521,7 @@
       "checkConstraints": {
         "contract_payments_amount_positive": {
           "name": "contract_payments_amount_positive",
-          "value": "amount > 0"
+          "value": "amount > 0 and amount <> 'NaN'"
         },
         "contract_payments_text_length": {
           "name": "contract_payments_text_length",
@@ -8666,6 +8683,12 @@
           "name": "contract_payment_claims_pending_request_unique",
           "columns": [
             {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "request_id",
               "isExpression": false,
               "asc": true,
@@ -8741,7 +8764,7 @@
       "checkConstraints": {
         "contract_payment_claims_amount_positive": {
           "name": "contract_payment_claims_amount_positive",
-          "value": "claimed_amount > 0"
+          "value": "claimed_amount > 0 and claimed_amount <> 'NaN'"
         },
         "contract_payment_claims_resolution": {
           "name": "contract_payment_claims_resolution",
@@ -9086,19 +9109,19 @@
       "checkConstraints": {
         "contract_cost_entries_description_present": {
           "name": "contract_cost_entries_description_present",
-          "value": "btrim(description) <> '' and char_length(description) <= 300"
+          "value": "description ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(description) <= 300"
         },
         "contract_cost_entries_amount_positive": {
           "name": "contract_cost_entries_amount_positive",
-          "value": "amount > 0"
+          "value": "amount > 0 and amount <> 'NaN'"
         },
         "contract_cost_entries_qty_positive": {
           "name": "contract_cost_entries_qty_positive",
-          "value": "qty > 0"
+          "value": "qty > 0 and qty <> 'NaN'"
         },
         "contract_cost_entries_unit_cost_nonneg": {
           "name": "contract_cost_entries_unit_cost_nonneg",
-          "value": "unit_cost >= 0"
+          "value": "unit_cost >= 0 and unit_cost <> 'NaN'"
         },
         "contract_cost_entries_quantity_triple": {
           "name": "contract_cost_entries_quantity_triple",
@@ -9335,7 +9358,7 @@
       "checkConstraints": {
         "contract_line_measurements_qty_nonneg": {
           "name": "contract_line_measurements_qty_nonneg",
-          "value": "measured_qty >= 0"
+          "value": "measured_qty >= 0 and measured_qty <> 'NaN'"
         },
         "contract_line_measurements_note_length": {
           "name": "contract_line_measurements_note_length",

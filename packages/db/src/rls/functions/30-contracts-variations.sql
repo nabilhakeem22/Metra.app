@@ -34,6 +34,18 @@
 -- OLD/NEW are read DIRECTLY rather than through `to_jsonb`: both attached tables
 -- carry contract_id, and materialising a whole row as jsonb to read one uuid is
 -- per-row cost on the deep copy that generates a contract from a proposal.
+--
+-- THE PARENT IS READ `FOR SHARE` (Stage 2, A2 reliability R1). A plain read
+-- under READ COMMITTED saw the last COMMITTED status, so a child written while
+-- an issue was in flight read `draft` and committed into an ISSUED contract
+-- (measured: 10 of 10 milestones landed in a schedule no issue gate saw). FOR
+-- SHARE conflicts with the issuer's row lock: the child waits for the issue to
+-- commit, re-reads the row as `issued`, and raises MT100. All children share
+-- the lock, so concurrent child writes do not block one another; only a status
+-- change waits for them (and the issue core locks the contract FOR UPDATE
+-- before it reads the schedule, plan A3.2 addendum). The writer that inserted
+-- the contract in the same transaction already holds it, so the deep copy
+-- pays nothing; on a cascade delete the parent is already gone (no row).
 create or replace function public.enforce_contract_child_draft()
 returns trigger
 language plpgsql
@@ -46,7 +58,7 @@ begin
   -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
   -- OLD is NULL on INSERT, hence the guard.
   if TG_OP <> 'INSERT' then
-    select status into st from public.contracts where id = OLD.contract_id;
+    select status into st from public.contracts where id = OLD.contract_id for share;
     if st is not null and st <> 'draft' then
       raise exception
         'contract children are frozen once the contract leaves draft (status=%)', st
@@ -58,7 +70,7 @@ begin
   end if;
 
   -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
-  select status into st from public.contracts where id = NEW.contract_id;
+  select status into st from public.contracts where id = NEW.contract_id for share;
   if st is not null and st <> 'draft' then
     raise exception
       'contract children are frozen once the contract leaves draft (status=%)', st
@@ -134,13 +146,17 @@ $$;
 --     the rest through app_contract_section_lines_by_token below (A3.6);
 --   * line `item_code` and `provisional` (a BOQ contract's; null / false on a
 --     proposal contract's);
---   * `lines_digest`: sha256 over EVERY line's client-visible fields, in order,
+--   * `lines_digest`: sha256 over EVERY line's client-visible fields, its
+--     section included (a line moved between sections moves it), in order,
 --     plus the schedule. The acknowledgement hash covers the snapshot, so once
 --     step B caps the lines the client still acknowledges every line;
 --   * `time_extension_days_total`: the days the APPROVED change orders add to
 --     the finish date.
 -- Every sub-read names `org_id = c.org_id`: the indexes lead with org_id, and
--- this definer function gets no RLS predicate to supply it.
+-- this definer function gets no RLS predicate to supply it. The per-section
+-- line reads also name `l.contract_id = s.contract_id` (security review S3);
+-- since 0063 the 3-column FK contract_lines_section_same_contract_fk makes a
+-- line of another contract in this section impossible anyway.
 create or replace function public.app_contract_by_token(p_hash text)
 returns jsonb
 language sql
@@ -208,8 +224,8 @@ as $$
       'lines', coalesce((
         select jsonb_agg(
           jsonb_build_array(
-            l.id, l.item_code, l.description_ar, l.description_en, l.qty, l.unit,
-            l.unit_price, l.discount_pct, l.line_total, l.provisional
+            l.id, l.section_id, l.item_code, l.description_ar, l.description_en, l.qty,
+            l.unit, l.unit_price, l.discount_pct, l.line_total, l.provisional
           ) order by s.sort_order, s.id, l.sort_order, l.id
         )
         from public.contract_lines l
@@ -242,7 +258,7 @@ as $$
             'sort_order', s.sort_order,
             'line_count', (
               select count(*) from public.contract_lines l
-              where l.org_id = s.org_id and l.section_id = s.id
+              where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
             ),
             'lines', coalesce((
               select jsonb_agg(ln order by ln_sort, ln_id)
@@ -262,7 +278,7 @@ as $$
                     'sort_order', l.sort_order
                   ) as ln
                 from public.contract_lines l
-                where l.org_id = s.org_id and l.section_id = s.id
+                where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
                 order by l.sort_order, l.id
               ) lx
             ), '[]'::jsonb)
@@ -325,7 +341,7 @@ as $$
     'offset', page.start_at,
     'line_count', (
       select count(*) from public.contract_lines l
-      where l.org_id = s.org_id and l.section_id = s.id
+      where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
     ),
     'lines', coalesce((
       select jsonb_agg(ln order by ln_sort, ln_id)
@@ -345,7 +361,7 @@ as $$
             'sort_order', l.sort_order
           ) as ln
         from public.contract_lines l
-        where l.org_id = s.org_id and l.section_id = s.id
+        where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
         order by l.sort_order, l.id
         offset page.start_at
         limit 100

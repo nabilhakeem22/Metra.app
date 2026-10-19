@@ -21,8 +21,11 @@
 --                                enforce_contract_child_draft() (MT100)
 --   payment_requests             trg_payment_requests_frozen: only issued ->
 --                                void, never a delete (MT100)
---   contract_payments,
---   contract_line_measurements   append-only BY GRANT (SELECT + INSERT)
+--   contract_payments            append-only BY GRANT (SELECT + INSERT), and
+--                                trg_contract_payments_fits: only on an issued
+--                                request, never past its amount (MT130/MT131)
+--   contract_line_measurements   append-only BY GRANT (SELECT, and INSERT on
+--                                every column but `seq`)
 --   contract_payment_claims,
 --   contract_cost_entries        mutable lifecycle, no DELETE grant
 
@@ -124,3 +127,11 @@ create trigger trg_payment_requests_frozen
   before update or delete on public.payment_requests
   for each row
   execute function public.enforce_payment_request_frozen();
+
+-- A payment fits its request: issued, and within its amount, under the
+-- request's row lock (functions/35-execution.sql).
+drop trigger if exists trg_contract_payments_fits on public.contract_payments;
+create trigger trg_contract_payments_fits
+  before insert on public.contract_payments
+  for each row
+  execute function public.enforce_contract_payment_fits();

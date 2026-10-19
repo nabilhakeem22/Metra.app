@@ -91,16 +91,17 @@ export interface SameContractTarget {
  * payment request) can only name a row of ITS OWN contract, as a database fact.
  * Precondition: `target` has unique(org_id, contract_id, id).
  *
- * RESTRICT only, and NO index is emitted: every caller declares the index its
- * reads need, and the parent rows are deletable only while their contract is a
- * draft, which is when no child of this kind can exist. A nullable `<name>_id`
- * is unchecked while null (MATCH SIMPLE), which is what an optional target
- * means.
+ * RESTRICT by default; `cascade` only where the child is part of its parent
+ * (a contract line of its section). NO index is emitted: every caller declares
+ * the index its reads need. A nullable `<name>_id` is unchecked while null
+ * (MATCH SIMPLE), which is what an optional target means. Never `set null`: it
+ * would null contract_id too (the 0052 defect, one column wider).
  */
 export function sameContractFk(
   t: Record<string, AnyPgColumn>,
   name: string,
   target: SameContractTarget,
+  opts?: { onDelete?: 'restrict' | 'cascade' },
 ) {
   const table = getTableName(
     (t.orgId as unknown as { table: Parameters<typeof getTableName>[0] }).table,
@@ -109,5 +110,5 @@ export function sameContractFk(
     columns: [t.orgId, t.contractId, t[`${name}Id`]],
     foreignColumns: [target.orgId, target.contractId, target.id],
     name: `${table}_${name}_same_contract_fk`,
-  }).onDelete('restrict');
+  }).onDelete(opts?.onDelete ?? 'restrict');
 }

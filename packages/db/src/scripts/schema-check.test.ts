@@ -189,8 +189,8 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 133 declared, 133 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 339 declared, 339 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 46 declared, 46 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 340 declared, 340 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 47 declared, 47 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 46 declared, 46 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 47 declared, 47 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 46 RLS functions', () => {
+  it('declares 47 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -225,8 +225,9 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // Round D's trigger fn clear_rom_issue_on_band_change (the seven-argument
     // respond overload shares its function's name, so it adds none). 46 since
     // Stage 2 (0063) added app_contract_section_lines_by_token and the trigger
-    // fn enforce_payment_request_frozen.
-    expect(declaredFunctions().size).toBe(46);
+    // fn enforce_payment_request_frozen; 47 with the A2 fix round's
+    // enforce_contract_payment_fits.
+    expect(declaredFunctions().size).toBe(47);
   });
 });
 

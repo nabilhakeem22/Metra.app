@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   appQuery,
@@ -136,6 +139,7 @@ describe('contract_payment_milestones: the signed schedule (AC8)', () => {
         [orgId, contract.contractId, label, value],
       );
     expect(await sqlstate(insert('Advance', '0'))).toBe('23514');
+    expect(await sqlstate(insert('Advance', 'NaN'))).toBe('23514');
     expect(await sqlstate(insert(null, '50'))).toBe('23514');
     expect(await sqlstate(insert(' \t', '50'))).toBe('23514');
     expect(await sqlstate(insert('x'.repeat(81), '50'))).toBe('23514');
@@ -204,6 +208,8 @@ describe('payment_requests: CHECKs and partial uniques (AC14, AC15, AC29)', () =
   it('refuses a zero amount, VAT above the amount, a due date before the issue date and a 501-character note', async () => {
     for (const [fields, constraint] of [
       [{ amount: '0' }, 'payment_requests_amount_positive'],
+      [{ amount: 'NaN', tax_amount: '0' }, 'payment_requests_amount_positive'],
+      [{ tax_amount: 'NaN' }, 'payment_requests_tax_amount_range'],
       [{ amount: '100', tax_amount: '100.0001' }, 'payment_requests_tax_amount_range'],
       [{ tax_amount: '-1' }, 'payment_requests_tax_amount_range'],
       [{ due_on: '2026-10-18' }, 'payment_requests_due_after_issue'],
@@ -384,6 +390,9 @@ describe('contract_payments and contract_payment_claims (AC17, AC18 DB parts)', 
 
   it('refuses a zero amount and over-long free text (23514)', async () => {
     expect(await sqlstate(pay({ amount: '0' }))).toBe('23514');
+    // NaN is refused before the CHECK: the payment-fits guard reads it as more
+    // than the request (NaN sorts above every number).
+    expect(await sqlstate(pay({ amount: 'NaN' }))).toBe('MT131');
     expect(await sqlstate(pay({ method: 'm'.repeat(41) }))).toBe('23514');
     expect(await sqlstate(pay({ reference: 'r'.repeat(121) }))).toBe('23514');
     expect(await sqlstate(pay({ note: 'n'.repeat(501) }))).toBe('23514');
@@ -446,6 +455,7 @@ describe('contract_payments and contract_payment_claims (AC17, AC18 DB parts)', 
       await claim().catch((caught: { constraint_name?: string }) => caught.constraint_name),
     ).toBe('contract_payment_claims_pending_request_unique');
     expect(await sqlstate(claim({ claimed_amount: '0' }))).toBe('23514');
+    expect(await sqlstate(claim({ claimed_amount: 'NaN' }))).toBe('23514');
     expect(
       await sqlstate(app(`update public.contract_payment_claims set status = 'dismissed' where id = $1`, [first.id])),
     ).toBe('23514');
@@ -508,6 +518,15 @@ describe('contract_cost_entries (AC20, AC21, AC22 DB parts)', () => {
     for (const [fields, constraint] of [
       [{ amount: '0' }, 'contract_cost_entries_amount_positive'],
       [{ description: '   ' }, 'contract_cost_entries_description_present'],
+      // F4: whitespace-only in every form a paste brings.
+      [{ description: '\t\t' }, 'contract_cost_entries_description_present'],
+      [{ description: '\r\n' }, 'contract_cost_entries_description_present'],
+      [{ description: '\u00a0\u00a0' }, 'contract_cost_entries_description_present'],
+      [{ description: ' \u3000\u200b\ufeff\u2028 ' }, 'contract_cost_entries_description_present'],
+      // F3: NaN sorts above every number, so `> 0` alone would admit it.
+      [{ amount: 'NaN' }, 'contract_cost_entries_amount_positive'],
+      [{ qty: 'NaN', unit: 'sqm', unit_cost: '5' }, 'contract_cost_entries_qty_positive'],
+      [{ qty: '1', unit: 'sqm', unit_cost: 'NaN' }, 'contract_cost_entries_unit_cost_nonneg'],
       [{ description: 'd'.repeat(301) }, 'contract_cost_entries_description_present'],
       [{ qty: '2', unit: 'sqm' }, 'contract_cost_entries_quantity_triple'],
       [{ unit_cost: '5' }, 'contract_cost_entries_quantity_triple'],
@@ -520,6 +539,11 @@ describe('contract_cost_entries (AC20, AC21, AC22 DB parts)', () => {
       const error = await entry(fields).catch((caught: { code?: string; constraint_name?: string }) => caught);
       expect(error, constraint).toMatchObject({ code: '23514', constraint_name: constraint });
     }
+  });
+
+  it('keeps a description with one visible character among the spaces (Arabic too)', async () => {
+    await expect(entry({ description: '\u00a0x\t' })).resolves.toHaveLength(1);
+    await expect(entry({ description: '\u0623\u0633\u0645\u0646\u062a' })).resolves.toHaveLength(1);
   });
 
   it("refuses a line or a section of ANOTHER contract by the 3-column FKs (AC21, 23503)", async () => {
@@ -626,8 +650,23 @@ describe('contract_line_measurements (AC24 DB part)', () => {
     ).toBe('428C9');
   });
 
-  it('refuses a negative quantity (23514) and a line of another contract (23503)', async () => {
+  it('refuses a chosen seq even with OVERRIDING SYSTEM VALUE: no INSERT on that column (S1, 42501)', async () => {
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_line_measurements
+             (org_id, contract_id, contract_line_id, seq, measured_qty, measured_on, recorded_by)
+           overriding system value
+           values ($1, $2, $3, 999999999, 1, '2026-10-19', $4)`,
+          [orgId, contract.contractId, contract.lineIds[0][1], ownerId],
+        ),
+      ),
+    ).toBe('42501');
+  });
+
+  it('refuses a negative or NaN quantity (23514) and a line of another contract (23503)', async () => {
     expect(await sqlstate(measure(contract.lineIds[0][1], '-1', '2026-10-19'))).toBe('23514');
+    expect(await sqlstate(measure(contract.lineIds[0][1], 'NaN', '2026-10-19'))).toBe('23514');
     const sibling = await seedExecutionContract(orgId, { state: 'signed', linesPerSection: [1] });
     expect(await sqlstate(measure(sibling.lineIds[0][0], '1', '2026-10-19'))).toBe('23503');
   });
@@ -656,12 +695,54 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
     );
     expect(Object.fromEntries(rows.map((row) => [row.table_name, row.privileges]))).toEqual({
       contract_cost_entries: 'S,I,U',
-      contract_line_measurements: 'S,I',
+      // INSERT is column-level (every column but seq), so not a table privilege.
+      contract_line_measurements: 'S',
       contract_payment_claims: 'S,I,U',
       contract_payment_milestones: 'S,I,U,D',
       contract_payments: 'S,I',
       payment_requests: 'S,I,U',
     });
+  });
+});
+
+describe('privileges metra_app never holds (S4)', () => {
+  it('has no TRUNCATE, REFERENCES or TRIGGER on any table, and may insert every measurement column but seq', async () => {
+    const [hidden] = await ownerQuery<{ n: number }>(
+      `select count(*)::int as n
+         from pg_class c cross join (values ('truncate'), ('references'), ('trigger')) as p(name)
+        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+          and has_table_privilege('metra_app', c.oid, p.name)`,
+    );
+    expect(hidden.n).toBe(0);
+    const columns = await ownerQuery<{ name: string; granted: boolean }>(
+      `select a.attname as name, has_column_privilege('metra_app', a.attrelid, a.attnum, 'insert') as granted
+         from pg_attribute a
+        where a.attrelid = 'public.contract_line_measurements'::regclass and a.attnum > 0 and not a.attisdropped`,
+    );
+    expect(columns.filter((column) => column.granted !== (column.name !== 'seq'))).toEqual([]);
+  });
+
+  it('converges a hand-granted TRUNCATE on a Stage 2 table when roles.sql runs again (revoke all)', async () => {
+    await ownerQuery(`grant truncate on public.contract_payments to metra_app`);
+    const roles = readFileSync(resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../packages/db/src/rls/roles.sql'), 'utf8');
+    await ownerQuery(roles);
+    const [after] = await ownerQuery<{ held: boolean }>(
+      `select has_table_privilege('metra_app', 'public.contract_payments', 'truncate') as held`,
+    );
+    expect(after.held).toBe(false);
+  });
+});
+
+describe('contract_lines: the 3-column section FK (S3)', () => {
+  it("refuses a line in a section of ANOTHER contract of the same studio (23503)", async () => {
+    const first = await seedExecutionContract(orgId, { state: 'draft', linesPerSection: [1] });
+    const second = await seedExecutionContract(orgId, { state: 'draft', linesPerSection: [1] });
+    const error = await ownerQuery(
+      `insert into public.contract_lines (org_id, contract_id, section_id, description_en, qty, unit, unit_price)
+       values ($1, $2, $3, 'Stray', 1, 'sqm', 1)`,
+      [orgId, first.contractId, second.sectionIds[0]],
+    ).catch((caught: { code?: string; constraint_name?: string }) => caught);
+    expect(error).toMatchObject({ code: '23503', constraint_name: 'contract_lines_section_same_contract_fk' });
   });
 });
 

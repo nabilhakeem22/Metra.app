@@ -30,8 +30,10 @@
 -- EVERY POLICY IN policies/* IS WRAPPED (Stage 2, DB step A): each GUC read and
 -- each membership helper call is written `(select ...)`, so the planner runs it
 -- ONCE per query as an InitPlan instead of once per row. Same answer: the
--- helpers take no argument and are STABLE, and a GUC does not change inside a
--- statement, so per-row and once-per-query evaluation cannot differ. The B1
+-- helpers take no argument and are STABLE, and the app sets its GUCs before a
+-- statement, never inside one. (A statement that itself calls set_config on
+-- the user id mid-scan is read once, at its first row: the wrapped form is the
+-- more stable of the two, and it only ever narrows to the same org.) The B1
 -- security tester measured a 50,000-line contract read at 445 ms unwrapped and
 -- 17.6 ms wrapped. A new policy uses the wrapped form too.
 

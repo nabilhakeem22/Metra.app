@@ -17,7 +17,7 @@ import { costItems } from './cost-items';
 import { costItemUnit } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
-import { sameOrgFk } from './org-ref';
+import { sameContractFk, sameOrgFk } from './org-ref';
 
 /**
  * A frozen baseline line within a contract section — deep-copied from the source
@@ -64,6 +64,10 @@ export const contractLines = pgTable(
     ),
     ...sameOrgFk(t, 'contract', contracts, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'section', contractSections, { onDelete: 'cascade' }),
+    // 0063: a line's section is a section of ITS OWN contract, as a database
+    // fact (the /c snapshot groups lines by section). Added NOT VALID, then
+    // VALIDATEd over the existing lines.
+    sameContractFk(t, 'section', contractSections, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'costItem', costItems, { onDelete: 'set null' }),
     index('contract_lines_org_section_sort_idx').on(
       t.orgId,

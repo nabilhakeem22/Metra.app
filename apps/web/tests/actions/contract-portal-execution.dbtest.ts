@@ -260,6 +260,18 @@ describe('the acknowledgement covers every line and the schedule (AC12)', () => 
     expect(contractPayloadHash(again!)).toBe(contractPayloadHash(afterSchedule!));
   });
 
+  it('moves lines_digest when a line moves to another section, even with the flat order unchanged (F2)', async () => {
+    const contract = await seedExecutionContract(orgId, { linesPerSection: [3, 3], state: 'issued' });
+    const before = (await snapshotOf(contract.rawToken!)).lines_digest;
+    // The last line of section 1 becomes the first line of section 2: the
+    // flattened (section, line) order is the same, only the section differs.
+    await tamper(`update public.contract_lines set section_id = $2, sort_order = 0 where id = $1`, [
+      contract.lineIds[0][2],
+      contract.sectionIds[1],
+    ]);
+    expect((await snapshotOf(contract.rawToken!)).lines_digest).not.toBe(before);
+  });
+
   it('notifies each owner, admin and project manager once, and nobody else', async () => {
     const contract = await seedExecutionContract(orgId, { linesPerSection: [2], state: 'issued' });
     const result = await acknowledgeContractByToken(contract.rawToken!, { actorName: 'Client' });

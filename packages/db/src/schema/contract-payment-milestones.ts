@@ -57,7 +57,9 @@ export const contractPaymentMilestones = pgTable(
       'contract_payment_milestones_label_length',
       sql`coalesce(char_length(label_ar), 0) <= 80 and coalesce(char_length(label_en), 0) <= 80`,
     ),
-    check('contract_payment_milestones_value_positive', sql`value > 0`),
+    // `<> 'NaN'` on every money CHECK: NaN sorts above every number in Postgres,
+    // so `> 0` alone admits it, and one NaN row turns every SUM into NaN.
+    check('contract_payment_milestones_value_positive', sql`value > 0 and value <> 'NaN'`),
     ...sameOrgFk(t, 'contract', contracts, { onDelete: 'cascade', index: false }),
   ],
 );

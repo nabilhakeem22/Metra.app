@@ -146,7 +146,7 @@ describe('every trigger function is created before the file that attaches it', (
   });
 
   it('finds the triggers it is meant to be checking', () => {
-    expect(attachedIn.length).toBeGreaterThanOrEqual(17);
+    expect(attachedIn.length).toBeGreaterThanOrEqual(18);
     expect(attachedIn.map((entry) => entry.name)).toContain('enforce_payment_request_frozen');
   });
 

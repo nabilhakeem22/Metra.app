@@ -51,7 +51,7 @@ export const contractLineMeasurements = pgTable(
   },
   (t) => [
     unique('contract_line_measurements_org_id_id_unique').on(t.orgId, t.id),
-    check('contract_line_measurements_qty_nonneg', sql`measured_qty >= 0`),
+    check('contract_line_measurements_qty_nonneg', sql`measured_qty >= 0 and measured_qty <> 'NaN'`),
     check('contract_line_measurements_note_length', sql`char_length(note) <= 500`),
     sameContractFk(t, 'contractLine', contractLines),
     // The latest reading of a line: the first row of this index.

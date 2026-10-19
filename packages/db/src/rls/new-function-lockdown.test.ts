@@ -97,6 +97,8 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     signature: 'public.app_contract_section_lines_by_token(text, uuid, integer)',
     grantsApp: true,
   },
+  // A2 fix round (R2): the payment-fits guard, a DEFINER trigger function.
+  { file: 'functions/35-execution.sql', signature: 'public.enforce_contract_payment_fits()', grantsApp: true },
   { file: 'functions/30-contracts-variations.sql', signature: 'public.app_contract_by_token(text)', grantsApp: true },
   {
     file: 'functions/30-contracts-variations.sql',

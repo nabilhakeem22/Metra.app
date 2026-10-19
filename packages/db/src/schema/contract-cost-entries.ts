@@ -65,13 +65,17 @@ export const contractCostEntries = pgTable(
   },
   (t) => [
     unique('contract_cost_entries_org_id_id_unique').on(t.orgId, t.id),
+    // Present = at least one character that is not whitespace: ASCII space,
+    // tab and newline ([[:space:]]) and the Unicode spaces a paste brings
+    // (no-break, the U+2000 block, zero-width, line and paragraph separators,
+    // narrow no-break, ideographic, BOM). btrim() strips only ' '.
     check(
       'contract_cost_entries_description_present',
-      sql`btrim(description) <> '' and char_length(description) <= 300`,
+      sql`description ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(description) <= 300`,
     ),
-    check('contract_cost_entries_amount_positive', sql`amount > 0`),
-    check('contract_cost_entries_qty_positive', sql`qty > 0`),
-    check('contract_cost_entries_unit_cost_nonneg', sql`unit_cost >= 0`),
+    check('contract_cost_entries_amount_positive', sql`amount > 0 and amount <> 'NaN'`),
+    check('contract_cost_entries_qty_positive', sql`qty > 0 and qty <> 'NaN'`),
+    check('contract_cost_entries_unit_cost_nonneg', sql`unit_cost >= 0 and unit_cost <> 'NaN'`),
     check(
       'contract_cost_entries_quantity_triple',
       sql`(qty is null) = (unit is null) and (unit is null) = (unit_cost is null)`,

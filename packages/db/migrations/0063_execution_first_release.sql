@@ -13,7 +13,9 @@
 --     and `contracts_one_source`: EXACTLY one of the two sources is set. Every
 --     existing row has a proposal and no BOQ, so the CHECK holds for all of them.
 --   * contract_lines: `item_code` (null) and `provisional` (false) copied from a
---     BOQ line, and unique (org_id, contract_id, id) for the 3-column FKs.
+--     BOQ line, unique (org_id, contract_id, id) for the 3-column FKs, and the
+--     3-column FK (org_id, contract_id, section_id) -> contract_sections: a
+--     line's section is a section of its own contract (NOT VALID, VALIDATE).
 --   * contract_sections: unique (org_id, contract_id, id), same reason.
 --   * variation_orders: `time_extension_days` (null, 0 to 3650), and unique
 --     (org_id, contract_id, id) for the payment request's 3-column FK.
@@ -36,30 +38,29 @@
 --
 -- THE CHECKS ON EXISTING TABLES go in NOT VALID and are then VALIDATEd, the
 -- 0052 pattern. Inside ONE migrator transaction that does not shorten the lock
--- (the ACCESS EXCLUSIVE taken by the first ALTER on a table is held to the
--- commit either way); what it buys is that a violating row fails at VALIDATE
+-- (the ACCESS EXCLUSIVE taken up front is held to the commit either
+-- way); what it buys is that a violating row fails at VALIDATE
 -- with the constraint's name, and the batch rolls back whole.
 --
--- LOCKS. `db:migrate` runs the batch as ONE transaction. The block below
--- re-asserts the migrator's 3 s lock_timeout, transaction-local (SET LOCAL
--- semantics), so it covers every statement after it too: a long reader makes
--- the batch fail fast with 55P03 and roll back, instead of queueing every
--- writer behind it. On EXISTING tables, in this order, held to the commit:
---   contracts          ACCESS EXCLUSIVE: DROP NOT NULL (a scan for nulls), the
---                      metadata-only ADD COLUMN, the unique index build, the
---                      CHECK validation (one scan);
---   boqs               SHARE ROW EXCLUSIVE for the FK add (no write path waits
---                      on it long; the FK validates an all-NULL column);
---   contract_sections  ACCESS EXCLUSIVE: one unique index build;
---   contract_lines     ACCESS EXCLUSIVE: two metadata-only ADD COLUMNs (a
---                      constant default) and one unique index build, the
---                      biggest step (linear in contract lines);
---   variation_orders   ACCESS EXCLUSIVE: metadata-only ADD COLUMN, one CHECK
---                      scan of an all-NULL column, one unique index build.
--- The new tables' FKs then take SHARE ROW EXCLUSIVE on contracts,
--- contract_sections, contract_lines, variation_orders, cost_items and
--- organizations for the instant of each ADD (the tables are new and empty, so
--- nothing is validated). The measured figures are in docs/DEPLOY.md (0063).
+-- LOCKS. `db:migrate` runs the batch as ONE transaction. The first block takes
+-- EVERY lock this file needs on an EXISTING table up front, in one fixed order,
+-- inside ONE 3 s budget for all of them together (each LOCK TABLE gets what is
+-- left of it as its lock_timeout): ACCESS EXCLUSIVE on contracts,
+-- contract_sections, contract_lines and variation_orders, then SHARE ROW
+-- EXCLUSIVE on boqs, cost_items and organizations (the new tables' FKs). So a
+-- busy moment can hold the contract tables waiting for at most 3 s in total
+-- before the batch gives up with 55P03 and rolls back, and nothing is acquired
+-- late. Then, held to the commit:
+--   contracts          DROP NOT NULL (a scan for nulls), a metadata-only ADD
+--                      COLUMN, one unique index build, one CHECK validation;
+--   contract_sections  one unique index build;
+--   contract_lines     two metadata-only ADD COLUMNs (a constant default), one
+--                      unique index build and the validation of the 3-column
+--                      section FK, the biggest step (linear in contract lines);
+--   variation_orders   a metadata-only ADD COLUMN, one CHECK scan of an
+--                      all-NULL column, one unique index build.
+-- The new tables are created empty, so their FKs validate nothing. The
+-- measured figures are in docs/DEPLOY.md (0063).
 --
 -- ENUMS. Three CREATE TYPEs, used by the tables below in the same file: legal
 -- (only `ALTER TYPE ... ADD VALUE` has the commit-before-use rule of 0061).
@@ -68,7 +69,36 @@
 -- NAMES are the exact drizzle spellings; camelCase ones are DOUBLE-QUOTED so
 -- Postgres keeps them (0053's header; migration-catalogue.test.ts).
 DO $$
+DECLARE
+  lock_started   timestamptz := clock_timestamp();
+  lock_target    text;
+  budget_left_ms integer;
 BEGIN
+  -- EVERY LOCK UP FRONT, in one fixed order, within ONE 3 s budget for all of
+  -- them together (not 3 s each): the lock_timeout of each LOCK TABLE is what
+  -- is left of the budget. So the contract tables are never held while this
+  -- waits on a busy table behind them for more than 3 s in total, and nothing
+  -- is acquired late (no lock-order deadlock with an app writer mid-batch).
+  -- Out of budget = 55P03, and the whole batch rolls back.
+  FOREACH lock_target IN ARRAY array[
+    'public.contracts:ACCESS EXCLUSIVE',
+    'public.contract_sections:ACCESS EXCLUSIVE',
+    'public.contract_lines:ACCESS EXCLUSIVE',
+    'public.variation_orders:ACCESS EXCLUSIVE',
+    'public.boqs:SHARE ROW EXCLUSIVE',
+    'public.cost_items:SHARE ROW EXCLUSIVE',
+    'public.organizations:SHARE ROW EXCLUSIVE'
+  ] LOOP
+    budget_left_ms := 3000 - floor(extract(epoch from clock_timestamp() - lock_started) * 1000)::integer;
+    IF budget_left_ms < 1 THEN
+      RAISE EXCEPTION '0063: could not take every lock within 3 s (stopped at %)', lock_target
+        USING ERRCODE = '55P03';
+    END IF;
+    PERFORM set_config('lock_timeout', budget_left_ms || 'ms', true);
+    EXECUTE format('LOCK TABLE %s IN %s MODE', split_part(lock_target, ':', 1), split_part(lock_target, ':', 2));
+  END LOOP;
+  -- Every lock is held now; the statements below wait on nothing. The 3 s
+  -- stays for the rest of the transaction (SET LOCAL semantics).
   PERFORM set_config('lock_timeout', '3s', true);
 
   ALTER TABLE public.contracts ALTER COLUMN source_proposal_id DROP NOT NULL;
@@ -92,6 +122,16 @@ BEGIN
   ALTER TABLE public.contract_lines ADD COLUMN provisional boolean DEFAULT false NOT NULL;
   ALTER TABLE public.contract_lines
     ADD CONSTRAINT contract_lines_org_contract_id_unique UNIQUE (org_id, contract_id, id);
+  -- A line's section is a section of ITS OWN contract (security review S3).
+  -- Every existing line satisfies it: lines are written only by the contract
+  -- copy, together with their section (runbook pre-flight 2 (e) counts any
+  -- that do not, and VALIDATE would refuse the batch with 23503).
+  ALTER TABLE public.contract_lines
+    ADD CONSTRAINT contract_lines_section_same_contract_fk
+    FOREIGN KEY (org_id, contract_id, section_id)
+    REFERENCES public.contract_sections (org_id, contract_id, id)
+    ON DELETE CASCADE NOT VALID;
+  ALTER TABLE public.contract_lines VALIDATE CONSTRAINT contract_lines_section_same_contract_fk;
 
   ALTER TABLE public.variation_orders ADD COLUMN time_extension_days integer;
   ALTER TABLE public.variation_orders
@@ -122,7 +162,7 @@ CREATE TABLE "contract_payment_milestones" (
   CONSTRAINT "contract_payment_milestones_org_contract_sort_unique" UNIQUE ("org_id", "contract_id", "sort_order"),
   CONSTRAINT "contract_payment_milestones_label_present" CHECK (length(regexp_replace(coalesce("label_ar", ''), '[[:space:]]', '', 'g')) > 0 or length(regexp_replace(coalesce("label_en", ''), '[[:space:]]', '', 'g')) > 0),
   CONSTRAINT "contract_payment_milestones_label_length" CHECK (coalesce(char_length(label_ar), 0) <= 80 and coalesce(char_length(label_en), 0) <= 80),
-  CONSTRAINT "contract_payment_milestones_value_positive" CHECK (value > 0)
+  CONSTRAINT "contract_payment_milestones_value_positive" CHECK (value > 0 and value <> 'NaN')
 );
 
 CREATE TABLE "payment_requests" (
@@ -147,8 +187,8 @@ CREATE TABLE "payment_requests" (
   CONSTRAINT "payment_requests_org_id_id_unique" UNIQUE ("org_id", "id"),
   CONSTRAINT "payment_requests_org_id_number_unique" UNIQUE ("org_id", "number"),
   CONSTRAINT "payment_requests_org_contract_id_unique" UNIQUE ("org_id", "contract_id", "id"),
-  CONSTRAINT "payment_requests_amount_positive" CHECK (amount > 0),
-  CONSTRAINT "payment_requests_tax_amount_range" CHECK (tax_amount >= 0 and tax_amount <= amount),
+  CONSTRAINT "payment_requests_amount_positive" CHECK (amount > 0 and amount <> 'NaN'),
+  CONSTRAINT "payment_requests_tax_amount_range" CHECK (tax_amount >= 0 and tax_amount <= amount and tax_amount <> 'NaN'),
   CONSTRAINT "payment_requests_due_after_issue" CHECK (due_on >= issued_on),
   CONSTRAINT "payment_requests_note_length" CHECK (char_length(note) <= 500),
   CONSTRAINT "payment_requests_kind_target" CHECK (case kind::text
@@ -177,7 +217,7 @@ CREATE TABLE "contract_payments" (
   "note" text,
   "idempotency_key" text,
   CONSTRAINT "contract_payments_org_id_id_unique" UNIQUE ("org_id", "id"),
-  CONSTRAINT "contract_payments_amount_positive" CHECK (amount > 0),
+  CONSTRAINT "contract_payments_amount_positive" CHECK (amount > 0 and amount <> 'NaN'),
   CONSTRAINT "contract_payments_text_length" CHECK (char_length(method) <= 40 and char_length(reference) <= 120 and char_length(note) <= 500)
 );
 CREATE INDEX "contract_payments_org_request_idx" ON "contract_payments" USING btree ("org_id", "request_id");
@@ -201,7 +241,7 @@ CREATE TABLE "contract_payment_claims" (
   "resolved_by" uuid,
   "resolved_at" timestamp with time zone,
   CONSTRAINT "contract_payment_claims_org_id_id_unique" UNIQUE ("org_id", "id"),
-  CONSTRAINT "contract_payment_claims_amount_positive" CHECK (claimed_amount > 0),
+  CONSTRAINT "contract_payment_claims_amount_positive" CHECK (claimed_amount > 0 and claimed_amount <> 'NaN'),
   CONSTRAINT "contract_payment_claims_resolution" CHECK (case status::text
       when 'pending'   then resolved_at is null and resolved_by is null and confirmed_payment_id is null
       when 'dismissed' then resolved_at is not null and resolved_by is not null and confirmed_payment_id is null
@@ -210,7 +250,7 @@ CREATE TABLE "contract_payment_claims" (
 );
 CREATE INDEX "contract_payment_claims_org_contract_status_idx" ON "contract_payment_claims" USING btree ("org_id", "contract_id", "status");
 CREATE INDEX "contract_payment_claims_confirmedPayment_idx" ON "contract_payment_claims" USING btree ("org_id", "confirmed_payment_id");
-CREATE UNIQUE INDEX "contract_payment_claims_pending_request_unique" ON "contract_payment_claims" USING btree ("request_id") WHERE status = 'pending';
+CREATE UNIQUE INDEX "contract_payment_claims_pending_request_unique" ON "contract_payment_claims" USING btree ("org_id", "request_id") WHERE status = 'pending';
 
 CREATE TABLE "contract_cost_entries" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -235,10 +275,10 @@ CREATE TABLE "contract_cost_entries" (
   "voided_at" timestamp with time zone,
   "voided_by" uuid,
   CONSTRAINT "contract_cost_entries_org_id_id_unique" UNIQUE ("org_id", "id"),
-  CONSTRAINT "contract_cost_entries_description_present" CHECK (btrim(description) <> '' and char_length(description) <= 300),
-  CONSTRAINT "contract_cost_entries_amount_positive" CHECK (amount > 0),
-  CONSTRAINT "contract_cost_entries_qty_positive" CHECK (qty > 0),
-  CONSTRAINT "contract_cost_entries_unit_cost_nonneg" CHECK (unit_cost >= 0),
+  CONSTRAINT "contract_cost_entries_description_present" CHECK (description ~ '[^[:space:]\u00a0\u1680\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]' and char_length(description) <= 300),
+  CONSTRAINT "contract_cost_entries_amount_positive" CHECK (amount > 0 and amount <> 'NaN'),
+  CONSTRAINT "contract_cost_entries_qty_positive" CHECK (qty > 0 and qty <> 'NaN'),
+  CONSTRAINT "contract_cost_entries_unit_cost_nonneg" CHECK (unit_cost >= 0 and unit_cost <> 'NaN'),
   CONSTRAINT "contract_cost_entries_quantity_triple" CHECK ((qty is null) = (unit is null) and (unit is null) = (unit_cost is null)),
   CONSTRAINT "contract_cost_entries_line_needs_section" CHECK (contract_line_id is null or contract_section_id is not null),
   CONSTRAINT "contract_cost_entries_text_length" CHECK (char_length(supplier) <= 120 and char_length(reference) <= 120),
@@ -263,7 +303,7 @@ CREATE TABLE "contract_line_measurements" (
   "recorded_by" uuid NOT NULL,
   "idempotency_key" text,
   CONSTRAINT "contract_line_measurements_org_id_id_unique" UNIQUE ("org_id", "id"),
-  CONSTRAINT "contract_line_measurements_qty_nonneg" CHECK (measured_qty >= 0),
+  CONSTRAINT "contract_line_measurements_qty_nonneg" CHECK (measured_qty >= 0 and measured_qty <> 'NaN'),
   CONSTRAINT "contract_line_measurements_note_length" CHECK (char_length(note) <= 500)
 );
 CREATE INDEX "contract_line_measurements_org_line_latest_idx" ON "contract_line_measurements" USING btree ("org_id", "contract_line_id", "seq" DESC);

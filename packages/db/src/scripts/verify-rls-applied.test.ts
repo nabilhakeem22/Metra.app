@@ -41,6 +41,12 @@ interface Catalogues {
   missingTables?: string[];
   /** Tables the matrix query silently returns NO ROW for. */
   narrowedRowsMissing?: string[];
+  /** Policies in the database that no manifest file declares, as `table.name`. */
+  extraPolicies?: string[];
+  /** TRUNCATE / REFERENCES / TRIGGER rows the database answers for metra_app. */
+  hiddenPrivileges?: Array<{ name: string; privilege: string }>;
+  /** The column-level INSERT read-back on contract_line_measurements. */
+  measurementColumns?: Array<{ name: string; granted: boolean }>;
 }
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
@@ -80,9 +86,21 @@ function fixtureSql(catalogues: Catalogues) {
   // be the LAST one tested, not the first.
   const sql = (strings: TemplateStringsArray) => {
     const text = strings.join(' ');
+    // Before the other has_*_privilege branches: these two name a privilege
+    // function too, and are told apart by what only they read.
+    if (text.includes("('truncate')")) {
+      return Promise.resolve(catalogues.hiddenPrivileges ?? []);
+    }
+    if (text.includes("a.attnum, 'insert'")) {
+      const columns = [...(declaredTables().get('contract_line_measurements') ?? [])];
+      return Promise.resolve(
+        catalogues.measurementColumns ??
+          columns.map((name) => ({ name, granted: name !== 'seq' })),
+      );
+    }
     if (text.includes('pg_policies')) {
       return Promise.resolve(
-        [...declaredPolicies().keys()]
+        [...declaredPolicies().keys(), ...(catalogues.extraPolicies ?? [])]
           .filter((key) => !catalogues.droppedPolicies?.includes(key))
           .map((key) => ({ tablename: key.split('.')[0], policyname: key.split('.')[1] })),
       );
@@ -160,6 +178,50 @@ describe('verifyRlsApplied', () => {
     expect(await verifyRlsApplied(fixtureSql({}))).toEqual([]);
   });
 
+  it('reports a policy NO manifest file declares (S4: policies OR together)', async () => {
+    expect(
+      await verifyRlsApplied(fixtureSql({ extraPolicies: ['contract_payments.leak'] })),
+    ).toEqual([
+      '  - policy contract_payments.leak is in the database and declared by NO rls/ file: ' +
+        'policies OR together, so it widens what the declared one allows. Drop it, then re-run apply-rls',
+    ]);
+  });
+
+  it('reports TRUNCATE, REFERENCES or TRIGGER for metra_app on any table (S4)', async () => {
+    const problems = await verifyRlsApplied(
+      fixtureSql({
+        hiddenPrivileges: [
+          { name: 'contract_payments', privilege: 'truncate' },
+          { name: 'clients', privilege: 'trigger' },
+        ],
+      }),
+    );
+    expect(problems).toEqual([
+      '  - metra_app has truncate on contract_payments, which rls/roles.sql grants on no table. ' +
+        'Re-run apply-rls; if it survives that, someone granted it by hand',
+      '  - metra_app has trigger on clients, which rls/roles.sql grants on no table. ' +
+        'Re-run apply-rls; if it survives that, someone granted it by hand',
+    ]);
+  });
+
+  it('reports an insertable measurement seq, and a measurement column metra_app cannot insert (S1)', async () => {
+    const columns = [...(declaredTables().get('contract_line_measurements') ?? [])];
+    expect(columns).toContain('seq');
+    const problems = await verifyRlsApplied(
+      fixtureSql({
+        measurementColumns: columns.map((name) => ({ name, granted: name !== 'note' })),
+      }),
+    );
+    expect(problems).toEqual([
+      '  - metra_app may INSERT contract_line_measurements.seq, so it can choose the recording order. ' +
+        'rls/roles.sql grants insert on every other column only',
+      '  - metra_app may NOT insert contract_line_measurements.note: every measurement write will fail with 42501',
+    ]);
+    expect(await verifyRlsApplied(fixtureSql({ measurementColumns: [] }))).toEqual([
+      '  - contract_line_measurements is not in this database at all. Run the migrations first.',
+    ]);
+  });
+
   it('catches a policy file that never ran — the D7 failure shape, at the database', async () => {
     // A whole file missing is a lot of policies; one is enough to prove the
     // comparison, and the message names the file that declares it.
@@ -218,7 +280,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('58 tables, 58 policies, 17 triggers, 46 functions');
+    expect(declaredCounts()).toBe('58 tables, 58 policies, 18 triggers, 47 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -232,7 +294,8 @@ describe('verifyRlsApplied', () => {
         'document_categories, engagement_document_comments, engagement_milestones, ' +
         'market_bulletins, market_categories, market_item_details, market_items, ' +
         'market_price_observations, market_seed_book, payment_requests, workspace_entitlements) ' +
-        'holding exactly what rls/roles.sql leaves them.',
+        'holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every ' +
+        'column but seq; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.',
     );
   });
 });

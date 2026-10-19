@@ -56,7 +56,7 @@ export const contractPaymentClaims = pgTable(
   },
   (t) => [
     unique('contract_payment_claims_org_id_id_unique').on(t.orgId, t.id),
-    check('contract_payment_claims_amount_positive', sql`claimed_amount > 0`),
+    check('contract_payment_claims_amount_positive', sql`claimed_amount > 0 and claimed_amount <> 'NaN'`),
     // The 0047 rule of `client_payment_claims`, word for word: CASE over
     // status::text, and a dismissal carries who refused it and NO payment.
     check(
@@ -74,8 +74,10 @@ export const contractPaymentClaims = pgTable(
       t.contractId,
       t.status,
     ),
+    // Leads with org_id like every other unique here: a bare request_id would
+    // answer 23505 for ANOTHER studio's pending claim (a cross-tenant oracle).
     uniqueIndex('contract_payment_claims_pending_request_unique')
-      .on(t.requestId)
+      .on(t.orgId, t.requestId)
       .where(sql`status = 'pending'`),
   ],
 );
