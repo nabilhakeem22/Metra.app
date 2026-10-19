@@ -339,3 +339,32 @@ describe('design-engagement capabilities (Machine, Step 1)', () => {
     }
   });
 });
+
+describe('site_measurements capability (Stage 2, A18)', () => {
+  it('owner, admin, PM and site engineer may record and read measurements', () => {
+    for (const role of ['owner', 'admin', 'project_manager', 'site_engineer'] as const) {
+      expect(can(role, 'site_measurements', 'create')).toBe(true);
+      expect(can(role, 'site_measurements', 'read')).toBe(true);
+    }
+  });
+
+  it('the accountant and the viewer read them but may not record one', () => {
+    for (const role of ['accountant', 'viewer'] as const) {
+      expect(can(role, 'site_measurements', 'read')).toBe(true);
+      expect(can(role, 'site_measurements', 'create')).toBe(false);
+    }
+  });
+
+  it('the client role has no access at all', () => {
+    for (const action of ['create', 'read', 'update', 'approve'] as const) {
+      expect(can('client', 'site_measurements', action)).toBe(false);
+    }
+  });
+
+  it('nobody may update or approve a reading: a correction is a new one', () => {
+    for (const role of MEMBER_ROLES) {
+      expect(can(role, 'site_measurements', 'update')).toBe(false);
+      expect(can(role, 'site_measurements', 'approve')).toBe(false);
+    }
+  });
+});

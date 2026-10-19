@@ -64,6 +64,10 @@ const ROWS: Record<Capability, string[]> = {
   engagements_issue: ['A', 'A', '', '', '', '', ''],
   tasks_schedule: ['CRUA', 'CRUA', 'CRUA', 'RU', 'R', 'R', 'R'],
   cost_entries: ['CRUA', 'CRUA', 'CRU', 'CRU', 'CRUA', '', ''],
+  // Site measurements (الحصر على الموقع, Stage 2) are an append-only ledger:
+  // a correction is a new reading, so there is no U and no A. The people on site
+  // and those who run the job record them; the accountant and the viewer read.
+  site_measurements: ['CR', 'CR', 'CR', 'CR', 'R', '', 'R'],
   cost_entry_approval: ['A', 'A', 'A', '', 'A', '', ''],
   custody_issue: ['A', 'A', '', '', 'A', '', ''],
   custody_settle: ['RU', 'RU', 'RU', 'C', 'CRUA', '', ''],
