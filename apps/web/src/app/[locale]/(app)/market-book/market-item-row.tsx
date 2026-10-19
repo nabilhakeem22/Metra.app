@@ -7,10 +7,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Link } from '@/i18n/routing';
 import { formatMonth } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
-import type { MarketItemRow as Row } from '@/lib/market-book/types';
 import { studioUnitFor } from '@/lib/market-book/units';
 import { MarketChangeChip } from './market-change-chip';
 import { itemName, itemSpec, itemUnit } from './market-item-text';
+import type { MarketRowView as Row } from './market-row-view';
 import { MarketSparkline } from './market-sparkline';
 
 export interface MarketItemRowProps {
@@ -29,7 +29,7 @@ function LatestPrice({ item }: { item: Row }) {
   if (!latest) return <span className="text-muted-foreground" aria-hidden>·</span>;
   return (
     <div className="space-y-0.5">
-      {latest.status === 'priced' ? (
+      {latest.price !== null ? (
         <div dir="ltr" className="whitespace-nowrap font-mono tabular-nums text-[color:var(--text)]">
           {formatMoney(latest.price, locale)}
         </div>
@@ -98,7 +98,7 @@ export function MarketItemRow({ item, categoryName, canAdd, onOpen, onAdd }: Mar
         <MarketChangeChip pct={item.ytdPct} label={t('table.ytd')} />
       </td>
       <td className="px-4 py-2.5">
-        <MarketSparkline series={item.series} label={t('trend')} />
+        <MarketSparkline trend={item.trend} label={t('trend')} />
       </td>
       <td className="px-4 py-2.5 text-end">
         <PriceBookAction item={item} canAdd={canAdd} onAdd={onAdd} />

@@ -40,7 +40,7 @@ async function activeMarketItem(tx: MetraDb, marketItemId: string) {
 /** The newest month whose EFFECTIVE value is a price (a suspended month gives way to the one before): the seed's rule. */
 async function latestPricedValue(tx: MetraDb, marketItemId: string): Promise<string | null> {
   const rows = (await tx.execute(sql`
-    with effective as (${effectiveSql(sql`(${marketItemId}::uuid)`, null)})
+    with effective as (${effectiveSql(sql`array[${marketItemId}::uuid]`, null)})
     select price::text as price from effective where status = 'priced' order by period_month desc limit 1`)) as unknown as Array<{ price: string }>;
   return rows[0]?.price ?? null;
 }

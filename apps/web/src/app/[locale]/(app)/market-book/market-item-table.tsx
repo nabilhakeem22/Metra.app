@@ -2,8 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
-import type { MarketItemRow as Row } from '@/lib/market-book/types';
 import { MarketItemRow } from './market-item-row';
+import type { MarketRowView as Row } from './market-row-view';
 
 export interface MarketItemTableProps {
   items: Row[];

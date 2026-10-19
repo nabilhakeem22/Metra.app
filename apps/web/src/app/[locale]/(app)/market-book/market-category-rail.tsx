@@ -24,7 +24,7 @@ export function MarketCategoryRail({ categories, current, locale, label }: { cat
               .map((leaf) => (
                 <li key={leaf.key}>
                   <Link
-                    href={`/market-book${marketBookSearch({ categoryKey: leaf.key, query: '' })}`}
+                    href={`/market-book${marketBookSearch({ categoryKey: leaf.key, query: '', page: 1 })}`}
                     aria-current={leaf.key === current ? 'page' : undefined}
                     className={cn(
                       'flex items-center justify-between gap-2 rounded-item px-2 py-1 text-body hover:bg-[color:var(--track)]',

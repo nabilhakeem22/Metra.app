@@ -3,18 +3,18 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { formatMonth } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
-import type { MarketItemRow } from '@/lib/market-book/types';
+import type { MarketRowView } from './market-row-view';
 
 /**
  * The two values the add form does not ask for, shown as they will be saved:
  * the studio unit, and the cost (the newest priced month the row shows; the
  * server takes the newest priced month of the item's whole history).
  */
-export function MarketAddCost({ item, unitLabel }: { item: MarketItemRow; unitLabel: string }) {
+export function MarketAddCost({ item, unitLabel }: { item: MarketRowView; unitLabel: string }) {
   const t = useTranslations('marketBook');
   const tp = useTranslations('priceBook');
   const locale = useLocale();
-  const latestPriced = [...item.series].reverse().find((point) => point.status === 'priced');
+  const latestPriced = item.latestPriced;
   return (
     <dl className="grid grid-cols-1 gap-3 rounded-item border p-3 sm:grid-cols-2">
       <div className="space-y-0.5">

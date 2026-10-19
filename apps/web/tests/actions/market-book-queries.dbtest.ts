@@ -41,7 +41,7 @@ afterAll(async () => {
   await closeFixture();
 });
 
-const search = (ctx: OrgContext) => readMarketBookPage(ctx, { categoryKey: null, query: TAG }, 'en');
+const search = (ctx: OrgContext) => readMarketBookPage(ctx, { categoryKey: null, query: TAG, page: 1 }, 'en');
 
 describe('readMarketBookPage', () => {
   it('reads the newest published bulletin and each item effective series, newest bulletin winning', async () => {
@@ -70,29 +70,39 @@ describe('readMarketBookPage', () => {
   });
 
   it('lists a leaf with its count, and reads an unknown leaf as the first leaf that has items', async () => {
-    const page = await readMarketBookPage(studio, { categoryKey: 'finishing.glass', query: '' }, 'ar-EG');
+    const page = await readMarketBookPage(studio, { categoryKey: 'finishing.glass', query: '', page: 1 }, 'ar-EG');
     expect(page.categoryKey).toBe('finishing.glass');
-    expect(page.items.map((item) => item.id)).toEqual(expect.arrayContaining([glass.id, rebar.id]));
+    expect(page.items).toHaveLength(Math.min(page.matched, 50));
+    expect(page.items.every((item) => item.categoryKey === 'finishing.glass')).toBe(true);
     const leaf = page.categories.find((category) => category.key === 'finishing.glass');
     const top = page.categories.find((category) => category.key === 'finishing');
     expect(leaf?.itemCount).toBe(page.matched);
     expect(top?.itemCount).toBeGreaterThanOrEqual(leaf?.itemCount ?? Infinity);
-    const fallback = await readMarketBookPage(studio, { categoryKey: 'nothing.here', query: '' }, 'en');
+    const fallback = await readMarketBookPage(studio, { categoryKey: 'nothing.here', query: '', page: 1 }, 'en');
     const firstLeaf = fallback.categories.find((category) => category.parentKey !== null && category.itemCount > 0);
     expect(fallback.categoryKey).toBe(firstLeaf?.key);
+    // A query that folds to no word (a lone tatweel) is no search: the category stays listed.
+    const noWord = await readMarketBookPage(studio, { categoryKey: 'finishing.glass', query: 'ـ', page: 1 }, 'en');
+    expect(noWord.categoryKey).toBe('finishing.glass');
   });
 
   it('keeps the series month bound an index condition on the real statement (R5)', async () => {
     const plan = await withOrgContext(studio, async (tx) => {
       await tx.execute(sql`set local enable_seqscan = off`);
-      const rows = await tx.execute(sql`explain ${marketBookPageSql({ categoryKey: null, query: TAG }, 'en')}`);
+      const rows = await tx.execute(sql`explain ${marketBookPageSql({ categoryKey: null, query: TAG, page: 1 }, 'en')}`);
       return (rows as unknown as Array<{ 'QUERY PLAN': string }>).map((row) => row['QUERY PLAN']).join('\n');
     });
     expect(plan).toMatch(/Index Cond: \(\(item_id = .*\) AND \(period_month >= /);
     // The market policies run their membership check once (market-book-plans.dbtest.ts);
     // the one per-row call left is cost_items' own org policy, on at most one linked row per item.
-    const perRow = plan.split('\n').filter((line) => line.includes('Filter:') && line.includes('app_is_current_org_member'));
-    expect(perRow).toEqual([expect.stringContaining('market_item_id = ')]);
+    let scanned = '';
+    const perRowOn: string[] = [];
+    for (const line of plan.split('\n')) {
+      if (/Scan.* on /.test(line)) scanned = line;
+      else if (line.includes('Filter:') && line.includes('app_is_current_org_member')) perRowOn.push(scanned);
+    }
+    expect(perRowOn.length).toBeGreaterThan(0);
+    for (const scan of perRowOn) expect(scan).toMatch(/ on cost_items /);
   });
 });
 
@@ -116,5 +126,27 @@ describe('a withdrawal', () => {
     expect(second.latest?.price).toBe('39850.0000');
     expect(second.momPct).toBe('4.3');
     expect((await readMarketItem(studio, glass.id))?.allPoints.map((point) => point.bulletinMonth)).toEqual(['2099-07', '2099-07']);
+  });
+});
+
+describe('paging a leaf', () => {
+  it('shows 50 a page, reads a page past the end as the last, and a search its first page only', async () => {
+    const paged: Array<{ id: string; key: string }> = [];
+    for (let index = 0; index < 51; index++) paged.push(await seedMarketItem('sqm', { nameEn: `Paged ${TAG} ${index}` }));
+    await seedBulletin('2098-12', paged.map((item) => [item.id, '2098-12', '10']));
+    const leaf = (page: number) => readMarketBookPage(studio, { categoryKey: 'finishing.glass', query: '', page }, 'en');
+
+    const first = await leaf(1);
+    expect(first.items).toHaveLength(50);
+    expect(first.page).toBe(1);
+    const lastPage = Math.ceil(first.matched / 50);
+    const second = await leaf(2);
+    expect(second.items.map((item) => item.id)).not.toContain(first.items[0].id);
+    const past = await leaf(999);
+    expect(past.page).toBe(lastPage);
+    expect(past.items).toHaveLength(first.matched - (lastPage - 1) * 50);
+
+    const search = await readMarketBookPage(studio, { categoryKey: null, query: `Paged ${TAG}`, page: 3 }, 'en');
+    expect({ page: search.page, shown: search.items.length, matched: search.matched }).toEqual({ page: 1, shown: 50, matched: 51 });
   });
 });

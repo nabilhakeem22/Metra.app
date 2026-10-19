@@ -12,7 +12,7 @@ export const MARKET_DETAIL_MONTHS = 60;
 export function marketItemSql(itemId: string): SQL {
   return sql`
     with effective as (
-      ${effectiveSql(sql`(${itemId}::uuid)`, null)}
+      ${effectiveSql(sql`array[${itemId}::uuid]`, null)}
     ), newest as (
       select * from effective order by period_month desc limit ${MARKET_DETAIL_MONTHS}
     )

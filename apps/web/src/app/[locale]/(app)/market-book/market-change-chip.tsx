@@ -1,10 +1,12 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatNumber } from '@/lib/format/number';
 
 const ONE_DECIMAL: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** Text marks, not icons: a row carries two chips, and an inline svg icon is ten times the bytes. */
+const MARK = { up: '▲', down: '▼', flat: '=' } as const;
 
 /**
  * A computed change ("4.3", "-3.4") as a NEUTRAL mark and its size: a rise is
@@ -25,11 +27,11 @@ export function MarketChangeChip({ pct, label }: { pct: string | null; label: st
   const falling = pct.startsWith('-');
   const value = `${formatNumber(falling ? pct.slice(1) : pct, locale, ONE_DECIMAL)}%`;
   const flat = Number(pct) === 0;
-  const Mark = flat ? Minus : falling ? ArrowDown : ArrowUp;
+  const mark = flat ? MARK.flat : falling ? MARK.down : MARK.up;
   const said = flat ? t('change.flat') : t(falling ? 'change.down' : 'change.up', { value });
   return (
     <span className="inline-flex items-center gap-1 rounded-pill bg-[color:var(--track)] px-2 py-0.5 text-caption text-[color:var(--text)]">
-      <Mark className="size-3" aria-hidden />
+      <span aria-hidden className="leading-none">{mark}</span>
       <span dir="ltr" className="font-mono tabular-nums" aria-hidden>
         {value}
       </span>

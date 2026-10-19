@@ -20,17 +20,18 @@ import type { MarketBookPage, MarketItemDetail } from './types';
 // the "in my price book" link is this studio's alone. Read-only, and never a
 // throw for "no data": no bulletin is a page with `bulletin: null` and no rows.
 
-type PageTuple = [BulletinTuple | null, CategoryTuple[], string | null, number, ItemTuple[]];
+type PageTuple = [BulletinTuple | null, CategoryTuple[], string | null, number, number, ItemTuple[]];
 
 /** Everything /market-book shows for `view`, in the page's language order. */
 export async function readMarketBookPage(ctx: OrgContext, view: MarketBookView, locale: string): Promise<MarketBookPage> {
   const rows = (await withOrgContext(ctx, (tx) => tx.execute(marketBookPageSql(view, locale)))) as unknown as Array<{ page: string }>;
-  const [bulletin, categories, categoryKey, matched, items] = JSON.parse(rows[0].page) as PageTuple;
+  const [bulletin, categories, categoryKey, matched, page, items] = JSON.parse(rows[0].page) as PageTuple;
   return {
     bulletin: decodeBulletin(bulletin),
     categories: categories.map(decodeCategory),
     categoryKey,
     matched,
+    page,
     items: items.map((tuple) => decodeItem(tuple, tuple[13].map(decodePoint))),
   };
 }

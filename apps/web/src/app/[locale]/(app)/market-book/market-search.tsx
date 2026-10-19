@@ -18,7 +18,7 @@ export function MarketSearch({ query }: { query: string }) {
   useEffect(() => setValue(query), [query]);
 
   const open = (typed: string) =>
-    startTransition(() => router.push(`/market-book${marketBookSearch({ categoryKey: null, query: typed.trim() })}`));
+    startTransition(() => router.push(`/market-book${marketBookSearch({ categoryKey: null, query: typed.trim(), page: 1 })}`));
 
   return (
     <form

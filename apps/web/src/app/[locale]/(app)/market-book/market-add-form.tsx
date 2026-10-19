@@ -12,9 +12,9 @@ import { toast } from '@/hooks/use-toast';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { addMarketItemToPriceBook } from '@/lib/market-book/actions';
 import { ADD_MARKET_ITEM_FIELDS, readAddMarketItemInput, suggestedCode, suggestedNames, type AddMarketItemField } from '@/lib/market-book/add-input';
-import type { MarketItemRow } from '@/lib/market-book/types';
 import { studioUnitFor } from '@/lib/market-book/units';
 import { MarketAddCost } from './market-add-cost';
+import type { MarketRowView } from './market-row-view';
 
 export interface MarketSectionOption {
   id: string;
@@ -39,7 +39,7 @@ interface AddFormState {
 }
 
 /** The offer: the seed's code and names, and the section the seed files this sub-category under when the studio has it. */
-function offerFor(item: MarketItemRow, sections: readonly MarketSectionOption[]): AddFormState {
+function offerFor(item: MarketRowView, sections: readonly MarketSectionOption[]): AddFormState {
   const seeded = sections.find((section) => section.key === sectionKey(item.categoryKey));
   return { code: suggestedCode(item), ...suggestedNames(item), sectionId: (seeded ?? sections[0])?.id ?? '', defaultUnitPrice: '' };
 }
@@ -49,7 +49,7 @@ function offerFor(item: MarketItemRow, sections: readonly MarketSectionOption[])
  * and the cost are the market item's (shown, not typed); every refusal the
  * studio can fix is said under its field.
  */
-export function MarketAddForm({ item, sections, onClose }: { item: MarketItemRow | null; sections: readonly MarketSectionOption[]; onClose: () => void }) {
+export function MarketAddForm({ item, sections, onClose }: { item: MarketRowView | null; sections: readonly MarketSectionOption[]; onClose: () => void }) {
   const t = useTranslations('marketBook');
   const tp = useTranslations('priceBook');
   const te = useTranslations('errors');

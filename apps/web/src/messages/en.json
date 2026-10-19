@@ -2770,6 +2770,12 @@
       "truncated": "Showing the first {shown}. Type more words to narrow it down.",
       "none": "No market item matches this search."
     },
+    "pager": {
+      "label": "Market price pages",
+      "range": "{from} to {to} of {total}",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
     "table": {
       "item": "Item",
       "latest": "Latest price",

@@ -7,6 +7,7 @@ import type { MarketItemRow } from '@/lib/market-book/types';
 import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { MARKET_ADD_CONTROL_ID, MarketAddForm } from './market-add-form';
+import { marketRowView } from './market-row-view';
 
 const actions = vi.hoisted(() => ({ addMarketItemToPriceBook: vi.fn(), loadMarketItem: vi.fn() }));
 vi.mock('@/lib/market-book/actions', () => actions);
@@ -18,14 +19,14 @@ const SECTIONS = [
   { id: 's-glass', key: 'market.finishing.glass', nameEn: 'Glass', nameAr: 'الزجاج' },
 ];
 
-const GLASS: MarketItemRow = {
+const GLASS = marketRowView({
   id: 'm-1', key: 'finishing.glass.clear_4mm', categoryKey: 'finishing.glass',
   nameAr: 'زجاج شفاف', nameEn: 'Clear glass', specAr: '4 مم', specEn: '4 mm',
   unit: 'sqm', unitLabelAr: 'م2', basisNoteAr: null, status: 'active',
   latest: { month: '2026-07', status: 'priced', price: '400.0000', bulletinMonth: '2026-07', sourcePage: 65 },
   series: [{ month: '2026-07', status: 'priced', price: '400.0000', bulletinMonth: '2026-07', sourcePage: 65 }],
   momPct: null, ytdPct: null, yoyPct: null, linkedCostItem: null,
-};
+} satisfies MarketItemRow);
 
 const onClose = vi.fn();
 

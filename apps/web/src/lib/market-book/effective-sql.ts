@@ -10,18 +10,23 @@ import { sql, type SQL } from 'drizzle-orm';
 /**
  * One row per (item, month): the EFFECTIVE value, i.e. the newest published
  * bulletin that reports the month (every bulletin restates the year so far, and
- * a withdrawn one falls back to the one before it). `fromMonth` must be a `date`
- * (R5: a timestamp bound falls out of the (item_id, period_month) index).
+ * a withdrawn one falls back to the one before it).
+ *
+ * No join to market_bulletins: the observations policy already shows a row only
+ * through a PUBLISHED bulletin (market-book.dbtest.ts: "even without the
+ * join"), and the row carries its bulletin's month. Without the join the
+ * planner has one path, the (item_id, period_month) index, and `itemIds` (a
+ * uuid[]) and `fromMonth` (a `date`), each one value (an InitPlan), are both
+ * conditions of it whatever the row estimates (R5: a timestamp bound fell out).
  */
 export function effectiveSql(itemIds: SQL, fromMonth: SQL | null): SQL {
   return sql`
     select distinct on (o.item_id, o.period_month)
            o.item_id, o.period_month, o.status, o.price,
-           coalesce(o.source_printed_page, o.source_pdf_page) as page, b.period_month as bulletin_month
+           coalesce(o.source_printed_page, o.source_pdf_page) as page, o.bulletin_period_month as bulletin_month
       from market_price_observations o
-      join market_bulletins b on b.id = o.bulletin_id and b.status = 'published'
-     where o.item_id in ${itemIds} ${fromMonth ? sql`and o.period_month >= ${fromMonth}` : sql``}
-     order by o.item_id, o.period_month, b.period_month desc`;
+     where o.item_id = any(${itemIds}) ${fromMonth ? sql`and o.period_month >= ${fromMonth}` : sql``}
+     order by o.item_id, o.period_month, o.bulletin_period_month desc`;
 }
 
 /** A point as ./decode.ts reads it: [month, status, price, bulletin month, page]. `e` is an effectiveSql row. */

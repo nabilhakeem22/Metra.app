@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 import type { MarketCategory, MarketItemRow } from '@/lib/market-book/types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { MarketBookClient, type MarketBookClientProps } from './market-book-client';
+import { marketRowView } from './market-row-view';
 
 vi.mock('@/lib/market-book/actions', () => ({ addMarketItemToPriceBook: vi.fn(), loadMarketItem: vi.fn() }));
 
@@ -22,7 +23,7 @@ const CATEGORIES: MarketCategory[] = [
   { key: 'finishing.glass', nameAr: 'الزجاج', nameEn: 'Glass', parentKey: 'finishing', itemCount: 3 },
 ];
 
-const ITEMS = [row('a'), row('bag', { unit: 'bag' }), row('linked', { linkedCostItem: { id: 'c-1', code: 'MKT-x' } })];
+const ITEMS = [row('a'), row('bag', { unit: 'bag' }), row('linked', { linkedCostItem: { id: 'c-1', code: 'MKT-x' } })].map(marketRowView);
 
 function renderClient(locale: TestLocale, props: Partial<MarketBookClientProps>) {
   renderWithIntl(

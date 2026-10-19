@@ -10,7 +10,9 @@ import { can } from '@/lib/permissions/can';
 import { listSections } from '@/lib/sections/queries';
 import { MarketAttribution } from './market-attribution';
 import { MarketBookClient } from './market-book-client';
+import { MarketBookPager } from './market-book-pager';
 import { MarketCategoryRail } from './market-category-rail';
+import { marketRowView } from './market-row-view';
 import { MarketSearch } from './market-search';
 
 /**
@@ -52,7 +54,7 @@ export default async function MarketBookPage({ searchParams }: { searchParams: P
         <div className="min-w-0 space-y-4">
           <MarketSearch query={view.query} />
           <MarketBookClient
-            items={page.items}
+            items={page.items.map(marketRowView)}
             matched={page.matched}
             categoryKey={page.categoryKey}
             query={view.query}
@@ -61,6 +63,7 @@ export default async function MarketBookPage({ searchParams }: { searchParams: P
             canAdd={canAdd}
             attribution={attribution}
           />
+          {page.categoryKey && <MarketBookPager categoryKey={page.categoryKey} page={page.page} matched={page.matched} locale={locale} />}
           {attribution}
         </div>
       </div>

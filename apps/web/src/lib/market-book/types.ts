@@ -77,6 +77,8 @@ export interface MarketBookPage {
   /** The leaf shown, or null for a search. */
   categoryKey: string | null;
   items: MarketItemRow[];
-  /** How many items match before the page's limit. */
+  /** How many items match, across every page. */
   matched: number;
+  /** The page shown: the one asked for, or the last one when it asked past the end. */
+  page: number;
 }

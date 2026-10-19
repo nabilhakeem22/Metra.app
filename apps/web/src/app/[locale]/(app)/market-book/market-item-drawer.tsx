@@ -5,14 +5,14 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { IconButton } from '@/components/ui/icon-button';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import type { MarketItemRow } from '@/lib/market-book/types';
 import { itemName, itemSpec, itemUnit } from './market-item-text';
 import { MarketItemMonths } from './market-item-months';
+import type { MarketRowView } from './market-row-view';
 import { useMarketItemDetail } from './use-market-item-detail';
 
 export interface MarketItemDrawerProps {
   /** The item shown; null closes the drawer. */
-  item: MarketItemRow | null;
+  item: MarketRowView | null;
   onClose: () => void;
   /** The attribution block, rendered by the server page: every drawer carries it. */
   attribution: ReactNode;

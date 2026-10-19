@@ -5,13 +5,14 @@ import { useState, type ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatNumber } from '@/lib/format/number';
-import type { MarketCategory, MarketItemRow } from '@/lib/market-book/types';
+import type { MarketCategory } from '@/lib/market-book/types';
 import { MarketAddForm, type MarketSectionOption } from './market-add-form';
 import { MarketItemDrawer } from './market-item-drawer';
 import { MarketItemTable } from './market-item-table';
+import type { MarketRowView } from './market-row-view';
 
 export interface MarketBookClientProps {
-  items: MarketItemRow[];
+  items: MarketRowView[];
   matched: number;
   /** The leaf listed, or null for a search. */
   categoryKey: string | null;
@@ -27,8 +28,8 @@ export interface MarketBookClientProps {
 export function MarketBookClient({ items, matched, categoryKey, query, categories, sections, canAdd, attribution }: MarketBookClientProps) {
   const t = useTranslations('marketBook');
   const locale = useLocale();
-  const [opened, setOpened] = useState<MarketItemRow | null>(null);
-  const [adding, setAdding] = useState<MarketItemRow | null>(null);
+  const [opened, setOpened] = useState<MarketRowView | null>(null);
+  const [adding, setAdding] = useState<MarketRowView | null>(null);
   const nameOf = (category: MarketCategory) => (locale.startsWith('ar') ? category.nameAr : category.nameEn);
   const leaf = categories.find((category) => category.key === categoryKey);
   const categoryNames = categoryKey === null ? Object.fromEntries(categories.map((category) => [category.key, nameOf(category)])) : null;
@@ -39,7 +40,7 @@ export function MarketBookClient({ items, matched, categoryKey, query, categorie
         <h2 className="text-title font-semibold">
           {leaf ? nameOf(leaf) : t('results.search', { query, matched: formatNumber(matched, locale) })}
         </h2>
-        {items.length < matched && (
+        {categoryKey === null && items.length < matched && (
           <p className="text-caption text-muted-foreground">{t('results.truncated', { shown: formatNumber(items.length, locale) })}</p>
         )}
       </div>
