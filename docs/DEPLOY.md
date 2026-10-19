@@ -2757,9 +2757,12 @@ Why this order, one sentence each:
   functions only add keys. Rehearsed: the current app's own contract and
   change-order code, unchanged, reads, acknowledges and responds on the 0063
   database.
-- **No client sees a change:** the contract link (/c) still shows every line
-  of every section, exactly as today; it only carries more keys (the
-  schedule, a digest of every line, the item codes). The lazy loading of long
+- **No client sees a change in what a contract says:** the contract link (/c)
+  still shows every line of every section; it only carries more keys (the
+  schedule, a digest of every line, the item codes). One visible difference:
+  lines that share a sort order now always appear in the same order, by sort
+  order and then by id, the order the studio page uses since PR B1 (before,
+  ties came back in whatever order the database stored them). The lazy loading of long
   sections arrives with PR A3, and the snapshot is only cut to 50 lines per
   section in DB step B (Nov 18), once that page is live.
 - **A signature or a change-order decision now also writes studio
@@ -2774,16 +2777,17 @@ Why this order, one sentence each:
 | Object | Change |
 |---|---|
 | `contracts` | `source_proposal_id` may be empty; new `source_boq_id` (the issued BOQ an execution contract comes from) with its same-org FK, one contract per BOQ, and the CHECK `contracts_one_source` (exactly one of the two is set; every existing contract has a proposal and no BOQ) |
-| `contract_lines` | new `item_code` (empty) and `provisional` (false), and one unique index `(org_id, contract_id, id)` |
+| `contract_lines` | new `item_code` (empty) and `provisional` (false), one unique index `(org_id, contract_id, id)`, and a 3-column foreign key: a line's section is a section of its own contract (added NOT VALID, then validated over every existing line; step 2 (e) checks first) |
 | `contract_sections` | one unique index `(org_id, contract_id, id)` |
 | `variation_orders` | new `time_extension_days` (empty), CHECK 0 to 3650, and one unique index `(org_id, contract_id, id)` |
 | three new enum types | `payment_request_kind`, `payment_request_status`, `cost_category` |
-| six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements` (the FINAL measured quantity per line at handover, ordered by an identity `seq`): per studio (`org_id`), empty. Every link to a line, a section, a request, a milestone or a change order is a 3-column foreign key, so it can only name a row of the SAME contract |
-| `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and two triggers (the schedule freezes with its contract; a payment request can only go issued to void) |
-| `rls/functions/35-execution.sql` | the payment request's frozen guard |
+| six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements` (the FINAL measured quantity per line at handover, ordered by an identity `seq`): per studio (`org_id`), empty. Every link to a line, a section, a request, a milestone or a change order is a 3-column foreign key, so it can only name a row of the SAME contract. Every money CHECK also refuses NaN; a cost description must hold a visible character |
+| `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and three triggers: the schedule freezes with its contract; a payment request can only go issued to void, never once paid; a payment fits its request (issued, and never more than its amount, under the request's row lock) |
+| `rls/functions/35-execution.sql` | the payment request's frozen guard and the payment-fits guard |
+| `enforce_contract_child_draft()` (`30-contracts-variations.sql`) | reads the parent contract `FOR SHARE`, so a schedule edit racing an issue waits for it and is refused, instead of landing in a sent contract |
 | `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes and the provisional flag, and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page); signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
 | every `rls/policies/*.sql` | **the policy speed-up:** each studio policy now reads the org context and the membership check ONCE per query instead of once per row (`(select ...)`). Same answer, about 40 times faster on a big contract (measured: 492.6 ms before, 11.4 ms after, on a 50,000-line contract). Applied by this same `db:apply-rls`; nothing extra to run |
-| `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments and measurements insert and read only. The new client function is callable by `metra_app` only |
+| `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments insert and read only; measurements read, and insert on every column but `seq`. Each written `revoke all`, then the exact grant. The new functions are callable by `metra_app` only |
 
 **1. Put the Stage 2 schema code in the production checkout.** This step adds
 no dependency of `db:migrate` or `db:apply-rls`, so the installed
@@ -2852,6 +2856,20 @@ select count(*) as policies,
 from pg_policies where schemaname = 'public';
 ```
 
+(e) **THE LINE CHECK: 0, or STOP.** 0063 adds a foreign key saying a contract
+line's section belongs to the line's own contract, and validates it over
+every existing line. Lines are only ever written together with their section,
+so expect 0. Anything else would make step 3 fail with 23503 (and change
+nothing): do not run step 3, tell the lead the number.
+
+```sql
+-- 0063 step 2 (e): contract lines whose section is another contract's. Run this one alone.
+select count(*) as lines_in_another_contracts_section
+from public.contract_lines l
+join public.contract_sections s on s.id = l.section_id
+where s.contract_id <> l.contract_id or s.org_id <> l.org_id;
+```
+
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
 `C:\Users\HP\merta-main` (its `.env` is the production connection):
 
@@ -2878,9 +2896,10 @@ skipping` is the same kind:
   then SIX new ones, once only: `message: 'policy "org_isolation" for relation "public.contract_payment_milestones" does not exist, skipping',`
   and the same for `public.payment_requests`, `public.contract_payments`,
   `public.contract_payment_claims`, `public.contract_cost_entries` and
-  `public.contract_line_measurements`, then TWO new ones, once only:
-  `message: 'trigger "trg_contract_payment_milestones_parent_draft" for relation "public.contract_payment_milestones" does not exist, skipping',`
-  and `message: 'trigger "trg_payment_requests_frozen" for relation "public.payment_requests" does not exist, skipping',`.
+  `public.contract_line_measurements`, then THREE new ones, once only:
+  `message: 'trigger "trg_contract_payment_milestones_parent_draft" for relation "public.contract_payment_milestones" does not exist, skipping',`,
+  `message: 'trigger "trg_payment_requests_frozen" for relation "public.payment_requests" does not exist, skipping',`
+  and `message: 'trigger "trg_contract_payments_fits" for relation "public.contract_payments" does not exist, skipping',`.
   A second `db:apply-rls` prints only the first four.
 
 Only a line that starts `Migration failed:` or `apply-rls failed:` is a
@@ -2889,15 +2908,18 @@ failure. Expected:
 - `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
   count, so run step 4 (a): `migrations` is exactly one higher (64).
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
-  `apply-rls: verified in the catalogues` and goes on `58 tables, 58 policies, 17 triggers, 46 functions, RLS forced on all of them, role metra_app present.`;
+  `apply-rls: verified in the catalogues` and goes on `58 tables, 58 policies, 18 triggers, 47 functions, RLS forced on all of them, role metra_app present.`;
   the second starts `apply-rls: grants verified` and goes on
-  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
+  If that second line is replaced by a problem list naming a policy the
+  manifest does not declare, or a TRUNCATE, REFERENCES or TRIGGER grant, it
+  exits 1: something was added by hand. Do not merge; tell the lead.
   The policy speed-up prints nothing of its own: the same 58 policies are
   re-created in their new form (step 4 (d) shows it).
 - `assert-schema-applied` exits 0 and prints six lines, in this order:
   `assert-schema-applied: OK — 58 declared table(s), every column present.`,
-  then `indexes — 133 declared, all present.`, `constraints — 339 declared, all present.`,
-  `functions — 46 declared, all present.`,
+  then `indexes — 133 declared, all present.`, `constraints — 340 declared, all present.`,
+  `functions — 47 declared, all present.`,
   `orphaned org rows — 50 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
   and `composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed to a single non-org_id column.`
   (The middle four are report only and do not fail it.)
@@ -2907,15 +2929,19 @@ failure. Expected:
 - `Migration failed: SQLSTATE 55P03: canceling statement due to lock timeout`
   (or `SQLSTATE 40P01: deadlock detected`) then
   `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
-  A long query held a contract table for more than 3 s. Re-run `db:migrate` a
-  little later. Rehearsed: a reader holding `contract_lines` for 10 s gave
-  exactly these two lines after 3 s, `migrations` stayed 63, no column was
-  added, and the re-run after the reader finished applied 0063. The same two
+  Long queries held the tables 0063 needs for more than 3 s in total (see
+  *Locks*). Re-run `db:migrate` a little later. Rehearsed: a reader holding
+  `contract_lines` for 10 s gave exactly these two lines after 3 s,
+  `migrations` stayed 63, no column was added, and the re-run after the reader
+  finished applied 0063. The same two
   codes from `db:apply-rls` print `apply-rls failed: ...` and end `(this file
   rolled back; the files before it stay applied).`: re-run `db:apply-rls`.
 - `Migration failed: SQLSTATE 23514: ... "contracts_one_source"`: a contract
   without a proposal, which step 2 (b) would have shown. Nothing changed; tell
   the lead.
+- `Migration failed: SQLSTATE 23503: ... "contract_lines_section_same_contract_fk"`:
+  a line in another contract's section, which step 2 (e) would have shown.
+  Nothing changed; tell the lead.
 - `Migration failed: SQLSTATE P0001: 0063: ... composite set-null foreign
   key(s) ...`: a foreign key the 0052 rule forbids. Nothing changed; tell the
   lead.
@@ -2928,22 +2954,29 @@ success it finds nothing pending and prints `Migrations applied.` again
 `db:apply-rls` prints the same two verified lines and only the first four
 notices (rehearsed). `assert-schema-applied` only reads.
 
-**Locks.** `db:migrate` runs 0063 as ONE transaction with a 3 s lock wait.
-It holds ACCESS EXCLUSIVE (no reads, no writes) on `contracts`,
-`contract_sections`, `contract_lines` and `variation_orders` until the
-commit, and SHARE ROW EXCLUSIVE (reads go on, writes wait) on `boqs`,
-`cost_items` and `organizations` for the foreign keys. The largest step is
-the new unique index on `contract_lines`, linear in its rows. Measured on the
-rehearsal server: about 0.35 s in all at 100,000 contract lines (0.21 to
-0.24 s on the existing tables) and about 1.9 to 2.1 s at 1,000,000; an app
-reader polling a contract's lines every 20 ms through the real 1,000,000-line
-run waited at most 2,002 ms and saw 0 errors (the app's own lock wait is 5 s).
-Step 2 (c) gives the size to compare with. `design_engagements` (the table every client act
-locks) is not touched. Pilot volumes are far below 100,000 lines. Estimates
-from a local server, not a production measurement. `db:apply-rls` adds one
-policy file with six NEW tables (nothing waits on them), and every existing
-policy file runs as it always does (the 11 x 3 s = 33 s worst case of
-`10-catalogue.sql` is unchanged).
+**Locks.** `db:migrate` runs 0063 as ONE transaction. It first takes every
+lock it needs, in one fixed order, within ONE 3 s budget for all of them
+together: ACCESS EXCLUSIVE (no reads, no writes) on `contracts`,
+`contract_sections`, `contract_lines` and `variation_orders`, then SHARE ROW
+EXCLUSIVE (reads go on, writes wait) on `boqs`, `cost_items` and
+`organizations`. 3 s is the most it waits in total, not per table: if busy
+tables one after the other use the budget up, it stops with the 55P03 lines
+above and nothing changes. So contract pages wait at most about 3 s for the
+lock waits plus the migration's own work, then it commits and releases
+everything. Rehearsed: two readers, one holding `contract_lines` for 2 s and
+one holding `variation_orders` for 8 s, made it give up with 55P03 after 3 s
+in total; an app reader of a contract (5 s lock wait) waited at most 3,015 ms
+and saw 0 errors. Without blockers the work is about 0.3 s at 100,000
+contract lines and about 2.1 s at 1,000,000 (the largest steps are the new
+unique index and the validation of the new section foreign key on
+`contract_lines`, both linear in its rows); through a real `db:migrate` on
+1,000,000 lines that app reader waited at most 2,111 ms and saw 0 errors. Step 2 (c) gives the size to
+compare with. `design_engagements` (the table every client act locks) is not
+touched. Pilot volumes are far below 100,000 lines; run it at a quiet moment
+anyway. Estimates from a local server, not a production measurement.
+`db:apply-rls` adds one policy file with six NEW tables (nothing waits on
+them), and every existing policy file runs as it always does (the 11 x 3 s =
+33 s worst case of `10-catalogue.sql` is unchanged).
 
 **4. Read-only, after: expected results.** Each block ON ITS OWN.
 
@@ -2955,10 +2988,11 @@ policy file runs as it always does (the 11 x 3 s = 33 s worst case of
 
 (c) 6 rows, every one with `rls` true, `forced` true, `policies` 1 and
 `api_roles_read` false; `app_privileges` exactly:
-`contract_cost_entries` S,I,U; `contract_line_measurements` S,I;
-`contract_payment_claims` S,I,U; `contract_payment_milestones` S,I,U,D;
-`contract_payments` S,I; `payment_requests` S,I,U. And `triggers` 1 on
-`contract_payment_milestones` and on `payment_requests`, 0 on the others.
+`contract_cost_entries` S,I,U; `contract_line_measurements` S (its INSERT is
+per column, see (g)); `contract_payment_claims` S,I,U;
+`contract_payment_milestones` S,I,U,D; `contract_payments` S,I;
+`payment_requests` S,I,U. And `triggers` 1 on `contract_payment_milestones`,
+`contract_payments` and `payment_requests`, 0 on the others.
 
 ```sql
 -- 0063 step 4 (c): the six tables' RLS, grants and triggers. Run this one alone.
@@ -2981,8 +3015,8 @@ order by 1;
 
 (e) Step 2 (c) again: the same five numbers as before.
 
-(f) The client functions: 5 rows, every one with `app_execute` true and
-`public_execute` false and `api_roles_execute` false.
+(f) The client functions and the payment-fits guard: 6 rows, every one with
+`app_execute` true and `public_execute` false and `api_roles_execute` false.
 
 ```sql
 -- 0063 step 4 (f): who may call the contract and change-order client functions. Run this one alone.
@@ -2994,8 +3028,21 @@ select p.proname,
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname in ('app_contract_by_token', 'app_contract_section_lines_by_token', 'app_contract_ack_by_token',
-                    'app_variation_by_token', 'app_variation_respond_by_token')
+                    'app_variation_by_token', 'app_variation_respond_by_token', 'enforce_contract_payment_fits')
 order by 1;
+```
+
+(g) Who may write a measurement's recording order: 12 rows, `insertable`
+true on every column except `seq`, which is false (nobody but the database
+chooses the order of the final measured quantities).
+
+```sql
+-- 0063 step 4 (g): which measurement columns metra_app may insert. Run this one alone.
+select a.attname as column_name,
+       has_column_privilege('metra_app', a.attrelid, a.attnum, 'insert') as insertable
+from pg_attribute a
+where a.attrelid = 'public.contract_line_measurements'::regclass and a.attnum > 0 and not a.attisdropped
+order by a.attnum;
 ```
 
 **5. Afterwards: merge, smoke test, return the checkout to main.**
