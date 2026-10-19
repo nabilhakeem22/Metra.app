@@ -3017,6 +3017,8 @@ order by 1;
 
 (f) The client functions and the payment-fits guard: 6 rows, every one with
 `app_execute` true and `public_execute` false and `api_roles_execute` false.
+(The guard runs as the caller, under RLS, so it can say nothing about another
+studio's request; it is locked down anyway, like every function here.)
 
 ```sql
 -- 0063 step 4 (f): who may call the contract and change-order client functions. Run this one alone.
