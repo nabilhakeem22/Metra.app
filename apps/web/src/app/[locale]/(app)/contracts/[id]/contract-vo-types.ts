@@ -3,15 +3,12 @@
 import type { CostItemUnit } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
 
-export interface BaselineLine {
-  id: string;
-  label: string;
-}
-
 export interface DraftVoLine {
   /** The row's own key: its refusals stay on it when another row is removed. */
   key: string;
   contractLineId: string;
+  /** What the picked contract line reads as, kept so it shows after another search. */
+  contractLineLabel: string;
   descriptionEn: string;
   qty: string;
   unit: CostItemUnit;

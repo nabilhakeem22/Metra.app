@@ -5,6 +5,7 @@ import en from '@/messages/en.json';
 import { ACTION_CODE_PROBLEM } from '@/lib/api/action-code-problem';
 import {
   describeFailure,
+  describeReadFailure,
   describeRejection,
   resolveActionError,
   type Translate,
@@ -95,6 +96,24 @@ describe('describeRejection', () => {
   it('falls back to generic for anything else', () => {
     expect(describeRejection(new Error('boom'), tEn)).toBe(en.errors.generic);
     expect(describeRejection(undefined, tEn)).toBe(en.errors.generic);
+  });
+});
+
+describe('describeReadFailure', () => {
+  const couldNotLoad = 'Could not load.';
+
+  it('says the load failed, not that typed input is kept, with the reference when there is one', () => {
+    expect(describeReadFailure({ error: 'generic' }, tEn, couldNotLoad)).toBe(couldNotLoad);
+    expect(describeReadFailure({ error: 'generic', reference: 'R-1' }, tEn, couldNotLoad)).toBe(
+      `${couldNotLoad} ${en.errors.reference.replace('{reference}', 'R-1')}`,
+    );
+    expect(describeReadFailure({ rejection: new TypeError('fetch failed') }, tEn, couldNotLoad)).toBe(couldNotLoad);
+    const thrown = Object.assign(new Error('boom'), { digest: '42' });
+    expect(describeReadFailure({ rejection: thrown }, tEn, couldNotLoad)).toContain('42');
+  });
+
+  it('keeps a coded refusal as its own message', () => {
+    expect(describeReadFailure({ error: 'record_not_found' }, tEn, couldNotLoad)).toBe(en.errors.record_not_found);
   });
 });
 

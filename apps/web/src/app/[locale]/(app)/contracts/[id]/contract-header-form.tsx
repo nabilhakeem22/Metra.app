@@ -11,7 +11,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { useRouter } from '@/i18n/routing';
 import { saveContractDraft } from '@/lib/contracts/actions';
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractHeaderDetail } from '@/lib/contracts/queries';
 import {
   CONTRACT_HEADER_FIELDS,
   contractHeaderInput,
@@ -38,7 +38,7 @@ const KIND: Partial<Record<HeaderKey, 'date' | 'number'>> = {
  * before the start); a refusal of the contract itself (`contract_not_draft`:
  * it was issued meanwhile) is said above the fields.
  */
-export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
+export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail }) {
   const t = useTranslations('contracts');
   const th = useTranslations('contracts.header');
   const te = useTranslations('errors');

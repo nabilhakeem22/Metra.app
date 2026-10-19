@@ -2,11 +2,11 @@ import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withOrgContext } from '@/lib/db/context';
 import { findExistingCodesCore } from '@/lib/price-book/import-existing';
-import { searchForm } from '@/lib/price-book/name-order';
 import { searchPriceBookPickerCore } from '@/lib/price-book/picker-core';
 import { hasActiveCostItem, searchPickerItems } from '@/lib/price-book/picker-query';
 import { PICKER_LIMIT } from '@/lib/price-book/picker-types';
-import { searchFormSql } from '@/lib/price-book/search-sql';
+import { searchForm } from '@/lib/search/fold';
+import { searchFormSql } from '@/lib/search/words-sql';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
 // The SQL half of the price book's search: it folds what it compares exactly as

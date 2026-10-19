@@ -1629,6 +1629,13 @@
       "originalValue": "Original value",
       "advancePct": "Advance %",
       "retentionPct": "Retention %"
+    },
+    "lines": {
+      "show": "Show lines ({count})",
+      "showMore": "Show more lines ({count} left)",
+      "loadFailed": "We couldn't load these lines. Check your connection and try again.",
+      "gone": "These lines are not in the workspace you are in now, or no longer exist. Reload the page.",
+      "reload": "Reload page"
     }
   },
   "variations": {
@@ -1650,7 +1657,10 @@
       "qty": "Quantity",
       "remove": "Remove line",
       "unit": "Unit",
-      "unitPrice": "Unit price"
+      "unitPrice": "Unit price",
+      "find": "Find a contract line",
+      "capped": "Showing the first {count} lines. Type a word from the line or its section to narrow them, or ask for more results.",
+      "more": "More results"
     },
     "saveDraft": "Save draft",
     "saved": "Saved",

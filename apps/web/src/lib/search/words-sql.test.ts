@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-const { STRIPPED_MARKS, searchWords } = await import('./search-sql');
-const { searchForm } = await import('./name-order');
+const { STRIPPED_MARKS, searchWords } = await import('./words-sql');
+const { searchForm } = await import('./fold');
 
 /** Every code point the SQL class lists, ranges expanded. */
 function strippedCodePoints(): number[] {

@@ -23,4 +23,10 @@ describe('the price book view in the URL', () => {
     expect(readPriceBookView({ q: ['first', 'second'] }).query).toBe('first');
     expect(readPriceBookView({ q: 'x'.repeat(5000) }).query).toHaveLength(MAX_SEARCH_LENGTH);
   });
+
+  it('drops U+0000 from the search before cutting it, so Postgres never sees it (S2)', () => {
+    const nul = String.fromCharCode(0);
+    expect(readPriceBookView({ q: `نحاس${nul} ٢` }).query).toBe('نحاس ٢');
+    expect(readPriceBookView({ q: nul.repeat(10) + 'x'.repeat(5000) }).query).toBe('x'.repeat(MAX_SEARCH_LENGTH));
+  });
 });

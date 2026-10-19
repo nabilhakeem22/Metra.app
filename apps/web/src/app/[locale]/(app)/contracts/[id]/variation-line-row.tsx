@@ -8,29 +8,29 @@ import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
 import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { variationLinePath } from '@/lib/variations/line-fields';
-import type { BaselineLine, DraftVoLine } from './contract-vo-types';
+import { BaselineLinePicker } from './baseline-line-picker';
+import type { DraftVoLine } from './contract-vo-types';
 import type { VariationCreateApi, VoLineColumn } from './use-variation-create';
-
-// Radix Select forbids an empty-string item value, so the "net delta" choice
-// (stored as '' on the line) rides a sentinel that is mapped back to '' at the
-// state boundary: the persisted contractLineId stays byte-identical.
-const NET_DELTA = '__net_delta__';
 
 /** The DOM id of one line cell (by row key); its refusal sits under it. */
 export function variationLineControlId(key: string, column: VoLineColumn): string {
   return `vo-line-${key}-${column}`;
 }
 
-/** One line of a new variation order: each cell labelled, its refusal under it. */
+/**
+ * One line of a new variation order: each cell labelled, its refusal under it.
+ * Its contract line is picked by search (baseline-line-picker.tsx), on a line
+ * of its own above the other cells.
+ */
 export function VariationLineRow({
   index,
   line,
-  baselineLines,
+  contractId,
   create,
 }: {
   index: number;
   line: DraftVoLine;
-  baselineLines: BaselineLine[];
+  contractId: string;
   create: VariationCreateApi;
 }) {
   const tv = useTranslations('variations');
@@ -42,17 +42,13 @@ export function VariationLineRow({
 
   return (
     <div className="flex flex-wrap items-start gap-2">
-      <FormField {...cell('contractLineId')} label={tv('line.baseline')}>
-        <SelectControl
-          className="h-9 w-auto min-w-40"
-          value={line.contractLineId || NET_DELTA}
-          onValueChange={(value) => update({ contractLineId: value === NET_DELTA ? '' : value })}
-          options={[
-            { value: NET_DELTA, label: tv('netDelta') },
-            ...baselineLines.map((baseline) => ({ value: baseline.id, label: baseline.label })),
-          ]}
-        />
-      </FormField>
+      <BaselineLinePicker
+        contractId={contractId}
+        field={cell('contractLineId')}
+        contractLineId={line.contractLineId}
+        contractLineLabel={line.contractLineLabel}
+        onPick={update}
+      />
       <FormField {...cell('description')} label={tv('line.description')}>
         <Input
           className="w-40"

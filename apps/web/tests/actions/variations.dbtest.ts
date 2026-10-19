@@ -15,7 +15,7 @@ import {
   issueContractCore,
   terminateContractCore,
 } from '@/lib/contracts/core';
-import { getContractWithLines } from '@/lib/contracts/queries';
+import { getContractPage } from '@/lib/contracts/queries';
 import {
   createVariationDraftCore,
   internalApproveVariationCore,
@@ -213,7 +213,7 @@ describe('client decision via token + revised value (AC9)', () => {
     await respondToVariationByToken(token2, { decision: 'reject' });
 
     // Revised value = 1140 (original) + 500 (only the approved VO).
-    const detail = await getContractWithLines(ctx, contractId, true);
+    const detail = await getContractPage(ctx, contractId, true);
     expect(detail!.originalValue).toBe('1140.0000');
     expect(detail!.revisedValue).toBe('1640.0000');
 
@@ -383,7 +383,7 @@ describe('F1: a de-scope reverses an add to the piastre', () => {
     await respondToVariationByToken(t2, { decision: 'approve' });
 
     // Revised value back to the original baseline, and the register nets to 0.
-    const detail = await getContractWithLines(ctx, contractId, true);
+    const detail = await getContractPage(ctx, contractId, true);
     expect(detail!.revisedValue).toBe(detail!.originalValue);
     expect(await approvedVariationTotal(projectId)).toBe('0.0000');
   });

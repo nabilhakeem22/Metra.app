@@ -1,14 +1,16 @@
 import 'server-only';
-// Sections and their lines, margin-gated. Split out of ./detail.ts so the
-// assembly there reads as its four phases rather than as a wall of mapping.
+// Sections with EVERY line, margin-gated: the PDF's read (getContractForPdf),
+// because a printed contract is the whole contract. The page never calls this;
+// it opens with ./section-summaries.ts and pages through ./section-lines.ts.
 //
 // THE MARGIN GATE LIVES HERE: `toDetailLine` OMITS unitCost / lineCost /
 // lineMargin unless the caller may see them. Omitting rather than nulling is
 // deliberate — a field that is not on the object cannot be rendered by accident
 // or serialized into an API response.
 import { contractLines, contractSections, type MetraDb } from '@metra/db';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ContractDetailLine, ContractDetailSection } from './detail-types';
+import { LINE_ORDER, SECTION_ORDER } from './line-view';
 
 type ContractLineRow = typeof contractLines.$inferSelect;
 
@@ -64,12 +66,12 @@ export async function loadContractSections(
     .select()
     .from(contractSections)
     .where(eq(contractSections.contractId, contractId))
-    .orderBy(asc(contractSections.sortOrder));
+    .orderBy(...SECTION_ORDER);
   const allLines = await tx
     .select()
     .from(contractLines)
     .where(eq(contractLines.contractId, contractId))
-    .orderBy(asc(contractLines.sortOrder));
+    .orderBy(...LINE_ORDER);
   const linesBySection = groupLinesBySection(allLines);
 
   return sections.map((section) => ({
