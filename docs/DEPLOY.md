@@ -3072,15 +3072,17 @@ npx wrangler tail metra-web
 Then, signed in to your own studio:
 
 1. **Page loads.** Open the dashboard, Clients and one client, Projects and
-   one project, that project's contracts list and one contract (and one of its
-   change orders, if it has any), and the price book. Expected: every page
+   one project, then **Contracts** in the sidebar and one contract (and, on
+   that contract's **Variation register** tab, سجل أوامر التغيير, one change
+   order if it has any), and the price book. Expected: every page
    loads and shows your data as before. A list that is suddenly EMPTY counts
    as a failure too: a policy that refuses hides rows, it does not show an
    error.
 2. **One harmless save.** Pick one of your own clients, open its **Details**
    tab, add a word at the end of **Notes** (for example `check`), press
    **Save details**: expected `Details saved`. Then delete that word, press
-   **Save details** again: expected `Details saved`. Reload the page: Notes
+   **Save details** again: expected `Details saved`. In Arabic the same
+   labels read التفاصيل, ملاحظات, حفظ التفاصيل and تم حفظ التفاصيل. Reload the page: Notes
    read exactly as before. (Notes are private to your studio and never shown
    to the client; your audit log records the two edits, nothing else
    changes.)
@@ -3129,8 +3131,12 @@ functions stay exactly as step 3 made them (the current site never touches
 them). Use it only while the site still runs the code from before the merge:
 if the new code is already deployed, undo (1) the code first, then this.
 
+The checkout you switch to below does not contain this runbook, so first
+save a copy and read the rest of undo (0) from that copy:
+
 ```powershell
 cd C:\Users\HP\merta-main
+Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-0063.md
 git fetch origin
 git switch --detach b415d66b
 git log --oneline -1    # b415d66b merge: main (A1 money engine) into the bounded contract pages
