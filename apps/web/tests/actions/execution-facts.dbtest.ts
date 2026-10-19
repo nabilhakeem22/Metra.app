@@ -147,6 +147,12 @@ describe('the execution card, stage by stage', () => {
     await ownerQuery(`update public.contracts set status = 'terminated' where number = 999 and org_id = $1`, [orgId]);
     expect((await stageOf(engagementId)).card.contract?.id).toBe(liveId);
 
+    // Terminate the live one and issue a newer BOQ: the card offers to contract it.
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [liveId]);
+    await ownerQuery(`update public.boqs set status = 'superseded' where id = $1`, [live.boqId]);
+    const newer = await seedBoq(orgId, { project: ids, engagementId });
+    expect(await stageOf(engagementId)).toMatchObject({ stage: 'no_contract', card: { boqId: newer.boqId, contract: null } });
+
     const elsewhere = await seedDelivery(orgId, ids, 'execution');
     expect(await stageOf(elsewhere)).toMatchObject({ stage: 'no_boq', card: { contract: null, boqId: null } });
   });

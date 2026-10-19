@@ -33,6 +33,7 @@ async function loadDeliveryContract(tx: MetraDb, engagementId: string) {
   const [row] = await tx
     .select({
       id: contracts.id, number: contracts.number, createdAt: contracts.createdAt, status: contracts.status,
+      sourceBoqId: contracts.sourceBoqId,
       originalValue: contracts.originalValue, taxAmount: contracts.taxAmount, taxRate: contracts.taxRate,
       supervisionPct: contracts.supervisionPct, discountPct: contracts.discountPct,
     })
@@ -112,7 +113,11 @@ async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<E
 export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promise<ExecutionCardFacts> {
   return withOrgContext(ctx, async (tx) => {
     const boqId = await loadIssuedBoqId(tx, engagementId);
-    const contract = await loadDeliveryContract(tx, engagementId);
+    const newest = await loadDeliveryContract(tx, engagementId);
+    // A terminated contract on an older BOQ does not stand in front of the newer
+    // issued one: the card offers to contract that one instead.
+    const replaced = newest?.status === 'terminated' && boqId !== null && newest.sourceBoqId !== boqId;
+    const contract = replaced ? null : newest;
     return {
       boqId,
       contract: contract
