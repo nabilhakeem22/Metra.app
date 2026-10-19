@@ -27,6 +27,7 @@ export type VoLineColumn = (typeof VO_LINE_COLUMNS)[number];
 
 const NEW_LINE: Omit<DraftVoLine, 'key'> = {
   contractLineId: '',
+  contractLineLabel: '',
   descriptionEn: '',
   qty: '1',
   unit: 'lump_sum',

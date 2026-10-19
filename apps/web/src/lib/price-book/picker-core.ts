@@ -5,6 +5,7 @@ import { unexpectedFailure } from '@/lib/actions/unexpected';
 import type { OrgContext } from '@/lib/db/context';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
+import { cleanSearchQuery } from '@/lib/search/query-input';
 import { MAX_SEARCH_LENGTH } from './page-params';
 import { searchPickerItems } from './picker-query';
 import type { PickerSearch } from './picker-types';
@@ -29,7 +30,7 @@ export async function searchPriceBookPickerCore(
   if (typeof query !== 'string' || !LOCALES.includes(locale as Locale)) return err('malformed');
   try {
     const withCost = await resolveSeeMargin(ctx);
-    return { ok: true, data: await searchPickerItems(ctx, query.slice(0, MAX_SEARCH_LENGTH), locale as Locale, withCost) };
+    return { ok: true, data: await searchPickerItems(ctx, cleanSearchQuery(query, MAX_SEARCH_LENGTH), locale as Locale, withCost) };
   } catch (error) {
     return unexpectedFailure('price book picker search failed', error);
   }

@@ -1,15 +1,17 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { pickLocale } from '@/lib/i18n/pick-locale';
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { ContractHeaderForm } from './contract-header-form';
+import { ContractSectionCard } from './contract-section-card';
+import type { KeptSectionLines } from './use-kept-section-lines';
 
 export function ContractOverview({
   detail,
+  keptLines,
   canManage,
   canIssue,
   pending,
@@ -17,7 +19,8 @@ export function ContractOverview({
   onIssue,
   onTerminate,
 }: {
-  detail: ContractDetail;
+  detail: ContractPageDetail;
+  keptLines: KeptSectionLines;
   canManage: boolean;
   canIssue: boolean;
   pending: boolean;
@@ -26,9 +29,6 @@ export function ContractOverview({
   onTerminate: () => void;
 }) {
   const t = useTranslations('contracts');
-  const locale = useLocale();
-  const pick = (ar: string | null, en: string | null) =>
-    pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
   const revised = detail.revisedValue !== detail.originalValue;
 
   return (
@@ -72,35 +72,8 @@ export function ContractOverview({
         <ContractHeaderForm detail={detail} />
       )}
 
-      {detail.sections.map((s) => (
-        <Card key={s.id}>
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-body font-semibold">{pick(s.titleAr, s.titleEn)}</h2>
-              <span className="text-body" dir="ltr">
-                {m(s.sectionSubtotal)}
-              </span>
-            </div>
-            <table className="w-full text-body">
-              <tbody>
-                {s.lines.map((l) => (
-                  <tr key={l.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">{pick(l.descriptionAr, l.descriptionEn)}</td>
-                    <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {l.qty} {l.unit}
-                    </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">
-                      {m(l.unitPrice)}
-                    </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">
-                      {m(l.lineTotal)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+      {detail.sections.map((section) => (
+        <ContractSectionCard key={section.id} contractId={detail.id} section={section} kept={keptLines} m={m} />
       ))}
     </div>
   );

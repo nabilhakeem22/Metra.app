@@ -8,7 +8,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
-import type { BaselineLine } from './contract-vo-types';
 import type { VariationCreateApi } from './use-variation-create';
 import { VariationLineRow } from './variation-line-row';
 
@@ -22,10 +21,10 @@ export const VO_REASON_ID = 'vo-reason';
  */
 export function VariationCreateForm({
   create,
-  baselineLines,
+  contractId,
 }: {
   create: VariationCreateApi;
-  baselineLines: BaselineLine[];
+  contractId: string;
 }) {
   const tv = useTranslations('variations');
   const formRef = useRef<HTMLDivElement>(null);
@@ -46,7 +45,7 @@ export function VariationCreateForm({
               key={line.key}
               index={index}
               line={line}
-              baselineLines={baselineLines}
+              contractId={contractId}
               create={create}
             />
           ))}

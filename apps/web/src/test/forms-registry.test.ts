@@ -26,6 +26,7 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/clients/[id]/use-client-details-form.ts': 'app/[locale]/(app)/clients/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/clients/client-form-fields.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/clients/client-form.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/baseline-line-picker.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/contract-header-form.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/use-variation-create.ts': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/variation-create-form.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',

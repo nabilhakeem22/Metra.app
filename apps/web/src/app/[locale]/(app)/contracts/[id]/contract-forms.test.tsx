@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ActionResult } from '@/lib/actions/result';
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractHeaderDetail } from '@/lib/contracts/queries';
 import { variationLinePath } from '@/lib/variations/line-fields';
 import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
@@ -22,6 +22,11 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 }));
 const contracts = vi.hoisted(() => ({ saveContractDraft: vi.fn() }));
 vi.mock('@/lib/contracts/actions', () => contracts);
+const lineReads = vi.hoisted(() => ({
+  loadSectionLines: vi.fn(),
+  searchBaselineLines: vi.fn(async () => ({ ok: true, data: { lines: [], hasMore: false } })),
+}));
+vi.mock('@/lib/contracts/lines-actions', () => lineReads);
 const variations = vi.hoisted(() => ({
   createVariationDraft: vi.fn(),
   saveVariationDraft: vi.fn(),
@@ -42,7 +47,7 @@ const DETAIL = {
   defectsLiabilityDays: null,
   termsEn: null,
   termsAr: null,
-} as unknown as ContractDetail;
+} as unknown as ContractHeaderDetail;
 
 const LINE_PATHS = VO_LINE_COLUMNS.map((column) => variationLinePath(0, column));
 const columnOf = (path: string) => path.split('.')[2] as VoLineColumn;
@@ -72,7 +77,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
         contractId="k-1"
         contractStatus="issued"
         variations={[]}
-        baselineLines={[{ id: 'cl-1', label: 'Doors' }]}
         canDraftVariation
         canPriceVariation={false}
         pending={false}

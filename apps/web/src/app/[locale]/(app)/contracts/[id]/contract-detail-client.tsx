@@ -7,13 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractPageDetail } from '@/lib/contracts/queries';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
-import type { BaselineLine, ContractAction } from './contract-vo-types';
+import type { ContractAction } from './contract-vo-types';
 import { CONTRACT_TABS, type ContractTab } from './tabs';
+import { useKeptSectionLines } from './use-kept-section-lines';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
@@ -24,7 +24,7 @@ export function ContractDetailClient({
   canDraftVariation,
   canPriceVariation,
 }: {
-  detail: ContractDetail;
+  detail: ContractPageDetail;
   variations: VariationListRow[];
   canManage: boolean;
   canIssue: boolean;
@@ -37,19 +37,12 @@ export function ContractDetailClient({
   const locale = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<ContractTab>('overview');
+  const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const m = (v: string) => formatMoney(v, locale);
-  const baselineLines: BaselineLine[] = detail.sections.flatMap((s) =>
-    s.lines.map((l) => ({
-      id: l.id,
-      label:
-        pickLocale({ nameAr: l.descriptionAr, nameEn: l.descriptionEn }, 'name', locale)
-          .value || l.id.slice(0, 8),
-    })),
-  );
 
   const act: ContractAction = (fn) => {
     setError(null);
@@ -113,6 +106,7 @@ export function ContractDetailClient({
       {tab === 'overview' ? (
         <ContractOverview
           detail={detail}
+          keptLines={keptLines}
           canManage={canManage}
           canIssue={canIssue}
           pending={pending}
@@ -125,7 +119,6 @@ export function ContractDetailClient({
           contractId={detail.id}
           contractStatus={detail.status}
           variations={variations}
-          baselineLines={baselineLines}
           canDraftVariation={canDraftVariation}
           canPriceVariation={canPriceVariation}
           pending={pending}

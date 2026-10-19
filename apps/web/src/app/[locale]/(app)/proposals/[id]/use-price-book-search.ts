@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
-import { searchForm } from '@/lib/price-book/name-order';
+import { searchForm } from '@/lib/search/fold';
 import { searchPriceBookPicker } from '@/lib/price-book/picker-actions';
 import type { PickerSearch } from '@/lib/price-book/picker-types';
 
