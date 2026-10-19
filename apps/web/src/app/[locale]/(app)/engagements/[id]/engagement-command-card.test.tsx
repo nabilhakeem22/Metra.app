@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import type { ExecutionCardView } from '@/lib/execution/card-view';
 import { openMenu } from '@/test/open-menu';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { EngagementCommandCardProps } from './command-card-props';
@@ -40,6 +41,7 @@ vi.mock('@/hooks/use-toast', () => ({
   },
 }));
 vi.mock('@/lib/boq-proposals/actions', () => ({ openBoqProposal: vi.fn() }));
+vi.mock('@/lib/contracts/actions', () => ({ generateExecutionContract: vi.fn(), recordContractSignedOffline: vi.fn() }));
 vi.mock('./trigger-actions', () => ({
   DIRECT_TRIGGER_ACTIONS: {
     chooseDesignOnly: actions.chooseDesignOnly,
@@ -92,7 +94,6 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canRecordPayment: true,
     canResolveClaims: true,
     canShare: true,
-    canStartQuotation: true,
     canUpload: true,
     canSetOffPlan: false,
     offPlan: false,
@@ -109,6 +110,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     actionError: null,
     onNudge: () => {},
     clientExpected: null,
+    execution: null,
     ...overrides,
   };
 }
@@ -290,22 +292,20 @@ describe('a closed delivery', () => {
     props({ state, preview: closedPreview, secondaryTriggers: [], ...extra });
   const link = (key: string) => screen.queryByRole('link', { name: ar(key) });
 
-  test('at execution: its own headline, View BOQ and Start a quotation, no nudge footer', () => {
-    renderWithIntl(<EngagementCommandCard {...closedProps('execution')} />);
+  test('at execution: its own headline and the execution card with its one next action, no nudge footer', () => {
+    const execution: ExecutionCardView = {
+      stage: 'no_boq',
+      next: { kind: 'open_boq' },
+      projectId: 'p-1',
+      boqId: null,
+      contract: null,
+      may: { generateContract: true, signOffline: true, openContract: true },
+    };
+    renderWithIntl(<EngagementCommandCard {...closedProps('execution', { execution })} />);
     expect(screen.getByText(ar('engagements.command.closed.execution.headline'))).toBeTruthy();
-    expect(link('engagements.command.closed.execution.viewBoq')?.getAttribute('href')).toContain(
-      '/projects/p-1?tab=boq',
-    );
-    expect(
-      link('engagements.command.closed.execution.startQuotation')?.getAttribute('href'),
-    ).toContain('/proposals/new?projectId=p-1');
+    expect(link('execution.card.next.open_boq')?.getAttribute('href')).toContain('/projects/p-1?tab=boq');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: ar('engagements.command.nudge') })).toBeNull();
-  });
-
-  test('Start a quotation needs proposals_build create', () => {
-    renderWithIntl(<EngagementCommandCard {...closedProps('execution', { canStartQuotation: false })} />);
-    expect(link('engagements.command.closed.execution.viewBoq')).not.toBeNull();
-    expect(link('engagements.command.closed.execution.startQuotation')).toBeNull();
   });
 
   test('closed_design_only and abandoned say how they ended, with no links', () => {

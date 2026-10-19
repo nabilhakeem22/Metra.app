@@ -1650,6 +1650,60 @@
       "loadFailed": "We couldn't load these lines. Check your connection and try again.",
       "gone": "These lines are not in the workspace you are in now, or no longer exist. Reload the page.",
       "reload": "Reload page"
+    },
+    "execution": {
+      "generate": {
+        "open": "Create the execution contract",
+        "title": "Execution contract from the BOQ",
+        "description": "The works value is the BOQ total. Set VAT and the supervision fee; you can change them while the contract is a draft.",
+        "taxRate": "VAT %",
+        "supervisionPct": "Supervision fee %",
+        "submit": "Create the contract",
+        "openContract": "Open the execution contract"
+      },
+      "charges": {
+        "title": "VAT and supervision",
+        "taxRate": "VAT %",
+        "supervisionPct": "Supervision fee %",
+        "worksValue": "Works value (BOQ total)",
+        "taxAmount": "VAT",
+        "supervisionAmount": "Supervision fee",
+        "originalValue": "Contract value",
+        "save": "Save the charges"
+      },
+      "schedule": {
+        "tab": "Payment schedule",
+        "title": "Payment schedule",
+        "intro": "What the client pays, and when. The client signs it with the contract, and it is fixed once the contract is sent.",
+        "basis": "Split by",
+        "bases": {
+          "percent": "Percentages",
+          "amount": "Amounts"
+        },
+        "labelAr": "Name (Arabic)",
+        "labelEn": "Name (English)",
+        "share": "Share %",
+        "amount": "Amount",
+        "total": "Total (must be {target})",
+        "add": "Add a payment",
+        "remove": "Remove",
+        "save": "Save the schedule",
+        "empty": "No payment schedule yet.",
+        "stale": "The schedule no longer adds up to the contract value. Save it again before you send the contract.",
+        "defaults": {
+          "advance": "Advance payment",
+          "works": "During the works",
+          "handover": "On handover"
+        }
+      },
+      "signOffline": {
+        "open": "Record signed on paper",
+        "title": "The client signed on paper",
+        "description": "Record the day the client signed this contract outside Metra. The contract becomes signed, and payment requests can be sent.",
+        "signedOn": "Signed on",
+        "note": "Note",
+        "submit": "Record the signature"
+      }
     }
   },
   "variations": {
@@ -1913,9 +1967,7 @@
       "closed": {
         "execution": {
           "headline": "Closed: the client is building with you",
-          "hint": "The design is done. Price the build from the BOQ when you're ready.",
-          "viewBoq": "View BOQ",
-          "startQuotation": "Start a quotation"
+          "hint": "The design is done. The build runs on the execution contract below."
         },
         "closed_design_only": {
           "headline": "Closed: design-only handover complete",
@@ -2781,5 +2833,36 @@
       "thousand_bricks": "1000 bricks"
     },
     "unitNotSupported": "Your price book has no unit for this item, so it can't be added."
+  },
+  "execution": {
+    "card": {
+      "title": "Execution",
+      "waitingOnClient": "Waiting for the client to sign the contract on its link.",
+      "someoneElse": "An owner or an admin does this.",
+      "stage": {
+        "no_boq": "No BOQ in Metra yet",
+        "no_contract": "The BOQ is issued, with no execution contract yet",
+        "draft": "The contract is a draft",
+        "awaiting_signature": "The contract is sent, not signed yet",
+        "in_progress": "Works in progress",
+        "final_account": "The final account is issued",
+        "settled": "Settled",
+        "terminated": "The contract was terminated"
+      },
+      "next": {
+        "open_boq": "Open the BOQ",
+        "create_contract": "Create the execution contract",
+        "set_schedule": "Set the payment schedule",
+        "send_contract": "Send the contract",
+        "record_signed_offline": "Record signed on paper",
+        "review_payment_claim": "Review the client's payment",
+        "send_milestone_request": "Send the next payment request",
+        "send_variation_request": "Bill the approved change order",
+        "record_payment": "Record a payment",
+        "await_variation_answer": "Follow up on the change order",
+        "prepare_final_account": "Prepare the final account",
+        "review_final_account": "Review the final account"
+      }
+    }
   }
 }

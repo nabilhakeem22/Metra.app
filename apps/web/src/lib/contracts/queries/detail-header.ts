@@ -17,6 +17,7 @@ const CONTRACT_HEADER_COLUMNS = {
   status: contracts.status,
   currency: contracts.currency,
   sourceProposalId: contracts.sourceProposalId,
+  sourceBoqId: contracts.sourceBoqId,
   signatureDate: contracts.signatureDate,
   startDate: contracts.startDate,
   endDate: contracts.endDate,

@@ -2,17 +2,22 @@ import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
+import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage } from '@/lib/contracts/queries';
+import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractTabsFor, openingContractTab } from './tabs';
 
 export default async function ContractDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const ctx = await requireOrg();
   if (!can(ctx.role, 'contracts_generate', 'read')) notFound();
@@ -23,6 +28,9 @@ export default async function ContractDetailPage({
   const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const variations = await listVariations(ctx, { contractId: id });
+  // Only an execution contract has a schedule: at most 12 rows.
+  const schedule = detail.sourceBoqId === null ? null : await getContractSchedule(ctx, detail);
+  const tabs = contractTabsFor(detail);
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
@@ -38,6 +46,10 @@ export default async function ContractDetailPage({
       <ContractDetailClient
         detail={detail}
         variations={variations}
+        schedule={schedule}
+        tabs={tabs}
+        openingTab={openingContractTab((await searchParams).tab, tabs)}
+        canSignOffline={mayRecordSignedOffline(ctx.role)}
         canManage={canManage}
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}

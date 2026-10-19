@@ -8,6 +8,7 @@ import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
+import type { ExecutionCardView } from '@/lib/execution/card-view';
 import type { DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
 import type { RunAction } from './use-engagement-action';
@@ -45,8 +46,6 @@ export interface EngagementCommandCardProps {
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
   canResolveClaims: boolean;
   canShare: boolean;
-  /** May this role start a quotation (`proposals_build` create)? Linked from the execution ending. */
-  canStartQuotation: boolean;
   canUpload: boolean;
   canSetOffPlan: boolean;
   offPlan: boolean;
@@ -72,4 +71,6 @@ export interface EngagementCommandCardProps {
   onNudge: () => void;
   /** The client's expected date for the next step; null when not offered. */
   clientExpected: ClientExpectedCard | null;
+  /** At `execution`: the BOQ contract's derived stage and next action; null elsewhere. */
+  execution: ExecutionCardView | null;
 }

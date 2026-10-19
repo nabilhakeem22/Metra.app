@@ -24,6 +24,21 @@ import {
   type DesignState,
 } from './states';
 import { TRANSITIONS } from './transitions';
+import {
+  EXECUTION_CARD_DIALOGS,
+  NEXT_ACTION_TARGET,
+  executionCardHref,
+} from '@/lib/execution/next-action-target';
+import {
+  EXECUTION_NEXT_ACTION_KINDS,
+  EXECUTION_STAGES,
+  executionStage,
+  type ExecutionContractFacts,
+  type ExecutionFacts,
+  type ExecutionStage,
+} from '@/lib/execution/stage';
+import ar from '@/messages/ar-EG.json';
+import en from '@/messages/en.json';
 
 // THE UI WALK — "can the cockpit satisfy the gate it is showing?"
 //
@@ -467,5 +482,87 @@ describe('the whole state space is accounted for', () => {
         `"${state}" is declared a deliberate dead end but now resolves a forward trigger — remove it from STATES_INTENTIONALLY_WITHOUT_FORWARD_TRIGGER.`,
       ).toBeNull();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// After `execution`: the delivery's execution card (PR A3.5, AC10).
+//
+// The design machine ends at `execution`; from there the card shows a stage
+// DERIVED from the BOQ contract and ONE next action. The same question as
+// above: can the card actually take the action it is showing? Every derived
+// stage must resolve an action (or be one that has none), and every action
+// must resolve a target the card renders: a page it links to, or a dialog it
+// opens in place. A new stage or action fails here until it is answered.
+// ---------------------------------------------------------------------------
+
+/** One delivery per derived stage, and the action that stage must show. */
+const EXECUTION_WALK: Record<ExecutionStage, ExecutionFacts> = {
+  no_boq: { hasIssuedBoq: false, contract: null },
+  no_contract: { hasIssuedBoq: true, contract: null },
+  draft: { hasIssuedBoq: true, contract: executionContract({ status: 'draft', scheduleValid: false }) },
+  awaiting_signature: { hasIssuedBoq: true, contract: executionContract({ status: 'issued' }) },
+  in_progress: {
+    hasIssuedBoq: true,
+    contract: executionContract({ nextUnbilledMilestone: { id: 'm1', amount: '62000' }, billingBalance: '124000', finalAccountBalance: '124000' }),
+  },
+  final_account: { hasIssuedBoq: true, contract: executionContract({ finalAccountOutstanding: '1240', unpaidRequestCount: 1 }) },
+  settled: { hasIssuedBoq: true, contract: executionContract({}) },
+  terminated: { hasIssuedBoq: true, contract: executionContract({ status: 'terminated' }) },
+};
+
+/** The stages that end the job: nothing is left to do, so no action is shown. */
+const EXECUTION_STAGES_WITHOUT_ACTION: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['settled', 'terminated']);
+
+function executionContract(overrides: Partial<ExecutionContractFacts>): ExecutionContractFacts {
+  return {
+    status: 'signed',
+    scheduleValid: true,
+    nextUnbilledMilestone: null,
+    pendingClaimCount: 0,
+    unbilledVariationCount: 0,
+    finalAccountOutstanding: null,
+    unpaidRequestCount: 0,
+    openVariationCount: 0,
+    billingBalance: '0',
+    finalAccountBalance: '0',
+    ...overrides,
+  };
+}
+
+const messageCatalogs = { en, ar } as const;
+
+describe('the execution card offers an action it can take, at every derived stage', () => {
+  for (const stage of EXECUTION_STAGES) {
+    it(`${stage}: derives here, and its action has a target the card renders`, () => {
+      const result = executionStage(EXECUTION_WALK[stage]);
+      expect(result.stage, `The walk's facts for "${stage}" derive "${result.stage}"; fix EXECUTION_WALK.`).toBe(stage);
+      if (EXECUTION_STAGES_WITHOUT_ACTION.has(stage)) {
+        expect(result.next, `"${stage}" is declared action-free but shows "${result.next?.kind}".`).toBeNull();
+        return;
+      }
+      expect(result.next, `"${stage}" shows no next action: the card would be a dead end.`).not.toBeNull();
+      const target = NEXT_ACTION_TARGET[result.next!.kind];
+      if (target.kind === 'dialog') expect(EXECUTION_CARD_DIALOGS).toContain(target.dialog);
+      else expect(executionCardHref(target.page, { projectId: 'p-1', contractId: 'c-1' })).toMatch(/^\/(projects|contracts)\//);
+    });
+  }
+
+  it('every next action kind has a target and its label in both languages', () => {
+    for (const kind of EXECUTION_NEXT_ACTION_KINDS) {
+      expect(NEXT_ACTION_TARGET[kind], `no target for "${kind}"`).toBeDefined();
+      for (const [locale, catalog] of Object.entries(messageCatalogs)) {
+        expect(catalog.execution.card.next[kind], `${locale} execution.card.next.${kind}`).toBeTruthy();
+      }
+    }
+    for (const stage of EXECUTION_STAGES) {
+      for (const catalog of Object.values(messageCatalogs)) expect(catalog.execution.card.stage[stage]).toBeTruthy();
+    }
+  });
+
+  it('the action that needs no contract (open the BOQ) links without one', () => {
+    const target = NEXT_ACTION_TARGET.open_boq;
+    expect(target).toEqual({ kind: 'link', page: 'project_boq' });
+    expect(executionCardHref('project_boq', { projectId: 'p-1', contractId: null })).toBe('/projects/p-1?tab=boq');
   });
 });

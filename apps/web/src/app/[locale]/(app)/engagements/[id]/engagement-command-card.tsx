@@ -5,7 +5,7 @@ import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardActionError } from './command-card-action-error';
 import { CommandCardClosedClaims } from './command-card-closed-claims';
-import { CommandCardClosedLinks } from './command-card-closed-links';
+import { CommandCardExecution } from './command-card-execution';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardHeadline } from './command-card-headline';
 import { deriveCommandCardModel } from './command-card-model';
@@ -56,13 +56,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           awaitingReplyCount={props.awaitingReplyCount}
         />
 
-        {closed && (
-          <CommandCardClosedLinks
-            state={state}
-            projectId={props.projectId}
-            canStartQuotation={props.canStartQuotation}
-          />
-        )}
+        {closed && props.execution && <CommandCardExecution view={props.execution} />}
 
         {closed && props.canResolveClaims && (
           <CommandCardClosedClaims

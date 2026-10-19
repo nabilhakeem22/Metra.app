@@ -34,8 +34,8 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/(app): the studio. */
   studio: [
     'account', 'apiKeys', 'app', 'automation', 'clients', 'common', 'contracts', 'dashboard.range',
-    'delivery.share', 'engagements', 'errors', 'help', 'hints.account', 'hints.client', 'hints.costItem',
-    'hints.org', 'hints.priceBook', 'hints.project', 'hints.proposal', 'hints.team', 'nav', 'notifications',
+    'delivery.share', 'engagements', 'errors', 'execution.card', 'help', 'hints.account', 'hints.client',
+    'hints.costItem', 'hints.org', 'hints.priceBook', 'hints.project', 'hints.proposal', 'hints.team', 'nav', 'notifications',
     'onboarding', 'org', 'priceBook', 'projects', 'proposals', 'roles', 'settings', 'shell', 'team', 'theme',
     'tour', 'variations',
   ],

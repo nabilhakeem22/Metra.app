@@ -77,6 +77,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       <ContractDetailClient
         detail={DETAIL}
         variations={[]}
+        schedule={null}
+        tabs={['overview', 'variations']}
+        openingTab="overview"
+        canSignOffline={false}
         canManage={false}
         canIssue
         canDraftVariation={false}

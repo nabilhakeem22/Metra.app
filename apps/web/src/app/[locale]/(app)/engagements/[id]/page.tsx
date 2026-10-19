@@ -4,6 +4,8 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { forwardMovesOf } from '@/lib/engagements/command-card';
 import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
+import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
+import { executionCardView } from '@/lib/execution/card-view';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
@@ -89,7 +91,6 @@ export default async function EngagementDetailPage({
         capabilities={engagementCapabilities(ctx.role, header.state)}
         canUpload={can(ctx.role, 'engagements_design', 'create')}
         canShare={canShare}
-        canStartQuotation={can(ctx.role, 'proposals_build', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
         canRecordOfflineApproval={mayRecordOfflineApproval(ctx.role)}
@@ -106,6 +107,17 @@ export default async function EngagementDetailPage({
         paymentClaims={paymentClaims}
         awaitingReplyCount={data.awaitingReplyCount}
         clientExpected={clientExpectedCardOf({ role: ctx.role, header, transitions, status, now: new Date() })}
+        execution={
+          data.execution &&
+          executionCardView(data.execution, {
+            projectId: header.projectId,
+            may: {
+              generateContract: can(ctx.role, 'contracts_generate', 'create'),
+              signOffline: mayRecordSignedOffline(ctx.role),
+              openContract: can(ctx.role, 'contracts_generate', 'read'),
+            },
+          })
+        }
       />
     </div>
   );

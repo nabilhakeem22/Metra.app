@@ -3,6 +3,7 @@ import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
+import type { ExecutionCardView } from '@/lib/execution/card-view';
 import type {
   EngagementArtifactRecord,
   EngagementChangeOrderRecord,
@@ -53,7 +54,6 @@ export interface EngagementDetailProps {
   capabilities: PanelCapabilities;
   canUpload: boolean;
   canShare: boolean;
-  canStartQuotation: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
   /** May this role record "Client approved offline" (owner, admin, project manager)? */
@@ -72,4 +72,6 @@ export interface EngagementDetailProps {
   awaitingReplyCount: number;
   /** The client's expected date for the next step; null when not offered. */
   clientExpected: ClientExpectedCard | null;
+  /** At `execution`: the execution card's view; null at every other state. */
+  execution: ExecutionCardView | null;
 }

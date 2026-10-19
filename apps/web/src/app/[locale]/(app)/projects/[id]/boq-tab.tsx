@@ -1,10 +1,33 @@
 import { useTranslations } from 'next-intl';
+import { GenerateExecutionContract } from '@/components/contracts/generate-execution-contract';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Link } from '@/i18n/routing';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { BoqCostedCopy } from './boq-costed-copy';
 import { BoqIssue } from './boq-issue';
 import { BoqSheet } from './boq-sheet';
 import { BoqStart } from './boq-start';
+
+/** What an issued BOQ offers for execution: its contract, or to create one. */
+export interface BoqExecution {
+  contractId: string | null;
+  /** May generate an execution contract (`contracts_generate` create). */
+  canGenerate: boolean;
+}
+
+/** An issued BOQ's way into execution: open its contract, or create it. */
+function BoqExecutionAction({ execution, boqId }: { execution: BoqExecution; boqId: string }) {
+  const t = useTranslations('contracts.execution.generate');
+  if (execution.contractId) {
+    return (
+      <Button asChild variant="secondary">
+        <Link href={`/contracts/${execution.contractId}`}>{t('openContract')}</Link>
+      </Button>
+    );
+  }
+  return execution.canGenerate ? <GenerateExecutionContract boqId={boqId} /> : null;
+}
 
 /**
  * The project's Bill of Quantities — the priced schedule of works that the
@@ -22,6 +45,7 @@ export function BoqTab({
   canBuild,
   canSeeCost,
   clientCanOpenOnIssue,
+  execution,
 }: {
   projectId: string;
   boq: BoqDetail | null;
@@ -31,6 +55,7 @@ export function BoqTab({
   /** The portal's BOQ rule on the engagement an issue would deliver through:
    *  decides which sentence the Issue confirm says. */
   clientCanOpenOnIssue: boolean;
+  execution: BoqExecution;
 }) {
   const t = useTranslations('projects.profile.boq');
 
@@ -52,6 +77,7 @@ export function BoqTab({
       actions={(shown) => (
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
+          {boq.status === 'issued' && <BoqExecutionAction execution={execution} boqId={boq.id} />}
           {canEdit && (
             <BoqIssue
               boqId={boq.id}

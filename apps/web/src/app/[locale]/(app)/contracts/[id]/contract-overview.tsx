@@ -2,9 +2,11 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
+import { ChargesForm } from './charges-form';
 import { ContractHeaderForm } from './contract-header-form';
 import { ContractSectionCard } from './contract-section-card';
 import type { KeptSectionLines } from './use-kept-section-lines';
@@ -14,6 +16,7 @@ export function ContractOverview({
   keptLines,
   canManage,
   canIssue,
+  canSignOffline,
   pending,
   m,
   onIssue,
@@ -23,6 +26,7 @@ export function ContractOverview({
   keptLines: KeptSectionLines;
   canManage: boolean;
   canIssue: boolean;
+  canSignOffline: boolean;
   pending: boolean;
   m: (v: string) => string;
   onIssue: () => void;
@@ -30,6 +34,7 @@ export function ContractOverview({
 }) {
   const t = useTranslations('contracts');
   const revised = detail.revisedValue !== detail.originalValue;
+  const execution = detail.sourceBoqId !== null;
 
   return (
     <div className="space-y-4">
@@ -47,6 +52,9 @@ export function ContractOverview({
             </span>
           )}
           <div className="ms-auto flex gap-2">
+            {execution && canSignOffline && detail.status === 'issued' && (
+              <SignOfflineDialog contractId={detail.id} />
+            )}
             {canIssue && detail.status === 'draft' && (
               <Button variant="default" size="sm" disabled={pending} onClick={onIssue}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
@@ -67,6 +75,8 @@ export function ContractOverview({
           </div>
         </CardContent>
       </Card>
+
+      {canManage && detail.status === 'draft' && execution && <ChargesForm detail={detail} m={m} />}
 
       {canManage && detail.status === 'draft' && (
         <ContractHeaderForm detail={detail} />

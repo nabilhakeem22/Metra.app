@@ -93,6 +93,8 @@ export interface ContractHeaderDetail {
   currency: string;
   /** Null on an execution contract generated from a BOQ (0063). */
   sourceProposalId: string | null;
+  /** Set on an execution contract: the issued BOQ it was generated from. */
+  sourceBoqId: string | null;
   signatureDate: string | null;
   startDate: string | null;
   endDate: string | null;
