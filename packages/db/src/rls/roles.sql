@@ -351,8 +351,9 @@ revoke execute on function public.app_variation_respond_by_token(text, text, tex
 grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
 revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from public;
 grant execute on function public.enforce_payment_request_frozen() to metra_app;
--- The payment-fits guard (A2 reliability R2) is a DEFINER trigger function:
--- also locked down in place, right after its CREATE (functions/35-execution.sql).
+-- The payment-fits guard (A2 reliability R2) is an INVOKER trigger function
+-- (S5: it reads as the caller, under RLS); locked down anyway, also in place
+-- right after its CREATE (functions/35-execution.sql).
 grant execute on function public.enforce_contract_payment_fits() to metra_app;
 revoke execute on function public.enforce_contract_payment_fits() from public;
 

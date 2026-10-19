@@ -92,13 +92,19 @@ $$;
 -- cannot deadlock against the planned cores. A void core must not lock a claim
 -- AFTER the request (plan A4.1 addendum).
 --
--- SECURITY DEFINER (with the lockdown below) so the lock and the sum do not
--- depend on the caller's grants or on RLS; it reads only rows of NEW's own
--- (org_id, contract_id, request_id). `set search_path = ''`.
+-- SECURITY INVOKER (A2 security re-check S5): it reads the request and the
+-- payments AS THE CALLER, under RLS. A definer would answer questions about
+-- another studio's request (MT130 / MT131) before RLS refused the row; as the
+-- invoker, a request the caller cannot see is "not found", the guard returns
+-- NEW, and the insert's own policy refuses it (42501). metra_app holds SELECT
+-- and UPDATE on payment_requests, which `FOR UPDATE` needs, and the policy is
+-- org_isolation for every command, so the lock and the sum see exactly the
+-- caller's own rows. The lockdown below is kept (uniform for every function
+-- under rls/). `set search_path = ''`.
 create or replace function public.enforce_contract_payment_fits()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
@@ -145,10 +151,10 @@ begin
 end
 $$;
 
--- Same-transaction lockdown (new-function-lockdown.test.ts): a NEW definer
--- function is executable by PUBLIC from the moment CREATE commits. It is a
--- trigger function, so a direct call fails anyway; this keeps the rule
--- uniform for every definer function.
+-- Same-transaction lockdown (new-function-lockdown.test.ts): a NEW function is
+-- executable by PUBLIC from the moment CREATE commits. It is a trigger
+-- function (a direct call fails anyway) and an invoker; the lockdown keeps the
+-- rule uniform for every function this file creates.
 revoke all on function public.enforce_contract_payment_fits() from public;
 do $$
 declare

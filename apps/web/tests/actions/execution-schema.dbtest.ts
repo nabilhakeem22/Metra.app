@@ -818,6 +818,46 @@ describe('org isolation with real rows in all six tables', () => {
     ).toBe('42501');
   });
 
+  it("a payment into another studio's request at an over-amount answers 42501, never MT131 (S5)", async () => {
+    // The payment-fits guard runs as the CALLER: org B's request is invisible
+    // to org A's member, so the guard learns nothing and says nothing, and the
+    // insert's own policy refuses the row.
+    const theirs = await seedExecutionContract(otherOrgId, { state: 'signed', linesPerSection: [1] });
+    const theirRequest = await seedRequest(otherOrgId, theirs.contractId, otherOwnerId, {}, '100');
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_payments (org_id, contract_id, request_id, amount, received_on, recorded_by)
+           values ($1, $2, $3, 1000000, current_date, $4)`,
+          [otherOrgId, theirs.contractId, theirRequest, ownerId],
+        ),
+      ),
+    ).toBe('42501');
+    // Under org A's own org_id the row passes the policy and meets the
+    // 3-column FK instead: still nothing about B's request.
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_payments (org_id, contract_id, request_id, amount, received_on, recorded_by)
+           values ($1, $2, $3, 1000000, current_date, $4)`,
+          [orgId, theirs.contractId, theirRequest, ownerId],
+        ),
+      ),
+    ).toBe('23503');
+    // And the same over-amount on org A's OWN request is MT131: the guard works under RLS.
+    const mine = await seedExecutionContract(orgId, { state: 'signed', linesPerSection: [1] });
+    const myRequest = await seedRequest(orgId, mine.contractId, ownerId, {}, '100');
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_payments (org_id, contract_id, request_id, amount, received_on, recorded_by)
+           values ($1, $2, $3, 1000000, current_date, $4)`,
+          [orgId, mine.contractId, myRequest, ownerId],
+        ),
+      ),
+    ).toBe('MT131');
+  });
+
   it("org A cannot write a row naming org B's contract under its own org_id (23503)", async () => {
     expect(
       await sqlstate(
