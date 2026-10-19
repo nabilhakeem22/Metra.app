@@ -168,4 +168,32 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   invalid_qty: 'bad-request',
   invalid_price: 'bad-request',
   invalid_discount: 'bad-request',
+  // Execution (Stage 2): BOQ contracts, payment requests, costs, measurements.
+  contract_not_execution: 'bad-request',
+  boq_not_issued: 'bad-request',
+  // A live contract stands on the issued BOQ: a state conflict, not bad input.
+  boq_has_contract: 'conflict',
+  delivery_not_in_execution: 'bad-request',
+  contract_schedule_missing: 'bad-request',
+  contract_schedule_invalid: 'bad-request',
+  schedule_too_long: 'bad-request',
+  contract_not_signed: 'bad-request',
+  contract_not_active: 'bad-request',
+  // Another request for the same milestone, change order or final account won.
+  request_exists: 'conflict',
+  request_not_found: 'not-found',
+  request_void: 'conflict',
+  request_has_payments: 'conflict',
+  payment_exceeds_request: 'bad-request',
+  claim_pending_for_request: 'conflict',
+  variation_not_approved: 'bad-request',
+  variation_credit_not_billable: 'bad-request',
+  final_account_issued: 'conflict',
+  final_account_nothing_due: 'bad-request',
+  // The balance moved since the studio read it: reload and confirm the new figure.
+  final_account_changed: 'conflict',
+  open_variations: 'conflict',
+  cost_entry_not_found: 'not-found',
+  cost_entry_voided: 'conflict',
+  line_not_in_contract: 'bad-request',
 };
