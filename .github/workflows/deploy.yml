@@ -25,7 +25,11 @@ jobs:
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success'
           && vars.DEPLOY_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moves ubuntu-latest to Ubuntu 26 from
+    # Oct 19 2026 (actions/runner-images#14748), and the first CI run after that
+    # date failed only its OpenNext build while the same commit builds locally.
+    # Move to a newer image deliberately, in its own commit, CI and Deploy together.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
