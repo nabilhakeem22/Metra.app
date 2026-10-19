@@ -5,7 +5,7 @@
 import { finding, type Finding } from '../findings';
 import type { Decimal } from '../format';
 import { byCodePoint } from '../order';
-import { percentChange } from '../percent';
+import { percentChange } from '@metra/db/market-percent';
 import { monthKey, type CheckContext, type ResolvedRow } from './context';
 
 const SIBLING_PCT = 5;

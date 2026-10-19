@@ -3,7 +3,7 @@
 // dropped items, applied corrections.
 import { monthKey, type CheckContext, type PublishedHistory, type ResolvedRow } from '../check/context';
 import { FINDING_TITLES, isBlocking, type Finding, type FindingCode } from '../findings';
-import { percentChange } from '../percent';
+import { percentChange } from '@metra/db/market-percent';
 import { describePack } from '../roll-pack';
 import { marketUnitOf } from '../units';
 import type { StagedProvenance } from '../stage';

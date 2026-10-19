@@ -1,8 +1,12 @@
 // Percentage change between two decimals, exact: BigInt at 4 decimal places,
 // rounded half away from zero to ONE decimal place (the repo's money rounding,
 // apps/web/src/lib/aggregates/proposal-totals.ts). Rates are always computed,
-// never read from the bulletin's printed % column.
-import type { Decimal } from './format';
+// never read from the bulletin's printed % column. A LEAF with no imports, so
+// the owner's gate (packages/market-ingest: its checks and review.html) and the
+// studio's market screens (apps/web, client-safe) print ONE figure for a change.
+
+/** A plain decimal: Western digits, no sign, no grouping ("38200", "30.455", "400.0000"). */
+type Decimal = string;
 
 const SCALE_DIGITS = 4;
 

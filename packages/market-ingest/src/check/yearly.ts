@@ -4,7 +4,7 @@
 // Both only list; the checker never changes a value.
 import { finding, type Finding } from '../findings';
 import type { Decimal } from '../format';
-import { percentChange } from '../percent';
+import { percentChange } from '@metra/db/market-percent';
 import type { CheckContext } from './context';
 
 function tolerance(printed: string): number {

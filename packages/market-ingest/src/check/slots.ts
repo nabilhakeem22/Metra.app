@@ -2,7 +2,7 @@
 // 10,000,000, which catches unsplit merges such as 1596029811.
 import { finding, type Finding } from '../findings';
 import type { Slot } from '../format';
-import { decimalExceeds } from '../percent';
+import { decimalExceeds } from '@metra/db/market-percent';
 import type { CheckContext } from './context';
 
 const MAXIMUM_VALUE = '10000000';

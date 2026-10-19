@@ -143,6 +143,7 @@
     "comingSoon": "Coming soon",
     "support": "Support",
     "priceBook": "Price Book",
+    "marketBook": "Market prices",
     "clients": "Clients"
   },
   "shell": {
@@ -632,7 +633,9 @@
     "open_variations": "A change order is still waiting for a decision. Settle every open change order before the final account.",
     "cost_entry_not_found": "That cost entry no longer exists. Refresh the page.",
     "cost_entry_voided": "This cost entry was voided, so it cannot be changed.",
-    "line_not_in_contract": "That line is not part of this contract. Pick a line of this contract."
+    "line_not_in_contract": "That line is not part of this contract. Pick a line of this contract.",
+    "market_item_not_found": "This market item isn't available any more. Refresh the page and pick another one.",
+    "market_unit_incompatible": "The units don't match, so this market item can't be added or linked here."
   },
   "common": {
     "untranslated": "untranslated",
@@ -2749,6 +2752,64 @@
     }
   },
   "marketBook": {
+    "title": "Market prices",
+    "subtitle": "Official guide prices of building materials, month by month.",
+    "empty": {
+      "title": "No market prices yet",
+      "body": "Prices show here as soon as the first monthly bulletin is published. Nothing here is sample data."
+    },
+    "railLabel": "Categories",
+    "search": {
+      "label": "Search market prices",
+      "placeholder": "Search by name or size",
+      "submit": "Search",
+      "clear": "Clear search"
+    },
+    "results": {
+      "search": "Results for \"{query}\": {matched}",
+      "truncated": "Showing the first {shown}. Type more words to narrow it down.",
+      "none": "No market item matches this search."
+    },
+    "table": {
+      "item": "Item",
+      "latest": "Latest price",
+      "mom": "On last month",
+      "ytd": "Since January",
+      "trend": "Last 12 months",
+      "priceBook": "Your price book"
+    },
+    "change": {
+      "up": "Up {value}",
+      "down": "Down {value}",
+      "flat": "No change",
+      "none": "No figure"
+    },
+    "perUnit": "per {unit}",
+    "suspended": "Pricing suspended",
+    "discontinued": "No longer priced",
+    "inPriceBook": "In my price book",
+    "add": "Add to my price book",
+    "trend": "Price trend",
+    "drawer": {
+      "months": "Month by month",
+      "source": "Bulletin of {month}, page {page}",
+      "basis": "Price basis",
+      "loading": "Loading the months"
+    },
+    "addForm": {
+      "description": "A new item in your price book, linked to this market item. Its cost is the latest official price, and you can change it any time.",
+      "costFrom": "The official price of {month}",
+      "noPrice": "No official price yet, so the cost starts at 0",
+      "priceHint": "Leave it empty to sell at cost",
+      "save": "Add",
+      "added": "Added to your price book"
+    },
+    "attribution": {
+      "source": "Guide prices from the monthly building-materials price bulletin of the Ministry of Housing, Utilities and Urban Communities (Central Administration for Building Materials).",
+      "method": "Collected in Greater Cairo on days {fromDay} to {toDay} of each month. Prices include taxes and exclude transport, unless the item says otherwise. Company list prices before discounts.",
+      "notBinding": "For guidance only, not binding. CAPMAS prices are the legal reference for price-variation compensation.",
+      "asOf": "Latest bulletin: {month}"
+    },
     "units": {
       "ton": "Ton",
       "kg": "Kg",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decimalExceeds, percentChange } from './percent';
+import { decimalExceeds, percentChange } from './market-percent';
 
 describe('percentChange', () => {
   it('computes to one decimal place', () => {

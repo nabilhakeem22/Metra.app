@@ -2,6 +2,7 @@ import {
   BookText,
   Building2,
   Calculator,
+  ChartLine,
   Compass,
   FileSignature,
   FileText,
@@ -56,6 +57,12 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'priceBook',
         href: '/price-book',
         icon: BookText,
+        capability: 'price_book',
+      },
+      {
+        key: 'marketBook',
+        href: '/market-book',
+        icon: ChartLine,
         capability: 'price_book',
       },
       {

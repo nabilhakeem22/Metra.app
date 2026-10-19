@@ -12,6 +12,7 @@
     "./env": "./src/env.ts",
     "./lock-timeout": "./src/scripts/lock-timeout.ts",
     "./market-units": "./src/market-units.ts",
+    "./market-percent": "./src/market-percent.ts",
     "./market-seed": "./src/market-seed/index.ts",
     "./market-seed/db": "./src/market-seed/db.ts"
   },

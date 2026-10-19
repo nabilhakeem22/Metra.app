@@ -27,6 +27,8 @@ async function categoryId(): Promise<string> {
 export interface MarketItemOptions {
   nameAr?: string;
   nameEn?: string;
+  specAr?: string;
+  specEn?: string;
   /** A roll's one-length pack, in metres (a roll needs one). */
   packLengthM?: number;
   status?: 'active' | 'discontinued';
@@ -36,8 +38,9 @@ export interface MarketItemOptions {
 export async function seedMarketItem(unit = 'sqm', options: MarketItemOptions = {}): Promise<{ id: string; key: string }> {
   const key = `${CATEGORY.leaf}.dbtest_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const [row] = await pg<{ id: string }[]>`
-    insert into public.market_items (key, category_id, name_ar, name_en, unit, unit_label_ar, pack_length_m, status)
-    values (${key}, ${await categoryId()}, ${options.nameAr ?? 'زجاج شفاف'}, ${options.nameEn ?? 'Clear glass'}, ${unit}::market_unit, 'م2',
+    insert into public.market_items (key, category_id, name_ar, name_en, spec_ar, spec_en, unit, unit_label_ar, pack_length_m, status)
+    values (${key}, ${await categoryId()}, ${options.nameAr ?? 'زجاج شفاف'}, ${options.nameEn ?? 'Clear glass'},
+            ${options.specAr ?? null}, ${options.specEn ?? null}, ${unit}::market_unit, 'م2',
             ${options.packLengthM ?? null}, ${options.status ?? 'active'}::market_item_status)
     returning id`;
   seeded.items.add(row.id);

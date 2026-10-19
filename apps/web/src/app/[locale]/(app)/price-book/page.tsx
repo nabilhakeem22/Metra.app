@@ -1,6 +1,9 @@
+import { ChartLine } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { can } from '@/lib/permissions/can';
 import { readPriceBookView } from '@/lib/price-book/page-params';
@@ -19,7 +22,7 @@ export default async function PriceBookPage({
   if (!can(ctx.role, 'price_book', 'read')) notFound();
 
   const view = readPriceBookView(await searchParams);
-  const [t, locale] = await Promise.all([getTranslations('priceBook'), getLocale()]);
+  const [t, tm, locale] = await Promise.all([getTranslations('priceBook'), getTranslations('marketBook'), getLocale()]);
   const [book, sectionRows]: [PriceBookPageData, Awaited<ReturnType<typeof listSections>>] = await Promise.all([
     listPriceBookPage(ctx, view, locale),
     listSections(ctx),
@@ -36,7 +39,18 @@ export default async function PriceBookPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t('title')} description={t('subtitle')} />
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        action={
+          <Button variant="secondary" asChild>
+            <Link href="/market-book">
+              <ChartLine className="size-4" aria-hidden />
+              {tm('title')}
+            </Link>
+          </Button>
+        }
+      />
       <PriceBookClient view={view} book={book} sections={sections} canManage={canManage} />
     </div>
   );

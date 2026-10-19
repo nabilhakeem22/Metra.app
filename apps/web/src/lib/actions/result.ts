@@ -6,6 +6,7 @@ import type { CommonActionCode } from './action-codes/common';
 import type { DocumentActionCode } from './action-codes/documents';
 import type { EngagementActionCode } from './action-codes/engagements';
 import type { ExecutionActionCode } from './action-codes/execution';
+import type { MarketBookActionCode } from './action-codes/market-book';
 import type { FieldErrors, MessageParams } from './field-errors';
 
 /** Every error code an action can return; each code lives in exactly one group file. */
@@ -13,7 +14,8 @@ export type ActionCode =
   | CommonActionCode
   | DocumentActionCode
   | EngagementActionCode
-  | ExecutionActionCode;
+  | ExecutionActionCode
+  | MarketBookActionCode;
 
 /**
  * A code `err` / `fail` may produce: never the literal 'check_fields', which only

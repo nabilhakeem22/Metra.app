@@ -196,4 +196,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   cost_entry_not_found: 'not-found',
   cost_entry_voided: 'conflict',
   line_not_in_contract: 'bad-request',
+  market_item_not_found: 'not-found',
+  market_unit_incompatible: 'bad-request',
 };
