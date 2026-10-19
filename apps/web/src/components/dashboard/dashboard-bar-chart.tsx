@@ -37,6 +37,7 @@ export function DashboardBarChart({
   series,
   emptyLabel,
   totalLabel,
+  caption,
 }: {
   title: string;
   /** One sentence describing the chart, for the region label. */
@@ -47,6 +48,8 @@ export function DashboardBarChart({
   emptyLabel: string;
   /** Label for the total line in the hover read-out, e.g. "Total". */
   totalLabel: string;
+  /** Where the figures come from (the rescue ledger's "Based on your data"), under the title. */
+  caption?: string;
 }) {
   const totals = columns.map((c) =>
     c.segments.reduce((sum, s) => sum + Math.max(0, s.value), 0),
@@ -57,7 +60,7 @@ export function DashboardBarChart({
     return (
       <Card>
         <CardContent className="space-y-3 py-4">
-          <ChartHeader title={title} series={series} />
+          <ChartHeader title={title} caption={caption} series={series} />
           <p className="py-8 text-center text-body text-muted-foreground">{emptyLabel}</p>
         </CardContent>
       </Card>
@@ -69,7 +72,7 @@ export function DashboardBarChart({
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <ChartHeader title={title} series={series} />
+        <ChartHeader title={title} caption={caption} series={series} />
 
         {/* Headroom for the read-out lives on a WRAPPER, not on the sized row:
             `h-32` is border-box, so padding on the row itself would eat the bars'
@@ -181,10 +184,13 @@ export function DashboardBarChart({
 }
 
 /** Title plus the colour legend — shared by the populated and empty states. */
-function ChartHeader({ title, series }: { title: string; series: ChartSeries[] }) {
+function ChartHeader({ title, caption, series }: { title: string; caption?: string; series: ChartSeries[] }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <p className="text-body font-semibold">{title}</p>
+      <div>
+        <p className="text-body font-semibold">{title}</p>
+        {caption && <p className="text-caption font-semibold text-[color:var(--text-muted)]">{caption}</p>}
+      </div>
       <ul className="flex flex-wrap items-center gap-3">
         {series.map((s) => (
           <li

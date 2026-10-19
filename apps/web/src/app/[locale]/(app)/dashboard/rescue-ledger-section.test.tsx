@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const render = () => renderWithIntl(<RescueLedgerSection range={12} />, { locale: 'en' });
+const render = () => renderWithIntl(<RescueLedgerSection range={12} orgId="org-1" />, { locale: 'en' });
 
 describe('RescueLedgerSection', () => {
   test('asks its own route for the window, never cached, and shows a skeleton until it answers', async () => {
@@ -29,7 +29,7 @@ describe('RescueLedgerSection', () => {
     expect(await screen.findByText(en('dashboard.rescue.title'))).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/dashboard/rescue-ledger?range=12');
+    expect(url).toBe('/api/dashboard/rescue-ledger?range=12&org=org-1');
     expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store' });
   });
 
@@ -52,6 +52,26 @@ describe('RescueLedgerSection', () => {
     fireEvent.click(screen.getByRole('button', { name: en('dashboard.rescue.retry') }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole('alert')).toBeTruthy();
+  });
+
+  test('past the read budget it says to wait, and retry asks again', async () => {
+    fetchMock.mockReturnValueOnce(json(429, { ok: false, error: 'rate_limited' }));
+    fetchMock.mockReturnValueOnce(json(200, { ok: true, ledger: LEDGER }));
+    render();
+    expect((await screen.findByRole('alert')).textContent).toContain(en('dashboard.rescue.rateLimited'));
+    fireEvent.click(screen.getByRole('button', { name: en('dashboard.rescue.retry') }));
+    expect(await screen.findByText(en('dashboard.rescue.title'))).toBeTruthy();
+  });
+
+  test('a workspace switched in another tab offers a reload, never the other figures', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
+    fetchMock.mockReturnValue(json(409, { ok: false, error: 'workspace_changed' }));
+    render();
+    expect((await screen.findByRole('alert')).textContent).toContain(en('dashboard.rescue.workspaceChanged'));
+    fireEvent.click(screen.getByRole('button', { name: en('dashboard.rescue.reload') }));
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(en('dashboard.rescue.title'))).toBeNull();
   });
 
   test('a refusal renders nothing at all', async () => {

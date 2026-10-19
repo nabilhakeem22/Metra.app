@@ -175,7 +175,7 @@ describe('DashboardView — the fence proves BOTH ways', () => {
 describe('DashboardView: the rescue ledger island (D1)', () => {
   // The page hands `rescue` exactly when canSeeRescueLedger says so; the view
   // renders the island for it and nothing otherwise.
-  const rescueFor = (role: MemberRole) => (canSeeRescueLedger(role, { restrictFirmDashboard: false }) ? { range: 12 as const } : null);
+  const rescueFor = (role: MemberRole) => (canSeeRescueLedger(role, { restrictFirmDashboard: false }) ? { range: 12 as const, orgId: 'org-1' } : null);
 
   test.each(['owner', 'admin', 'accountant'] as const)('%s gets the island, with the dashboard window', (role) => {
     renderView({ rescue: rescueFor(role) });

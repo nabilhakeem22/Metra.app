@@ -2,7 +2,8 @@ import 'server-only';
 // The rescue ledger's ONE statement (Risk & Rescue Ledger v1). Every figure is
 // aggregated in Postgres, money included (numeric, returned as text), so no
 // money math happens in JavaScript; the answer is at most 52 rows: per risk,
-// one row per month plus the window total.
+// one row per month plus the window total. The history it reads is bounded
+// (window-sql.ts) and each rule is one file of SQL pieces.
 //
 // The org's "limit firm figures" flag rides in the SAME statement, because a
 // role it narrows out (the accountant) can only be refused once it is known.
@@ -11,8 +12,10 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { RangeMonths } from '../range';
-import { rangeStartSql } from '../queries/range-start';
-import { changeOrderFacts, heldFeeFacts, ledgerRows, stagesMovedFacts } from './rescue-facts-sql';
+import { changeOrderFacts } from './change-orders-sql';
+import { heldFeeFacts } from './held-fees-sql';
+import { stagesMovedFacts } from './stages-moved-sql';
+import { historyCtes, windowCtes } from './window-sql';
 import type { RescueLedgerRow } from './types';
 
 export interface RescueLedgerRead {
@@ -39,8 +42,8 @@ export async function loadRescueLedgerRows(
 ): Promise<RescueLedgerRead> {
   const raw = (await withOrgContext(ctx, (tx) =>
     tx.execute(sql`
-      with window_start as (select ${rangeStartSql(range)} as at),
-      ${ledgerRows()},
+      with ${windowCtes(range)},
+      ${historyCtes()},
       ${heldFeeFacts()},
       ${changeOrderFacts()},
       ${stagesMovedFacts()},

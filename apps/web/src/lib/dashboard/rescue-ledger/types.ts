@@ -59,4 +59,4 @@ export interface RescueLedger {
 
 export type RescueLedgerResponse =
   | { ok: true; ledger: RescueLedger }
-  | { ok: false; error: 'unauthorized' | 'forbidden' | 'generic'; reference?: string };
+  | { ok: false; error: 'unauthorized' | 'forbidden' | 'generic' | 'rate_limited' | 'workspace_changed'; reference?: string };

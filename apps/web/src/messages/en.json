@@ -254,24 +254,26 @@
     },
     "rescue": {
       "title": "Rescue ledger",
-      "summary": "What Metra caught for you in the last {n} months, from your own records.",
+      "summary": "What Metra caught for you in the last {count, plural, one {month} other {{countText} months}}, from your own records.",
       "basedOnYourData": "Based on your data",
       "cards": {
         "collected": "Collected",
         "collectedHint": "Real payments only. Never added to estimates.",
         "heldFees": "Stage fees paid while the stage was held",
         "changeOrders": "Extra revisions billed and paid",
-        "moneyInputs": "{payments} payments on {deliveries} deliveries",
+        "moneyInputs": "{paymentCount, plural, one {{paymentText} payment} other {{paymentText} payments}} on {deliveryCount, plural, one {{deliveryText} delivery} other {{deliveryText} deliveries}}",
+        "moneyNone": "No payment counted in this period.",
         "stagesMoved": "Stages moved after a follow up",
-        "stagesMovedInputs": "Metra flagged {followups} waits, you sent or prepared a reminder, and the stage moved.",
+        "stagesMovedInputs": "Metra flagged {followupCount, plural, one {{followupText} wait} other {{followupText} waits}}, you sent or prepared a reminder, and the stage moved.",
+        "stagesMovedNone": "No waits flagged in this period.",
         "protectedTitle": "Protected · estimated",
         "protectedLocked": "Shows once market rates are set. It will never be added to collected money."
       },
       "charts": {
         "collected": "Collected per month",
-        "collectedSummary": "Money collected in the last {n} months, split by held stage fees and change orders.",
+        "collectedSummary": "Money collected in the last {count, plural, one {month} other {{countText} months}}, split by held stage fees and change orders.",
         "stagesMoved": "Stages moved per month",
-        "stagesMovedSummary": "Stages that moved after a follow up in the last {n} months."
+        "stagesMovedSummary": "Stages that moved after a follow up in the last {count, plural, one {month} other {{countText} months}}."
       },
       "series": {
         "heldFees": "Held stage fees",
@@ -282,7 +284,10 @@
       "empty": "Nothing caught in this period yet.",
       "loading": "Loading the ledger",
       "loadFailed": "We could not load the ledger.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "rateLimited": "The ledger was asked for too often in a short time. Wait a minute, then try again.",
+      "workspaceChanged": "You switched workspace in another tab. Reload the page to see the ledger of the workspace you are in now.",
+      "reload": "Reload the page"
     }
   },
   "team": {
@@ -525,6 +530,7 @@
     "invite_not_found": "This invitation link is not valid; it may have been used or cancelled. Ask the person who invited you for a new link.",
     "otp_verify_failed": "That code is wrong or has expired. Type the newest code we sent, or ask for a new one.",
     "otp_rate_limited": "Too many codes were requested. Wait a minute, then ask for a new one.",
+    "rate_limited": "Too many requests in a short time. Wait a minute, then try again.",
     "otp_sms_unavailable": "We cannot send text messages right now. Sign in with your email instead.",
     "otp_email_unavailable": "We cannot send email to this address yet. Sign in with your phone number, or contact us.",
     "immutable": "This record is locked, so it cannot be changed. Refresh the page to see its current state.",

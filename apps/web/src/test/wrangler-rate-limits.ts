@@ -38,3 +38,4 @@ export function rateLimitCeiling(name: string): number {
 /** The two portal budgets' ceilings. */
 export const PORTAL_ACT_CEILING = rateLimitCeiling('PORTAL_ACT_RATE_LIMITER');
 export const PORTAL_READ_CEILING = rateLimitCeiling('PORTAL_READ_RATE_LIMITER');
+export const STUDIO_READ_CEILING = rateLimitCeiling('STUDIO_READ_RATE_LIMITER');

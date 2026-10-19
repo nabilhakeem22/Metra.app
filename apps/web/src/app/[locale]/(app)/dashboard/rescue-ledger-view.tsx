@@ -4,6 +4,7 @@ import { DashboardBarChart } from '@/components/dashboard/dashboard-bar-chart';
 import { RescueFigureCard } from '@/components/dashboard/rescue-figure-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { collectedColumns, RESCUE_SERIES_KEYS, stagesMovedColumns } from '@/lib/dashboard/rescue-ledger/chart-columns';
+import { pluralParams } from '@/lib/dashboard/rescue-ledger/plural-params';
 import type { RescueLedger, RescueMoneyFigure } from '@/lib/dashboard/rescue-ledger/types';
 import { cachedDateTimeFormat } from '@/lib/format/intl-cache';
 import { formatMoney } from '@/lib/format/money';
@@ -18,18 +19,28 @@ import { formatNumber } from '@/lib/format/number';
 
 export function RescueLedgerView({ ledger, locale }: { ledger: RescueLedger; locale: string }) {
   const t = useTranslations('dashboard.rescue');
-  const n = formatNumber(ledger.rangeMonths, locale);
+  const months = pluralParams('count', 'countText', ledger.rangeMonths, locale);
   const monthLabel = (month: string) =>
     cachedDateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
+  // A zero figure gets a line that claims nothing happened, never "0 payments on 0 deliveries".
   const moneyInputs = (figure: RescueMoneyFigure) =>
-    t('cards.moneyInputs', { payments: formatNumber(figure.payments, locale), deliveries: formatNumber(figure.deliveries, locale) });
+    figure.payments === 0
+      ? t('cards.moneyNone')
+      : t('cards.moneyInputs', {
+          ...pluralParams('paymentCount', 'paymentText', figure.payments, locale),
+          ...pluralParams('deliveryCount', 'deliveryText', figure.deliveries, locale),
+        });
+  const stagesMovedInputs =
+    ledger.stagesMoved.count === 0
+      ? t('cards.stagesMovedNone')
+      : t('cards.stagesMovedInputs', pluralParams('followupCount', 'followupText', ledger.stagesMoved.followups, locale));
   const source = t('basedOnYourData');
 
   return (
     <section className="flex flex-col gap-[14px]" aria-labelledby="rescue-ledger-title">
       <div className="px-1.5">
         <h2 id="rescue-ledger-title" className="text-title font-bold text-[color:var(--text)]">{t('title')}</h2>
-        <p className="text-body text-[color:var(--text-muted)]">{t('summary', { n })}</p>
+        <p className="text-body text-[color:var(--text-muted)]">{t('summary', months)}</p>
       </div>
 
       <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-3">
@@ -55,7 +66,7 @@ export function RescueLedgerView({ ledger, locale }: { ledger: RescueLedger; loc
         <RescueFigureCard
           title={t('cards.stagesMoved')}
           figure={formatNumber(ledger.stagesMoved.count, locale)}
-          inputs={t('cards.stagesMovedInputs', { followups: formatNumber(ledger.stagesMoved.followups, locale) })}
+          inputs={stagesMovedInputs}
           sourceTag={source}
         />
         <Card className="h-full sm:col-span-2 lg:col-span-2">
@@ -72,7 +83,8 @@ export function RescueLedgerView({ ledger, locale }: { ledger: RescueLedger; loc
       <div className="grid gap-[14px] lg:grid-cols-2">
         <DashboardBarChart
           title={t('charts.collected')}
-          summary={t('charts.collectedSummary', { n })}
+          summary={t('charts.collectedSummary', months)}
+          caption={source}
           columns={collectedColumns(ledger.months, locale, monthLabel)}
           series={[
             { key: RESCUE_SERIES_KEYS.heldFees, label: t('series.heldFees'), token: '--chart-1' },
@@ -83,7 +95,8 @@ export function RescueLedgerView({ ledger, locale }: { ledger: RescueLedger; loc
         />
         <DashboardBarChart
           title={t('charts.stagesMoved')}
-          summary={t('charts.stagesMovedSummary', { n })}
+          summary={t('charts.stagesMovedSummary', months)}
+          caption={source}
           columns={stagesMovedColumns(ledger.months, locale, monthLabel)}
           series={[{ key: RESCUE_SERIES_KEYS.stagesMoved, label: t('series.stagesMoved'), token: '--chart-1' }]}
           emptyLabel={t('empty')}

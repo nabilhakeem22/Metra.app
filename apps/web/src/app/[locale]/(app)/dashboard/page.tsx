@@ -87,7 +87,7 @@ export default async function DashboardPage({
         }
       }
       // A pure predicate, no query: the ledger loads in its island's own request.
-      rescue={canSeeRescueLedger(ctx.role, org) ? { range } : null}
+      rescue={canSeeRescueLedger(ctx.role, org) ? { range, orgId: ctx.orgId } : null}
       locale={locale}
       now={new Date()}
     />

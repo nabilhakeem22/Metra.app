@@ -1,9 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { loadRescueLedgerCore } from '@/lib/dashboard/rescue-ledger/core';
 import { loadRescueLedgerRows } from '@/lib/dashboard/rescue-ledger/queries';
-import type { RescueLedger } from '@/lib/dashboard/rescue-ledger/types';
 import { closeFixture, raw, teardown } from './fixture';
-import { changeOrder, DAY_MS, delivery, followupAlert, HOUR_MS, payment, reminder, rescueOrg, transition, type RescueOrg } from './rescue-ledger-fixture';
+import { changeOrder, DAY_MS, delivery, followupAlert, HOUR_MS, ledgerOf, milestone, payment, reminder, rescueOrg, transition, type RescueOrg } from './rescue-ledger-fixture';
 
 // The ledger's bounds against a real database: ONE statement, at most 52 rows,
 // monthly sums that equal the totals, an empty org that reads as zeros, and an
@@ -48,6 +46,7 @@ async function everyRiskEveryMonth(org: RescueOrg, months: number, firstNumber =
     const start = (await monthStart(back)).getTime();
     const day = (days: number, hours = 0) => new Date(start + days * DAY_MS + hours * HOUR_MS);
     const id = await delivery(org, firstNumber + back);
+    await milestone(org, id, 'deposit', '1000.25');
     await transition(org, id, 'submitDesignFee', 'created', 'design_proposal', day(1));
     await changeOrder(org, id, '250.5', day(1, 1));
     await payment(org, id, 'deposit', '1000.25', day(2));
@@ -57,12 +56,6 @@ async function everyRiskEveryMonth(org: RescueOrg, months: number, firstNumber =
     await reminder(org, id, 'prepared', day(3, 2));
     await transition(org, id, 'spatialBaseReady', 'survey', 'layout', day(4));
   }
-}
-
-async function ledgerOf(org: RescueOrg, range: 3 | 6 | 12): Promise<RescueLedger> {
-  const result = await loadRescueLedgerCore(org.contexts.owner, { range });
-  if (!result.ok) throw new Error(`ledger refused: ${result.error}`);
-  return result.data;
 }
 
 /** Piastre exact sum of scale 4 money strings, back to a scale 4 string. */

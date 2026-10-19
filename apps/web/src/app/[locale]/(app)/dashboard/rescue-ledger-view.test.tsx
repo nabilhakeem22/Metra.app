@@ -58,17 +58,34 @@ describe('RescueLedgerView', () => {
     expect(card.textContent).not.toMatch(/[0-9]/);
   });
 
-  test('the cards carry their inputs and their source', () => {
+  // F5: real plural forms, with Latin digits. These assert rendered WORDS on
+  // purpose: choosing the plural form is the behaviour under test.
+  test('en: the cards carry their inputs in the right plural, and every figure its source', () => {
     render(FILLED, 'en');
     expect(screen.getByText('3 payments on 2 deliveries')).toBeTruthy();
-    expect(screen.getByText(messageAt('en', 'dashboard.rescue.cards.stagesMovedInputs').replace('{followups}', '9'))).toBeTruthy();
-    expect(screen.getAllByText(messageAt('en', 'dashboard.rescue.basedOnYourData'))).toHaveLength(4);
+    expect(screen.getByText('1 payment on 1 delivery')).toBeTruthy();
+    expect(screen.getByText(/^Metra flagged 9 waits,/)).toBeTruthy();
+    expect(screen.getByText(/in the last 6 months,/)).toBeTruthy();
+    // Four figure cards and both charts.
+    expect(screen.getAllByText(messageAt('en', 'dashboard.rescue.basedOnYourData'))).toHaveLength(6);
+  });
+
+  test('ar-EG: the Arabic plural forms, never Arabic-Indic digits', () => {
+    render(FILLED, 'ar-EG');
+    expect(screen.getByText('3 دفعات على تسليمين')).toBeTruthy();
+    expect(screen.getByText('دفعة واحدة على تسليم واحد')).toBeTruthy();
+    expect(screen.getByText(/^ميترا نبهتك 9 مرات،/)).toBeTruthy();
+    expect(screen.getByText(/في آخر 6 شهور،/)).toBeTruthy();
   });
 
   test.each(LOCALES)('%s: an empty ledger shows zeros and the empty line in both charts, no error', (locale) => {
     render(EMPTY, locale);
     expect(screen.getAllByText(messageAt(locale, 'dashboard.rescue.empty'))).toHaveLength(2);
     expect(screen.getAllByText(formatMoney('0.0000', locale))).toHaveLength(3);
+    // The zero state claims no action and no outcome.
+    expect(screen.getAllByText(messageAt(locale, 'dashboard.rescue.cards.moneyNone'))).toHaveLength(3);
+    expect(screen.getByText(messageAt(locale, 'dashboard.rescue.cards.stagesMovedNone'))).toBeTruthy();
+    expect(screen.queryByText(/\d payments? on|Metra flagged|دفعة على|ولا دفعة|ميترا نبهتك/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });

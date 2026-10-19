@@ -5,6 +5,8 @@
 // table, so the fixture's teardown already covers every row. Not a test file.
 import { randomUUID } from 'node:crypto';
 import type { MemberRole } from '@metra/db';
+import { loadRescueLedgerCore } from '@/lib/dashboard/rescue-ledger/core';
+import type { RescueLedger } from '@/lib/dashboard/rescue-ledger/types';
 import type { OrgContext } from '@/lib/db/context';
 import { ctxFor, raw, seedOrg } from './fixture';
 
@@ -62,6 +64,22 @@ export async function payment(org: RescueOrg, engagementId: string, kind: string
   return id;
 }
 
+/** The fee schedule row the gate's guard reads: an `amount` milestone, or a `percent` one of `designFee`. */
+export async function milestone(
+  org: RescueOrg,
+  engagementId: string,
+  kind: string,
+  value: string,
+  basis: 'amount' | 'percent' = 'amount',
+  designFee?: string,
+): Promise<void> {
+  await raw.query(
+    `insert into public.engagement_milestones (org_id, engagement_id, kind, basis, value)
+     values ('${org.orgId}', '${engagementId}', '${kind}', '${basis}', ${value})`,
+  );
+  if (designFee) await raw.query(`update public.design_engagements set design_fee = ${designFee} where id = '${engagementId}'`);
+}
+
 export async function changeOrder(org: RescueOrg, engagementId: string, amount: string, at: Date): Promise<void> {
   await raw.query(
     `insert into public.engagement_change_orders (org_id, engagement_id, amount, raised_by_user_id, raised_at)
@@ -89,4 +107,11 @@ export async function reminder(org: RescueOrg, engagementId: string, kind: strin
 export async function monthOf(at: Date): Promise<string> {
   const [row] = await raw.query<{ month: string }>(`select to_char(date_trunc('month', '${iso(at)}'::timestamptz), 'YYYY-MM') as month`);
   return row.month;
+}
+
+/** The owner's ledger for `range` months; a refusal fails the test with its code. */
+export async function ledgerOf(org: RescueOrg, range: 3 | 6 | 12 = 6): Promise<RescueLedger> {
+  const result = await loadRescueLedgerCore(org.contexts.owner, { range });
+  if (!result.ok) throw new Error(`ledger refused: ${result.error}`);
+  return result.data;
 }

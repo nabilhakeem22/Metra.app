@@ -60,7 +60,7 @@ export interface DashboardViewProps {
   deliveries: DashboardDeliveriesBlock | null;
   /** NULL when this role may not see the rescue ledger (D1). The ledger itself
    *  is fetched by its island from its own route, never in this render. */
-  rescue: { range: RangeMonths } | null;
+  rescue: { range: RangeMonths; orgId: string } | null;
   locale: string;
   /** Passed in so the server renders one consistent "today" for every row. */
   now: Date;
@@ -129,7 +129,7 @@ export function DashboardView({
 
       {/* Keyed by the window, so a new range starts from the skeleton rather
           than showing the previous window's figures under the new filter. */}
-      {rescue && <RescueLedgerSection key={rescue.range} range={rescue.range} />}
+      {rescue && <RescueLedgerSection key={rescue.range} range={rescue.range} orgId={rescue.orgId} />}
     </div>
   );
 }

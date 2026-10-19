@@ -39,7 +39,7 @@ async function renderPage(role: string, range = '12') {
 describe('dashboard page: the rescue ledger island', () => {
   it.each(['owner', 'admin', 'accountant'])('hands %s the island with the window, and opens no extra org context', async (role) => {
     const element = await renderPage(role);
-    expect(element.props.rescue).toEqual({ range: 12 });
+    expect(element.props.rescue).toEqual({ range: 12, orgId: 'org-1' });
     expect(deps.withOrgContext).toHaveBeenCalledTimes(1);
     expect(deps.loadDashboardFigures).toHaveBeenCalledTimes(1);
   });

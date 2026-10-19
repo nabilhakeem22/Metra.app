@@ -37,6 +37,9 @@ export type CommonActionCode =
   | 'otp_verify_failed'
   // Supabase refused to send a sign-in code, by cause (lib/auth/otp-failure.ts).
   | 'otp_rate_limited'
+  // A member asked for an expensive studio read too often in a short time
+  // (lib/cf/studio-read-rate-limit.ts): wait a minute and ask again.
+  | 'rate_limited'
   | 'otp_sms_unavailable'
   | 'otp_email_unavailable'
   | 'immutable'
