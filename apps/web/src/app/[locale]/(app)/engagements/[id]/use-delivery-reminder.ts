@@ -11,6 +11,7 @@ import {
   rotateDeliveryLink,
   shareDeliveryLink,
 } from '@/lib/engagements/actions';
+import { recordWhatsappOpened } from '@/lib/engagements/reminder/whatsapp-opened-request';
 import { reminderViewOf, type ReminderView } from './reminder-view';
 import {
   DELIVERY_LINK_CHANGED_EVENT,
@@ -41,6 +42,8 @@ export interface DeliveryReminderApi {
   emailResult: { ok: true } | { ok: false; failure: ShownFailure } | null;
   copied: boolean;
   copy: () => void;
+  /** "Open WhatsApp" was clicked: recorded (the rescue ledger's WhatsApp reminder), never awaited. */
+  whatsappOpened: () => void;
 }
 
 type Result<T = undefined> = { ok: boolean; error?: ActionCode; reference?: string; data?: T };
@@ -156,5 +159,6 @@ export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
       void navigator.clipboard?.writeText(view.reminder.messages[locale]);
       setCopied(true);
     },
+    whatsappOpened: () => recordWhatsappOpened(engagementId),
   };
 }

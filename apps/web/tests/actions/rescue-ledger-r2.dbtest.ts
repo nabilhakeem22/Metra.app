@@ -38,10 +38,10 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     expect(ledger.months.find((m) => m.month === month)?.stagesMoved).toBe(1);
   });
 
-  it('counts a prepared WhatsApp reminder (D3)', async () => {
+  it('counts a click on Open WhatsApp (D3)', async () => {
     const org = await rescueOrg(orgIds);
     const id = await waitingAtConcept(org, 1);
-    await reminder(org, id, 'prepared', at(1, 1));
+    await reminder(org, id, 'whatsapp_opened', at(1, 1));
     await advance(org, id, 3);
     expect((await ledgerOf(org)).stagesMoved.count).toBe(1);
   });
@@ -64,7 +64,7 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     const org = await rescueOrg(orgIds);
     const id = await waitingAtConcept(org, 1);
     await advance(org, id, 3);
-    await reminder(org, id, 'prepared', at(4));
+    await reminder(org, id, 'whatsapp_opened', at(4));
     await transition(org, id, 'confirmConcept', 'negotiation', 'design_3d', at(5));
     expect((await ledgerOf(org)).stagesMoved.count).toBe(0);
   });
@@ -84,7 +84,7 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     await reminder(org, id, 'email', at(1, 1));
     for (const week of [8, 15]) {
       await followupAlert(org, id, at(week));
-      await reminder(org, id, 'prepared', at(week, 1));
+      await reminder(org, id, 'whatsapp_opened', at(week, 1));
     }
     await advance(org, id, 17);
     expect((await ledgerOf(org)).stagesMoved).toEqual({ count: 1, deliveries: 1, followups: 3 });
@@ -96,10 +96,10 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     await transition(org, looped, 'confirmConcept', 'concept_review', 'negotiation', at(0));
     await followupAlert(org, looped, at(1));
     await transition(org, looped, 'requestRevision', 'negotiation', 'negotiation', at(2));
-    await reminder(org, looped, 'prepared', at(2, 1));
+    await reminder(org, looped, 'whatsapp_opened', at(2, 1));
     await transition(org, looped, 'confirmConcept', 'negotiation', 'design_3d', at(3));
     const dropped = await waitingAtConcept(org, 2);
-    await reminder(org, dropped, 'prepared', at(1, 1));
+    await reminder(org, dropped, 'whatsapp_opened', at(1, 1));
     await transition(org, dropped, 'abandon', 'concept_review', 'abandoned', at(3));
     expect((await ledgerOf(org)).stagesMoved).toEqual({ count: 1, deliveries: 1, followups: 1 });
   });
@@ -109,7 +109,7 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
     const id = await delivery(org, 1);
     await transition(org, id, 'rendersReady', 'design_3d', 'final_approval', at(0));
     await followupAlert(org, id, at(1));
-    await reminder(org, id, 'prepared', at(1, 1));
+    await reminder(org, id, 'whatsapp_opened', at(1, 1));
     await transition(org, id, 'approveDesign', 'final_approval', 'shop_drawings', at(3));
     expect((await ledgerOf(org)).stagesMoved.count).toBe(0);
   });
@@ -117,7 +117,7 @@ describe('R2: a follow up, a reminder, then the stage moved', () => {
   it('ignores an alert whose key names no delivery, without failing the read', async () => {
     const org = await rescueOrg(orgIds);
     const id = await waitingAtConcept(org, 1);
-    await reminder(org, id, 'prepared', at(1, 1));
+    await reminder(org, id, 'whatsapp_opened', at(1, 1));
     await advance(org, id, 3);
     await raw.query(`insert into public.automation_run_log (org_id, automation_key, period_key, created_at)
       values ('${org.orgId}', 'delivery-followup', 'not-a-uuid:2026-W40', '${at(1).toISOString()}')`);

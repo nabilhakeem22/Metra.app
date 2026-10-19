@@ -24,7 +24,7 @@ async function chain(org: RescueOrg, number: number, alertAt: Date, moveAt: Date
   return id;
 }
 
-describe('R2 action: the rows the reminder dialog writes (F3)', () => {
+describe('R2 action: the rows the reminder dialog writes (F3, lead ruling Oct 20)', () => {
   it('prepared, then an email, then email_failed: the failed email decides, 0', async () => {
     const org = await rescueOrg(orgIds);
     const id = await chain(org, 1, at(1), at(3));
@@ -42,19 +42,29 @@ describe('R2 action: the rows the reminder dialog writes (F3)', () => {
     expect((await ledgerOf(org)).stagesMoved.count).toBe(1);
   });
 
-  it('prepared alone, no email within the cooldown: the WhatsApp reminder counts, 1 (D3)', async () => {
+  it('the dialog opened and closed (prepared rows only, on open and on focus): 0', async () => {
     const org = await rescueOrg(orgIds);
     const id = await chain(org, 1, at(1), at(3));
     await reminder(org, id, 'prepared', at(1, 1));
+    await reminder(org, id, 'prepared', seconds(at(1, 1), 45));
+    expect((await ledgerOf(org)).stagesMoved.count).toBe(0);
+  });
+
+  it('the dialog opened and Open WhatsApp clicked: 1 (D3)', async () => {
+    const org = await rescueOrg(orgIds);
+    const id = await chain(org, 1, at(1), at(3));
+    await reminder(org, id, 'prepared', at(1, 1));
+    await reminder(org, id, 'whatsapp_opened', seconds(at(1, 1), 10));
     expect((await ledgerOf(org)).stagesMoved.count).toBe(1);
   });
 
-  it('prepared, then a failed email 20 minutes later: the prepared text stands, 1', async () => {
+  it('prepared, then an email that failed, then Open WhatsApp: the click counts, 1', async () => {
     const org = await rescueOrg(orgIds);
     const id = await chain(org, 1, at(1), at(3));
     await reminder(org, id, 'prepared', at(1, 1));
-    await reminder(org, id, 'email', seconds(at(1, 1), 20 * 60));
-    await reminder(org, id, 'email_failed', seconds(at(1, 1), 20 * 60 + 5));
+    await reminder(org, id, 'email', seconds(at(1, 1), 20));
+    await reminder(org, id, 'email_failed', seconds(at(1, 1), 25));
+    await reminder(org, id, 'whatsapp_opened', seconds(at(1, 1), 40));
     expect((await ledgerOf(org)).stagesMoved.count).toBe(1);
   });
 });
@@ -68,7 +78,7 @@ describe('R2 window: bucketed on the stage move (F2)', () => {
     const windowStart = new Date(start);
     const alertAt = new Date(windowStart.getTime() - HOUR_MS);
     const id = await chain(org, 1, alertAt, new Date(windowStart.getTime() + 2 * DAY_MS));
-    await reminder(org, id, 'prepared', new Date(windowStart.getTime() - HOUR_MS / 2));
+    await reminder(org, id, 'whatsapp_opened', new Date(windowStart.getTime() - HOUR_MS / 2));
     const month = await monthOf(new Date(windowStart.getTime() + 2 * DAY_MS));
     for (const range of [3, 6, 12] as const) {
       const ledger = await ledgerOf(org, range);
@@ -80,7 +90,7 @@ describe('R2 window: bucketed on the stage move (F2)', () => {
   it('an alert more than 60 days before the move is not part of its chain', async () => {
     const org = await rescueOrg(orgIds);
     const id = await chain(org, 1, at(-40), at(25));
-    await reminder(org, id, 'prepared', at(-39));
+    await reminder(org, id, 'whatsapp_opened', at(-39));
     expect((await ledgerOf(org)).stagesMoved.count).toBe(0);
   });
 });

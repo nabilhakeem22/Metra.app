@@ -21,19 +21,20 @@ function bindingNamesInCode(): string[] {
 describe('wrangler.jsonc ratelimits', () => {
   const entries = configuredRateLimits();
 
-  it('declares the five bindings, each over 60 seconds', () => {
+  it('declares the six bindings, each over 60 seconds', () => {
     expect(entries.map(({ name, simple }) => [name, simple.period])).toEqual([
       ['API_RATE_LIMITER', 60],
       ['API_PREAUTH_RATE_LIMITER', 60],
       ['PORTAL_ACT_RATE_LIMITER', 60],
       ['PORTAL_READ_RATE_LIMITER', 60],
       ['STUDIO_READ_RATE_LIMITER', 60],
+      ['STUDIO_SEARCH_RATE_LIMITER', 60],
     ]);
   });
 
   it('keeps the settled ceilings, and a whole positive READ ceiling', () => {
     const ceiling = (name: string) => entries.find((entry) => entry.name === name)?.simple.limit;
-    expect([ceiling('API_RATE_LIMITER'), ceiling('API_PREAUTH_RATE_LIMITER'), ceiling('PORTAL_ACT_RATE_LIMITER'), ceiling('STUDIO_READ_RATE_LIMITER')]).toEqual([100, 300, 30, 30]);
+    expect([ceiling('API_RATE_LIMITER'), ceiling('API_PREAUTH_RATE_LIMITER'), ceiling('PORTAL_ACT_RATE_LIMITER'), ceiling('STUDIO_READ_RATE_LIMITER'), ceiling('STUDIO_SEARCH_RATE_LIMITER')]).toEqual([100, 300, 30, 30, 120]);
     expect(Number.isInteger(ceiling('PORTAL_READ_RATE_LIMITER'))).toBe(true);
     expect(ceiling('PORTAL_READ_RATE_LIMITER')).toBeGreaterThan(0);
   });

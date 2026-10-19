@@ -53,7 +53,7 @@ async function everyRiskEveryMonth(org: RescueOrg, months: number, firstNumber =
     await payment(org, id, 'revision_co', '250.5', day(2, 1));
     await transition(org, id, 'confirmAndPayDeposit', 'design_proposal', 'survey', day(3));
     await followupAlert(org, id, day(3, 1));
-    await reminder(org, id, 'prepared', day(3, 2));
+    await reminder(org, id, 'whatsapp_opened', day(3, 2));
     await transition(org, id, 'spatialBaseReady', 'survey', 'layout', day(4));
   }
 }

@@ -11,17 +11,14 @@ import 'server-only';
 //     belongs to R5, A5). One rescue per move; `followups` counts its alerts.
 //   Action, strictly between the alert and the move:
 //     - an 'email' reminder that no 'email_failed' followed within the cooldown;
-//     - a 'prepared' reminder (the WhatsApp text, D3) that no email attempt
-//       followed within the cooldown. The reminder dialog writes 'prepared' when
-//       it opens, and its email button lives in the same dialog, so an email
-//       sent from it decides on its own and the dialog's row is not the action.
+//     - a 'whatsapp_opened' row: the studio clicked "Open WhatsApp" (D3).
+//   The dialog's 'prepared' row is NOT an action: it is written whenever the
+//   dialog opens (and again on focus), so it proves only that it was opened.
 import { sql, type SQL } from 'drizzle-orm';
 import { WEEKLY_KEY as FOLLOWUP_ALERT_KEY } from '@/lib/automation/delivery-followup-writes';
 import { REMINDER_EMAIL_COOLDOWN_MINUTES, REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/cooldown';
+import { REMINDER_WHATSAPP_OPENED } from '@/lib/engagements/reminder/whatsapp-opened';
 import { ALERT_LOOKBACK_DAYS } from './window-sql';
-
-/** The WhatsApp reminder the studio prepared in Metra. */
-const REMINDER_PREPARED = 'prepared';
 
 /** A follow up alert's period key: '{engagement uuid}:{ISO week}'. Checked before the cast. */
 const ALERT_PERIOD_KEY = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:';
@@ -57,7 +54,7 @@ export function stagesMovedFacts(): SQL {
               where r.entity = 'design_engagement' and r.entity_id = c.engagement_id
                 and r.at > c.alert_at and r.at < c.move_at
                 and ((r.after ->> 'reminder' = ${REMINDER_EMAIL_REQUESTED} and not ${followedWithinCooldown('r', REMINDER_EMAIL_FAILED)})
-                  or (r.after ->> 'reminder' = ${REMINDER_PREPARED} and not ${followedWithinCooldown('r', REMINDER_EMAIL_REQUESTED)}))) as acted
+                  or r.after ->> 'reminder' = ${REMINDER_WHATSAPP_OPENED})) as acted
       from first_moves c
      where c.move_at >= (select at from window_start)
        and c.alert_at >= c.move_at - make_interval(days => ${ALERT_LOOKBACK_DAYS})

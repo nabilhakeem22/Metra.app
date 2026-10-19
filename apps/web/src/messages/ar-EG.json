@@ -264,7 +264,7 @@
         "moneyInputs": "{paymentCount, plural, zero {ولا دفعة} one {دفعة واحدة} two {دفعتين} few {{paymentText} دفعات} many {{paymentText} دفعة} other {{paymentText} دفعة}} على {deliveryCount, plural, zero {ولا تسليم} one {تسليم واحد} two {تسليمين} few {{deliveryText} تسليمات} many {{deliveryText} تسليم} other {{deliveryText} تسليم}}",
         "moneyNone": "مفيش دفعات اتحسبت في الفترة دي.",
         "stagesMoved": "مراحل اتحركت بعد المتابعة",
-        "stagesMovedInputs": "ميترا نبهتك {followupCount, plural, zero {ولا مرة} one {مرة واحدة} two {مرتين} few {{followupText} مرات} many {{followupText} مرة} other {{followupText} مرة}}، انت بعت أو جهزت تذكير، والمرحلة اتحركت.",
+        "stagesMovedInputs": "ميترا نبهتك {followupCount, plural, zero {ولا مرة} one {مرة واحدة} two {مرتين} few {{followupText} مرات} many {{followupText} مرة} other {{followupText} مرة}}، انت بعت تذكير بالإيميل أو واتساب، والمرحلة اتحركت.",
         "stagesMovedNone": "ميترا ما نبهتكش على أي انتظار في الفترة دي.",
         "protectedTitle": "اتحمى · تقدير",
         "protectedLocked": "هيظهر لما أسعار السوق تتحدد، ومش هيتجمع أبدا مع الفلوس اللي اتحصلت."

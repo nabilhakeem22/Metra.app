@@ -264,7 +264,7 @@
         "moneyInputs": "{paymentCount, plural, one {{paymentText} payment} other {{paymentText} payments}} on {deliveryCount, plural, one {{deliveryText} delivery} other {{deliveryText} deliveries}}",
         "moneyNone": "No payment counted in this period.",
         "stagesMoved": "Stages moved after a follow up",
-        "stagesMovedInputs": "Metra flagged {followupCount, plural, one {{followupText} wait} other {{followupText} waits}}, you sent or prepared a reminder, and the stage moved.",
+        "stagesMovedInputs": "Metra flagged {followupCount, plural, one {{followupText} wait} other {{followupText} waits}}, you sent a reminder by email or WhatsApp, and the stage moved.",
         "stagesMovedNone": "No waits flagged in this period.",
         "protectedTitle": "Protected · estimated",
         "protectedLocked": "Shows once market rates are set. It will never be added to collected money."

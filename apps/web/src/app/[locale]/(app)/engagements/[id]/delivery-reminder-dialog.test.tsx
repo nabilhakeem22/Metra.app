@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
   shareDeliveryLink: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
+const recordWhatsappOpened = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/engagements/reminder/whatsapp-opened-request', () => ({ recordWhatsappOpened }));
 
 afterEach(() => {
   for (const fn of Object.values(actions)) fn.mockReset();
@@ -64,6 +66,16 @@ describe('the reminder dialog', () => {
     expect(link.hasAttribute('data-primary-action')).toBe(true);
     expect(actions.prepareDeliveryReminder).toHaveBeenCalledWith('e-1');
     expect(actions.rotateDeliveryLink).not.toHaveBeenCalled();
+  });
+
+  test('opening the dialog records no WhatsApp reminder; clicking Open WhatsApp records one for this delivery', async () => {
+    actions.prepareDeliveryReminder.mockResolvedValue(READY);
+    await openDialog();
+    await waitFor(whatsappLink);
+    expect(recordWhatsappOpened).not.toHaveBeenCalled();
+    fireEvent.click(whatsappLink());
+    expect(recordWhatsappOpened.mock.calls).toEqual([['e-1']]);
+    recordWhatsappOpened.mockReset();
   });
 
   test('switching the language switches the message and its link', async () => {
