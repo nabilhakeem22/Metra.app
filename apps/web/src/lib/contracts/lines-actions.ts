@@ -2,6 +2,7 @@
 
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { studioReadRefusal } from '@/lib/cf/studio-read-rate-limit';
 import { loadSectionLinesCore, searchBaselineLinesCore } from './lines-core';
 import type {
   ContractLineOptionsPage,
@@ -18,10 +19,10 @@ export async function loadSectionLines(
   return loadSectionLinesCore(ctx, request);
 }
 
-/** The variation form's baseline-line picker, asked on demand (lines-core.ts). */
+/** The variation form's baseline-line picker, asked on demand (lines-core.ts), on the member's studio read budget. */
 export async function searchBaselineLines(
   request: LineSearchRequest,
 ): Promise<ActionResult & { data?: ContractLineOptionsPage }> {
   const ctx = await requireOrg();
-  return searchBaselineLinesCore(ctx, request);
+  return (await studioReadRefusal(ctx, 'contract_line_search')) ?? searchBaselineLinesCore(ctx, request);
 }

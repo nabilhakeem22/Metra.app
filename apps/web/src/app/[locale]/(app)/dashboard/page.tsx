@@ -12,6 +12,7 @@ import { clientColumns, projectColumns } from '@/lib/dashboard/chart-columns';
 import { loadDashboardFigures } from '@/lib/dashboard/load-dashboard';
 import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
 import { parseRange } from '@/lib/dashboard/range';
+import { canSeeRescueLedger } from '@/lib/dashboard/rescue-ledger/visibility';
 import { deliveriesEmptyState } from '@/lib/dashboard/setup-step';
 import { cachedDateTimeFormat } from '@/lib/format/intl-cache';
 import { DashboardView } from './dashboard-view';
@@ -85,6 +86,8 @@ export default async function DashboardPage({
           empty: deliveriesEmptyState(ctx.role, progress),
         }
       }
+      // A pure predicate, no query: the ledger loads in its island's own request.
+      rescue={canSeeRescueLedger(ctx.role, org) ? { range, orgId: ctx.orgId } : null}
       locale={locale}
       now={new Date()}
     />

@@ -252,6 +252,43 @@
       "emptyNoProject": "ضيف مشروع للعميل، وبعدين ابدأ التسليم بتاعه.",
       "emptyNoDelivery": "لسه مفيش تسليم بدأ.",
       "emptyAllClosed": "كل التسليمات اتقفلت."
+    },
+    "rescue": {
+      "title": "سجل الإنقاذ",
+      "summary": "اللي ميترا لحقته لك في {count, plural, zero {الفترة دي} one {آخر شهر} two {آخر شهرين} few {آخر {countText} شهور} many {آخر {countText} شهر} other {آخر {countText} شهر}}، من بياناتك انت.",
+      "basedOnYourData": "من بياناتك",
+      "cards": {
+        "collected": "فلوس اتحصلت",
+        "collectedHint": "فلوس دخلت فعلا بس، ومش بتتجمع مع أي تقدير.",
+        "heldFees": "دفعات مراحل اتدفعت والمرحلة واقفة",
+        "changeOrders": "تعديلات زيادة اتحاسب عليها واتدفعت",
+        "moneyInputs": "{paymentCount, plural, zero {ولا دفعة} one {دفعة واحدة} two {دفعتين} few {{paymentText} دفعات} many {{paymentText} دفعة} other {{paymentText} دفعة}} على {deliveryCount, plural, zero {ولا تسليم} one {تسليم واحد} two {تسليمين} few {{deliveryText} تسليمات} many {{deliveryText} تسليم} other {{deliveryText} تسليم}}",
+        "moneyNone": "مفيش دفعات اتحسبت في الفترة دي.",
+        "stagesMoved": "مراحل اتحركت بعد المتابعة",
+        "stagesMovedInputs": "ميترا نبهتك {followupCount, plural, zero {ولا مرة} one {مرة واحدة} two {مرتين} few {{followupText} مرات} many {{followupText} مرة} other {{followupText} مرة}}، انت بعت تذكير بالإيميل أو واتساب، والمرحلة اتحركت.",
+        "stagesMovedNone": "ميترا ما نبهتكش على أي انتظار في الفترة دي.",
+        "protectedTitle": "اتحمى · تقدير",
+        "protectedLocked": "هيظهر لما أسعار السوق تتحدد، ومش هيتجمع أبدا مع الفلوس اللي اتحصلت."
+      },
+      "charts": {
+        "collected": "المحصل كل شهر",
+        "collectedSummary": "الفلوس اللي اتحصلت في {count, plural, zero {الفترة دي} one {آخر شهر} two {آخر شهرين} few {آخر {countText} شهور} many {آخر {countText} شهر} other {آخر {countText} شهر}}، متقسمة لدفعات مراحل وأوامر تغيير.",
+        "stagesMoved": "المراحل اللي اتحركت كل شهر",
+        "stagesMovedSummary": "المراحل اللي اتحركت بعد المتابعة في {count, plural, zero {الفترة دي} one {آخر شهر} two {آخر شهرين} few {آخر {countText} شهور} many {آخر {countText} شهر} other {آخر {countText} شهر}}."
+      },
+      "series": {
+        "heldFees": "دفعات المراحل",
+        "changeOrders": "أوامر التغيير",
+        "stagesMoved": "مراحل اتحركت"
+      },
+      "total": "الإجمالي",
+      "empty": "لسه مفيش حاجة اتلحقت في الفترة دي.",
+      "loading": "بنحمل السجل",
+      "loadFailed": "معرفناش نحمل السجل.",
+      "retry": "جرب تاني",
+      "rateLimited": "السجل اتطلب كتير في وقت قصير. استنى دقيقة وبعدين جرب تاني.",
+      "workspaceChanged": "غيرت مساحة العمل في تابة تانية. اعمل تحديث للصفحة عشان تشوف سجل مساحة العمل اللي انت فيها دلوقتي.",
+      "reload": "حدث الصفحة"
     }
   },
   "team": {
@@ -494,6 +531,7 @@
     "invite_not_found": "لينك الدعوة ده مش شغال، ممكن يكون اتستخدم أو اتلغى. اطلب من اللي بعتلك الدعوة لينك جديد.",
     "otp_verify_failed": "الكود ده غلط أو خلص وقته. اكتب آخر كود بعتناه، أو اطلب كود جديد.",
     "otp_rate_limited": "اتطلب أكواد كتير. استنى دقيقة وبعدين اطلب كود جديد.",
+    "rate_limited": "طلبات كتير في وقت قصير. استنى دقيقة وبعدين جرّب تاني.",
     "otp_sms_unavailable": "مش قادرين نبعت رسايل SMS دلوقتي. ادخل بالإيميل بدل الموبايل.",
     "otp_email_unavailable": "لسه مش قادرين نبعت إيميل للعنوان ده. ادخل برقم الموبايل، أو كلمنا.",
     "immutable": "السجل ده اتقفل، فمش هينفع يتعدل. اعمل تحديث للصفحة عشان تشوف حالته دلوقتي.",

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
+import { fromThisSite } from '@/lib/http/same-site';
 import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 
 // POST: seed the signed-in studio's price book from the market book, as the
@@ -17,18 +18,6 @@ const answer = (body: object, status: number, headers: Record<string, string> = 
 
 /** How long a seed that met the market book being rebuilt should wait before it asks again (seconds). */
 const BUSY_RETRY_AFTER_SECONDS = '60';
-
-/** A cookie-authenticated write: refuse a request another site's page sent (the browser always sends Origin on a POST). */
-function fromThisSite(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: Request): Promise<Response> {
   if (!fromThisSite(request)) return answer({ error: 'Forbidden' }, 403);

@@ -24,19 +24,16 @@ import { gte, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { MonthlyBucket, RangeMonths } from '../range';
+import { rangeStartSql } from './range-start';
 
 /**
  * "Created within the last `months` months, counting the current one."
  *
- * ONE declaration, because both series were carrying their own copy and a window
- * that means two slightly different things in two charts on one screen is a bug
- * nobody would spot.
+ * The window start itself is `rangeStartSql`, shared with the rescue ledger, so
+ * every figure on the dashboard means the same window.
  */
 function monthWindow(column: PgColumn, months: RangeMonths): SQL {
-  return gte(
-    column,
-    sql`date_trunc('month', now()) - make_interval(months => ${months - 1})`,
-  );
+  return gte(column, rangeStartSql(months));
 }
 
 /** One month of the projects chart: how many started, split by where they got to. */

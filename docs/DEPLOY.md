@@ -15,7 +15,7 @@ Everything below assumes these. Nobody had written them down in one place.
 | Postgres | Supabase `eu-west-1`, reached through the **Hyperdrive** binding to the **session pooler `:5432`**. The Worker never dials Supabase directly |
 | Files | Supabase Storage, private `metra-files` bucket, signed URLs |
 | PDF | `@cloudflare/puppeteer` on the **`BROWSER`** binding (Cloudflare Browser Rendering) - **not** a bundled Chromium |
-| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). It **fails open**; the contract is [API.md](API.md), which this file deliberately does not restate |
+| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). A binding **error** (or a limiter that does not answer in time) **fails open**; a binding **missing** on Cloudflare is a misdeployed Worker and the surface **refuses** rather than serve unlimited. The Public API contract is [API.md](API.md); the studio read budgets have a smoke test under *The rescue ledger and the studio read budgets* |
 | Cron | worker **`metra-cron`** (`workers/cron`), a separate wrangler project outside the npm workspaces. Needs `APP_ORIGIN` and a `CRON_SECRET` matching `metra-web`'s |
 | Deploy trigger | `deploy.yml`, on `workflow_run` of **CI** on `main`, gated on the repository variable **`DEPLOY_ENABLED == 'true'`** |
 | Rollback lever | **`npx wrangler rollback <version-id>`** on the Worker (from `apps/web`) - not a git revert. The command and what it does not undo are under *Rolling back* |
@@ -2727,6 +2727,28 @@ in the same revert, or the next `db:apply-rls` fails on the missing table.
 **(3) The seeded items:** a studio seeded at sign-up or from its empty price
 book has the same `MKT-` codes and market links as one the CLI seeded, so the
 undo of *Seeding studio price books from the market book* removes them too.
+
+### The rescue ledger and the studio read budgets (PR BR): smoke test
+
+No database step. The deploy adds two Rate Limiting bindings, which
+`wrangler deploy` creates from `apps/web/wrangler.jsonc`:
+`STUDIO_READ_RATE_LIMITER` (namespace 1005, 30 per 60 s: the rescue ledger
+route) and `STUDIO_SEARCH_RATE_LIMITER` (namespace 1006, 120 per 60 s: the
+contract line picker and the price book picker). Each is keyed per surface,
+workspace and member.
+
+**Smoke test, right after the Deploy workflow is green (owner, 3 minutes),**
+with `npx wrangler tail metra-web` open in a terminal (from `apps/web`):
+
+1. Open the dashboard as the owner. The Rescue ledger block renders below the
+   charts, with its cards and both monthly charts (zeros are fine on a quiet
+   studio). A "We could not load the ledger" card instead is a failure.
+2. Do one picker search: in a draft proposal's builder, open "From price book"
+   and type a word. Matches (or "no matches") come back; a "Too many requests"
+   line on the first search is a failure.
+3. Read the tail. It must show NO line containing `limiter missing`. Such a
+   line names the binding the deployed Worker lacks: the surface is refusing
+   every request, and the fix is a redeploy with `wrangler.jsonc` intact.
 
 ## Monthly market bulletin
 

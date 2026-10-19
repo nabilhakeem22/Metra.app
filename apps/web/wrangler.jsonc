@@ -61,6 +61,13 @@
   //   PORTAL_READ_RATE_LIMITER its "limit" below / 60s (the one line to change),
   //     keyed the same way: the document and logo routes and a document's
   //     comment thread.
+  // The studio's per-member read brake (lead ruling, Oct 19), see
+  // lib/cf/studio-read-rate-limit.ts. Same rule: ON Cloudflare a missing binding
+  // refuses the read rather than serving it unlimited.
+  //   STUDIO_READ_RATE_LIMITER   30 req / 60s, keyed per surface + workspace +
+  //     member: the rescue ledger route.
+  //   STUDIO_SEARCH_RATE_LIMITER 120 req / 60s, keyed the same way: the contract
+  //     line picker and the price book picker (one ask per pause in typing).
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.
@@ -84,6 +91,16 @@
       "name": "PORTAL_READ_RATE_LIMITER",
       "namespace_id": "1004",
       "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "STUDIO_READ_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "STUDIO_SEARCH_RATE_LIMITER",
+      "namespace_id": "1006",
+      "simple": { "limit": 120, "period": 60 }
     }
   ]
 }

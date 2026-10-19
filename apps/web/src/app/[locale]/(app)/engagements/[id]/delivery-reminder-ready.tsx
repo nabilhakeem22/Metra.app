@@ -13,8 +13,10 @@ import type { DeliveryReminder } from '@/lib/engagements/reminder/prepare';
 /**
  * The reminder, ready to go: the language, the message as the client will read
  * it, then WhatsApp (the filled action, a real link so no popup blocker stands
- * in the way), copy, and email. Nothing here writes to Metra; "Open WhatsApp"
- * hands the text to the studio's own WhatsApp and the studio presses send.
+ * in the way), copy, and email. "Open WhatsApp" hands the text to the studio's
+ * own WhatsApp, where the studio presses send; the click itself is recorded
+ * (one audit row, sent with keepalive), because the rescue ledger counts it as
+ * the WhatsApp reminder.
  */
 export function DeliveryReminderReady({
   api,
@@ -60,6 +62,7 @@ export function DeliveryReminderReady({
           href={whatsappUrl(reminder.whatsappDigits, message)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={api.whatsappOpened}
         >
           <MessageCircle className="size-4" aria-hidden />
           {t('openWhatsapp')}

@@ -13,6 +13,7 @@ import type { ChecklistResult } from '@/lib/onboarding/checklist';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { DashboardCharts } from './dashboard-charts';
 import { DashboardFirmCards } from './dashboard-firm-cards';
+import { RescueLedgerSection } from './rescue-ledger-section';
 
 // A PLAIN module, deliberately NOT 'use client' (A11). `useTranslations` works in
 // a server component — eleven files in this repo already do it — and marking this
@@ -57,6 +58,9 @@ export interface DashboardViewProps {
   firm: DashboardFirmBlock | null;
   /** NULL means the role cannot read engagements at all. */
   deliveries: DashboardDeliveriesBlock | null;
+  /** NULL when this role may not see the rescue ledger (D1). The ledger itself
+   *  is fetched by its island from its own route, never in this render. */
+  rescue: { range: RangeMonths; orgId: string } | null;
   locale: string;
   /** Passed in so the server renders one consistent "today" for every row. */
   now: Date;
@@ -95,6 +99,7 @@ export function DashboardView({
   onboarding,
   firm,
   deliveries,
+  rescue,
   locale,
   now,
 }: DashboardViewProps) {
@@ -121,6 +126,10 @@ export function DashboardView({
       )}
 
       {firm && <DashboardCharts firm={firm} locale={locale} />}
+
+      {/* Keyed by the window, so a new range starts from the skeleton rather
+          than showing the previous window's figures under the new filter. */}
+      {rescue && <RescueLedgerSection key={rescue.range} range={rescue.range} orgId={rescue.orgId} />}
     </div>
   );
 }
