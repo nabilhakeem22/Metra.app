@@ -3206,6 +3206,391 @@ migration, never a hand edit here. The policy speed-up is NOT undone by it
 and needs no undo: it changes how often the same check runs, not what it
 answers.
 
+### Stage 2 DB step B (the client "I paid" on the delivery page): owner runbook
+
+The second and last Stage 2 database step. It is `db:apply-rls` ONLY: no
+migration, so `db:migrate` is not part of it and the migration count stays 64.
+It is validated on branch `validate/stage2-b4-client-paid`; the code it runs is
+pinned at `<B_SHA>`.
+
+**THE ORDER (do not change it):**
+
+0. **PR A3 must already be deployed** (the contract link /c opening long
+   contracts section by section and loading the rest on request). This step
+   cuts what the contract link's first answer carries to what that page opens
+   with; a page from before A3 would show only part of a long contract. Step 1
+   checks that A3 is on `main`; check yourself that the Deploy run of that merge
+   was green.
+1. **The database goes first**, from the branch (steps 1 to 4 below), while
+   production still runs the current `main`.
+2. **Then a short check of the live site on the new database (step 5),**
+   still before any merge. If it fails, undo (0) puts the previous database
+   code back.
+3. **Then, right after that check,** the lead merges the branch to `main`, the
+   Deploy workflow deploys it, and you run the smoke test (step 6). Do not leave
+   a gap: merge within the hour (see the second reason below).
+
+Why this order, one sentence each:
+
+- **The new code needs the new database code:** the delivery page's new
+  execution card and the client's "I paid" call two new client functions, and
+  the contract link's "show more sections" calls a third; on the old database
+  code the card does not show and "show more sections" fails.
+- **The current Worker is safe on it, with ONE visible difference while it
+  waits for the merge:** the contract link's first answer now carries only its
+  first 50 sections (and, between them, the contract's first 50 lines). The
+  current page already opens on exactly that, so a client sees the same page;
+  but on a contract with MORE than 50 sections, the current page's "show more
+  sections" finds nothing until this branch is deployed. Every other change
+  only adds, or refuses a write the current code never makes (rehearsed: the
+  current code's own action tests pass on the new database, except the four
+  that test the old uncapped contract link, listed under *Rehearsed*).
+- **A client "I paid" on a payment request now also writes studio
+  notifications** ("The client says they paid payment request PR-2026-0004").
+  The current Worker shows an unknown notification as an empty line, never as
+  an error, which is the second reason the merge follows step 5 at once. No
+  client can send one before the merge: only the new page has the button.
+
+**What it changes.** No row is written, updated or deleted. Nothing is
+backfilled.
+
+| Object | Change |
+|---|---|
+| `rls/functions/70-execution-portal.sql` (new) | the delivery page's execution card (`app_delivery_execution_by_token`: the execution contract, its newest 60 payment requests with what is paid and due on each, the newest 60 payments received, and the studio's payment details only while something is due) and the client's "I paid" on one request (`app_delivery_claim_request_by_token`: claims what is still due, the client sends no amount; tells owners, admins and accountants in the same transaction; at most 10 claims per contract per hour; waits at most 4 s on a busy request), plus two internal helpers nobody else may call |
+| `rls/functions/30-contracts-variations.sql` | the contract link's first answer carries its first 50 sections and, between them, the first 50 lines of the WHOLE contract, plus how many sections it has; a new function serves the sections after the first 50, 50 at a time; the digest the client's acknowledgement covers now also covers every section's title and subtotal. The change-order link (/v) adds the contract's end date and its approved extra days |
+| `rls/functions/35-execution.sql`, `rls/policies/35-execution.sql` | two new trigger functions and four triggers: a cost entry never moves to another contract and a voided one stays voided; and the member a payment request, a payment, a void or a cost entry names as its author must be the member who is signed in |
+| `rls/roles.sql` | `metra_app` may update only the 15 columns a cost edit or void writes (it could update every column before); the new functions are callable by `metra_app` only, the two helpers by nobody |
+
+**1. Put the step B code in the production checkout.** This step adds no
+dependency of `db:apply-rls`, so the installed `node_modules` serve as they
+are. First save a copy of this runbook: the checkout undo (0) switches to does
+not contain it.
+
+```powershell
+cd C:\Users\HP\merta-main
+Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-b.md
+git fetch origin
+git rev-parse --short origin/main    # WRITE THIS DOWN: the code the site runs now, which undo (0) puts back
+git switch --detach origin/validate/stage2-b4-client-paid
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat <B_SHA> HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (<B_SHA>)
+git merge-base --is-ancestor origin/main HEAD; "contains main: $LASTEXITCODE"    # MUST print "contains main: 0"
+git diff --stat origin/main HEAD -- packages/db/migrations    # MUST print nothing: no migration in step B
+git show origin/main:apps/web/src/lib/contracts/public.ts | Select-String -SimpleMatch "app_contract_section_lines_by_token"    # MUST print a line: A3 is on main
+```
+
+The first `Copy-Item` line saves this runbook to your Desktop; read the rest of
+it from that copy (undo (0) needs it). Four STOPs, tell the lead in each case:
+
+- The `git diff --stat <B_SHA> HEAD` lists any file other than
+  `docs/DEPLOY.md`: the code is not the code that was rehearsed.
+- It prints `contains main: 1`: something reached `main` after this branch was
+  last brought up to date, and this branch's `db:apply-rls` would remove it.
+- The migrations diff prints anything: this branch carries a migration, and
+  this runbook does not cover one.
+- The last command prints nothing: PR A3 is not on `main` (step 0).
+
+**2. Read-only, before** (Supabase SQL editor). The editor shows only the LAST
+result of what you run, so run each block below ON ITS OWN.
+
+(a) Expect `migrations` 64 and `newest` 1792363603266 (0063's journal stamp).
+Anything else: STOP, tell the lead.
+
+```sql
+-- Step B step 2 (a): migrations recorded so far. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) **THE PRE-CHECK. Exactly this row, or STOP:** every column 0. Anything else
+means part of step B is already in this database: do not run step 3, tell the
+lead.
+
+```sql
+-- Step B step 2 (b): the pre-check. Run this one alone.
+select
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('app_delivery_execution_by_token', 'app_delivery_claim_request_by_token',
+                        'app_delivery_execution_contract', 'app_studio_payment_details',
+                        'app_contract_sections_by_token', 'enforce_actor_is_session_user',
+                        'enforce_cost_entry_guarded')) as step_b_functions,
+  (select count(*) from pg_trigger t
+    where not t.tgisinternal
+      and t.tgname in ('trg_payment_requests_actor', 'trg_contract_payments_actor',
+                       'trg_contract_cost_entries_actor', 'trg_contract_cost_entries_guarded')) as step_b_triggers,
+  (select count(*) from public.contract_payment_claims) as client_claims;
+```
+
+(c) The sizes. Note the five numbers; step 4 (e) expects the same.
+
+```sql
+-- Step B step 2 (c): the execution tables' sizes. Run this one alone.
+select (select count(*) from public.payment_requests) as payment_requests,
+       (select count(*) from public.contract_payments) as contract_payments,
+       (select count(*) from public.contract_cost_entries) as cost_entries,
+       (select count(*) from public.contracts where status in ('issued', 'signed')) as contracts_with_a_link,
+       (select coalesce(max(n), 0) from (select count(*) as n from public.contract_sections group by contract_id) per_contract) as most_sections_in_one_contract;
+```
+
+If `most_sections_in_one_contract` is more than 50, that contract is the one
+the first reason under THE ORDER is about: merge at once after step 5.
+
+(d) The six execution tables' grants and triggers, before. Expect exactly:
+`contract_cost_entries` S,I,U / 21 / 0; `contract_line_measurements` S / 0 / 0;
+`contract_payment_claims` S,I,U / 15 / 0; `contract_payment_milestones`
+S,I,U,D / 10 / 1; `contract_payments` S,I / 0 / 1; `payment_requests` S,I,U /
+18 / 1 (privileges / updatable columns / triggers). Step 4 (b) runs it again.
+
+```sql
+-- Step B step 2 (d): the six tables' grants and triggers. Run this one alone.
+select c.relname,
+       concat_ws(',',
+         case when has_table_privilege('metra_app', c.oid, 'select') then 'S' end,
+         case when has_table_privilege('metra_app', c.oid, 'insert') then 'I' end,
+         case when has_table_privilege('metra_app', c.oid, 'update') then 'U' end,
+         case when has_table_privilege('metra_app', c.oid, 'delete') then 'D' end) as app_privileges,
+       (select count(*) from pg_attribute a
+         where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+           and has_column_privilege('metra_app', c.oid, a.attnum, 'update')) as updatable_columns,
+       (select count(*) from pg_trigger t where t.tgrelid = c.oid and not t.tgisinternal) as triggers
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname in ('contract_payment_milestones', 'payment_requests', 'contract_payments', 'contract_payment_claims', 'contract_cost_entries', 'contract_line_measurements')
+order by 1;
+```
+
+**3. Apply RLS, then prove it landed.** From `C:\Users\HP\merta-main` (its
+`.env` is the production connection). NOT `db:migrate`: step B has no
+migration.
+
+```powershell
+npm run db:apply-rls
+npm run assert-schema-applied -w @metra/db
+```
+
+**NOTICE blocks are normal.** `db:apply-rls` prints routine NOTICE blocks with
+a `message:` line; on Supabase a line about a role may differ, and any line
+that ends `does not exist, skipping` or `already exists, skipping` is the same
+kind. In this order: the same first four as every run
+(`message: 'function public.app_delivery_respond_by_token(text,text,text,text,text,text) does not exist, skipping',`,
+then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`,
+then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`,
+then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`),
+then FOUR new ones, once only:
+`message: 'trigger "trg_contract_cost_entries_guarded" for relation "public.contract_cost_entries" does not exist, skipping',`,
+`message: 'trigger "trg_payment_requests_actor" for relation "public.payment_requests" does not exist, skipping',`,
+`message: 'trigger "trg_contract_payments_actor" for relation "public.contract_payments" does not exist, skipping',`
+and `message: 'trigger "trg_contract_cost_entries_actor" for relation "public.contract_cost_entries" does not exist, skipping',`.
+A second `db:apply-rls` prints only the first four.
+
+Only a line that starts `apply-rls failed:` is a failure. Expected:
+
+- `db:apply-rls` exits 0 and ends with two lines. The first starts
+  `apply-rls: verified in the catalogues` and goes on
+  `58 tables, 58 policies, 22 triggers, 54 functions, RLS forced on all of them, role metra_app present.`;
+  the second starts `apply-rls: grants verified` and goes on
+  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; contract_cost_entries updatable on its 15 entry and void columns only; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
+  If that second line is replaced by a problem list, it exits 1: something
+  was added by hand. Do not merge; tell the lead.
+- `assert-schema-applied` exits 0 and prints six lines, in this order:
+  `assert-schema-applied: OK — 58 declared table(s), every column present.`,
+  then `indexes — 133 declared, all present.`, `constraints — 340 declared, all present.`,
+  `functions — 54 declared, all present.`,
+  `orphaned org rows — 50 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
+  and `composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed to a single non-org_id column.`
+
+**If it fails, it prints the SQLSTATE and what to do,** on two lines:
+`apply-rls failed: SQLSTATE 55P03: canceling statement due to lock timeout`
+(or `40P01: deadlock detected`) ends `(this file rolled back; the files before
+it stay applied).`: a long studio transaction held a table for more than 3 s.
+Run `npm run db:apply-rls` again a little later; every file is safe to re-run.
+Any other code: tell the lead before running anything else.
+
+**Safe to re-run.** Every statement under `rls/` is idempotent: a second
+`db:apply-rls` prints only the first four notices and the same two lines.
+`assert-schema-applied` only reads.
+
+**Locks.** Each policy file takes a table lock for an instant per table, and
+waits at most 3 s for it (`MIGRATION_LOCK_TIMEOUT`). The four new triggers are
+attached in `policies/35-execution.sql`, on tables that now hold live rows; so
+a payment, a cost entry or a request being written at that very moment makes
+the file wait up to 3 s per table and, past it, roll back (the 55P03 lines
+above). Pilot volumes are small; run it at a quiet moment anyway.
+
+**4. Read-only, after: expected results.** Each block ON ITS OWN.
+
+(a) Step 2 (a) again: `migrations` still 64, `newest` still 1792363603266.
+
+(b) Step 2 (b) again: now `step_b_functions` 7, `step_b_triggers` 4,
+`client_claims` 0. Then step 2 (d) again: now `contract_cost_entries` S,I / 15
+/ 2; `contract_line_measurements` S / 0 / 0; `contract_payment_claims` S,I,U /
+15 / 0; `contract_payment_milestones` S,I,U,D / 10 / 1; `contract_payments`
+S,I / 0 / 2; `payment_requests` S,I,U / 18 / 2.
+
+(c) Who may call the step B functions: 7 rows. `app_execute` true on the three
+`app_*_by_token` functions and the two `enforce_*` trigger functions, false on
+`app_delivery_execution_contract` and `app_studio_payment_details` (internal:
+nobody calls them but the functions beside them); `public_execute` false and
+`api_roles_execute` false on all seven.
+
+```sql
+-- Step B step 4 (c): who may call the step B functions. Run this one alone.
+select p.proname,
+       has_function_privilege('metra_app', p.oid, 'execute') as app_execute,
+       exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_execute,
+       coalesce((select bool_or(has_function_privilege(r.oid, p.oid, 'execute')) from pg_roles r
+                  where r.rolname in ('anon', 'authenticated', 'service_role')), false) as api_roles_execute
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('app_delivery_execution_by_token', 'app_delivery_claim_request_by_token',
+                    'app_delivery_execution_contract', 'app_studio_payment_details',
+                    'app_contract_sections_by_token', 'enforce_actor_is_session_user',
+                    'enforce_cost_entry_guarded')
+order by 1;
+```
+
+(d) The contract link's first answer, on every contract with a link: one row
+each (at most 20), with `opening_sections` at most 50, `opening_lines` at most
+50, and `section_count` the contract's real number of sections. It reads only
+what a client's link reads.
+
+```sql
+-- Step B step 4 (d): what each contract link opens with now. Run this one alone.
+select c.number,
+       (d.snapshot ->> 'section_count')::int as section_count,
+       jsonb_array_length(d.snapshot -> 'sections') as opening_sections,
+       (select coalesce(sum(jsonb_array_length(s -> 'lines')), 0) from jsonb_array_elements(d.snapshot -> 'sections') s) as opening_lines
+from public.contracts c
+cross join lateral (select public.app_contract_by_token(c.token_hash) as snapshot) d
+where c.token_hash is not null and c.status in ('issued', 'signed')
+order by c.number desc
+limit 20;
+```
+
+(e) Step 2 (c) again: the same five numbers as before.
+
+**Stop and do not go on** if any output in steps 3 or 4 differs from what is
+written there. Tell the lead what you saw instead.
+
+**5. Before the merge: the live site on the new database.** The site still runs
+the current `main`. About ten minutes, in your own studio only. Open the log
+first, in a second window, and leave it open:
+
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler tail metra-web
+```
+
+Then, signed in to your own studio:
+
+1. **Page loads.** Open **Contracts** in the sidebar (العقود) and one contract,
+   then, if it is an execution contract, its **Payments** tab (الدفعات), and its
+   change-order tab. Then a delivery (التسليمات) and the price book. Expected:
+   every page loads and shows your data as before.
+2. **The client links, only if you have a test one.** If a test project of
+   yours has a contract link (`/c/...`) or a delivery link (`/d/...`) you sent
+   to yourself, open each: it shows as before, and on the contract link "show
+   lines" on a section still opens its lines. Only look: do not sign, approve or
+   say you paid anything. No test link: skip this; do not create one for it.
+
+Expected in the log for all of the above: no `42501`, no `42883`, no `MT100`,
+no `MT140`, no `mutateInOrg failed`.
+
+**If anything in step 5 fails:** do not merge. Run undo (0) below now, then
+tell the lead what you saw. If everything passes, go straight to step 6.
+
+**6. Then: merge, smoke test, return the checkout to main.**
+
+1. Tell the lead steps 1 to 5 are done; the lead merges the branch and the
+   Deploy workflow deploys it (within the hour, see THE ORDER).
+2. Smoke test on your own studio, the log still open: the page loads of step 5
+   (1) again, now on the new code. If a test delivery of yours is at the
+   execution stage and its contract is signed, open its delivery link: under
+   the payments card there is a "Construction contract" card (عقد التنفيذ) with
+   the contract's number. Only look. Expected in the log: no `42501`, no
+   `42883`, no `MT140`, no `mutateInOrg failed`.
+3. Put the production checkout back on main:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/main
+```
+
+**Undo, if ever needed.**
+
+**(0) The database code, before the merge** (step 5 fails, or before the merge
+the log shows a `42501`, an `MT140` or a studio reports a broken page). Two
+parts: the PREVIOUS `main`'s own `db:apply-rls` (the SHA you wrote down in step
+1, the code the site runs now), which puts back the contract link without the
+cap, the change-order link without the two new keys, and the cost entries'
+full UPDATE; then one SQL block that removes what the previous code does not
+know (the four triggers and the seven functions). Afterwards the database is
+exactly as it was before step 3: rehearsed, a catalogue comparison found zero
+differences. Use it only while the site still runs the code from before the
+merge: if the new code is already deployed, undo (1) the code first, then this.
+Any "I paid" a client sent in between stays recorded as a pending claim (data,
+not code); tell the lead how many step 2 (b) shows.
+
+From the copy you saved in step 1:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach <the SHA you wrote down in step 1>
+git log --oneline -1    # the commit `git rev-parse --short origin/main` named in step 1
+npm run db:apply-rls
+```
+
+Run only `db:apply-rls` from this checkout. Expected: it exits 0; only the
+FIRST FOUR notices of step 3; and it ends with the two lines the previous code
+prints, the first going on
+`58 tables, 58 policies, 18 triggers, 47 functions, RLS forced on all of them, role metra_app present.`
+and the second the same as step 3's WITHOUT the part
+`contract_cost_entries updatable on its 15 entry and void columns only; `
+(if `main` changed its database code since this runbook was written, these
+counts may differ: then compare with what the lead tells you). Then, in the
+Supabase SQL editor, this block, on its own:
+
+```sql
+-- Step B undo (0), part 2: the objects the previous code does not know. Run this one alone.
+drop trigger if exists trg_payment_requests_actor on public.payment_requests;
+drop trigger if exists trg_contract_payments_actor on public.contract_payments;
+drop trigger if exists trg_contract_cost_entries_actor on public.contract_cost_entries;
+drop trigger if exists trg_contract_cost_entries_guarded on public.contract_cost_entries;
+drop function if exists public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text);
+drop function if exists public.app_delivery_execution_by_token(text);
+drop function if exists public.app_delivery_execution_contract(uuid, uuid);
+drop function if exists public.app_studio_payment_details(uuid);
+drop function if exists public.app_contract_sections_by_token(text, integer);
+drop function if exists public.enforce_actor_is_session_user();
+drop function if exists public.enforce_cost_entry_guarded();
+```
+
+Expected: `Success. No rows returned`. Then, read-only, each block ON ITS OWN:
+step 2 (b) again (`step_b_functions` 0, `step_b_triggers` 0) and step 2 (d)
+again (exactly what step 2 (d) expects). Then step 5 again: everything works as
+it did before step 3. Put the checkout back on main (step 6 (3)) and tell the
+lead what failed the first time. Do not merge. If step 5 STILL fails after undo
+(0), the database code was not the cause: tell the lead at once and run nothing
+else.
+
+To go forward again later, only when the lead says so: step 1 again, then step
+3 (`npm run db:apply-rls`, whose first run prints the eight notices again),
+then step 4 and on.
+
+**(1) The code** (a page fails after the deploy): from
+`C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
+the version that served before the merge (`npx wrangler deployments list`).
+Leave the database alone: the older Worker runs on it (see THE ORDER).
+
+**Rehearsed** on a local database built by the A2 code (`b43919ab`: 0063 and
+its `db:apply-rls`, with Supabase's API roles and default grants), plus a
+signed execution contract of 121 sections (one of 300 lines), a delivery at
+execution, a part-paid payment request, a pending claim, a cost entry and an
+approved change order. Every command and SQL block above was run as written.
+
 ## Monthly market bulletin
 
 Once 0061 is applied and the branch is merged, every month's ministry
