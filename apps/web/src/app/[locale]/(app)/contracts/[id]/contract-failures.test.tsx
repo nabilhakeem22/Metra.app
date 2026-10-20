@@ -4,6 +4,7 @@ import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractsClient } from '../contracts-client';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractTabsFor } from './tabs';
 import { ContractHeaderForm } from './contract-header-form';
 import { VariationRegister } from './variation-register';
 
@@ -31,6 +32,9 @@ const variations = vi.hoisted(() => ({
   issueVariation: vi.fn(),
 }));
 vi.mock('@/lib/variations/actions', () => variations);
+// The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
+vi.mock('@/lib/execution/costs/actions', () => ({}));
+vi.mock('@/lib/price-book/picker-actions', () => ({}));
 
 const DETAIL = {
   id: 'k-1',
@@ -77,6 +81,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       <ContractDetailClient
         detail={DETAIL}
         variations={[]}
+        costs={null}
+        tabs={contractTabsFor(false)}
+        canCreateCosts={false}
+        canUpdateCosts={false}
         canManage={false}
         canIssue
         canDraftVariation={false}

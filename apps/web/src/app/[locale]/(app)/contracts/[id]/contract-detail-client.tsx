@@ -9,16 +9,22 @@ import { describeFailure, describeRejection } from '@/lib/actions/error-message'
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
+import type { CostEntriesPage } from '@/lib/execution/costs/types';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import type { ContractAction } from './contract-vo-types';
-import { CONTRACT_TABS, type ContractTab } from './tabs';
+import { CostsTab } from './costs-tab';
+import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
   detail,
   variations,
+  costs,
+  tabs,
+  canCreateCosts,
+  canUpdateCosts,
   canManage,
   canIssue,
   canDraftVariation,
@@ -26,6 +32,11 @@ export function ContractDetailClient({
 }: {
   detail: ContractPageDetail;
   variations: VariationListRow[];
+  /** The first page of an execution contract's costs; null when the Costs tab is not shown. */
+  costs: CostEntriesPage | null;
+  tabs: readonly ContractTab[];
+  canCreateCosts: boolean;
+  canUpdateCosts: boolean;
   canManage: boolean;
   canIssue: boolean;
   canDraftVariation: boolean;
@@ -87,7 +98,7 @@ export function ContractDetailClient({
       )}
 
       <div className="flex gap-2 border-b">
-        {CONTRACT_TABS.map((tb) => (
+        {tabs.map((tb) => (
           <button
             key={tb}
             type="button"
@@ -98,12 +109,12 @@ export function ContractDetailClient({
                 : 'border-transparent text-muted-foreground'
             }`}
           >
-            {tb === 'overview' ? t('contract') : tv('register')}
+            {tb === 'overview' ? t('contract') : tb === 'costs' ? t('costs.tab') : tv('register')}
           </button>
         ))}
       </div>
 
-      {tab === 'overview' ? (
+      {tab === 'overview' && (
         <ContractOverview
           detail={detail}
           keptLines={keptLines}
@@ -114,7 +125,18 @@ export function ContractDetailClient({
           onIssue={() => act(() => issueContract(detail.id))}
           onTerminate={() => act(() => terminateContract(detail.id))}
         />
-      ) : (
+      )}
+      {tab === 'costs' && costs && (
+        <CostsTab
+          contractId={detail.id}
+          sections={detail.sections}
+          initial={costs}
+          canCreate={canCreateCosts}
+          canUpdate={canUpdateCosts}
+          m={m}
+        />
+      )}
+      {tab === 'variations' && (
         <VariationRegister
           contractId={detail.id}
           contractStatus={detail.status}

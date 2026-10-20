@@ -3,11 +3,15 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getContractPage } from '@/lib/contracts/queries';
+import { listCostEntries } from '@/lib/execution/costs/queries';
+import { mayReadCostEntries } from '@/lib/execution/costs/reads';
+import { NO_COST_FILTER } from '@/lib/execution/costs/types';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractTabsFor } from './tabs';
 
 export default async function ContractDetailPage({
   params,
@@ -23,6 +27,11 @@ export default async function ContractDetailPage({
   const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const variations = await listVariations(ctx, { contractId: id });
+  // Only an execution contract has costs: their first page (at most 50) and its total.
+  const costs =
+    detail.sourceBoqId !== null && mayReadCostEntries(ctx.role)
+      ? await listCostEntries(ctx, { contractId: id, filter: NO_COST_FILTER, cursor: null })
+      : null;
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
@@ -38,6 +47,10 @@ export default async function ContractDetailPage({
       <ContractDetailClient
         detail={detail}
         variations={variations}
+        costs={costs}
+        tabs={contractTabsFor(costs !== null)}
+        canCreateCosts={can(ctx.role, 'cost_entries', 'create')}
+        canUpdateCosts={can(ctx.role, 'cost_entries', 'update')}
         canManage={canManage}
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}

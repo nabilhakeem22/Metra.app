@@ -4,6 +4,7 @@ import type { ContractLineOption, ContractLineView, ContractPageDetail, Contract
 import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractTabsFor } from './tabs';
 import { ContractSectionCard } from './contract-section-card';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useVariationCreate } from './use-variation-create';
@@ -23,6 +24,9 @@ const lineReads = vi.hoisted(() => ({ loadSectionLines: vi.fn(), searchBaselineL
 vi.mock('@/lib/contracts/lines-actions', () => lineReads);
 vi.mock('@/lib/contracts/actions', () => ({ issueContract: vi.fn(), terminateContract: vi.fn(), saveContractDraft: vi.fn() }));
 vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), saveVariationDraft: vi.fn() }));
+// The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
+vi.mock('@/lib/execution/costs/actions', () => ({}));
+vi.mock('@/lib/price-book/picker-actions', () => ({}));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,
@@ -127,6 +131,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
       <ContractDetailClient
         detail={detail as unknown as ContractPageDetail}
         variations={[]}
+        costs={null}
+        tabs={contractTabsFor(false)}
+        canCreateCosts={false}
+        canUpdateCosts={false}
         canManage={false}
         canIssue={false}
         canDraftVariation={false}
