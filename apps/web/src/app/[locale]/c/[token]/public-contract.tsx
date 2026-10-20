@@ -4,14 +4,16 @@ import { Check, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Centered, Row } from '@/components/share/link-page-parts';
+import { Centered } from '@/components/share/link-page-parts';
 import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
-import { formatMoney } from '@/lib/format/money';
-import { formatPercent, formatQuantity } from '@/lib/format/number';
+import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import type { PublicContract } from '@/lib/contracts/public';
+import type { PublicContractOpening } from '@/lib/contracts/public-types';
 import { contractDecidedKey } from './contract-outcome';
+import { ContractSectionList } from './contract-section-list';
+import { ContractTotalsCard } from './contract-totals-card';
+import { ScheduleCard } from './schedule-card';
 import { useContractAck } from './use-contract-ack';
 
 export function PublicContractView({
@@ -19,7 +21,7 @@ export function PublicContractView({
   contract,
 }: {
   token: string;
-  contract: PublicContract | null;
+  contract: PublicContractOpening | null;
 }) {
   const t = useTranslations('contracts.ack');
   const locale = useLocale();
@@ -29,14 +31,16 @@ export function PublicContractView({
     return <Centered>{t('invalid')}</Centered>;
   }
 
-  const m = (v: string) => formatMoney(v, locale);
   const wantAr = locale.startsWith('ar');
   const pick = (ar: string | null, en: string | null) =>
     (wantAr ? ar || en : en || ar) ?? '';
   const num = formatDocNumber('C', contract.number, docYear(null, new Date()));
 
   const decided = contract.status !== 'issued' || ack.outcome !== null;
-  const decidedMessage = t(contractDecidedKey(contract.status, ack.outcome));
+  // The signing day is the Cairo day the snapshot carries (YYYY-MM-DD), never a UTC timestamp.
+  const decidedMessage = t(contractDecidedKey(contract, ack.outcome), {
+    date: contract.signed ? formatDate(contract.signed.on, locale) : '',
+  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -50,38 +54,10 @@ export function PublicContractView({
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
       </header>
 
-      {contract.sections.map((s) => (
-        <Card key={s.id}>
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-body font-semibold">{pick(s.title_ar, s.title_en)}</h2>
-              <span className="text-body" dir="ltr">{m(s.section_subtotal)}</span>
-            </div>
-            <table className="w-full text-body">
-              <tbody>
-                {s.lines.map((l) => (
-                  <tr key={l.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">{pick(l.description_ar, l.description_en)}</td>
-                    <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {formatQuantity(l.qty, locale)} {l.unit}
-                    </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">{m(l.unit_price)}</td>
-                    <td className="px-4 py-2 text-end" dir="ltr">{m(l.line_total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      ))}
+      <ContractSectionList token={token} sections={contract.sections} sectionCount={contract.section_count} />
 
-      <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body">
-          <Row label={t('originalValue')} value={m(contract.total)} bold />
-          <Row label={t('advancePct')} value={formatPercent(contract.advance_pct, locale)} />
-          <Row label={t('retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
-        </CardContent>
-      </Card>
+      <ContractTotalsCard contract={contract} />
+      <ScheduleCard contract={contract} />
 
       {decided ? (
         <Card>

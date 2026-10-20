@@ -1,9 +1,33 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { GenerateExecutionContract } from '@/components/contracts/generate-execution-contract';
+import { Button } from '@/components/ui/button';
+import { Link } from '@/i18n/routing';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { BoqCostedCopy } from './boq-costed-copy';
 import { BoqIssue } from './boq-issue';
 import { BoqSheet } from './boq-sheet';
+
+/** What an issued BOQ offers for execution: its contract, or to create one. */
+export interface BoqExecution {
+  contractId: string | null;
+  /** May generate an execution contract (`contracts_generate` create). */
+  canGenerate: boolean;
+}
+
+/** An issued BOQ's way into execution: open its contract, or create it. */
+function BoqExecutionAction({ execution, boqId }: { execution: BoqExecution; boqId: string }) {
+  const t = useTranslations('contracts.execution.generate');
+  if (execution.contractId) {
+    return (
+      <Button asChild variant="secondary">
+        <Link href={`/contracts/${execution.contractId}`}>{t('openContract')}</Link>
+      </Button>
+    );
+  }
+  return execution.canGenerate ? <GenerateExecutionContract boqId={boqId} /> : null;
+}
 
 /**
  * The sheet with the tab's controls in its header.
@@ -19,12 +43,17 @@ export function BoqTabSheet({
   canEdit,
   canSeeCost,
   clientCanOpenOnIssue,
+  issueBlockedByContract,
+  execution,
 }: {
   boq: BoqDetail;
   canEdit: boolean;
   canSeeCost: boolean;
   clientCanOpenOnIssue: boolean;
+  issueBlockedByContract: boolean;
+  execution: BoqExecution;
 }) {
+  const t = useTranslations('projects.profile.boq');
   return (
     <BoqSheet
       boq={boq}
@@ -32,10 +61,14 @@ export function BoqTabSheet({
       actions={(shown) => (
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
+          {boq.status === 'issued' && <BoqExecutionAction execution={execution} boqId={boq.id} />}
+          {canEdit && issueBlockedByContract && (
+            <p className="text-body text-[color:var(--text-muted)]">{t('issueBlockedByContract')}</p>
+          )}
           {canEdit && (
             <BoqIssue
               boqId={boq.id}
-              disabled={shown.lineCount === 0}
+              disabled={shown.lineCount === 0 || issueBlockedByContract}
               clientCanOpen={clientCanOpenOnIssue}
             />
           )}

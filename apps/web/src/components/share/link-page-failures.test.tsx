@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { PublicContractView } from '@/app/[locale]/c/[token]/public-contract';
 import { PublicProposalView } from '@/app/[locale]/p/[token]/public-proposal';
 import { PublicVariationView } from '@/app/[locale]/v/[token]/public-variation';
-import type { PublicContract } from '@/lib/contracts/public';
+import type { PublicContractOpening } from '@/lib/contracts/public';
 import type { PublicProposal } from '@/lib/proposals/public';
 import type { PublicVariation } from '@/lib/variations/public';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
@@ -31,8 +31,8 @@ const PROPOSAL = {
 } as unknown as PublicProposal;
 const CONTRACT = {
   number: 1, status: 'issued', title_ar: null, title_en: 'Fit-out', total: '114', advance_pct: '10',
-  retention_pct: '5', org: ORG, sections: [],
-} as unknown as PublicContract;
+  retention_pct: '5', org: ORG, sections: [], section_count: 0, signed: null, source: 'proposal', payment_schedule: [],
+} as unknown as PublicContractOpening;
 const VARIATION = {
   number: 1, status: 'issued', title_ar: null, title_en: 'Doors', reason_ar: null, reason_en: null,
   net_delta: '100', contractActive: true, rejectionChannel: null, org: ORG, lines: [],

@@ -8,9 +8,11 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
-import { contractHeaderPatch, validateContractHeader } from './update-header';
-import { fieldsFailed } from '@/lib/actions/field-errors';
+import { contractHeaderPatch, validateContractHeader, type ValidatedContractHeader } from './update-header';
+import { failFields, fieldsFailed, type FieldErrors } from '@/lib/actions/field-errors';
+import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 
 export interface ContractHeaderInput {
   titleAr?: string | null;
@@ -57,6 +59,29 @@ function auditContractHeaderSaved(
 }
 
 /**
+ * An execution contract carries no advance or retention percentage (plan A5:
+ * the first and last schedule rows are those payments), so either one set
+ * above 0 is refused under its box; 0 (or not sent) is the stored value.
+ */
+function executionPercentRefusals(validated: ValidatedContractHeader): FieldErrors {
+  const refusal = { code: 'out_of_range' as const, params: { min: 0, max: 0 } };
+  const above = (value: string | undefined) => value !== undefined && parseMoney4(value) !== 0n;
+  return {
+    ...(above(validated.advancePct) ? { advancePct: refusal } : {}),
+    ...(above(validated.retentionPct) ? { retentionPct: refusal } : {}),
+  };
+}
+
+/**
+ * An execution contract's signing day is its signing event's (online on /c, or
+ * recorded on paper), so its header never takes a typed one (A3 F4): the form
+ * does not show the box, and a direct call's value is left unwritten.
+ */
+function withoutSignatureDate(header: ContractHeaderInput): ContractHeaderInput {
+  return { ...header, signatureDate: undefined };
+}
+
+/**
  * Edit a DRAFT contract's header only (lines/totals are the frozen baseline from
  * generation and are never edited here). Rejects a non-draft contract with
  * `contract_not_draft`. Percentages are [0,100]; dates must be well-formed.
@@ -65,8 +90,10 @@ export async function saveContractDraftCore(
   ctx: OrgContext,
   input: SaveContractDraftInput,
 ): Promise<ActionResult> {
-  const id = input.id?.trim();
-  if (!id || !isUuid(id)) return err('malformed');
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
+  const id = typeof input.id === 'string' ? input.id.trim() : '';
+  if (!isUuid(id)) return err('malformed');
   const header = input.header ?? {};
   const read = validateContractHeader(header);
   if (!read.ok) return fieldsFailed(read.errors);
@@ -80,13 +107,17 @@ export async function saveContractDraftCore(
         tx,
         contracts,
         id,
-        { status: contracts.status },
+        { status: contracts.status, sourceBoqId: contracts.sourceBoqId },
         'record_not_found',
       );
       if (row.status !== 'draft') fail('contract_not_draft');
+      if (row.sourceBoqId !== null) {
+        const refusals = executionPercentRefusals(validated);
+        if (Object.keys(refusals).length > 0) failFields(refusals);
+      }
       await tx
         .update(contracts)
-        .set(contractHeaderPatch(header, validated))
+        .set(contractHeaderPatch(row.sourceBoqId === null ? header : withoutSignatureDate(header), validated))
         .where(and(eq(contracts.id, id), eq(contracts.status, 'draft')));
       await auditContractHeaderSaved(audit, id);
     },

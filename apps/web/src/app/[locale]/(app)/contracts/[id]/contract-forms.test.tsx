@@ -38,6 +38,7 @@ vi.mock('@/lib/variations/actions', () => variations);
 const DETAIL = {
   id: 'k-1',
   status: 'draft',
+  sourceBoqId: null,
   signatureDate: null,
   startDate: null,
   endDate: null,

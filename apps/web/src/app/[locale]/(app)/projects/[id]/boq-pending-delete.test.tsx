@@ -25,6 +25,7 @@ const actions = vi.hoisted(() => ({
   }),
 }));
 vi.mock('@/lib/boqs/actions', () => actions);
+vi.mock('@/lib/contracts/actions', () => ({ generateExecutionContract: vi.fn() }));
 
 let toastApi: ReturnType<typeof useToast> | null = null;
 function ToastApi() {
@@ -73,7 +74,15 @@ const boq = {
 function renderTab(detail: BoqDetail = boq, locale: 'ar-EG' | 'en' = 'ar-EG') {
   renderWithIntl(
     <>
-      <BoqTab projectId="p1" boq={detail} canBuild canSeeCost={false} clientCanOpenOnIssue={false} />
+      <BoqTab
+        projectId="p1"
+        boq={detail}
+        canBuild
+        canSeeCost={false}
+        clientCanOpenOnIssue={false}
+        issueBlockedByContract={false}
+        execution={{ contractId: null, canGenerate: false }}
+      />
       <ToastApi />
     </>,
     { locale },

@@ -28,7 +28,7 @@ import {
   acknowledgeContractByToken,
   getContractByToken,
 } from '@/lib/contracts/public';
-import { getContractPage } from '@/lib/contracts/queries';
+import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
 import type { MemberRole } from '@metra/db';
@@ -96,9 +96,10 @@ describe('generateContractCore (AC1, AC2, AC3)', () => {
     expect(detail).not.toBeNull();
     expect(detail!.status).toBe('draft');
     expect(detail!.originalValue).toBe(total);
-    expect(detail!.sections).toHaveLength(1);
-    expect(detail!.sections[0].lineCount).toBe(2);
-    expect(detail!.sections[0].openingLines).toHaveLength(2);
+    const { sections } = (await getContractSectionsPage(ctx, contractId, null))!;
+    expect(sections).toHaveLength(1);
+    expect(sections[0].lineCount).toBe(2);
+    expect(sections[0].openingLines).toHaveLength(2);
     // Revised == original when there are no approved VOs.
     expect(detail!.revisedValue).toBe(total);
   });

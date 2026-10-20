@@ -25,6 +25,7 @@ function detail(): ContractDetail {
     status: 'signed',
     currency: 'EGP',
     sourceProposalId: 'p1',
+    sourceBoqId: null,
     signatureDate: '2026-03-10',
     startDate: '2026-03-15',
     endDate: '2026-06-15',

@@ -43,7 +43,6 @@ export function commandCardPropsOf(
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,
     canShare: detail.canShare,
-    canStartQuotation: detail.canStartQuotation,
     canUpload: detail.canUpload,
     canSetOffPlan: detail.capabilities.setRom,
     offPlan: header.offPlan,
@@ -66,5 +65,6 @@ export function commandCardPropsOf(
     // already hold (B11); the header's menu still opens the link itself.
     onNudge: openDeliveryReminder,
     clientExpected: detail.clientExpected,
+    execution: detail.execution,
   };
 }

@@ -11,7 +11,7 @@ import { PORTAL_ACT_CEILING, PORTAL_READ_CEILING } from '@/test/wrangler-rate-li
 vi.mock('server-only', () => ({}));
 const cf = vi.hoisted(() => ({ isCloudflareRuntime: vi.fn(() => true), cfEnv: vi.fn() }));
 vi.mock('@/lib/cf/context', () => cf);
-vi.mock('./request-provenance', () => ({ requestProvenance: async () => ({ ip: null, userAgent: null }) }));
+vi.mock('@/lib/share/request-provenance', () => ({ requestProvenance: async () => ({ ip: null, userAgent: null }) }));
 
 const writes = vi.hoisted(() => ({
   chooseConceptAndNotify: vi.fn(async () => ({ kind: 'approved', studioNotified: true })),

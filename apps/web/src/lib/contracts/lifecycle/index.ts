@@ -6,4 +6,5 @@
 // The contract lifecycle transitions, one per file — the shape `variations` and
 // `proposals` already use.
 export * from './issue';
+export * from './sign-offline';
 export * from './terminate';

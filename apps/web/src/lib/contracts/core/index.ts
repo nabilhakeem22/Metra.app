@@ -10,5 +10,12 @@
 // import surface for callers/tests. Pure structural refactor — no query, type, or
 // behaviour changed.
 export * from './create';
+export * from './create-from-boq';
+export * from './charges';
 export * from './update';
-export { issueContractCore, terminateContractCore } from '../lifecycle';
+export {
+  issueContractCore,
+  recordContractSignedOfflineCore,
+  terminateContractCore,
+  type RecordContractSignedOfflineInput,
+} from '../lifecycle';

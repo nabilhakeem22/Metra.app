@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // log line it writes carries none of them (W3.5, AC 31).
 
 vi.mock('server-only', () => ({}));
-vi.mock('./request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
+vi.mock('@/lib/share/request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
 
 const LEAKY = Object.assign(new Error('Failed query: select ... params: SECRET-HASH,approve_design,x,my private note,,9.9.9.9,probe/1'), {
   cause: Object.assign(new Error('date/time field value out of range'), { code: '57014', severity: 'ERROR' }),

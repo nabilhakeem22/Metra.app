@@ -1,35 +1,45 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
+import { formatDate } from '@/lib/format/date';
+import { ChargesForm } from './charges-form';
 import { ContractHeaderForm } from './contract-header-form';
-import { ContractSectionCard } from './contract-section-card';
+import { ContractSectionList } from './contract-section-list';
 import type { KeptSectionLines } from './use-kept-section-lines';
+import type { KeptSections } from './use-kept-sections';
 
 export function ContractOverview({
   detail,
+  keptSections,
   keptLines,
   canManage,
   canIssue,
+  canSignOffline,
   pending,
   m,
   onIssue,
   onTerminate,
 }: {
   detail: ContractPageDetail;
+  keptSections: KeptSections;
   keptLines: KeptSectionLines;
   canManage: boolean;
   canIssue: boolean;
+  canSignOffline: boolean;
   pending: boolean;
   m: (v: string) => string;
   onIssue: () => void;
   onTerminate: () => void;
 }) {
   const t = useTranslations('contracts');
+  const locale = useLocale();
   const revised = detail.revisedValue !== detail.originalValue;
+  const execution = detail.sourceBoqId !== null;
 
   return (
     <div className="space-y-4">
@@ -46,7 +56,15 @@ export function ContractOverview({
               {t('revisedValue')}: <span dir="ltr">{m(detail.revisedValue)}</span>
             </span>
           )}
+          {detail.signed && (
+            <span className="text-muted-foreground">
+              {t('signedOn', { date: formatDate(detail.signed.on, locale), via: detail.signed.via })}
+            </span>
+          )}
           <div className="ms-auto flex gap-2">
+            {execution && canSignOffline && detail.status === 'issued' && (
+              <SignOfflineDialog contractId={detail.id} />
+            )}
             {canIssue && detail.status === 'draft' && (
               <Button variant="default" size="sm" disabled={pending} onClick={onIssue}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
@@ -68,13 +86,13 @@ export function ContractOverview({
         </CardContent>
       </Card>
 
+      {canManage && detail.status === 'draft' && execution && <ChargesForm detail={detail} m={m} />}
+
       {canManage && detail.status === 'draft' && (
         <ContractHeaderForm detail={detail} />
       )}
 
-      {detail.sections.map((section) => (
-        <ContractSectionCard key={section.id} contractId={detail.id} section={section} kept={keptLines} m={m} />
-      ))}
+      <ContractSectionList contractId={detail.id} sections={keptSections} lines={keptLines} m={m} />
     </div>
   );
 }

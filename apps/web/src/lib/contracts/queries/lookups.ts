@@ -36,3 +36,15 @@ export async function getContractedProposalIds(
     );
   });
 }
+
+/** The execution contract generated from a given BOQ, if any (for the BOQ tab). */
+export async function getContractIdForBoq(ctx: OrgContext, boqId: string): Promise<string | null> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select({ id: contracts.id })
+      .from(contracts)
+      .where(eq(contracts.sourceBoqId, boqId))
+      .limit(1);
+    return row?.id ?? null;
+  });
+}
