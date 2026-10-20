@@ -1,8 +1,8 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
-import { NEXT_ACTION_TARGET, STATUS_LINE_ACTIONS } from '@/lib/execution/next-action-target';
-import { EXECUTION_NEXT_ACTION_KINDS, type ExecutionNextActionKind } from '@/lib/execution/stage';
+import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS, STATUS_LINE_ACTIONS } from '@/lib/execution/next-action-target';
+import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES, type ExecutionNextActionKind } from '@/lib/execution/stage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CommandCardExecution } from './command-card-execution';
 
@@ -21,8 +21,10 @@ vi.mock('@/lib/contracts/actions', () => ({
   recordContractSignedOffline: vi.fn(),
 }));
 
-const EVERYTHING = { generateContract: true, signOffline: true, openContract: true };
-const NOTHING = { generateContract: false, signOffline: false, openContract: false };
+// "Record costs" sits beside the next action, not in its place: the per-action
+// counts below leave it off, and the costs test turns it on.
+const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, recordCosts: false };
+const NOTHING = { generateContract: false, signOffline: false, openContract: false, recordCosts: false };
 
 function view(kind: ExecutionNextActionKind, may = EVERYTHING): ExecutionCardView {
   return {
@@ -102,5 +104,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     renderWithIntl(<CommandCardExecution view={view('record_signed_offline')} />, { locale });
     expect(screen.getByText(at('execution.card.waitingOnClient'))).toBeTruthy();
     expect(screen.getByText(at('execution.card.stage.awaiting_signature'))).toBeTruthy();
+  });
+
+  test('"Record costs" opens the costs page for a role that records them, from works in progress on (F1)', () => {
+    const costs = at('execution.card.recordCosts');
+    for (const stage of EXECUTION_STAGES) {
+      const { unmount } = renderWithIntl(
+        <CommandCardExecution view={{ ...view('record_payment', { ...NOTHING, recordCosts: true }), stage }} />,
+        { locale },
+      );
+      const link = screen.queryByRole('link', { name: costs });
+      if (STAGES_RECORDING_COSTS.has(stage)) expect(link?.getAttribute('href')).toMatch(/\/contracts\/c-1\/costs$/);
+      else expect(link).toBeNull();
+      unmount();
+    }
+    renderWithIntl(<CommandCardExecution view={view('record_payment', EVERYTHING)} />, { locale });
+    expect(screen.queryByRole('link', { name: costs })).toBeNull();
   });
 });

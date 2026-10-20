@@ -2,7 +2,7 @@
 // them. Plain types and the categories, CLIENT-SAFE: the server query
 // (./queries.ts) builds them, the tab and its form render them. Money is a
 // scale-4 string, a day is 'YYYY-MM-DD'.
-import type { CostCategory, CostItemUnit } from '@metra/db';
+import type { ContractStatus, CostCategory, CostItemUnit } from '@metra/db';
 
 /** The six fixed categories (A15), in the order the form offers them. Equal to COST_CATEGORIES (types.test.ts). */
 export const COST_ENTRY_CATEGORIES: readonly CostCategory[] = [
@@ -16,6 +16,9 @@ export const COST_ENTRY_CATEGORIES: readonly CostCategory[] = [
 
 /** The most entries one list answer carries; the rest load a page at a time. */
 export const COST_ENTRIES_PAGE_SIZE = 50;
+
+/** The earliest day a cost may be dated (and a list cursor may name): no studio books costs from before 2000. */
+export const EARLIEST_COST_DAY = '2000-01-01';
 
 /**
  * The official guide price of the entry's price-book item, shown for reference
@@ -54,6 +57,8 @@ export interface CostEntryRow {
   costItemNameEn: string | null;
   /** A voided entry stays listed, and counts in no total. */
   voided: boolean;
+  /** This member may edit and void it: a keeper (owner, admin), or the member who recorded it (./access.ts). */
+  editable: boolean;
   market: CostEntryMarketReference | null;
 }
 
@@ -83,4 +88,30 @@ export interface CostEntriesPage {
   next: CostEntriesCursor | null;
   /** Read with the first page only; a later page leaves it null. */
   totals: CostEntriesTotals | null;
+}
+
+/** The costs page's contract header: what it is and where it stands, and no money. */
+export interface CostContractHeader {
+  id: string;
+  number: number;
+  /** ISO timestamp: the document number's year. */
+  createdAt: string;
+  titleAr: string | null;
+  titleEn: string | null;
+  status: ContractStatus;
+  clientNameAr: string | null;
+  clientNameEn: string | null;
+}
+
+/** A section a cost is booked to or filtered by: its titles, and no money. */
+export interface CostSection {
+  id: string;
+  titleAr: string | null;
+  titleEn: string | null;
+}
+
+/** At most one page of sections, in document order, and whether more follow. */
+export interface CostSectionsPage {
+  sections: CostSection[];
+  hasMore: boolean;
 }

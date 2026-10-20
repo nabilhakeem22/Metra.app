@@ -86,7 +86,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         openingTab="overview"
         canSignOffline={false}
         canCreateCosts={false}
-        canUpdateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue
         canDraftVariation={false}

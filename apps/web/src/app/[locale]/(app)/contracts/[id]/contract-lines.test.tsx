@@ -141,7 +141,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingTab="overview"
         canSignOffline={false}
         canCreateCosts={false}
-        canUpdateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue={false}
         canDraftVariation={false}
@@ -169,7 +169,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           openingTab="overview"
           canSignOffline={false}
           canCreateCosts={false}
-          canUpdateCosts={false}
+          canPickCostItem={false}
           canManage={false}
           canIssue={false}
           canDraftVariation={false}
@@ -227,7 +227,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingTab="variations"
         canSignOffline={false}
         canCreateCosts={false}
-        canUpdateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue={false}
         canDraftVariation={false}

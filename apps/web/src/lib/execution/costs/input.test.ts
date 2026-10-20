@@ -29,18 +29,29 @@ describe('readCostEntry', () => {
     expect(costEntryFieldErrors({ ...BASE, qty: '0', unit: 'sqm', unitCost: '5' }, TODAY)).toMatchObject({ qty: { code: 'out_of_range' } });
   });
 
-  it('refuses a zero amount as out of range, never "1,5" as 15 (AC20)', () => {
-    expect(costEntryFieldErrors({ ...BASE, amount: '0' }, TODAY)).toEqual({
-      amount: { code: 'out_of_range', params: { min: '0.01', max: '1,000,000,000,000' } },
-    });
+  it('refuses a zero amount as out of range, naming the smallest it keeps, never "1,5" as 15 (AC20, F4)', () => {
+    const range = { code: 'out_of_range', params: { min: '0.0001', max: '1,000,000,000,000' } };
+    expect(costEntryFieldErrors({ ...BASE, amount: '0' }, TODAY)).toEqual({ amount: range });
+    expect(costEntryFieldErrors({ ...BASE, amount: '0.00001' }, TODAY)).toEqual({ amount: range });
+    expect(readCostEntry({ ...BASE, amount: '0.0001' }, TODAY)).toMatchObject({ ok: true, values: { amount: '0.0001' } });
     expect(costEntryFieldErrors({ ...BASE, amount: '1,5' }, TODAY)).toEqual({ amount: { code: 'not_a_number' } });
     expect(costEntryFieldErrors({ ...BASE, amount: '-4' }, TODAY)).toEqual({ amount: { code: 'not_negative' } });
     expect(costEntryFieldErrors({ ...BASE, amount: '' }, TODAY)).toEqual({ amount: { code: 'required' } });
   });
 
-  it('refuses a day that does not exist, or one after today in Cairo', () => {
-    expect(costEntryFieldErrors({ ...BASE, incurredOn: '2026-02-30' }, TODAY)).toEqual({ incurredOn: { code: 'invalid_date' } });
+  it('refuses a day that does not exist, one before 2000, or one after today in Cairo (F6)', () => {
+    for (const day of ['2026-02-30', '0000-01-01', '0001-01-01', '1900-01-01', '1999-12-31']) {
+      expect(costEntryFieldErrors({ ...BASE, incurredOn: day }, TODAY)).toEqual({ incurredOn: { code: 'invalid_date' } });
+    }
+    expect(readCostEntry({ ...BASE, incurredOn: '2000-01-01' }, TODAY)).toMatchObject({ ok: true, values: { incurredOn: '2000-01-01' } });
     expect(costEntryFieldErrors({ ...BASE, incurredOn: '2026-10-21' }, TODAY)).toEqual({ incurredOn: { code: 'date_in_future' } });
+  });
+
+  it('calls a description of invisible characters only blank (F5)', () => {
+    for (const blank of ['‏', '‌', '‍', '‎', '⁠', ' ​ ﻿ ', '　']) {
+      expect(costEntryFieldErrors({ ...BASE, description: blank }, TODAY)).toEqual({ description: { code: 'required' } });
+    }
+    expect(readCostEntry({ ...BASE, description: '‏أسمنت' }, TODAY)).toMatchObject({ ok: true, values: { description: '‏أسمنت' } });
   });
 
   it('asks for the section of a line, and caps the texts', () => {

@@ -12,10 +12,10 @@ import {
   type CreateCostEntryInput,
   type UpdateCostEntryInput,
 } from './core';
-import { loadCostEntriesCore, searchCostEntryLinesCore } from './reads';
-import type { CostEntriesCursor, CostEntriesFilter, CostEntriesPage } from './types';
+import { loadCostEntriesCore, loadCostSectionsCore, searchCostEntryLinesCore } from './reads';
+import type { CostEntriesCursor, CostEntriesFilter, CostEntriesPage, CostSectionsPage } from './types';
 
-/** The Costs tab's "Record a cost". A replayed key answers `already: true`. */
+/** "Record a cost". A replayed key answers `already: true`, and no answer carries the entry's id. */
 export async function createCostEntry(input: CreateCostEntryInput): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await createCostEntryCore(ctx, input);
@@ -46,6 +46,15 @@ export async function loadCostEntries(request: {
 }): Promise<ActionResult & { data?: CostEntriesPage }> {
   const ctx = await requireOrg();
   return loadCostEntriesCore(ctx, request);
+}
+
+/** The contract's sections after the last one shown, for the costs filter and the entry form. */
+export async function loadCostSections(request: {
+  contractId: string;
+  afterSectionId: string | null;
+}): Promise<ActionResult & { data?: CostSectionsPage }> {
+  const ctx = await requireOrg();
+  return loadCostSectionsCore(ctx, request);
 }
 
 /** The entry form's line picker, on the member's contract line search budget (the variation picker's surface). */

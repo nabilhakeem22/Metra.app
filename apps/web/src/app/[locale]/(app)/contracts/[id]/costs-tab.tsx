@@ -10,43 +10,46 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { SelectControl } from '@/components/ui/select-control';
 import { toast } from '@/hooks/use-toast';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
-import type { ContractSectionSummary } from '@/lib/contracts/queries';
 import { voidCostEntry } from '@/lib/execution/costs/actions';
 import { COST_ENTRY_CATEGORIES, type CostEntryRow as CostEntry } from '@/lib/execution/costs/types';
 import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { CostEntryForm } from './cost-entry-form';
 import { CostEntryRow } from './cost-entry-row';
+import { MoreSectionsButton } from './more-sections-button';
 import { useCostEntries } from './use-cost-entries';
 import { useCostEntryForm } from './use-cost-entry-form';
+import { useCostSections } from './use-cost-sections';
 
 const ALL = '__all__';
 
 /**
- * The Costs tab (المصروفات) of an execution contract: what was recorded, 50 at
- * a time newest first (asked when the tab opens), narrowed by category or
- * section, with the live total of what is shown; record, edit and void for a
- * role that may, each followed by the list asked again.
+ * The costs (المصروفات) of an execution contract, on the contract page's Costs
+ * tab and on the costs page alike: what was recorded, 50 at a time newest
+ * first (asked when it opens), narrowed by category or section, with the live
+ * total of what is shown; record for a role that may, and edit and void on
+ * the rows this member may change (each row says so), each followed by the
+ * list asked again as far as it was shown.
  */
 export function CostsTab({
   contractId,
   contractStatus,
-  sections,
   canCreate,
-  canUpdate,
+  canPickCostItem,
   m,
 }: {
   contractId: string;
   contractStatus: ContractStatus;
-  sections: ContractSectionSummary[];
   canCreate: boolean;
-  canUpdate: boolean;
+  /** The price book search (the proposal builder's): owner, admin and project manager. */
+  canPickCostItem: boolean;
   m: (value: string) => string;
 }) {
   const t = useTranslations('contracts.costs');
   const te = useTranslations('errors');
   const locale = useLocale();
   const list = useCostEntries(contractId);
+  const sections = useCostSections(contractId);
   const entry = useCostEntryForm(contractId, list.reload);
   const { confirm, dialog } = useConfirm();
   const [voiding, startVoid] = useTransition();
@@ -71,7 +74,7 @@ export function CostsTab({
   return (
     <div className="space-y-4">
       {dialog}
-      {(canCreate || canUpdate) && <CostEntryForm contractId={contractId} sections={sections} entry={entry} />}
+      <CostEntryForm contractId={contractId} sections={sections} entry={entry} canPickCostItem={canPickCostItem} />
       <p className="text-body text-muted-foreground">{t('intro')}</p>
       {canCreate && !canRecord && <p className="text-body text-muted-foreground">{t('draftNote')}</p>}
       <div className="flex flex-wrap items-end gap-3">
@@ -92,9 +95,10 @@ export function CostsTab({
             className="h-9 w-48"
             value={list.filter.sectionId ?? ALL}
             onValueChange={(value) => list.applyFilter({ ...list.filter, sectionId: value === ALL ? null : value })}
-            options={[{ value: ALL, label: t('all') }, ...sections.map((section) => ({ value: section.id, label: pickLocale({ nameAr: section.titleAr, nameEn: section.titleEn }, 'name', locale).value }))]}
+            options={[{ value: ALL, label: t('all') }, ...sections.sections.map((section) => ({ value: section.id, label: pickLocale({ nameAr: section.titleAr, nameEn: section.titleEn }, 'name', locale).value }))]}
           />
         </label>
+        <MoreSectionsButton sections={sections} />
         {list.totals && (
           <dl className="ms-auto flex gap-4 text-body">
             <div><dt className="text-caption text-muted-foreground">{t('total')}</dt><dd className="font-mono tabular-nums" dir="ltr">{m(list.totals.amount)}</dd></div>
@@ -108,6 +112,7 @@ export function CostsTab({
           </Button>
         )}
       </div>
+      {sections.failure && <p className="text-body text-destructive" role="alert">{sections.failure}</p>}
       {list.failure && <p className="text-body text-destructive" role="alert">{list.failure}</p>}
       <Card aria-busy={list.pending}>
         <CardContent className="overflow-x-auto p-0">
@@ -120,7 +125,7 @@ export function CostsTab({
             <table className="w-full text-body">
               <tbody>
                 {list.entries.map((row) => (
-                  <CostEntryRow key={row.id} entry={row} m={m} canUpdate={canUpdate} pending={voiding} onEdit={entry.openEdit} onVoid={askVoid} />
+                  <CostEntryRow key={row.id} entry={row} m={m} pending={voiding} onEdit={entry.openEdit} onVoid={askVoid} />
                 ))}
               </tbody>
             </table>

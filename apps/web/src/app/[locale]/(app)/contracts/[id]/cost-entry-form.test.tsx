@@ -7,6 +7,7 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { CostEntryForm } from './cost-entry-form';
 import { COST_ENTRY_CONTROL_ID } from './cost-entry-form-state';
 import { useCostEntryForm } from './use-cost-entry-form';
+import type { CostSectionsApi } from './use-cost-sections';
 
 // PR B3.2: the cost entry sheet says every refusal under its own box (AC 19 of
 // the field-errors plan), checks the typed values before sending, and keeps
@@ -17,6 +18,7 @@ const actions = vi.hoisted(() => ({
   updateCostEntry: vi.fn(),
   voidCostEntry: vi.fn(),
   loadCostEntries: vi.fn(),
+  loadCostSections: vi.fn(),
   searchCostEntryLines: vi.fn(),
 }));
 vi.mock('@/lib/execution/costs/actions', () => actions);
@@ -26,23 +28,29 @@ vi.mock('@/lib/price-book/picker-actions', () => ({
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-toast', () => ({ toast }));
 
-const SECTIONS = [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil', sortOrder: 0, sectionSubtotal: '0', lineCount: 0, openingLines: [] }];
+const SECTIONS: CostSectionsApi = {
+  sections: [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil' }],
+  hasMore: false,
+  pending: false,
+  failure: null,
+  loadMore: () => {},
+};
 
-function Sheet() {
+function Sheet({ canPickCostItem = true }: { canPickCostItem?: boolean }) {
   const entry = useCostEntryForm('k-1', () => {});
   return (
     <>
       <button type="button" onClick={entry.openNew}>
         open
       </button>
-      <CostEntryForm contractId="k-1" sections={SECTIONS} entry={entry} />
+      <CostEntryForm contractId="k-1" sections={SECTIONS} entry={entry} canPickCostItem={canPickCostItem} />
     </>
   );
 }
 
-async function openSheet(locale: TestLocale) {
+async function openSheet(locale: TestLocale, canPickCostItem = true) {
   document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
-  renderWithIntl(<Sheet />, { locale });
+  renderWithIntl(<Sheet canPickCostItem={canPickCostItem} />, { locale });
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'open' }));
   });
@@ -80,6 +88,20 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostEntryForm (%s)', (locale) => {
     });
   });
 
+  test('a role without the price book search sees the item kept, and a refusal of it under that box', async () => {
+    const { searchPriceBookPicker } = await import('@/lib/price-book/picker-actions');
+    vi.mocked(searchPriceBookPicker).mockClear();
+    await openSheet(locale, false);
+    expect(document.getElementById('ce-item-find')).toBeNull();
+    expect((document.getElementById(COST_ENTRY_CONTROL_ID.costItemId) as HTMLInputElement).value).toBe(at('contracts.costs.form.noCostItem'));
+    expect(searchPriceBookPicker).not.toHaveBeenCalled();
+    type('description', 'Cement');
+    type('amount', '1500');
+    actions.createCostEntry.mockResolvedValue({ ok: false, error: 'check_fields', fields: { costItemId: { code: 'no_longer_exists' } } });
+    await save();
+    expect(under('costItemId')).toBe(at('errors.field.no_longer_exists'));
+  });
+
   test('a blank description, a zero amount and a half-typed quantity are refused before anything is sent', async () => {
     await openSheet(locale);
     type('amount', '0');
@@ -87,7 +109,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostEntryForm (%s)', (locale) => {
     await save();
     expect(actions.createCostEntry).not.toHaveBeenCalled();
     expect(under('description')).toBe(at('errors.field.required'));
-    expect(under('amount')).toBe(messageAt(locale, 'errors.field.out_of_range').replace('{min}', '0.01').replace('{max}', '1,000,000,000,000'));
+    expect(under('amount')).toBe(messageAt(locale, 'errors.field.out_of_range').replace('{min}', '0.0001').replace('{max}', '1,000,000,000,000'));
     expect(under('unit')).toBe(at('errors.field.required'));
     expect(under('unitCost')).toBe(at('errors.field.required'));
     expect(document.activeElement?.id).toBe(COST_ENTRY_CONTROL_ID.description);

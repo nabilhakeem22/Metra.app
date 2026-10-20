@@ -1675,7 +1675,9 @@
       "marketVariance": "{value} against the market price",
       "marketNote": "Market prices are the official guide prices of the Ministry of Housing bulletin, shown for reference only. They change nothing.",
       "showMore": "Show more",
+      "moreSections": "More sections",
       "loadFailed": "We couldn't load the costs. Check your connection and try again.",
+      "sectionsFailed": "We couldn't load the sections. Check your connection and try again.",
       "edit": "Edit",
       "void": "Void the cost",
       "voidConfirm": {
@@ -1716,6 +1718,10 @@
         "findCostItem": "Find in the price book",
         "costItemHint": "When the item follows a market price, that price shows beside this cost for reference only.",
         "save": "Save"
+      },
+      "page": {
+        "title": "Costs of {number}",
+        "subtitle": "Record and review what this contract's works actually cost."
       }
     },
     "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
@@ -3062,6 +3068,7 @@
       "title": "Execution",
       "waitingOnClient": "Waiting for the client to sign the contract on its link.",
       "someoneElse": "An owner or an admin does this.",
+      "recordCosts": "Record costs",
       "stage": {
         "no_boq": "No BOQ in Metra yet",
         "no_contract": "The BOQ is issued, with no execution contract yet",

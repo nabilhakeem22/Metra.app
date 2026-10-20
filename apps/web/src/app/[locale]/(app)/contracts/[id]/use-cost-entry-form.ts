@@ -9,7 +9,7 @@ import { createCostEntry, updateCostEntry } from '@/lib/execution/costs/actions'
 import { COST_ENTRY_FIELDS, costEntryFieldErrors } from '@/lib/execution/costs/input';
 import type { CostEntryRow } from '@/lib/execution/costs/types';
 import { costEntryFormOf, costEntryPayload, emptyCostEntryForm, type CostEntryFormState } from './cost-entry-form-state';
-import { costItemLabel, lineLabel } from './cost-entry-labels';
+import { costItemLabel, lineLabel, sectionLabel } from './cost-entry-labels';
 
 /**
  * The cost entry sheet: record a new cost or edit a listed one. Save checks
@@ -41,7 +41,7 @@ export function useCostEntryForm(contractId: string, onSaved: () => void) {
   function openEdit(entry: CostEntryRow) {
     errors.clear();
     setEditing(entry);
-    setForm(costEntryFormOf(entry, { line: lineLabel(entry, locale), costItem: costItemLabel(entry, locale) }));
+    setForm(costEntryFormOf(entry, { section: sectionLabel(entry, locale), line: lineLabel(entry, locale), costItem: costItemLabel(entry, locale) }));
     setOpen(true);
   }
 

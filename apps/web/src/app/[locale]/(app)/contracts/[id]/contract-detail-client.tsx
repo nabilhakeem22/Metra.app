@@ -30,7 +30,7 @@ export function ContractDetailClient({
   openingTab,
   canSignOffline,
   canCreateCosts,
-  canUpdateCosts,
+  canPickCostItem,
   canManage,
   canIssue,
   canDraftVariation,
@@ -48,7 +48,8 @@ export function ContractDetailClient({
   /** Owner, admin or project manager: may record a paper signature (D5). */
   canSignOffline: boolean;
   canCreateCosts: boolean;
-  canUpdateCosts: boolean;
+  /** The price book search, for the cost entry form's item. */
+  canPickCostItem: boolean;
   canManage: boolean;
   canIssue: boolean;
   canDraftVariation: boolean;
@@ -139,9 +140,8 @@ export function ContractDetailClient({
         <CostsTab
           contractId={detail.id}
           contractStatus={detail.status}
-          sections={keptSections.page?.sections ?? []}
           canCreate={canCreateCosts}
-          canUpdate={canUpdateCosts}
+          canPickCostItem={canPickCostItem}
           m={m}
         />
       )}

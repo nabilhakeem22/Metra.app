@@ -9,13 +9,16 @@ import { CostsTab } from './costs-tab';
 // PR B3.2: the Costs tab asks the server for its list when it opens (the
 // contract page never carries it), asks again for a filter, the next page or
 // after a write, shows the market price only where the read joined one, and
-// voids after a confirm.
+// voids after a confirm. Fix round: edit and void only on the rows this member
+// may change, a reload after a write asks again for every page shown, the
+// sections come a page at a time, and an edit shows money as typed.
 
 const actions = vi.hoisted(() => ({
   createCostEntry: vi.fn(),
   updateCostEntry: vi.fn(),
   voidCostEntry: vi.fn(),
   loadCostEntries: vi.fn(),
+  loadCostSections: vi.fn(),
   searchCostEntryLines: vi.fn(),
 }));
 vi.mock('@/lib/execution/costs/actions', () => actions);
@@ -28,7 +31,7 @@ const row = (n: number, extra: Partial<CostEntryRow> = {}): CostEntryRow => ({
   category: 'materials', description: `Entry ${n}`, amount: '100.0000', incurredOn: '2026-10-01',
   qty: null, unit: null, unitCost: null, supplier: null, reference: null,
   contractSectionId: null, sectionTitleAr: null, sectionTitleEn: null, contractLineId: null, lineDescriptionAr: null, lineDescriptionEn: null,
-  costItemId: null, costItemCode: null, costItemNameAr: null, costItemNameEn: null, voided: false, market: null,
+  costItemId: null, costItemCode: null, costItemNameAr: null, costItemNameEn: null, voided: false, editable: true, market: null,
   ...extra,
 });
 
@@ -43,13 +46,15 @@ const FIRST: CostEntriesPage = {
 const ALL = { category: null, sectionId: null };
 
 async function renderTab(locale: TestLocale, contractStatus: 'draft' | 'signed' = 'signed') {
-  renderWithIntl(<CostsTab contractId="k-1" contractStatus={contractStatus} sections={[]} canCreate canUpdate m={(value) => value} />, { locale });
+  renderWithIntl(<CostsTab contractId="k-1" contractStatus={contractStatus} canCreate canPickCostItem m={(value) => value} />, { locale });
   await act(async () => {});
 }
 
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockReset();
   actions.loadCostEntries.mockResolvedValue({ ok: true, data: FIRST });
+  actions.loadCostSections.mockResolvedValue({ ok: true, data: { sections: [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil' }], hasMore: false } });
+  actions.searchCostEntryLines.mockResolvedValue({ ok: true, data: { lines: [], hasMore: false } });
   toast.mockReset();
 });
 
@@ -121,5 +126,64 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
     await renderTab(locale, 'draft');
     expect(screen.queryByRole('button', { name: at('contracts.costs.record') })).toBeNull();
     expect(screen.getByText(at('contracts.costs.draftNote'))).toBeTruthy();
+  });
+
+  test('offers edit and void only on a row this member may change', async () => {
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(1, { editable: false }), row(3)], next: null, totals: { count: 2, amount: '200.0000' } } });
+    await renderTab(locale);
+    expect(screen.getAllByRole('button', { name: at('common.moreActions') })).toHaveLength(1);
+  });
+
+  test('after a void, asks again for every page shown, so the row stays in view', async () => {
+    const second: CostEntriesPage = { entries: [row(3)], next: null, totals: null };
+    actions.voidCostEntry.mockResolvedValue({ ok: true });
+    await renderTab(locale);
+    actions.loadCostEntries.mockResolvedValueOnce({ ok: true, data: second });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.showMore') }));
+    });
+    actions.loadCostEntries.mockClear();
+    actions.loadCostEntries.mockResolvedValueOnce({ ok: true, data: FIRST }).mockResolvedValueOnce({ ok: true, data: { ...second, entries: [row(3, { voided: true })] } });
+    const menus = screen.getAllByRole('button', { name: at('common.moreActions') });
+    fireEvent.pointerDown(menus[menus.length - 1], { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('menuitem', { name: at('contracts.costs.void') }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.voidConfirm.confirm') }));
+    });
+    expect(actions.voidCostEntry).toHaveBeenCalledWith(row(3).id);
+    expect(actions.loadCostEntries.mock.calls.map(([request]) => (request as { cursor: unknown }).cursor)).toEqual([null, FIRST.next]);
+    expect(screen.getByText('Entry 3')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: at('contracts.costs.showMore') })).toBeNull();
+  });
+
+  test('lists the sections a page at a time, asked when it opens', async () => {
+    actions.loadCostSections.mockResolvedValueOnce({ ok: true, data: { sections: [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil' }], hasMore: true } });
+    await renderTab(locale);
+    expect(actions.loadCostSections).toHaveBeenCalledWith({ contractId: 'k-1', afterSectionId: null });
+    actions.loadCostSections.mockResolvedValueOnce({ ok: true, data: { sections: [{ id: 's-2', titleAr: 'كهرباء', titleEn: 'Electrical' }], hasMore: false } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.moreSections') }));
+    });
+    expect(actions.loadCostSections).toHaveBeenLastCalledWith({ contractId: 'k-1', afterSectionId: 's-1' });
+    expect(screen.queryByRole('button', { name: at('contracts.costs.moreSections') })).toBeNull();
+    await pickOption('costs-filter-section', locale === 'en' ? 'Electrical' : 'كهرباء');
+    expect(actions.loadCostEntries).toHaveBeenLastCalledWith({ contractId: 'k-1', filter: { category: null, sectionId: 's-2' }, cursor: null });
+  });
+
+  test('an edit shows the money as typed, not at four decimals', async () => {
+    actions.loadCostEntries.mockResolvedValue({
+      ok: true,
+      data: { entries: [row(1, { amount: '410.0000', qty: '2.5000', unit: 'sqm', unitCost: '164.0000' })], next: null, totals: { count: 1, amount: '410.0000' } },
+    });
+    await renderTab(locale);
+    openMenu(at('common.moreActions'));
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('menuitem', { name: at('contracts.costs.edit') }));
+    });
+    expect((document.getElementById('ce-amount') as HTMLInputElement).value).toBe('410');
+    expect((document.getElementById('ce-qty') as HTMLInputElement).value).toBe('2.5');
+    expect((document.getElementById('ce-unit-cost') as HTMLInputElement).value).toBe('164');
   });
 });

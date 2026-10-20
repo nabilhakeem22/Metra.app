@@ -2,7 +2,7 @@ import 'server-only';
 // What the cost entry cores (./core.ts) read inside their RLS transaction
 // before they write, each a coded refusal when the answer forbids the write:
 // the contract an entry is booked on, the line and section it is booked to,
-// the price-book item it names, and the entry an edit changes.
+// the price-book item it names, and the entry an edit or a void changes.
 //
 // NO CONTRACT-LEVEL LOCK, on purpose (the lock-order addendum applies to cores
 // that write contract children AND the contract row; these write neither). A
@@ -14,6 +14,8 @@ import { contractCostEntries, contractLines, contractSections, contracts, costIt
 import { and, eq } from 'drizzle-orm';
 import { failFields } from '@/lib/actions/field-errors';
 import { fail } from '@/lib/actions/mutate';
+import type { OrgContext } from '@/lib/db/context';
+import { mayChangeCostEntry } from './access';
 import type { CleanCostEntry } from './input';
 
 /** The contract a cost may be booked on: an execution contract (from a BOQ) that has left `draft` (A15). */
@@ -82,17 +84,21 @@ export const COST_ENTRY_COLUMNS = {
 };
 
 /**
- * The entry an edit changes, locked FOR UPDATE so a void racing the edit waits
- * for it (and the edit, once it holds the row, sees the entry still live).
+ * The entry an edit or a void changes, locked FOR UPDATE so a void racing the
+ * edit (or another void) waits for it, and the one that waits then sees the
+ * entry voided. Refused in this order: not this studio's or no such entry,
+ * not this member's to change (lead ruling on PR B3: owner and admin change
+ * any entry, every other role only the ones it recorded), already voided.
  */
-export async function lockLiveEntry(tx: MetraDb, entryId: string) {
+export async function lockLiveEntry(tx: MetraDb, ctx: OrgContext, entryId: string) {
   const [entry] = await tx
-    .select(COST_ENTRY_COLUMNS)
+    .select({ ...COST_ENTRY_COLUMNS, recordedBy: contractCostEntries.recordedBy })
     .from(contractCostEntries)
     .where(eq(contractCostEntries.id, entryId))
     .limit(1)
     .for('update');
   if (!entry) fail('cost_entry_not_found');
+  if (!mayChangeCostEntry(ctx.role, entry, ctx.userId)) fail('forbidden');
   if (entry.voidedAt !== null) fail('cost_entry_voided');
   return entry;
 }

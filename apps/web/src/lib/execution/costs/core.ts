@@ -4,9 +4,9 @@
 // PURE cores: no next/*, no session. The 'use server' wrappers in ./actions
 // delegate here; exercised directly by tests/actions/cost-entries.dbtest.ts.
 import { contractCostEntries, type MetraDb } from '@metra/db';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { mutateInOrg } from '@/lib/actions/mutate';
 import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
@@ -79,7 +79,8 @@ export async function createCostEntryCore(
 ): Promise<ActionResult & { data?: string; already?: boolean }> {
   if (!isObject(input)) return err('malformed');
   const contractId = entryId(input.contractId);
-  const idempotencyKey = entryId(input.idempotencyKey);
+  // Lower case: the key is compared as text, and a uuid in capitals is the same key.
+  const idempotencyKey = entryId(input.idempotencyKey).toLowerCase();
   if (!isUuid(contractId) || !isUuid(idempotencyKey)) return err('malformed');
   const read = readCostEntry(input, todayInCairo(new Date()));
   if (!read.ok) return read.malformed ? err('malformed') : fieldsFailed(read.errors);
@@ -103,7 +104,11 @@ export async function createCostEntryCore(
   return result.ok ? { ...result, already } : result;
 }
 
-/** Change a live entry; its contract stays. A voided one is `cost_entry_voided`. */
+/**
+ * Change a live entry; its contract stays. An owner or admin may change any
+ * entry; another role only one it recorded (`forbidden` otherwise, ./access.ts).
+ * A voided one is `cost_entry_voided`.
+ */
 export async function updateCostEntryCore(ctx: OrgContext, input: UpdateCostEntryInput): Promise<ActionResult> {
   if (!isObject(input)) return err('malformed');
   const id = entryId(input.id);
@@ -116,7 +121,7 @@ export async function updateCostEntryCore(ctx: OrgContext, input: UpdateCostEntr
     ctx,
     { capability: 'cost_entries', action: 'update', refusals: COST_ENTRY_REFUSALS },
     async (tx, audit) => {
-      const { voidedAt: _live, ...before } = await lockLiveEntry(tx, id);
+      const { voidedAt: _live, recordedBy: _by, ...before } = await lockLiveEntry(tx, ctx, id);
       await requireTargets(tx, before.contractId, entry);
       await tx
         .update(contractCostEntries)
@@ -128,9 +133,9 @@ export async function updateCostEntryCore(ctx: OrgContext, input: UpdateCostEntr
 }
 
 /**
- * Void a live entry: it stays listed and leaves every total. The `voided_at
- * is null` in the WHERE is the admission gate, so of two voids one wins and
- * the other answers `cost_entry_voided`.
+ * Void a live entry: it stays listed and leaves every total. The entry is
+ * locked first, so of two voids one wins and the other answers
+ * `cost_entry_voided`; whose it is decides as for an edit (`forbidden`).
  */
 export async function voidCostEntryCore(ctx: OrgContext, input: { id?: unknown }): Promise<ActionResult> {
   if (!isObject(input)) return err('malformed');
@@ -138,15 +143,11 @@ export async function voidCostEntryCore(ctx: OrgContext, input: { id?: unknown }
   if (!isUuid(id)) return err('malformed');
 
   return mutateInOrg(ctx, { capability: 'cost_entries', action: 'update' }, async (tx, audit) => {
-    const [voided] = await tx
+    await lockLiveEntry(tx, ctx, id);
+    await tx
       .update(contractCostEntries)
       .set({ voidedAt: sql`now()`, voidedBy: ctx.userId, updatedAt: new Date() })
-      .where(and(eq(contractCostEntries.id, id), isNull(contractCostEntries.voidedAt)))
-      .returning({ id: contractCostEntries.id });
-    if (!voided) {
-      const [kept] = await tx.select({ id: contractCostEntries.id }).from(contractCostEntries).where(eq(contractCostEntries.id, id)).limit(1);
-      fail(kept ? 'cost_entry_voided' : 'cost_entry_not_found');
-    }
+      .where(eq(contractCostEntries.id, id));
     await audit({ entity: 'contract_cost_entry', entityId: id, action: 'update', before: { voided: false }, after: { voided: true } });
   });
 }

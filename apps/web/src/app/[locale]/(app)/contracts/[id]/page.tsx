@@ -5,7 +5,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { getContractSchedule } from '@/lib/contracts/schedule/queries';
-import { mayReadCostEntries } from '@/lib/execution/costs/reads';
+import { mayReadCostEntries, mayRecordCostEntries } from '@/lib/execution/costs/access';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
@@ -59,8 +59,8 @@ export default async function ContractDetailPage({
         tabs={tabs}
         openingTab={openingTab}
         canSignOffline={mayRecordSignedOffline(ctx.role)}
-        canCreateCosts={can(ctx.role, 'cost_entries', 'create')}
-        canUpdateCosts={can(ctx.role, 'cost_entries', 'update')}
+        canCreateCosts={mayRecordCostEntries(ctx.role)}
+        canPickCostItem={can(ctx.role, 'proposals_build', 'update')}
         canManage={canManage}
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}

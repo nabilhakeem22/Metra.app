@@ -9,8 +9,8 @@ import type { ExecutionNextActionKind, ExecutionStage } from './stage';
 export const EXECUTION_CARD_DIALOGS = ['generate_contract', 'sign_offline'] as const;
 export type ExecutionCardDialog = (typeof EXECUTION_CARD_DIALOGS)[number];
 
-/** The pages a next action links to. */
-export type ExecutionCardPage = 'project_boq' | 'contract' | 'contract_schedule' | 'contract_variations';
+/** The pages the card links to: a next action's, and the costs page beside it. */
+export type ExecutionCardPage = 'project_boq' | 'contract' | 'contract_schedule' | 'contract_variations' | 'contract_costs';
 
 export type NextActionTarget =
   | { kind: 'link'; page: ExecutionCardPage }
@@ -63,6 +63,18 @@ export function isStatusLineAction(kind: ExecutionNextActionKind): kind is Statu
 /** The stages whose action waits on the client: the card says so beside it. */
 export const STAGES_WAITING_ON_CLIENT: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['awaiting_signature']);
 
+/**
+ * The stages the card offers "Record costs" in, beside the next action: from
+ * works in progress onward (lead ruling on PR B3, F1). A terminated contract
+ * still takes the costs it ran up.
+ */
+export const STAGES_RECORDING_COSTS: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>([
+  'in_progress',
+  'final_account',
+  'settled',
+  'terminated',
+]);
+
 /** The page a link target opens, or null when the id it needs is not there. */
 export function executionCardHref(
   page: ExecutionCardPage,
@@ -73,5 +85,6 @@ export function executionCardHref(
   const base = `/contracts/${ids.contractId}`;
   if (page === 'contract_schedule') return `${base}?tab=schedule`;
   if (page === 'contract_variations') return `${base}?tab=variations`;
+  if (page === 'contract_costs') return `${base}/costs`;
   return base;
 }

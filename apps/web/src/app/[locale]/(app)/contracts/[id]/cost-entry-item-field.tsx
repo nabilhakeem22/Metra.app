@@ -17,9 +17,22 @@ const NO_ITEM = '__no_item__';
  * The price book item a cost is for, found by search: optional, and what lets
  * the list show the item's market price beside the cost (when the entry's
  * quantity is in the market item's unit). The picked item stays offered
- * whatever is searched next.
+ * whatever is searched next. A role that may not search the price book (a
+ * site engineer, an accountant) sees the entry's item, kept as it is.
  */
-export function CostEntryItemField({ entry }: { entry: CostEntryFormApi }) {
+export function CostEntryItemField({ entry, canSearch }: { entry: CostEntryFormApi; canSearch: boolean }) {
+  const t = useTranslations('contracts.costs.form');
+  if (!canSearch) {
+    return (
+      <FormField id={COST_ENTRY_CONTROL_ID.costItemId} label={t('costItem')} {...entry.errors.bind('costItemId')}>
+        <Input readOnly className="w-auto min-w-40" value={entry.form.costItemLabel || t('noCostItem')} />
+      </FormField>
+    );
+  }
+  return <CostItemSearchField entry={entry} />;
+}
+
+function CostItemSearchField({ entry }: { entry: CostEntryFormApi }) {
   const t = useTranslations('contracts.costs.form');
   const locale = useLocale();
   const [query, setQuery] = useState('');

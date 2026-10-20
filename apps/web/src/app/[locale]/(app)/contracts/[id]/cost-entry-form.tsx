@@ -5,7 +5,6 @@ import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
-import type { ContractSectionSummary } from '@/lib/contracts/queries';
 import type { CostEntryField } from '@/lib/execution/costs/input';
 import { COST_ENTRY_CATEGORIES } from '@/lib/execution/costs/types';
 import { UNIT_TOKENS } from '@/lib/price-book/import';
@@ -13,6 +12,7 @@ import { COST_ENTRY_CONTROL_ID, type CostEntryFormState } from './cost-entry-for
 import { CostEntryItemField } from './cost-entry-item-field';
 import { CostEntryTargetFields } from './cost-entry-target-fields';
 import type { CostEntryFormApi } from './use-cost-entry-form';
+import type { CostSectionsApi } from './use-cost-sections';
 
 const NO_UNIT = '__no_unit__';
 
@@ -27,10 +27,13 @@ export function CostEntryForm({
   contractId,
   sections,
   entry,
+  canPickCostItem,
 }: {
   contractId: string;
-  sections: ContractSectionSummary[];
+  sections: CostSectionsApi;
   entry: CostEntryFormApi;
+  /** May search the price book (the builder's search); otherwise the entry's item is shown, kept as it is. */
+  canPickCostItem: boolean;
 }) {
   const t = useTranslations('contracts.costs');
   const tp = useTranslations('priceBook');
@@ -100,7 +103,7 @@ export function CostEntryForm({
           {box('reference')}
         </FormField>
       </div>
-      <CostEntryItemField entry={entry} />
+      <CostEntryItemField entry={entry} canSearch={canPickCostItem} />
     </FormSheet>
   );
 }

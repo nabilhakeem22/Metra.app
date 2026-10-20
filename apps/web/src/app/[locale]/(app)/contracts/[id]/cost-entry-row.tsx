@@ -14,19 +14,19 @@ const ONE_DECIMAL: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDig
 /**
  * One cost on the Costs tab: when, what, where it is booked, how much, and
  * the market price of its price book item for reference (only when the units
- * compare). A voided entry stays, struck through, with no actions.
+ * compare). Edit and void only on an entry this member may change (owner and
+ * admin any, another role its own); a voided entry stays, struck through, with
+ * no actions.
  */
 export function CostEntryRow({
   entry,
   m,
-  canUpdate,
   pending,
   onEdit,
   onVoid,
 }: {
   entry: CostEntry;
   m: (value: string) => string;
-  canUpdate: boolean;
   pending: boolean;
   onEdit: (entry: CostEntry) => void;
   onVoid: (entry: CostEntry) => void;
@@ -73,7 +73,7 @@ export function CostEntryRow({
         )}
       </td>
       <td className="px-4 py-2">
-        {canUpdate && !entry.voided && (
+        {entry.editable && !entry.voided && (
           <OverflowMenu
             label={tc('moreActions')}
             disabled={pending}

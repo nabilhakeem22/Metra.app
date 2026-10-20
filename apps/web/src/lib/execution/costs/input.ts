@@ -14,10 +14,10 @@ import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { readTypedMoney } from '@/lib/validation/amount-field';
 import { collectFieldErrors, readOptionalText, type FieldRead } from '@/lib/validation/field-rules';
 import { validIsoDate } from '@/lib/validation/iso-date';
-import { clean } from '@/lib/validation/text';
+import { clean, visibleText } from '@/lib/validation/text';
 import { boundedText, requiredText } from '@/lib/validation/text-field-rules';
 import { NOT_UUID, optionalUuid } from '@/lib/uuid';
-import { COST_ENTRY_CATEGORIES } from './types';
+import { COST_ENTRY_CATEGORIES, EARLIEST_COST_DAY } from './types';
 
 export const COST_ENTRY_FIELDS = [
   'category',
@@ -40,8 +40,8 @@ export type CostEntryField = (typeof COST_ENTRY_FIELDS)[number];
 export const MAX_COST_DESCRIPTION_CHARS = 300;
 export const MAX_COST_PARTY_CHARS = 120;
 
-/** Zero, or a figure so small it stores as 0.0000: said with the range a box takes. */
-const POSITIVE_RANGE: FieldError = { code: 'out_of_range', params: { min: '0.01', max: '1,000,000,000,000' } };
+/** Zero, or a figure so small it stores as 0.0000: said with the range a box takes (the smallest kept is 0.0001). */
+const POSITIVE_RANGE: FieldError = { code: 'out_of_range', params: { min: '0.0001', max: '1,000,000,000,000' } };
 
 /** The entry as typed. Directly invokable, so anything may arrive. */
 export interface TypedCostEntry {
@@ -103,10 +103,11 @@ function readPositive(raw: string | null): FieldRead<string> {
   return parseMoney4(read.value) > 0n ? { ok: true, value: canonical(read.value) } : { ok: false, error: POSITIVE_RANGE };
 }
 
+/** A real day from EARLIEST_COST_DAY to today: year 0000 (which Postgres refuses) or 1999 is `invalid_date`. */
 function readIncurredOn(raw: string | null, today: string): FieldRead<string> {
   const value = clean(raw);
   if (value === null) return { ok: false, error: { code: 'required' } };
-  if (!validIsoDate(value)) return { ok: false, error: { code: 'invalid_date' } };
+  if (!validIsoDate(value) || value < EARLIEST_COST_DAY) return { ok: false, error: { code: 'invalid_date' } };
   return value > today ? { ok: false, error: { code: 'date_in_future' } } : { ok: true, value };
 }
 
@@ -139,7 +140,8 @@ export function readCostEntry(input: TypedCostEntry, today: string): CostEntryRe
   if (!category || !typed || unit === undefined) return MALFORMED;
   if (sectionId === NOT_UUID || lineId === NOT_UUID || costItemId === NOT_UUID) return MALFORMED;
 
-  const description = clean(text(input.description));
+  // Invisible characters alone (a bidi mark, a zero-width joiner) are a blank description.
+  const description = visibleText(text(input.description));
   const amount = readPositive(text(input.amount));
   const incurredOn = readIncurredOn(text(input.incurredOn), today);
   const quantity = readQuantity(text(input.qty), unit, text(input.unitCost));

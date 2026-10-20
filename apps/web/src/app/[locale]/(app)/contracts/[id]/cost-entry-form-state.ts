@@ -4,6 +4,8 @@
 import type { CostCategory } from '@metra/db';
 import type { CostEntryField, TypedCostEntry } from '@/lib/execution/costs/input';
 import type { CostEntryRow } from '@/lib/execution/costs/types';
+// The builder's figure display: trailing fractional zeros carry no value.
+import { compactFigure } from '@/app/[locale]/(app)/proposals/[id]/figure-display';
 
 /** The control each refusal sits under. */
 export const COST_ENTRY_CONTROL_ID: Record<CostEntryField, string> = {
@@ -27,6 +29,8 @@ export interface CostEntryFormState {
   amount: string;
   incurredOn: string;
   contractSectionId: string;
+  /** What the picked section reads as, kept so the select can show it before its page of sections is loaded. */
+  sectionLabel: string;
   contractLineId: string;
   /** What the picked line reads as, kept so the picker can show it whatever is searched next. */
   lineLabel: string;
@@ -46,6 +50,7 @@ export function emptyCostEntryForm(today: string): CostEntryFormState {
     amount: '',
     incurredOn: today,
     contractSectionId: '',
+    sectionLabel: '',
     contractLineId: '',
     lineLabel: '',
     qty: '',
@@ -58,19 +63,24 @@ export function emptyCostEntryForm(today: string): CostEntryFormState {
   };
 }
 
-/** A listed entry as the form edits it; `labels` names its line and price book item in the page's language. */
-export function costEntryFormOf(entry: CostEntryRow, labels: { line: string; costItem: string }): CostEntryFormState {
+/**
+ * A listed entry as the form edits it; `labels` names its section, line and
+ * price book item in the page's language. Money shows as typed, not as
+ * stored: 410, not 410.0000.
+ */
+export function costEntryFormOf(entry: CostEntryRow, labels: { section: string; line: string; costItem: string }): CostEntryFormState {
   return {
     category: entry.category,
     description: entry.description,
-    amount: entry.amount,
+    amount: compactFigure(entry.amount),
     incurredOn: entry.incurredOn,
     contractSectionId: entry.contractSectionId ?? '',
+    sectionLabel: labels.section,
     contractLineId: entry.contractLineId ?? '',
     lineLabel: labels.line,
-    qty: entry.qty ?? '',
+    qty: entry.qty === null ? '' : compactFigure(entry.qty),
     unit: entry.unit ?? '',
-    unitCost: entry.unitCost ?? '',
+    unitCost: entry.unitCost === null ? '' : compactFigure(entry.unitCost),
     supplier: entry.supplier ?? '',
     reference: entry.reference ?? '',
     costItemId: entry.costItemId ?? '',
