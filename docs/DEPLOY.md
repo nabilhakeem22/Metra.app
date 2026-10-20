@@ -3217,8 +3217,9 @@ this section when handing the step over; do not start with the placeholder
 still in it.
 
 **Step B is NOT the last database step.** These were asked for in the plan's
-"DB step B" addenda and are deferred, by owner decision, to a later step that
-carries a migration (0064 or later), with its own runbook:
+"DB step B" addenda and are NOT in it; they wait for a later step that carries
+a migration (0064 or later), with its own runbook, and the owner has not yet
+decided when:
 
 - the stored folded search columns on contract lines, section titles and the
   price book (`contract_lines.search_text` and its kin), which make a search
@@ -3666,29 +3667,53 @@ re-run it until it exits 0, as step 3 says), then step 4 and on.
 the version that served before the merge (`npx wrangler deployments list`).
 Leave the database alone: the older Worker runs on it (see THE ORDER).
 
-**Rehearsed** on a local database built by the A2 code (`b43919ab`: 0063 and
-its `db:apply-rls`, with Supabase's API roles and default grants), plus a
-signed execution contract of 121 sections (one of 300 lines), a delivery at
-execution, a part-paid payment request, a cost entry and an approved change
-order. Every command and SQL block above was run as written, from a separate
-checkout standing in for `merta-main`, with `origin/main` played by the A4
-code (`478567c0`, the same database code as A2). Steps 1 to 4 printed exactly
-what they say, step 2 (c) included (`most_sections_in_one_contract` 121, so
-step 4 (d) showed `section_count` 121, `opening_sections` 50 and
-`opening_lines` 50). A catalogue comparison before and after step 3 found
-exactly the changes listed under *What it changes* (7 functions and 4 triggers
-added, the contract and change-order link functions replaced, the cost
-entries' UPDATE turned into 15 column grants) and nothing else. Undo (0), both
-parts, left a catalogue identical to the one before step 3 (policies,
-function bodies and grants, triggers, table and column grants, the role: zero
-differences). Going forward again gave a catalogue identical to the first
-step 3's. The A4 code's own action tests on the step B database: 1,295 of
-1,302 passed; of the 7 that did not, 4 test the uncapped contract link of step
-A (the visible difference under THE ORDER), 2 pin step A's list of client
-functions and step A's cost entry grant (both moved on purpose), and 1 fails
-the same way on the database before step 3 (it checks a Supabase default grant
-on functions that this rehearsal's simulated roles add and roles.sql does not
-manage).
+**Rehearsed** (B4 fix round, Oct 20) on a local PostgreSQL 17 database built
+by the code `main` will run at step B (`b7747503`, A5: the same database code
+as A2 and A4), with Supabase's API roles and default grants simulated before
+migrating, plus a signed execution contract of 121 sections (one of 300
+lines), a delivery at execution, a part-paid payment request with a pending
+claim, a cost entry and an approved change order of 15 days. Every command and
+SQL block above was run as written, from a separate checkout standing in for
+`merta-main` (its own `npm ci`), with `origin/main` played by `b7747503` and
+`<B_SHA>` by the fix round's code commit `f4579f66`.
+
+- Steps 1 to 4 printed exactly what they say (step 2 (b) showed
+  `client_claims` 1 because the rehearsal data carries one claim; production
+  has none before the merge). Step 3 printed the four notices, then the eight
+  trigger notices in the order listed, and the two green lines; the second run
+  printed only the four.
+- A catalogue comparison before and after step 3 found exactly the changes
+  under *What it changes*: 9 functions and 8 triggers added; the contract
+  link, the change-order link and the change-order answer replaced; the cost
+  entries' UPDATE turned into 15 column grants and the claims' INSERT and
+  UPDATE into 5 column grants; nothing else.
+- Undo (0), both parts, the SQL block taken from the saved copy, left a
+  catalogue identical to the one before step 3 (policies, function bodies and
+  grants, triggers, table and column grants, the role: zero differences). Going
+  forward again printed the twelve notices and gave a catalogue identical to
+  the first step 3's.
+- **The lock races, on purpose.** A reader holding `contract_cost_entries` for
+  10 s: `policies/35-execution.sql` lost once and the retry landed it (exit
+  0). Held for 30 s on a database before step B: the file lost three times,
+  `apply-rls` exited 1 with the two failure lines, step 2 (b) then showed 9
+  and 0, and the re-run after the reader ended exited 0 with the twelve
+  notices (9 and 8). App-shaped writes (a read, a 30 ms round trip, then a
+  cost entry insert), while `db:apply-rls` ran six times: at about 6 writes a
+  second, one run met a 40P01 at `policies/00-core.sql` and its retry landed
+  it, all six exited 0; at about 22 writes a second every run met one, three
+  landed on a retry and three failed after three attempts (re-run until it
+  exits 0); in both, a few of the app's own writes were the deadlock's victim.
+- **The current code on the step B database.** `main`'s own action tests
+  (`b7747503`): 1,329 of 1,341 passed. The 12 that did not test what step B
+  changes on purpose, and no app path: 4 test the uncapped contract link of
+  step A (the visible difference under THE ORDER); 1 pins step A's list of
+  client functions; 1 pins step A's grants on the six execution tables; 1
+  inserts a claim as `metra_app` (now only the client's link function may);
+  4 write site readings as `metra_app` dated before their test contract was
+  issued (now refused, as the measurement screen already refuses them); and 1
+  fails the same way on the database before step 3 (it checks a Supabase
+  default grant that this rehearsal's simulated roles add and `roles.sql`
+  does not manage).
 
 ## Monthly market bulletin
 
