@@ -23,6 +23,9 @@ export type ExecutionActionCode =
   // Sits under the amount field, with params {outstanding}.
   | 'payment_exceeds_request'
   | 'claim_pending_for_request'
+  // A payment's idempotency key already names a DIFFERENT payment (another
+  // request, or another amount): refused, never answered as that one.
+  | 'idempotency_conflict'
   // Billing an approved change order.
   | 'variation_not_approved'
   | 'variation_credit_not_billable'

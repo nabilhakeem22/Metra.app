@@ -16,13 +16,14 @@ import { PaymentsTab } from './payments-tab';
 import type { BillingMay } from './request-row';
 import { ScheduleTab } from './schedule-tab';
 import { ShareLinkCard } from './share-link-card';
+import type { ContractPageHeader } from './page-payload';
 import type { ContractTab } from './tabs';
-import { useContractBilling } from './use-contract-billing';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useKeptSections } from './use-kept-sections';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
+  header,
   detail,
   openingSections,
   variations,
@@ -36,7 +37,10 @@ export function ContractDetailClient({
   canDraftVariation,
   canPriceVariation,
 }: {
-  detail: ContractPageDetail;
+  /** What every role on the page sees: the tab strip and the Payments tab need nothing more. */
+  header: ContractPageHeader;
+  /** The whole contract, for the roles that read it (the other tabs); null for a payments-only role (S1). */
+  detail: ContractPageDetail | null;
   /** The first page of sections when the page opened on the overview; null on another tab. */
   openingSections: ContractSectionsPage | null;
   variations: VariationListRow[];
@@ -58,7 +62,6 @@ export function ContractDetailClient({
   const [tab, setTab] = useState<ContractTab>(openingTab);
   const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
-  const billing = useContractBilling(detail.id);
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export function ContractDetailClient({
 
       <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />
 
-      {tab === 'overview' && (
+      {tab === 'overview' && detail && (
         <ContractOverview
           detail={detail}
           keptSections={keptSections}
@@ -103,25 +106,25 @@ export function ContractDetailClient({
           canSignOffline={canSignOffline}
           pending={pending}
           m={m}
-          onIssue={() => act(() => issueContract(detail.id))}
-          onTerminate={() => act(() => terminateContract(detail.id))}
+          onIssue={() => act(() => issueContract(header.id))}
+          onTerminate={() => act(() => terminateContract(header.id))}
         />
       )}
-      {tab === 'schedule' && schedule && (
+      {tab === 'schedule' && schedule && detail && (
         <ScheduleTab
-          contractId={detail.id}
-          status={detail.status}
+          contractId={header.id}
+          status={header.status}
           canManage={canManage}
           schedule={schedule}
           contract={detail}
           m={m}
         />
       )}
-      {tab === 'payments' && <PaymentsTab billing={billing} may={billingMay} m={m} />}
+      {tab === 'payments' && <PaymentsTab contractId={header.id} may={billingMay} m={m} />}
       {tab === 'variations' && (
         <VariationRegister
-          contractId={detail.id}
-          contractStatus={detail.status}
+          contractId={header.id}
+          contractStatus={header.status}
           variations={variations}
           canDraftVariation={canDraftVariation}
           canPriceVariation={canPriceVariation}

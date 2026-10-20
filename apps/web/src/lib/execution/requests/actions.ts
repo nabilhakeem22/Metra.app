@@ -1,8 +1,8 @@
 'use server';
 
-import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { withBillingView, type BillingTab, type WithBillingView } from '../billing/after-write';
 import {
   issueMilestoneRequestCore,
   type IssueMilestoneRequestInput,
@@ -11,28 +11,31 @@ import {
 import { issueVariationRequestCore, type IssueVariationRequestInput } from './issue-variation';
 import { voidPaymentRequestCore, type VoidPaymentRequestInput } from './void';
 
+// Each write answers with the Payments tab's view when it worked (after-write.ts).
+
 /** Send the payment request for one schedule row (issue-milestone.ts). */
-export async function issueMilestoneRequest(input: IssueMilestoneRequestInput): Promise<IssueMilestoneRequestResult> {
+export async function issueMilestoneRequest(
+  input: IssueMilestoneRequestInput,
+  tab: BillingTab,
+): Promise<WithBillingView<IssueMilestoneRequestResult>> {
   const ctx = await requireOrg();
-  const res = await issueMilestoneRequestCore(ctx, input);
-  if (res.ok) refreshApp();
-  return res;
+  return withBillingView(ctx, await issueMilestoneRequestCore(ctx, input), tab);
 }
 
 /** Send the payment request for one approved change order (issue-variation.ts). */
 export async function issueVariationRequest(
   input: IssueVariationRequestInput,
-): Promise<ActionResult & { data?: string }> {
+  tab: BillingTab,
+): Promise<WithBillingView<ActionResult & { data?: string }>> {
   const ctx = await requireOrg();
-  const res = await issueVariationRequestCore(ctx, input);
-  if (res.ok) refreshApp();
-  return res;
+  return withBillingView(ctx, await issueVariationRequestCore(ctx, input), tab);
 }
 
 /** Withdraw an unpaid payment request, with the reason (void.ts). */
-export async function voidPaymentRequest(input: VoidPaymentRequestInput): Promise<ActionResult> {
+export async function voidPaymentRequest(
+  input: VoidPaymentRequestInput,
+  tab: BillingTab,
+): Promise<WithBillingView<ActionResult>> {
   const ctx = await requireOrg();
-  const res = await voidPaymentRequestCore(ctx, input);
-  if (res.ok) refreshApp();
-  return res;
+  return withBillingView(ctx, await voidPaymentRequestCore(ctx, input), tab);
 }

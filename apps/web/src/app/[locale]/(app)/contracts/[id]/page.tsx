@@ -11,6 +11,7 @@ import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractPagePayload } from './page-payload';
 import { contractTabsFor, openingContractTab } from './tabs';
 
 export default async function ContractDetailPage({
@@ -53,7 +54,7 @@ export default async function ContractDetailPage({
         description={t(detail.sourceBoqId === null ? 'subtitle' : 'subtitleBoq')}
       />
       <ContractDetailClient
-        detail={detail}
+        {...contractPagePayload(detail, access)}
         openingSections={openingSections}
         variations={variations}
         schedule={schedule}

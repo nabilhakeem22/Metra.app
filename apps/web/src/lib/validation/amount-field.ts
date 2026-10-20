@@ -9,6 +9,7 @@
 // "1500 ج.م"). "1,5" is still refused, never read as 15 (money/read.ts).
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { FieldError } from '@/lib/actions/field-errors';
+import { toLatinNumerals, withoutSeparators } from '@/lib/money/separators';
 import { readMoneyField, type FieldRead } from './field-rules';
 import { clean } from './text';
 
@@ -40,4 +41,26 @@ export function readPositiveAmount(raw: unknown, missing: FieldError): FieldRead
   if (!read.ok) return read;
   const amount4 = parseMoney4(read.value);
   return amount4 > 0n ? { ok: true, value: formatMoney4(amount4) } : { ok: false, error: missing };
+}
+
+/** The decimals an amount is stored to (numeric(18,4)). */
+const STORED_DECIMALS = 4;
+
+/** How many decimals the figure was typed with, read the way the box reads it (digits, grouping, currency mark). */
+function typedDecimals(raw: string): number {
+  const canonical = withoutSeparators(toLatinNumerals(withoutCurrencyMark(raw) ?? ''));
+  return canonical === null ? 0 : (/\.(\d*)$/.exec(canonical)?.[1].length ?? 0);
+}
+
+/**
+ * readPositiveAmount, except that a figure typed with more decimals than it is
+ * stored to is refused (`too_many_decimals`), never cut: 100.12345 is not
+ * 100.1234, and 0.00001 is not "missing". The contract payment ledger reads
+ * its amount this way (A4 F8); the older callers keep readPositiveAmount.
+ */
+export function readPositiveExactAmount(raw: unknown, missing: FieldError): FieldRead<string> {
+  if (typeof raw === 'string' && typedDecimals(raw) > STORED_DECIMALS) {
+    return { ok: false, error: { code: 'too_many_decimals', params: { max: STORED_DECIMALS } } };
+  }
+  return readPositiveAmount(raw, missing);
 }

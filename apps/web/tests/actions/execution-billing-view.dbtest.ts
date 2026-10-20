@@ -1,6 +1,7 @@
 import type { MemberRole } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
+import { withBillingView } from '@/lib/execution/billing/after-write';
 import { loadContractBillingCore, loadContractPaymentsCore } from '@/lib/execution/billing/read-core';
 import type { ContractBillingView } from '@/lib/execution/billing/view';
 import { recordContractPaymentCore } from '@/lib/execution/payments/core';
@@ -18,7 +19,7 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 const orgIds: string[] = [];
 let orgId: string;
 const ctx: Partial<Record<MemberRole, OrgContext>> = {};
-const ROLES: MemberRole[] = ['project_manager', 'site_engineer', 'accountant', 'viewer'];
+const ROLES: MemberRole[] = ['project_manager', 'site_engineer', 'accountant', 'viewer', 'client'];
 const TODAY = todayInCairo(new Date());
 
 beforeAll(async () => {
@@ -55,6 +56,8 @@ describe('the Payments tab view', () => {
     // 124,000 + 12,400 (the +10,000 order) - 124 (the -100 de-scope) - 62,000 issued.
     const view = await billingOf(contract.contractId, ctx.viewer!);
     expect(view).toMatchObject({ status: 'signed', finalAccountIssued: false, billingBalance: '74276.0000', moreRequests: false });
+    // No issued event in the fixture: the contract's own day, in Cairo (contractIssuedOnInCairo).
+    expect(view.issuedOn).toBe(TODAY);
     expect(view.schedule.map((row) => [row.labelEn, row.amount, row.billed])).toEqual([
       ['Advance', '62000.0000', true],
       ['Works', '37200.0000', false],
@@ -92,6 +95,8 @@ describe('the Payments tab view', () => {
   it('refuses a role without payments read, a forged cursor, and a contract that is not the caller\'s', async () => {
     const contract = await seedBillableContract(orgId);
     expect(await loadContractBillingCore(ctx.site_engineer!, { contractId: contract.contractId })).toEqual({ ok: false, error: 'forbidden' });
+    // The client role is refused by name, whatever the matrix grants it for the portal (S4).
+    expect(await loadContractBillingCore(ctx.client!, { contractId: contract.contractId })).toEqual({ ok: false, error: 'forbidden' });
     expect(await loadContractBillingCore(ctx.project_manager!, { contractId: contract.contractId })).toMatchObject({ ok: true });
     for (const cursor of [null, 'x', `2026-02-30_${contract.contractId}`, `2026-01-01_${contract.contractId}_x`]) {
       expect(await loadContractPaymentsCore(ctx.owner!, { contractId: contract.contractId, cursor }), String(cursor)).toEqual({
@@ -106,5 +111,29 @@ describe('the Payments tab view', () => {
     expect(
       await loadContractPaymentsCore(ctx.owner!, { contractId: foreign.contractId, cursor: `2026-01-01_${foreign.contractId}` }),
     ).toEqual({ ok: false, error: 'record_not_found' });
+  });
+});
+
+describe('a Payments-tab write answers with the tab (R1)', () => {
+  it('adds the view read after a write that worked, and only then', async () => {
+    const contract = await seedBillableContract(orgId);
+    const tab = { contractId: contract.contractId };
+    const sent = await issueMilestoneRequestCore(ctx.owner!, { milestoneId: contract.milestoneIds[0] });
+    const answered = await withBillingView(ctx.accountant!, sent, tab);
+    expect(answered).toMatchObject({ ok: true, data: sent.data });
+    expect(answered.view?.requests.map((row) => row.id)).toEqual([sent.data]);
+    const refused = { ok: false as const, error: 'request_exists' as const };
+    expect(await withBillingView(ctx.owner!, refused, tab)).toBe(refused);
+  });
+
+  it('a tab the caller cannot read leaves the view out and never turns the write into a failure', async () => {
+    const contract = await seedBillableContract(orgId);
+    const worked = { ok: true as const, data: 'x' };
+    expect(await withBillingView(ctx.owner!, worked, { contractId: 'not-a-uuid' })).toEqual(worked);
+    expect(await withBillingView(ctx.site_engineer!, worked, { contractId: contract.contractId })).toEqual(worked);
+    const other = await seedOrg({ owners: 1 });
+    orgIds.push(other.orgId);
+    const foreign = await seedBillableContract(other.orgId);
+    expect(await withBillingView(ctx.owner!, worked, { contractId: foreign.contractId })).toEqual(worked);
   });
 });

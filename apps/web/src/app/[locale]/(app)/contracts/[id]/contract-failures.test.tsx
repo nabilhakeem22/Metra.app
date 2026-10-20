@@ -4,6 +4,7 @@ import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractsClient } from '../contracts-client';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractPagePayload } from './page-payload';
 import { ContractHeaderForm } from './contract-header-form';
 import { VariationRegister } from './variation-register';
 
@@ -79,7 +80,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
     renderWithIntl(
       <ContractDetailClient
-        detail={DETAIL}
+        {...contractPagePayload(DETAIL, { seeContract: true })}
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}

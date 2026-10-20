@@ -7,6 +7,7 @@ import 'server-only';
 // money is aggregated in SQL, so the tab's cost does not grow with the ledger.
 import { contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { contractIssuedOnInCairo } from '@/lib/contracts/queries/issued-on';
 import { loadScheduleRows, scheduleView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { billingBalance } from '../money/final-account';
@@ -32,6 +33,8 @@ export interface ScheduleBillingRow {
 export interface ContractBillingView {
   contractId: string;
   status: ContractStatus;
+  /** The day it was issued, in Cairo (`YYYY-MM-DD`): no payment is dated before it. */
+  issuedOn: string;
   finalAccountIssued: boolean;
   /** The contract plus approved change orders, minus every issued request. */
   billingBalance: string;
@@ -73,6 +76,7 @@ export function getContractBilling(ctx: OrgContext, contractId: string): Promise
     return {
       contractId,
       status: contract.status,
+      issuedOn: await contractIssuedOnInCairo(tx, contractId),
       finalAccountIssued: money.finalAccount !== null,
       billingBalance: billingBalance({ ...contract, ...money }),
       schedule: schedule.rows.map((row) => ({

@@ -16,6 +16,13 @@ import {
 } from '@/lib/execution/next-action-target';
 import type { ExecutionNextActionKind } from '@/lib/execution/stage';
 
+/** May this role take the step a link leads to? The BOQ needs nothing; a money step its capability (A18). */
+function mayFollow(view: ExecutionCardView, target: Extract<NextActionTarget, { kind: 'link' }>): boolean {
+  if (target.page === 'project_boq') return true;
+  if (target.page === 'contract_payments') return view.may[target.needs];
+  return view.may.openContract;
+}
+
 /**
  * The one control for the next action, or null when this role cannot take it
  * here. A plain function, not a component: the card needs to know it is null to
@@ -30,8 +37,7 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
     return view.may.signOffline && view.contract ? <SignOfflineDialog contractId={view.contract.id} /> : null;
   }
   const href = executionCardHref(target.page, { projectId: view.projectId, contractId: view.contract?.id ?? null });
-  const opens = target.page === 'project_boq' || (target.page === 'contract_payments' ? view.may.openPayments : view.may.openContract);
-  if (!href || !opens) return null;
+  if (!href || !mayFollow(view, target)) return null;
   return (
     <Button asChild variant="default">
       <Link href={href}>{label}</Link>

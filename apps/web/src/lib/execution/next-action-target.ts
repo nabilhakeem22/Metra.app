@@ -17,12 +17,22 @@ export type ExecutionCardPage =
   | 'contract_payments'
   | 'contract_variations';
 
+/**
+ * What a money step on the Payments tab needs (A18), named as the card's `may`
+ * names it: sending a request is `invoices_issue`, recording a payment and
+ * reviewing a client's claim are `payments` create. Reading the tab is not
+ * enough: a role that can only read is told who does it (A4 F6).
+ */
+export type MoneyCapability = 'sendRequests' | 'recordPayments';
+
 export type NextActionTarget =
-  | { kind: 'link'; page: ExecutionCardPage }
+  | { kind: 'link'; page: Exclude<ExecutionCardPage, 'contract_payments'> }
+  | { kind: 'link'; page: 'contract_payments'; needs: MoneyCapability }
   | { kind: 'dialog'; dialog: ExecutionCardDialog }
   | { kind: 'status' };
 
-const link = (page: ExecutionCardPage): NextActionTarget => ({ kind: 'link', page });
+const link = (page: Exclude<ExecutionCardPage, 'contract_payments'>): NextActionTarget => ({ kind: 'link', page });
+const payments = (needs: MoneyCapability): NextActionTarget => ({ kind: 'link', page: 'contract_payments', needs });
 const dialog = (name: ExecutionCardDialog): NextActionTarget => ({ kind: 'dialog', dialog: name });
 
 /**
@@ -41,10 +51,10 @@ export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextAc
   record_signed_offline: dialog('sign_offline'),
   // The Payments tab (A4.3): the request a claim is on shows it, and recording
   // a payment waits for the claim's answer (B4 brings confirm and dismiss).
-  review_payment_claim: link('contract_payments'),
-  send_milestone_request: link('contract_payments'),
-  send_variation_request: link('contract_payments'),
-  record_payment: link('contract_payments'),
+  review_payment_claim: payments('recordPayments'),
+  send_milestone_request: payments('sendRequests'),
+  send_variation_request: payments('sendRequests'),
+  record_payment: payments('recordPayments'),
   await_variation_answer: link('contract_variations'),
   prepare_final_account: STATUS_LINE,
   review_final_account: STATUS_LINE,

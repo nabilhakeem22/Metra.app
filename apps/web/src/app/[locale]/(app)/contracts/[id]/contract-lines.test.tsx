@@ -4,6 +4,7 @@ import type { ContractLineOption, ContractLineView, ContractPageDetail, Contract
 import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractPagePayload } from './page-payload';
 import { ContractSectionList } from './contract-section-list';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useKeptSections } from './use-kept-sections';
@@ -133,7 +134,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        detail={detail as unknown as ContractPageDetail}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
@@ -160,7 +161,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
       const detail = { id: 'k-1', status: 'signed', originalValue: '1', revisedValue: '1', signed: { on: '2026-10-15', via } };
       const { unmount } = renderWithIntl(
         <ContractDetailClient
-          detail={detail as unknown as ContractPageDetail}
+          {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
@@ -232,7 +233,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        detail={detail as unknown as ContractPageDetail}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
         openingSections={null}
         variations={[]}
         schedule={null}

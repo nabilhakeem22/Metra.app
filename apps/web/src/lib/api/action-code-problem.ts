@@ -186,6 +186,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   request_has_payments: 'conflict',
   payment_exceeds_request: 'bad-request',
   claim_pending_for_request: 'conflict',
+  idempotency_conflict: 'conflict',
   variation_not_approved: 'bad-request',
   variation_credit_not_billable: 'bad-request',
   final_account_issued: 'conflict',

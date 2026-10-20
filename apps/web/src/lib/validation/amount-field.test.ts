@@ -4,7 +4,7 @@ import { validateFeeSchedule } from '@/lib/engagements/fee-schedule';
 import { readChangeOrderAmount } from '@/lib/engagements/revision-field-rules';
 import { readRomRange } from '@/lib/engagements/rom-field-rules';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { readPositiveAmount, readTypedMoney } from './amount-field';
+import { readPositiveAmount, readPositiveExactAmount, readTypedMoney } from './amount-field';
 
 // validateFeeSchedule sits beside its server-only runner; the reader under test is pure.
 vi.mock('server-only', () => ({}));
@@ -37,6 +37,27 @@ describe('readPositiveAmount', () => {
     expect(readPositiveAmount('', MISSING)).toEqual({ ok: false, error: MISSING });
     expect(readPositiveAmount('0', MISSING)).toEqual({ ok: false, error: MISSING });
     expect(readPositiveAmount('1,5', MISSING)).toEqual({ ok: false, error: { code: 'not_a_number' } });
+  });
+});
+
+describe('readPositiveExactAmount: the contract ledger refuses a fifth decimal (A4 F8)', () => {
+  const TOO_MANY = { ok: false, error: { code: 'too_many_decimals', params: { max: 4 } } };
+
+  it.each(['100.12345', '100.00005', '0.00001', '1,000.12345 EGP', '١٠٠٫١٢٣٤٥'])('refuses %j, never cuts it', (typed) => {
+    expect(readPositiveExactAmount(typed, MISSING)).toEqual(TOO_MANY);
+  });
+
+  it('reads four decimals and fewer as readPositiveAmount does', () => {
+    for (const typed of ['100.1234', '1,500', '١٥٠٠ ج.م', '7.5']) {
+      expect(readPositiveExactAmount(typed, MISSING)).toEqual(readPositiveAmount(typed, MISSING));
+    }
+    expect(readPositiveExactAmount('', MISSING)).toEqual({ ok: false, error: MISSING });
+    expect(readPositiveExactAmount('1,5', MISSING)).toEqual({ ok: false, error: { code: 'not_a_number' } });
+    expect(readPositiveExactAmount(100, MISSING)).toEqual({ ok: false, error: MISSING });
+  });
+
+  it('leaves the older callers cutting as they did', () => {
+    expect(readPositiveAmount('100.12345', MISSING)).toEqual({ ok: true, value: '100.1234' });
   });
 });
 

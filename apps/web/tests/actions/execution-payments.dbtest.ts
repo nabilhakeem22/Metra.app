@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { MemberRole } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { todayInCairo } from '@/lib/automation/clock';
+import { formatDate } from '@/lib/format/date';
 import type { OrgContext } from '@/lib/db/context';
 import { recordContractPaymentCore, type RecordContractPaymentInput } from '@/lib/execution/payments/core';
 import { voidPaymentRequestCore } from '@/lib/execution/requests/void';
@@ -38,6 +39,14 @@ async function requestOf(amount = '500') {
   const contract = await seedBillableContract(orgId);
   const requestId = await seedRequest(orgId, contract.contractId, ctx.owner!.userId, { milestoneId: contract.milestoneIds[0] }, amount);
   return { contract, requestId };
+}
+
+/** Two requests of 5,000 on the first two rows of ONE signed contract (seeded in turn: each takes the next number). */
+async function twoRequests(): Promise<[string, string]> {
+  const contract = await seedBillableContract(orgId);
+  const first = await seedRequest(orgId, contract.contractId, ctx.owner!.userId, { milestoneId: contract.milestoneIds[0] }, '5000');
+  const second = await seedRequest(orgId, contract.contractId, ctx.owner!.userId, { milestoneId: contract.milestoneIds[1] }, '5000');
+  return [first, second];
 }
 
 const payment = (requestId: string, fields: Partial<RecordContractPaymentInput> = {}): RecordContractPaymentInput => ({
@@ -90,8 +99,11 @@ describe('recordContractPaymentCore', () => {
     const { requestId } = await requestOf();
     const input = payment(requestId, { amount: '500' });
     const first = await recordContractPaymentCore(ctx.owner!, input);
-    const replay = await recordContractPaymentCore(ctx.owner!, { ...input, amount: '999' });
+    const replay = await recordContractPaymentCore(ctx.owner!, { ...input, amount: '500.0000' });
     expect(replay).toEqual({ ok: true, data: first.data, already: true });
+    // The key's upper-case spelling is the same key (S2): never a second payment.
+    const shouted = await recordContractPaymentCore(ctx.owner!, { ...input, idempotencyKey: String(input.idempotencyKey).toUpperCase() });
+    expect(shouted).toEqual({ ok: true, data: first.data, already: true });
     expect(await ledger(requestId)).toHaveLength(1);
     const [audits] = await ownerQuery<{ n: number }>(
       `select count(*)::int as n from public.audit_log where entity = 'contract_payment' and entity_id = $1`,
@@ -146,6 +158,67 @@ describe('recordContractPaymentCore', () => {
       expect(await recordContractPaymentCore(ctx[role]!, payment(requestId))).toEqual({ ok: false, error: 'forbidden' });
     }
     expect(await recordContractPaymentCore(ctx.owner!, payment(randomUUID()))).toEqual({ ok: false, error: 'request_not_found' });
+    expect(await ledger(requestId)).toEqual([]);
+  });
+
+  it('a key that names another payment is refused, never answered as it (F4, S2: idempotency_conflict)', async () => {
+    const [a, b] = await twoRequests();
+    const key = randomUUID();
+    const first = await recordContractPaymentCore(ctx.owner!, payment(a, { amount: '1000', idempotencyKey: key }));
+    expect(first).toMatchObject({ ok: true, already: false });
+    // Another request under the key, and the same request with another amount.
+    expect(await recordContractPaymentCore(ctx.owner!, payment(b, { amount: '1000', idempotencyKey: key }))).toEqual({ ok: false, error: 'idempotency_conflict' });
+    expect(await recordContractPaymentCore(ctx.owner!, payment(a, { amount: '999', idempotencyKey: key }))).toEqual({ ok: false, error: 'idempotency_conflict' });
+    expect(await ledger(a)).toHaveLength(1);
+    expect(await ledger(b)).toEqual([]);
+  });
+
+  it('one key raced onto two requests records ONE payment; the other is refused as a conflict', async () => {
+    const [a, b] = await twoRequests();
+    const key = randomUUID();
+    const answers = await Promise.all([
+      recordContractPaymentCore(ctx.owner!, payment(a, { amount: '300', idempotencyKey: key })),
+      recordContractPaymentCore(ctx.admin!, payment(b, { amount: '300', idempotencyKey: key })),
+    ]);
+    expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
+    expect(answers.find((answer) => !answer.ok)).toEqual({ ok: false, error: 'idempotency_conflict' });
+    expect((await ledger(a)).length + (await ledger(b)).length).toBe(1);
+  });
+
+  it('a replay on a void request answers request_void', async () => {
+    const [paid, voided] = await twoRequests();
+    const key = randomUUID();
+    await recordContractPaymentCore(ctx.owner!, payment(paid, { idempotencyKey: key }));
+    await voidPaymentRequestCore(ctx.owner!, { requestId: voided, reason: 'Mistake' });
+    expect(await recordContractPaymentCore(ctx.owner!, payment(voided, { idempotencyKey: key }))).toEqual({ ok: false, error: 'request_void' });
+  });
+
+  it('refuses a day before the contract was issued, before 2000, and a fifth decimal (F5, F8)', async () => {
+    const { requestId } = await requestOf();
+    const [{ day }] = await ownerQuery<{ day: string }>(
+      `select to_char(c.created_at at time zone 'Africa/Cairo', 'YYYY-MM-DD') as day
+         from public.contracts c join public.payment_requests r on r.contract_id = c.id where r.id = $1`,
+      [requestId],
+    );
+    expect(day).toBe(TODAY);
+    expect(await recordContractPaymentCore(ctx.owner!, payment(requestId, { receivedOn: '2020-01-01' }))).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { receivedOn: { code: 'date_before_issue', params: { date: formatDate(TODAY, 'en') } } },
+    });
+    expect(await recordContractPaymentCore(ctx.owner!, payment(requestId, { receivedOn: '0026-10-20' }))).toMatchObject({
+      fields: { receivedOn: { code: 'invalid_date' } },
+    });
+    expect(await recordContractPaymentCore(ctx.owner!, payment(requestId, { amount: '100.12345' }))).toMatchObject({
+      fields: { amount: { code: 'too_many_decimals', params: { max: 4 } } },
+    });
+    // Both refusals of the request's own figures at once: past what is due, and before the issue day.
+    expect(await recordContractPaymentCore(ctx.owner!, payment(requestId, { amount: '501', receivedOn: '2020-01-01' }))).toMatchObject({
+      fields: {
+        amount: { code: 'payment_exceeds_request', params: { outstanding: '500.0000' } },
+        receivedOn: { code: 'date_before_issue' },
+      },
+    });
     expect(await ledger(requestId)).toEqual([]);
   });
 });

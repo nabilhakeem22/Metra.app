@@ -628,6 +628,7 @@
     "request_has_payments": "Payments are recorded against this payment request, so it cannot be voided.",
     "payment_exceeds_request": "That is more than what is still due on this request. Enter {outstanding} or less.",
     "claim_pending_for_request": "The client says they paid this request. Confirm or dismiss their claim first.",
+    "idempotency_conflict": "This attempt was already used for a different payment, so nothing was recorded. Close the form, check the payments, and record it again.",
     "variation_not_approved": "The client has not approved this change order yet. Wait for their approval, then send the request.",
     "variation_credit_not_billable": "This change order lowers the contract value, so there is nothing to bill. It reduces the final account instead.",
     "final_account_issued": "The final account is already issued, so this can no longer change. Void the final account first if it has no payments.",
@@ -1742,6 +1743,10 @@
           "description": "The request is dated today. It cannot be edited once sent; if it is wrong, void it and send a new one.",
           "amount": "Amount, VAT included:",
           "overBalance": "This is more than what is left to bill on the contract. You can still send it. Left to bill:",
+        "alreadyCovered": "Everything on the contract is already billed, so this is more than is left to bill. You can still send it.",
+        "sent": "The request was sent.",
+        "sentOverBalance": "It bills more than what was left to bill on the contract, which was:",
+        "sentCovered": "Everything on the contract was already billed before it.",
           "dueOn": "Due on",
           "note": "Note",
           "submit": "Send the request"
@@ -1778,7 +1783,10 @@
           "reference": "Reference",
           "note": "Note",
           "submit": "Record the payment",
-          "already": "That payment was already recorded."
+          "already": "That payment was already recorded.",
+        "previousAttempt": "An earlier try to record a payment on this request got no answer, so it may already be recorded. Check the payments before you record a different one.",
+        "checkPayments": "Check the payments",
+        "checkFailed": "The payments could not be read. Try again in a moment."
         },
         "void": {
           "open": "Void",

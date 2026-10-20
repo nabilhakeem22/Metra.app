@@ -152,6 +152,7 @@ const ALL_CODES: ActionCode[] = [
   'request_has_payments',
   'payment_exceeds_request',
   'claim_pending_for_request',
+  'idempotency_conflict',
   'variation_not_approved',
   'variation_credit_not_billable',
   'final_account_issued',

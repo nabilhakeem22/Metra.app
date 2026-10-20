@@ -21,8 +21,10 @@ export interface ExecutionCardView {
     signOffline: boolean;
     /** `contracts_generate` read: the contract page opens for this role. */
     openContract: boolean;
-    /** `payments` read: the contract's Payments tab opens for this role (A4.3). */
-    openPayments: boolean;
+    /** `invoices_issue` approve: sends payment requests from the Payments tab (A18). */
+    sendRequests: boolean;
+    /** `payments` create: records payments and answers a client's claim there (A18). */
+    recordPayments: boolean;
   };
 }
 

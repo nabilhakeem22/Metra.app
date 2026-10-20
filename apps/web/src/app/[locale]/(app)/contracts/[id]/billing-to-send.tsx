@@ -1,9 +1,10 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
 import type { ContractBillingView } from '@/lib/execution/billing/view';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-import { SendRequestDialog } from './send-request-dialog';
+import type { RequestTarget } from './send-request-dialog';
 
 /**
  * What the studio can bill next: each row of the signed schedule (with "send
@@ -11,21 +12,27 @@ import { SendRequestDialog } from './send-request-dialog';
  * adds money and has no request yet. `canSend` is false for a role without
  * `invoices_issue` and for a contract that cannot be billed (not signed,
  * terminated, or under an issued final account): the rows are then listed with
- * no button.
+ * no button. A button only asks the tab to open the send dialog, which lives on
+ * the tab so a read of the tab never unmounts it.
  */
 export function BillingToSend({
   view,
   canSend,
   m,
-  onSent,
+  onSend,
 }: {
   view: ContractBillingView;
   canSend: boolean;
   m: (value: string) => string;
-  onSent: () => void;
+  onSend: (target: RequestTarget) => void;
 }) {
   const t = useTranslations('contracts.execution.payments');
   const locale = useLocale();
+  const sendButton = (target: RequestTarget) => (
+    <Button variant="default" size="sm" onClick={() => onSend(target)}>
+      {t('send.open')}
+    </Button>
+  );
 
   return (
     <div className="space-y-4">
@@ -41,15 +48,7 @@ export function BillingToSend({
                 {row.billed ? (
                   <span className="text-caption text-muted-foreground">{t('schedule.requested')}</span>
                 ) : (
-                  canSend &&
-                  row.amount && (
-                    <SendRequestDialog
-                      target={{ kind: 'milestone', id: row.id, label, amount: row.amount }}
-                      balance={view.billingBalance}
-                      m={m}
-                      onSent={onSent}
-                    />
-                  )
+                  canSend && row.amount && sendButton({ kind: 'milestone', id: row.id, label, amount: row.amount })
                 )}
               </li>
             );
@@ -67,14 +66,7 @@ export function BillingToSend({
                   <span dir="ltr" className="font-mono tabular-nums">{order.documentNumber}</span>
                   <span className="flex-1">{title}</span>
                   <span dir="ltr" className="font-mono tabular-nums">{m(order.charge)}</span>
-                  {canSend && (
-                    <SendRequestDialog
-                      target={{ kind: 'variation', id: order.id, label: order.documentNumber, amount: order.charge }}
-                      balance={view.billingBalance}
-                      m={m}
-                      onSent={onSent}
-                    />
-                  )}
+                  {canSend && sendButton({ kind: 'variation', id: order.id, label: order.documentNumber, amount: order.charge })}
                 </li>
               );
             })}

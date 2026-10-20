@@ -17,6 +17,7 @@ import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
 import { formatDate } from '@/lib/format/date';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
+import { contractIssuedOnInCairo } from '../queries/issued-on';
 import { readOfflineSignature, type TypedOfflineSignature } from '../sign-offline-input';
 
 export interface RecordContractSignedOfflineInput extends TypedOfflineSignature {
@@ -26,22 +27,6 @@ export interface RecordContractSignedOfflineInput extends TypedOfflineSignature 
 /** Owner, admin or project manager: who stands in for the client's consent (D5). */
 export function mayRecordSignedOffline(role: OrgContext['role']): boolean {
   return ENDING_DECIDERS.includes(role);
-}
-
-/**
- * The day the contract was issued, in Cairo: the day of its `issued` event, or
- * of the contract itself for one issued before events were kept.
- */
-async function issuedOnInCairo(tx: MetraDb, contractId: string): Promise<string> {
-  const rows = (await tx.execute(sql`
-    select to_char(coalesce((
-             select min(e.decided_at) from public.contract_events e
-              where e.contract_id = c.id and e.kind = 'issued'
-           ), c.created_at) at time zone 'Africa/Cairo', 'YYYY-MM-DD') as day
-      from public.contracts c
-     where c.id = ${contractId}
-  `)) as unknown as Array<{ day: string }>;
-  return rows[0].day;
 }
 
 /**
@@ -61,7 +46,7 @@ async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: str
   if (!locked) fail('record_not_found');
   if (locked.sourceBoqId === null) fail('contract_not_execution');
   if (locked.status !== 'issued') fail('contract_not_signable');
-  const issuedOn = await issuedOnInCairo(tx, contractId);
+  const issuedOn = await contractIssuedOnInCairo(tx, contractId);
   if (signedOn < issuedOn) failFields({ signedOn: { code: 'date_before_issue', params: { date: formatDate(issuedOn, 'en') } } });
   const flipped = await tx
     .update(contracts)

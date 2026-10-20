@@ -6,15 +6,17 @@ import { describeFailure, describeRejection } from '@/lib/actions/error-message'
 import { loadContractBilling, loadContractPayments } from '@/lib/execution/billing/actions';
 import type { ContractBillingView } from '@/lib/execution/billing/view';
 
-/** The Payments tab's data, held by the contract detail client ABOVE the tab switch. */
+/** The Payments tab's data, held BY THE TAB: it is read again every time the tab is shown. */
 export interface ContractBilling {
-  /** Null until the first read: the page opened on another tab. */
+  /** Null until the first read of this showing. */
   view: ContractBillingView | null;
   /** What the last read or "show more" was refused with, said above the tab. */
   error: string | null;
   loading: boolean;
-  /** Read the whole tab again: when it is first shown, and after each change it makes. */
-  reload: () => Promise<void>;
+  /** Read the whole tab again; true when the read worked. */
+  reload: () => Promise<boolean>;
+  /** Show the view a write answered with (after-write.ts), instead of reading again. */
+  apply: (view: ContractBillingView) => void;
   /** The ledger's next 50 rows, after the ones shown. */
   showMorePayments: () => Promise<void>;
 }
@@ -25,8 +27,11 @@ export interface ContractBilling {
  * up to 100 requests and 50 payments rendered by the server made the page 26%
  * heavier on the Worker with 60 requests and 500 payments (A4 workerd
  * measurement), while the read alone grows 9%. The rows render in the browser.
- * Every change the tab makes reloads it, which also brings the ledger back to
- * its first page.
+ *
+ * Never shown stale (A4 F1, F3): the tab mounts each time it is shown and reads
+ * itself then; a write that worked answers with the fresh view; a write that
+ * failed, or whose answer never came, is followed by a read. Either way the
+ * ledger is back on its first page.
  */
 export function useContractBilling(contractId: string): ContractBilling {
   const te = useTranslations('errors');
@@ -39,14 +44,23 @@ export function useContractBilling(contractId: string): ContractBilling {
     setError(null);
     try {
       const res = await loadContractBilling({ contractId });
-      if (res.ok && res.data) setView(res.data);
-      else setError(describeFailure(res, te));
+      if (res.ok && res.data) {
+        setView(res.data);
+        return true;
+      }
+      setError(describeFailure(res, te));
     } catch (rejection) {
       setError(describeRejection(rejection, te));
     } finally {
       setLoading(false);
     }
+    return false;
   }, [contractId, te]);
+
+  const apply = useCallback((next: ContractBillingView) => {
+    setError(null);
+    setView(next);
+  }, []);
 
   const showMorePayments = useCallback(async () => {
     const cursor = view?.payments.nextCursor;
@@ -71,5 +85,5 @@ export function useContractBilling(contractId: string): ContractBilling {
     }
   }, [contractId, te, view?.payments.nextCursor]);
 
-  return { view, error, loading, reload, showMorePayments };
+  return { view, error, loading, reload, apply, showMorePayments };
 }

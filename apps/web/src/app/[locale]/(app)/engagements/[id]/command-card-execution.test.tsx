@@ -22,8 +22,10 @@ vi.mock('@/lib/contracts/actions', () => ({
   recordContractSignedOffline: vi.fn(),
 }));
 
-const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, openPayments: true };
-const NOTHING = { generateContract: false, signOffline: false, openContract: false, openPayments: false };
+const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, sendRequests: true, recordPayments: true };
+const NOTHING = { generateContract: false, signOffline: false, openContract: false, sendRequests: false, recordPayments: false };
+/** A project manager or a viewer: reads the Payments tab, can take none of its money steps (A4 F6). */
+const READS_MONEY_ONLY = { ...EVERYTHING, sendRequests: false, recordPayments: false };
 const INSTALMENT = { en: 'Advance', 'ar-EG': 'دفعة مقدمة' } as const;
 
 function view(kind: ExecutionNextActionKind, may = EVERYTHING): ExecutionCardView {
@@ -82,10 +84,31 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     expect(screen.getByRole('link', { name: text })).toBeTruthy();
   });
 
-  test('a role that cannot open the Payments tab is told the owner, an admin or the accountant bills', () => {
-    renderWithIntl(<CommandCardExecution view={view('record_payment', { ...EVERYTHING, openPayments: false })} />, { locale });
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-    expect(screen.getByText(at('execution.card.someoneElseMoney'))).toBeTruthy();
+  test('a role that can only read the money is told the owner, an admin or the accountant does each money step', () => {
+    for (const kind of ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment'] as const) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind, READS_MONEY_ONLY)} />, { locale });
+      expect(screen.queryAllByRole('link'), kind).toHaveLength(0);
+      expect(screen.queryAllByRole('button'), kind).toHaveLength(0);
+      expect(screen.getByText(at('execution.card.someoneElseMoney'))).toBeTruthy();
+      unmount();
+    }
+  });
+
+  test('sending a request needs invoices_issue; recording a payment and the claim review need payments create', () => {
+    const cases = [
+      ['send_milestone_request', { ...READS_MONEY_ONLY, sendRequests: true }, true],
+      ['send_milestone_request', { ...READS_MONEY_ONLY, recordPayments: true }, false],
+      ['send_variation_request', { ...READS_MONEY_ONLY, sendRequests: true }, true],
+      ['record_payment', { ...READS_MONEY_ONLY, recordPayments: true }, true],
+      ['record_payment', { ...READS_MONEY_ONLY, sendRequests: true }, false],
+      ['review_payment_claim', { ...READS_MONEY_ONLY, recordPayments: true }, true],
+      ['review_payment_claim', { ...READS_MONEY_ONLY, sendRequests: true }, false],
+    ] as const;
+    for (const [kind, may, linked] of cases) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind, may)} />, { locale });
+      expect(screen.queryAllByRole('link'), `${kind} ${JSON.stringify(may)}`).toHaveLength(linked ? 1 : 0);
+      unmount();
+    }
   });
 
   test('a role that may not take the action is told who can, with no button and no link', () => {
