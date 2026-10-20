@@ -30,10 +30,12 @@ import { contractIssuedOnInCairo } from '@/lib/contracts/queries/issued-on';
 import type { OrgContext } from '@/lib/db/context';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
+import { dayBeforeIssue } from '@/lib/validation/day-field';
 import { requestOutstanding } from '../money/outstanding';
 import { appendKeyedContractPayment, findKeyedPayment } from './append';
-import { readContractPayment, receivedBeforeIssue, type CleanContractPayment, type TypedContractPayment } from './input';
-import { canonicalIdempotencyKey, isSamePayment, type KeyedPayment } from './replay';
+import { readContractPayment, type CleanContractPayment, type TypedContractPayment } from './input';
+import { canonicalIdempotencyKey } from '../idempotency-key';
+import { isSamePayment, type KeyedPayment } from './replay';
 import { lockPaymentRequest, type LockedRequest } from './request-lock';
 
 export interface RecordContractPaymentInput extends TypedContractPayment {
@@ -60,7 +62,7 @@ async function outstandingFor(tx: MetraDb, request: LockedRequest, requestId: st
   if (parseMoney4(payment.amount) > parseMoney4(outstanding)) {
     refused.amount = { code: 'payment_exceeds_request', params: { outstanding } };
   }
-  const beforeIssue = receivedBeforeIssue(payment.receivedOn, await contractIssuedOnInCairo(tx, request.contractId));
+  const beforeIssue = dayBeforeIssue(payment.receivedOn, await contractIssuedOnInCairo(tx, request.contractId));
   if (beforeIssue) refused.receivedOn = beforeIssue;
   if (hasFieldErrors(refused)) failFields(refused);
   return outstanding;

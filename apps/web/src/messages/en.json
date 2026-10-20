@@ -1177,10 +1177,13 @@
         "retention": "Retention %",
         "jobCost": "Job cost",
         "margin": "Margin",
-        "lockedTitle": "Job costing not enabled",
-        "lockedBody": "Job-cost and margin figures activate once job costing begins.",
         "noContracts": "No contracts yet",
-        "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}"
+        "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}",
+        "noExecutionContract": "No execution contract yet",
+        "notShown": "Not shown to your role",
+        "openCostSheet": "Open the cost sheet",
+        "costBody": "Job cost and margin come from the cost sheet of the project's execution contract.",
+        "budget": "Budget:"
       },
       "team": {
         "title": "Team",
@@ -1744,10 +1747,10 @@
           "description": "The request is dated today. It cannot be edited once sent; if it is wrong, void it and send a new one.",
           "amount": "Amount, VAT included:",
           "overBalance": "This is more than what is left to bill on the contract. You can still send it. Left to bill:",
-        "alreadyCovered": "Everything on the contract is already billed, so this is more than is left to bill. You can still send it.",
-        "sent": "The request was sent.",
-        "sentOverBalance": "It bills more than what was left to bill on the contract, which was:",
-        "sentCovered": "Everything on the contract was already billed before it.",
+          "alreadyCovered": "Everything on the contract is already billed, so this is more than is left to bill. You can still send it.",
+          "sent": "The request was sent.",
+          "sentOverBalance": "It bills more than what was left to bill on the contract, which was:",
+          "sentCovered": "Everything on the contract was already billed before it.",
           "dueOn": "Due on",
           "note": "Note",
           "submit": "Send the request"
@@ -1785,10 +1788,10 @@
           "note": "Note",
           "submit": "Record the payment",
           "already": "That payment was already recorded.",
-        "previousAttempt": "An earlier try to record a payment on this request got no answer, so it may already be recorded. Check the payments before you record a different one.",
-        "checkPayments": "Check the payments",
-        "checkFailed": "The payments could not be read. Try again in a moment.",
-        "stillRunning": "The earlier try may still be in progress. Wait a few seconds, then check again."
+          "previousAttempt": "An earlier try to record a payment on this request got no answer, so it may already be recorded. Check the payments before you record a different one.",
+          "checkPayments": "Check the payments",
+          "checkFailed": "The payments could not be read. Try again in a moment.",
+          "stillRunning": "The earlier try may still be in progress. Wait a few seconds, then check again."
         },
         "void": {
           "open": "Void",
@@ -1796,7 +1799,7 @@
           "description": "A void request bills nothing and keeps its number. Its instalment or change order can then be requested again.",
           "reason": "Reason",
           "submit": "Void the request",
-        "done": "The request was voided."
+          "done": "The request was voided."
         },
         "ledger": {
           "title": "Payments received",
@@ -1811,6 +1814,132 @@
       "finish": {
         "revised": "Revised finish date: {date}, {count, plural, one {{n} day} other {{n} days}} added by approved change orders",
         "added": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the works"
+      },
+      "measurements": {
+        "tab": "Measurements",
+        "title": "Final measured quantities",
+        "intro": "Record the final measured quantity of each line at handover. A correction is a new reading, and the latest one counts. Only provisional lines change the final account; a difference on a firm line needs a change order.",
+        "loading": "Loading the lines",
+        "provisionalOnly": "Provisional lines only",
+        "search": "Search the lines",
+        "empty": "No line matches.",
+        "line": "Line",
+        "contractQty": "Contract quantity",
+        "ordered": "Change orders",
+        "measured": "Final measured quantity",
+        "notMeasured": "Not measured yet",
+        "measuredOn": "Measured {date}",
+        "provisional": "Provisional",
+        "more": "Show more lines",
+        "closed": {
+          "notSigned": "Measurements can be recorded once the client signs the contract.",
+          "terminated": "The contract was terminated, so no more measurements can be recorded on it.",
+          "finalAccountIssued": "The final account is issued, so no more measurements can be recorded. Void it first if it has no payments."
+        },
+        "record": {
+          "open": "Record",
+          "title": "Final measured quantity: {line}",
+          "description": "The quantity measured on site at handover. Earlier readings stay in the record; the latest one counts.",
+          "measuredQty": "Final measured quantity",
+          "measuredOn": "Measured on",
+          "note": "Note",
+          "submit": "Save the reading",
+          "saved": "The reading was saved.",
+          "already": "That reading was already saved."
+        },
+        "page": {
+          "title": "Measurements of {number}",
+          "subtitle": "Final measured quantities at handover"
+        }
+      },
+      "finalAccount": {
+        "tab": "Final account",
+        "title": "Final account",
+        "intro": "The contract value, plus approved change orders, plus the measured differences of the provisional lines, minus everything requested before it.",
+        "loading": "Loading the final account",
+        "originalValue": "Contract value",
+        "variationsCharge": "Approved change orders",
+        "adjustmentWorks": "Measured differences, works",
+        "adjustmentCharge": "Measured differences, with VAT and supervision",
+        "finalValue": "Final value",
+        "billedSoFar": "Requested before it",
+        "balance": "Left to bill",
+        "differences": {
+          "title": "Measured differences",
+          "empty": "No line was measured differently from its quantity.",
+          "counts": "Provisional lines billed: {billed}. Firm lines that need a change order: {flagged}.",
+          "line": "Line",
+          "qty": "Contract quantity",
+          "ordered": "Change orders",
+          "measured": "Measured",
+          "residual": "Difference",
+          "works": "Works",
+          "billed": "Billed",
+          "flagged": "Needs a change order",
+          "more": "Show more lines"
+        },
+        "blocked": {
+          "notSigned": "The final account can be issued once the client signs the contract.",
+          "terminated": "The contract was terminated, so no final account can be issued on it.",
+          "openVariations": "Change orders still waiting for a decision: {count}. Settle them before the final account.",
+          "nothingDue": "Nothing is left to bill, so there is no final account to issue."
+        },
+        "issued": {
+          "title": "Final account request",
+          "amount": "Amount",
+          "paid": "Paid",
+          "outstanding": "Due",
+          "note": "It closes new payment requests, measurements and change-order approvals. To reopen them, void it on the Payments tab while it has no payments."
+        },
+        "issue": {
+          "open": "Issue the final account",
+          "title": "Issue the final account",
+          "description": "It is sent as the contract's last payment request, dated today, and cannot be edited once issued.",
+          "amount": "Amount, VAT included:",
+          "dueOn": "Due on",
+          "note": "Note",
+          "submit": "Issue it",
+          "done": "The final account was issued."
+        },
+        "someoneElse": "An owner, an admin or the accountant issues the final account."
+      },
+      "costSheet": {
+        "tab": "Cost sheet",
+        "title": "Cost sheet",
+        "loading": "Loading the cost sheet",
+        "value": {
+          "originalValue": "Contract value",
+          "approvedVariations": "Approved change orders",
+          "revisedValue": "Revised value",
+          "valueExVat": "Value before VAT"
+        },
+        "billing": {
+          "requested": "Requested",
+          "paid": "Paid",
+          "outstanding": "Due"
+        },
+        "rows": {
+          "title": "Budget and actual cost",
+          "section": "Section",
+          "budget": "Budget",
+          "actual": "Actual cost",
+          "variance": "Difference",
+          "overBudget": "Over budget",
+          "untitled": "Untitled section",
+          "total": "Total",
+          "kinds": {
+            "whole_contract": "Whole contract",
+            "change_orders": "Change orders, new scope",
+            "more_sections": "Other sections: {count}"
+          }
+        },
+        "margin": {
+          "title": "Margin",
+          "planned": "Planned margin",
+          "projected": "Projected margin",
+          "note": "Projected margin counts each section at its budget or its actual cost, whichever is higher.",
+          "hidden": "Margin is not shown to your role."
+        }
       }
     }
   },
@@ -2993,12 +3122,11 @@
         "send_milestone_request": "Send the payment request for {instalment}",
         "send_variation_request": "Bill the approved change order",
         "record_payment": "Record a payment",
-        "await_variation_answer": "Follow up on the change order"
+        "await_variation_answer": "Follow up on the change order",
+        "prepare_final_account": "Prepare the final account",
+        "review_final_account": "Review the final account"
       },
-      "upcoming": {
-        "prepare_final_account": "Next: the final account.",
-        "review_final_account": "Next: reviewing the final account."
-      }
+      "recordMeasurements": "Record measurements"
     }
   }
 }

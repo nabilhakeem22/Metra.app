@@ -5,13 +5,13 @@ import 'server-only';
 // first page of the payment ledger, and what is left to bill. Every part is
 // bounded (12 schedule rows, 50 change orders, 100 requests, 50 payments) and
 // money is aggregated in SQL, so the tab's cost does not grow with the ledger.
-import { contracts, type ContractStatus, type MetraDb } from '@metra/db';
-import { eq } from 'drizzle-orm';
+import type { ContractStatus } from '@metra/db';
 import { contractIssuedOnInCairo } from '@/lib/contracts/queries/issued-on';
 import { loadScheduleRows, scheduleView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { billingBalance } from '../money/final-account';
 import { listContractPayments, type ContractPaymentsPage } from '../payments/queries';
+import { loadExecutionContract } from '../queries/execution-contract';
 import { loadContractMoneyFacts } from '../queries/money-facts';
 import {
   listBillableVariations,
@@ -44,25 +44,6 @@ export interface ContractBillingView {
   /** More requests than the tab shows (the newest 100). */
   moreRequests: boolean;
   payments: ContractPaymentsPage;
-}
-
-/** The execution contract, or null when it is not one the caller can see. */
-async function loadExecutionContract(tx: MetraDb, contractId: string) {
-  const [row] = await tx
-    .select({
-      id: contracts.id,
-      status: contracts.status,
-      sourceBoqId: contracts.sourceBoqId,
-      originalValue: contracts.originalValue,
-      taxAmount: contracts.taxAmount,
-      taxRate: contracts.taxRate,
-      supervisionPct: contracts.supervisionPct,
-      discountPct: contracts.discountPct,
-    })
-    .from(contracts)
-    .where(eq(contracts.id, contractId))
-    .limit(1);
-  return row && row.sourceBoqId !== null ? row : null;
 }
 
 export function getContractBilling(ctx: OrgContext, contractId: string): Promise<ContractBillingView | null> {

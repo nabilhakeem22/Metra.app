@@ -36,6 +36,9 @@ vi.mock('@/lib/variations/actions', () => variations);
 vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
 vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
+vi.mock('@/lib/execution/final-account/actions', () => ({ loadFinalAccount: vi.fn(), loadFinalAccountDifferences: vi.fn(), issueFinalAccount: vi.fn() }));
+vi.mock('@/lib/execution/measurements/actions', () => ({ loadMeasurements: vi.fn(), recordMeasurement: vi.fn() }));
+vi.mock('@/lib/execution/cost-sheet/actions', () => ({ loadCostSheet: vi.fn() }));
 
 const DETAIL = {
   id: 'k-1',
@@ -84,7 +87,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
-        billingMay={{ issue: false, record: false }}
+        executionMay={{ issue: false, record: false, measure: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}

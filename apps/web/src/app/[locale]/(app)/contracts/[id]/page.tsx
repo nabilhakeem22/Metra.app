@@ -6,6 +6,8 @@ import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import { mayIssueRequests, mayRecordPayments, maySeeBilling } from '@/lib/execution/billing/access';
+import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
+import { mayReadMeasurements, mayRecordMeasurements } from '@/lib/execution/measurements/access';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
@@ -22,7 +24,12 @@ export default async function ContractDetailPage({
   searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const ctx = await requireOrg();
-  const access = { seeContract: can(ctx.role, 'contracts_generate', 'read'), seeBilling: maySeeBilling(ctx.role) };
+  const access = {
+    seeContract: can(ctx.role, 'contracts_generate', 'read'),
+    seeBilling: maySeeBilling(ctx.role),
+    seeMeasurements: mayReadMeasurements(ctx.role),
+    seeCostSheet: mayOpenCostSheet(ctx.role),
+  };
   if (!access.seeContract && !access.seeBilling) notFound();
   const { id } = await params;
 
@@ -31,7 +38,7 @@ export default async function ContractDetailPage({
   const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const tabs = contractTabsFor(detail, access);
-  // A proposal contract has no Payments tab: nothing on it is a billing role's.
+  // A proposal contract has no execution tab: nothing on it is a billing role's.
   if (tabs.length === 0) notFound();
   const variations = tabs.includes('variations') ? await listVariations(ctx, { contractId: id }) : [];
   // Only an execution contract has a schedule: at most 12 rows.
@@ -58,7 +65,7 @@ export default async function ContractDetailPage({
         openingSections={openingSections}
         variations={variations}
         schedule={schedule}
-        billingMay={{ issue: mayIssueRequests(ctx.role), record: mayRecordPayments(ctx.role) }}
+        executionMay={{ issue: mayIssueRequests(ctx.role), record: mayRecordPayments(ctx.role), measure: mayRecordMeasurements(ctx.role) }}
         tabs={tabs}
         openingTab={openingTab}
         canSignOffline={mayRecordSignedOffline(ctx.role)}

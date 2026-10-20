@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatDate } from '@/lib/format/date';
-import { contractPaymentFieldErrors, readContractPayment, receivedBeforeIssue } from './input';
+import { dayBeforeIssue } from '@/lib/validation/day-field';
+import { contractPaymentFieldErrors, readContractPayment } from './input';
 
 // A4 F5 and F8: the day a payment was received, and its amount, as the record
 // dialog and the core both read them.
@@ -16,8 +17,8 @@ describe('the day a payment was received', () => {
   });
 
   it('refuses a day before the contract was issued, with the issue day as the app shows it', () => {
-    expect(receivedBeforeIssue('2026-10-19', '2026-10-20')).toEqual({ code: 'date_before_issue', params: { date: formatDate('2026-10-20', 'en') } });
-    expect(receivedBeforeIssue('2026-10-20', '2026-10-20')).toBeNull();
+    expect(dayBeforeIssue('2026-10-19', '2026-10-20')).toEqual({ code: 'date_before_issue', params: { date: formatDate('2026-10-20', 'en') } });
+    expect(dayBeforeIssue('2026-10-20', '2026-10-20')).toBeNull();
     expect(contractPaymentFieldErrors({ amount: '10', receivedOn: '2020-01-01' }, TODAY, '2026-10-01')).toEqual({
       receivedOn: { code: 'date_before_issue', params: { date: '01/10/2026' } },
     });
