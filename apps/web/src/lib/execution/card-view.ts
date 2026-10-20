@@ -23,6 +23,10 @@ export interface ExecutionCardView {
     openContract: boolean;
     /** `cost_entries` create: the costs page records for this role (lib/execution/costs/access.ts). */
     recordCosts: boolean;
+    /** `invoices_issue` approve: sends payment requests from the Payments tab (A18). */
+    sendRequests: boolean;
+    /** `payments` create: records payments and answers a client's claim there (A18). */
+    recordPayments: boolean;
   };
 }
 

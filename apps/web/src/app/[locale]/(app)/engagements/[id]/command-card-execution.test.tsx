@@ -9,8 +9,9 @@ import { CommandCardExecution } from './command-card-execution';
 // AC10: at `execution` the delivery card shows exactly one next action per
 // derived stage, and that action is a control the studio can press: a link to
 // the page that does it, or the dialog that does it in place. A role that may
-// not take it is told who can, never shown a dead button. A money step whose
-// screen arrives with PR A4 or A5 is a plain status line (lead ruling F2).
+// not take it is told who can, never shown a dead button. The money steps PR A4
+// built link to the contract's Payments tab (lead ruling, A3 fix round); the
+// final account steps, which A5 builds, are a plain status line (F2).
 
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
@@ -23,8 +24,11 @@ vi.mock('@/lib/contracts/actions', () => ({
 
 // "Record costs" sits beside the next action, not in its place: the per-action
 // counts below leave it off, and the costs test turns it on.
-const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, recordCosts: false };
-const NOTHING = { generateContract: false, signOffline: false, openContract: false, recordCosts: false };
+const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, recordCosts: false, sendRequests: true, recordPayments: true };
+const NOTHING = { generateContract: false, signOffline: false, openContract: false, recordCosts: false, sendRequests: false, recordPayments: false };
+/** A project manager or a viewer: reads the Payments tab, can take none of its money steps (A4 F6). */
+const READS_MONEY_ONLY = { ...EVERYTHING, sendRequests: false, recordPayments: false };
+const INSTALMENT = { en: 'Advance', 'ar-EG': 'دفعة مقدمة' } as const;
 
 function view(kind: ExecutionNextActionKind, may = EVERYTHING): ExecutionCardView {
   return {
@@ -53,8 +57,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     if (target.kind === 'status') {
       expect(screen.queryAllByRole('button')).toHaveLength(0);
       expect(screen.queryAllByRole('link')).toHaveLength(0);
-      const instalment = locale === 'en' ? 'Advance' : 'دفعة مقدمة';
-      expect(screen.getByText(at(`execution.card.upcoming.${kind}`).replace('{instalment}', instalment))).toBeTruthy();
+      expect(screen.getByText(at(`execution.card.upcoming.${kind}`))).toBeTruthy();
     } else if (target.kind === 'dialog') {
       expect(screen.getAllByRole('button')).toHaveLength(1);
       expect(screen.getByRole('button', { name: at(DIALOG_BUTTON[target.dialog]) })).toBeTruthy();
@@ -62,19 +65,52 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     } else {
       const links = screen.getAllByRole('link');
       expect(links).toHaveLength(1);
-      expect(links[0].textContent).toBe(at(`execution.card.next.${kind}`));
+      expect(links[0].textContent).toBe(at(`execution.card.next.${kind}`).replace('{instalment}', INSTALMENT[locale]));
       expect(links[0].getAttribute('href')).toMatch(target.page === 'project_boq' ? /\/projects\/p-1\?tab=boq$/ : /\/contracts\/c-1/);
     }
   });
 
-  test('the money steps A4 and A5 build are status lines, the next payment request naming its instalment (F2)', () => {
-    expect([...STATUS_LINE_ACTIONS].sort()).toEqual(
-      EXECUTION_NEXT_ACTION_KINDS.filter((kind) => NEXT_ACTION_TARGET[kind].kind === 'status').sort(),
-    );
+  test('only the final account steps (A5) are status lines; the A4 money steps open the Payments tab', () => {
+    expect([...STATUS_LINE_ACTIONS].sort()).toEqual(['prepare_final_account', 'review_final_account']);
+    expect(STATUS_LINE_ACTIONS.filter((kind) => NEXT_ACTION_TARGET[kind].kind !== 'status')).toEqual([]);
+    for (const kind of ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment'] as const) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind)} />, { locale });
+      expect(screen.getByRole('link').getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=payments$/);
+      unmount();
+    }
+  });
+
+  test('the next payment request names its instalment, or says "the next instalment" when it has no name', () => {
     renderWithIntl(<CommandCardExecution view={{ ...view('send_milestone_request'), nextInstalment: null }} />, { locale });
-    const text = at('execution.card.upcoming.send_milestone_request').replace('{instalment}', at('execution.card.upcoming.anInstalment'));
-    expect(screen.getByText(text)).toBeTruthy();
-    expect(screen.queryByText(at('execution.card.someoneElse'))).toBeNull();
+    const text = at('execution.card.next.send_milestone_request').replace('{instalment}', at('execution.card.anInstalment'));
+    expect(screen.getByRole('link', { name: text })).toBeTruthy();
+  });
+
+  test('a role that can only read the money is told the owner, an admin or the accountant does each money step', () => {
+    for (const kind of ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment'] as const) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind, READS_MONEY_ONLY)} />, { locale });
+      expect(screen.queryAllByRole('link'), kind).toHaveLength(0);
+      expect(screen.queryAllByRole('button'), kind).toHaveLength(0);
+      expect(screen.getByText(at('execution.card.someoneElseMoney'))).toBeTruthy();
+      unmount();
+    }
+  });
+
+  test('sending a request needs invoices_issue; recording a payment and the claim review need payments create', () => {
+    const cases = [
+      ['send_milestone_request', { ...READS_MONEY_ONLY, sendRequests: true }, true],
+      ['send_milestone_request', { ...READS_MONEY_ONLY, recordPayments: true }, false],
+      ['send_variation_request', { ...READS_MONEY_ONLY, sendRequests: true }, true],
+      ['record_payment', { ...READS_MONEY_ONLY, recordPayments: true }, true],
+      ['record_payment', { ...READS_MONEY_ONLY, sendRequests: true }, false],
+      ['review_payment_claim', { ...READS_MONEY_ONLY, recordPayments: true }, true],
+      ['review_payment_claim', { ...READS_MONEY_ONLY, sendRequests: true }, false],
+    ] as const;
+    for (const [kind, may, linked] of cases) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind, may)} />, { locale });
+      expect(screen.queryAllByRole('link'), `${kind} ${JSON.stringify(may)}`).toHaveLength(linked ? 1 : 0);
+      unmount();
+    }
   });
 
   test('a role that may not take the action is told who can, with no button and no link', () => {

@@ -4,6 +4,7 @@ import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractsClient } from '../contracts-client';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractPagePayload } from './page-payload';
 import { ContractHeaderForm } from './contract-header-form';
 import { VariationRegister } from './variation-register';
 
@@ -34,6 +35,10 @@ vi.mock('@/lib/variations/actions', () => variations);
 // The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
 vi.mock('@/lib/execution/costs/actions', () => ({}));
 vi.mock('@/lib/price-book/picker-actions', () => ({}));
+// The Payments tab's server actions: never called on these tabs, mocked so the page loads.
+vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
+vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
+vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 
 const DETAIL = {
   id: 'k-1',
@@ -78,10 +83,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
     renderWithIntl(
       <ContractDetailClient
-        detail={DETAIL}
+        {...contractPagePayload(DETAIL, { seeContract: true })}
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}

@@ -4,6 +4,7 @@ import type { ContractLineOption, ContractLineView, ContractPageDetail, Contract
 import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractDetailClient } from './contract-detail-client';
+import { contractPagePayload } from './page-payload';
 import { ContractSectionList } from './contract-section-list';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useKeptSections } from './use-kept-sections';
@@ -29,6 +30,10 @@ vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), save
 // The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
 vi.mock('@/lib/execution/costs/actions', () => ({}));
 vi.mock('@/lib/price-book/picker-actions', () => ({}));
+// The Payments tab's server actions: never called on these tabs, mocked so the page loads.
+vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
+vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
+vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,
@@ -133,10 +138,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        detail={detail as unknown as ContractPageDetail}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
@@ -161,10 +167,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
       const detail = { id: 'k-1', status: 'signed', originalValue: '1', revisedValue: '1', signed: { on: '2026-10-15', via } };
       const { unmount } = renderWithIntl(
         <ContractDetailClient
-          detail={detail as unknown as ContractPageDetail}
+          {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
+          billingMay={{ issue: false, record: false }}
           tabs={['overview', 'variations']}
           openingTab="overview"
           canSignOffline={false}
@@ -234,10 +241,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        detail={detail as unknown as ContractPageDetail}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
         openingSections={null}
         variations={[]}
         schedule={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="variations"
         canSignOffline={false}

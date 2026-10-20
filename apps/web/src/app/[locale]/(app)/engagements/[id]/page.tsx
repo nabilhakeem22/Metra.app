@@ -5,6 +5,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { forwardMovesOf } from '@/lib/engagements/command-card';
 import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
+import { mayIssueRequests, mayRecordPayments } from '@/lib/execution/billing/access';
 import { executionCardView } from '@/lib/execution/card-view';
 import { mayRecordCostEntries } from '@/lib/execution/costs/access';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
@@ -117,6 +118,8 @@ export default async function EngagementDetailPage({
               signOffline: mayRecordSignedOffline(ctx.role),
               openContract: can(ctx.role, 'contracts_generate', 'read'),
               recordCosts: mayRecordCostEntries(ctx.role),
+              sendRequests: mayIssueRequests(ctx.role),
+              recordPayments: mayRecordPayments(ctx.role),
             },
           })
         }

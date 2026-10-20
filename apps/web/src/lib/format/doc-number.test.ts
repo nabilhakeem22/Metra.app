@@ -19,6 +19,8 @@ describe('the document year is Cairo time', () => {
   it('a date-only issue date is taken as written; a timestamp one is read in Cairo', () => {
     expect(docYear('2026-12-31', '2027-03-01T00:00:00Z')).toBe(2026);
     expect(docYear('2026-12-31T23:00:00Z', '2025-01-01T00:00:00Z')).toBe(2027);
+    // A payment request (D3a) is numbered by the Cairo day it was issued on.
+    expect(formatDocNumber('PR', 7, docYear('2026-12-31', '2027-01-01T00:00:00Z'))).toBe('PR-2026-0007');
   });
 
   it('an invalid issue date falls back to the creation year; an invalid instant is NaN', () => {

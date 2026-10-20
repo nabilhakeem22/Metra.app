@@ -2,8 +2,6 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
@@ -15,17 +13,23 @@ import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction } from './contract-vo-types';
 import { CostsTab } from './costs-tab';
+import { PaymentsTab } from './payments-tab';
+import type { BillingMay } from './request-row';
 import { ScheduleTab } from './schedule-tab';
+import { ShareLinkCard } from './share-link-card';
+import type { ContractPageHeader } from './page-payload';
 import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useKeptSections } from './use-kept-sections';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
+  header,
   detail,
   openingSections,
   variations,
   schedule,
+  billingMay,
   tabs,
   openingTab,
   canSignOffline,
@@ -36,13 +40,17 @@ export function ContractDetailClient({
   canDraftVariation,
   canPriceVariation,
 }: {
-  detail: ContractPageDetail;
+  /** What every role on the page sees: the tab strip and the Payments tab need nothing more. */
+  header: ContractPageHeader;
+  /** The whole contract, for the roles that read it (the other tabs); null for a payments-only role (S1). */
+  detail: ContractPageDetail | null;
   /** The first page of sections when the page opened on the overview; null on another tab. */
   openingSections: ContractSectionsPage | null;
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
-  /** Schedule and Costs are among them only on an execution contract; Costs only for a role that reads its costs. */
+  billingMay: BillingMay;
+  /** Schedule, Payments and Costs are among them only on an execution contract; Costs only for a role that reads the contract and its costs. */
   tabs: readonly ContractTab[];
   openingTab: ContractTab;
   /** Owner, admin or project manager: may record a paper signature (D5). */
@@ -55,7 +63,6 @@ export function ContractDetailClient({
   canDraftVariation: boolean;
   canPriceVariation: boolean;
 }) {
-  const t = useTranslations('contracts');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
@@ -92,27 +99,11 @@ export function ContractDetailClient({
           {error}
         </p>
       )}
-      {link && (
-        <Card>
-          <CardContent className="flex items-center gap-2 py-3 text-body">
-            <span className="text-muted-foreground">{t('shareLink')}:</span>
-            <code className="flex-1 truncate" dir="ltr">
-              {link}
-            </code>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigator.clipboard?.writeText(link)}
-            >
-              {t('copyLink')}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {link && <ShareLinkCard link={link} />}
 
       <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />
 
-      {tab === 'overview' && (
+      {tab === 'overview' && detail && (
         <ContractOverview
           detail={detail}
           keptSections={keptSections}
@@ -122,24 +113,25 @@ export function ContractDetailClient({
           canSignOffline={canSignOffline}
           pending={pending}
           m={m}
-          onIssue={() => act(() => issueContract(detail.id))}
-          onTerminate={() => act(() => terminateContract(detail.id))}
+          onIssue={() => act(() => issueContract(header.id))}
+          onTerminate={() => act(() => terminateContract(header.id))}
         />
       )}
-      {tab === 'schedule' && schedule && (
+      {tab === 'schedule' && schedule && detail && (
         <ScheduleTab
-          contractId={detail.id}
-          status={detail.status}
+          contractId={header.id}
+          status={header.status}
           canManage={canManage}
           schedule={schedule}
           contract={detail}
           m={m}
         />
       )}
+      {tab === 'payments' && <PaymentsTab contractId={header.id} may={billingMay} m={m} />}
       {tab === 'costs' && (
         <CostsTab
-          contractId={detail.id}
-          contractStatus={detail.status}
+          contractId={header.id}
+          contractStatus={header.status}
           canCreate={canCreateCosts}
           canPickCostItem={canPickCostItem}
           m={m}
@@ -147,10 +139,10 @@ export function ContractDetailClient({
       )}
       {tab === 'variations' && (
         <VariationRegister
-          contractId={detail.id}
-          contractStatus={detail.status}
+          contractId={header.id}
+          contractStatus={header.status}
           chargeRates={
-            detail.sourceBoqId === null
+            detail === null || detail.sourceBoqId === null
               ? null
               : { taxRate: detail.taxRate, supervisionPct: detail.supervisionPct }
           }

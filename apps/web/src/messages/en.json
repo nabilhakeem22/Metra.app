@@ -518,6 +518,7 @@
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
       "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
       "date_in_future": "That day has not come yet. Pick today or an earlier day.",
+      "date_in_past": "That day has already passed. Pick today or a later day.",
       "too_many_decimals": "Use at most {max} decimal places.",
       "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
       "not_whole_number": "Enter a whole number, without a fraction."
@@ -667,6 +668,7 @@
     "request_has_payments": "Payments are recorded against this payment request, so it cannot be voided.",
     "payment_exceeds_request": "That is more than what is still due on this request. Enter {outstanding} or less.",
     "claim_pending_for_request": "The client says they paid this request. Confirm or dismiss their claim first.",
+    "idempotency_conflict": "This attempt was already used for a different payment, so nothing was recorded. Close the form, check the payments, and record it again.",
     "variation_not_approved": "The client has not approved this change order yet. Wait for their approval, then send the request.",
     "variation_credit_not_billable": "This change order lowers the contract value, so there is nothing to bill. It reduces the final account instead.",
     "final_account_issued": "The final account is already issued, so this can no longer change. Void the final account first if it has no payments.",
@@ -1864,6 +1866,93 @@
         "note": "Note",
         "submit": "Record the signature"
       },
+      "payments": {
+        "tab": "Payments",
+        "title": "Payment requests and payments",
+        "loading": "Loading the payments",
+        "leftToBill": "Left to bill on the contract:",
+        "closed": {
+          "notSigned": "Payment requests can be sent once the client signs the contract.",
+          "terminated": "The contract was terminated, so nothing more can be billed on it.",
+          "finalAccountIssued": "The final account is issued, so no new payment requests can be sent."
+        },
+        "schedule": {
+          "title": "Payment schedule",
+          "requested": "Requested"
+        },
+        "variations": {
+          "title": "Approved change orders to bill"
+        },
+        "send": {
+          "open": "Send request",
+          "title": "Payment request for {target}",
+          "description": "The request is dated today. It cannot be edited once sent; if it is wrong, void it and send a new one.",
+          "amount": "Amount, VAT included:",
+          "overBalance": "This is more than what is left to bill on the contract. You can still send it. Left to bill:",
+          "alreadyCovered": "Everything on the contract is already billed, so this is more than is left to bill. You can still send it.",
+          "sent": "The request was sent.",
+          "sentOverBalance": "It bills more than what was left to bill on the contract, which was:",
+          "sentCovered": "Everything on the contract was already billed before it.",
+          "dueOn": "Due on",
+          "note": "Note",
+          "submit": "Send the request"
+        },
+        "requests": {
+          "title": "Payment requests",
+          "empty": "No payment requests yet.",
+          "more": "Showing the newest 100 requests.",
+          "request": "Request",
+          "dates": "Dates",
+          "amount": "Amount",
+          "paid": "Paid",
+          "outstanding": "Due",
+          "state": "Status",
+          "issuedOn": "Sent {date}",
+          "dueOn": "Due {date}",
+          "finalAccount": "Final account",
+          "variationTarget": "Change order {number}",
+          "claimPending": "The client says they paid this request.",
+          "status": {
+            "issued": "Awaiting payment",
+            "paid": "Paid",
+            "void": "Void"
+          }
+        },
+        "record": {
+          "open": "Record a payment",
+          "title": "Payment on {request}",
+          "description": "Record money the client paid against this request.",
+          "due": "Due on it now:",
+          "amount": "Amount received",
+          "receivedOn": "Received on",
+          "method": "Method",
+          "reference": "Reference",
+          "note": "Note",
+          "submit": "Record the payment",
+          "already": "That payment was already recorded.",
+          "previousAttempt": "An earlier try to record a payment on this request got no answer, so it may already be recorded. Check the payments before you record a different one.",
+          "checkPayments": "Check the payments",
+          "checkFailed": "The payments could not be read. Try again in a moment.",
+          "stillRunning": "The earlier try may still be in progress. Wait a few seconds, then check again."
+        },
+        "void": {
+          "open": "Void",
+          "title": "Void {request}",
+          "description": "A void request bills nothing and keeps its number. Its instalment or change order can then be requested again.",
+          "reason": "Reason",
+          "submit": "Void the request",
+          "done": "The request was voided."
+        },
+        "ledger": {
+          "title": "Payments received",
+          "empty": "No payments recorded yet.",
+          "receivedOn": "Received on",
+          "request": "Request",
+          "amount": "Amount",
+          "details": "Details",
+          "more": "Show more payments"
+        }
+      },
       "finish": {
         "revised": "Revised finish date: {date}, {count, plural, one {{n} day} other {{n} days}} added by approved change orders",
         "added": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the works"
@@ -2979,6 +3068,7 @@
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
         "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
         "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
+        "date_in_past": "That day has already passed. Please choose today or a later day.",
         "too_many_decimals": "Please use at most {max} decimal places.",
         "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
         "not_whole_number": "Please enter a whole number, without a fraction."
@@ -3097,6 +3187,8 @@
       "title": "Execution",
       "waitingOnClient": "Waiting for the client to sign the contract on its link.",
       "someoneElse": "An owner or an admin does this.",
+      "someoneElseMoney": "An owner, an admin or the accountant does this.",
+      "anInstalment": "the next instalment",
       "recordCosts": "Record costs",
       "stage": {
         "no_boq": "No BOQ in Metra yet",
@@ -3114,16 +3206,15 @@
         "set_schedule": "Set the payment schedule",
         "send_contract": "Send the contract",
         "record_signed_offline": "Record signed on paper",
+        "review_payment_claim": "Review the client's payment",
+        "send_milestone_request": "Send the payment request for {instalment}",
+        "send_variation_request": "Bill the approved change order",
+        "record_payment": "Record a payment",
         "await_variation_answer": "Follow up on the change order"
       },
       "upcoming": {
-        "send_milestone_request": "Next: a payment request for {instalment}.",
-        "send_variation_request": "Next: a payment request for the approved change order.",
-        "record_payment": "Next: the client's payment on the open payment request.",
-        "review_payment_claim": "Next: checking the payment the client reported.",
         "prepare_final_account": "Next: the final account.",
-        "review_final_account": "Next: reviewing the final account.",
-        "anInstalment": "the next instalment"
+        "review_final_account": "Next: reviewing the final account."
       }
     }
   }

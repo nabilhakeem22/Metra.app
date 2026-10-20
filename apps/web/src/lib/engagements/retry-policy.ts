@@ -104,6 +104,12 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'client_page_details_owner_only',
   'client_page_details_stale',
   'expected_date_out_of_range',
+  // A contract payment refused under the request's row lock: the transaction
+  // rolled back, so the Payments tab's held key is released (A4 F1).
+  'request_not_found',
+  'request_void',
+  'claim_pending_for_request',
+  'idempotency_conflict',
 ]);
 
 /** True only when the server is KNOWN to have committed nothing. */

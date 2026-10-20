@@ -18,6 +18,10 @@ describe('isDefiniteRefusal', () => {
     expect(isDefiniteRefusal('record_not_found')).toBe(true);
     // Field rules refused the input before anything was written.
     expect(isDefiniteRefusal('check_fields')).toBe(true);
+    // A contract payment refused under the request's lock (A4 F1).
+    for (const code of ['request_not_found', 'request_void', 'claim_pending_for_request', 'idempotency_conflict'] as const) {
+      expect(isDefiniteRefusal(code), code).toBe(true);
+    }
   });
 
   it('is false for every AMBIGUOUS answer — the key must be held', () => {
