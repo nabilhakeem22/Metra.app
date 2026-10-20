@@ -2788,7 +2788,7 @@ Why this order, one sentence each:
 | `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and three triggers: the schedule freezes with its contract; a payment request can only go issued to void, never once paid; a payment fits its request (issued, and never more than its amount, under the request's row lock) |
 | `rls/functions/35-execution.sql` | the payment request's frozen guard and the payment-fits guard |
 | `enforce_contract_child_draft()` (`30-contracts-variations.sql`) | reads the parent contract `FOR SHARE`, so a schedule edit racing an issue waits for it and is refused, instead of landing in a sent contract |
-| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes and the provisional flag, and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page, reading that section only); signing notifies owners, admins and project managers, and waits at most 4 s behind a studio save holding the contract (the client is then told to refresh and check, and nothing is signed later); the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
+| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes, the provisional flag and the day and way a signed contract was signed (online or on paper), and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page, reading that section only); signing notifies owners, admins and project managers, and waits at most 4 s behind a studio save holding the contract (the client is then told to refresh and check, and nothing is signed later); the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
 | every `rls/policies/*.sql` | **the policy speed-up:** each studio policy now reads the org context and the membership check ONCE per query instead of once per row (`(select ...)`). Same answer, about 40 times faster on a big contract (measured: 492.6 ms before, 11.4 ms after, on a 50,000-line contract). Applied by this same `db:apply-rls`; nothing extra to run |
 | `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments insert and read only; measurements read, and insert on every column but `seq`. Each written `revoke all`, then the exact grant. The new functions are callable by `metra_app` only |
 
@@ -2801,7 +2801,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/stage2-a2-schema
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 3f682d67 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (3f682d67)
+git diff --stat 65c2b4bc HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (65c2b4bc)
 git diff --stat b415d66b origin/main -- packages/db    # MUST print nothing: main's database code is still the one undo (0) restores
 ```
 
