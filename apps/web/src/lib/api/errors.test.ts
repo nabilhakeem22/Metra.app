@@ -158,6 +158,7 @@ const ALL_CODES: ActionCode[] = [
   'final_account_issued',
   'final_account_nothing_due',
   'final_account_changed',
+  'final_account_too_large',
   'open_variations',
   'cost_entry_not_found',
   'cost_entry_voided',

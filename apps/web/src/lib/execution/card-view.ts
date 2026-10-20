@@ -25,6 +25,8 @@ export interface ExecutionCardView {
     sendRequests: boolean;
     /** `payments` create: records payments and answers a client's claim there (A18). */
     recordPayments: boolean;
+    /** `site_measurements` create: the measurements page records for this role (measurements/access.ts). */
+    recordMeasurements: boolean;
   };
 }
 

@@ -2,6 +2,7 @@ import 'server-only';
 import {
   activities,
   clients,
+  contracts,
   projects,
   projectStages,
   projectTypes,
@@ -11,7 +12,9 @@ import {
   type ProjectStage,
   type ProjectStatus,
 } from '@metra/db';
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { COMMITTED_STATUSES } from '@/lib/clients/financials';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { currentStage } from '@/lib/project-stages/queries';
 
@@ -122,7 +125,12 @@ export interface ProjectOverview {
   doneStages: number;
   /** round(avg(progress_pct)) across all stages, 0 if none. */
   overallProgress: number;
-  /** Sum of ACCEPTED proposal totals for this project (scale-4 money string). */
+  /**
+   * Sum of ACCEPTED proposal totals for this project, plus the value of its
+   * committed (issued or signed) EXECUTION contracts, which come from a BOQ and
+   * have no proposal behind them (A5 fix round F4). A proposal contract is its
+   * accepted proposal, so it is counted once. Scale-4 money string.
+   */
   contractedTotal: string;
   recentActivity: Activity[];
   // Job-costing figures are intentionally ABSENT — UI renders a locked state.
@@ -163,6 +171,16 @@ export function getProjectOverview(
           eq(proposals.status, 'accepted'),
         ),
       );
+    const [executionRow] = await tx
+      .select({ total: sql<string>`coalesce(sum(${contracts.originalValue}), 0)::text` })
+      .from(contracts)
+      .where(
+        and(
+          eq(contracts.projectId, projectId),
+          isNotNull(contracts.sourceBoqId),
+          inArray(contracts.status, [...COMMITTED_STATUSES]),
+        ),
+      );
 
     const recentActivity = await tx
       .select()
@@ -182,7 +200,7 @@ export function getProjectOverview(
       totalStages: stages.length,
       doneStages,
       overallProgress,
-      contractedTotal: contractedRow?.total ?? '0',
+      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionRow?.total)),
       recentActivity,
     };
   });

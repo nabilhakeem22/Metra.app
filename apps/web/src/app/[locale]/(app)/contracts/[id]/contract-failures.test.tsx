@@ -37,6 +37,9 @@ vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn()
 vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 vi.mock('@/lib/execution/claims/actions', () => ({ confirmContractClaim: vi.fn(), dismissContractClaim: vi.fn() }));
+vi.mock('@/lib/execution/final-account/actions', () => ({ loadFinalAccount: vi.fn(), loadFinalAccountDifferences: vi.fn(), issueFinalAccount: vi.fn() }));
+vi.mock('@/lib/execution/measurements/actions', () => ({ loadMeasurements: vi.fn(), recordMeasurement: vi.fn() }));
+vi.mock('@/lib/execution/cost-sheet/actions', () => ({ loadCostSheet: vi.fn() }));
 
 const DETAIL = {
   id: 'k-1',
@@ -85,7 +88,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
-        billingMay={{ issue: false, record: false }}
+        executionMay={{ issue: false, record: false, measure: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
@@ -122,6 +125,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       <VariationRegister
         contractId="k-1"
         contractStatus="issued"
+        chargeRates={null}
         variations={[]}
         canDraftVariation
         canPriceVariation={false}

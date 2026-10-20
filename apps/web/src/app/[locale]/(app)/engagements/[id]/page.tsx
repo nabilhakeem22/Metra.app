@@ -7,6 +7,7 @@ import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { mayIssueRequests, mayRecordPayments } from '@/lib/execution/billing/access';
 import { executionCardView } from '@/lib/execution/card-view';
+import { mayRecordMeasurements } from '@/lib/execution/measurements/access';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
@@ -118,6 +119,7 @@ export default async function EngagementDetailPage({
               openContract: can(ctx.role, 'contracts_generate', 'read'),
               sendRequests: mayIssueRequests(ctx.role),
               recordPayments: mayRecordPayments(ctx.role),
+              recordMeasurements: mayRecordMeasurements(ctx.role),
             },
           })
         }

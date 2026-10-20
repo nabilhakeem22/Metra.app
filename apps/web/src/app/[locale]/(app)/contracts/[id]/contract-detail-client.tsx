@@ -12,8 +12,7 @@ import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction } from './contract-vo-types';
-import { PaymentsTab } from './payments-tab';
-import type { BillingMay } from './request-row';
+import { ExecutionTabPanel, isOnDemandTab, type ExecutionMay } from './execution-tab-panel';
 import { ScheduleTab } from './schedule-tab';
 import { ShareLinkCard } from './share-link-card';
 import type { ContractPageHeader } from './page-payload';
@@ -28,7 +27,7 @@ export function ContractDetailClient({
   openingSections,
   variations,
   schedule,
-  billingMay,
+  executionMay,
   tabs,
   openingTab,
   canSignOffline,
@@ -37,7 +36,7 @@ export function ContractDetailClient({
   canDraftVariation,
   canPriceVariation,
 }: {
-  /** What every role on the page sees: the tab strip and the Payments tab need nothing more. */
+  /** What every role on the page sees: the tab strip and the on-demand execution tabs need nothing more. */
   header: ContractPageHeader;
   /** The whole contract, for the roles that read it (the other tabs); null for a payments-only role (S1). */
   detail: ContractPageDetail | null;
@@ -46,7 +45,7 @@ export function ContractDetailClient({
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
-  billingMay: BillingMay;
+  executionMay: ExecutionMay;
   tabs: readonly ContractTab[];
   openingTab: ContractTab;
   /** Owner, admin or project manager: may record a paper signature (D5). */
@@ -120,11 +119,16 @@ export function ContractDetailClient({
           m={m}
         />
       )}
-      {tab === 'payments' && <PaymentsTab contractId={header.id} may={billingMay} m={m} />}
+      {isOnDemandTab(tab) && <ExecutionTabPanel tab={tab} contractId={header.id} may={executionMay} m={m} />}
       {tab === 'variations' && (
         <VariationRegister
           contractId={header.id}
           contractStatus={header.status}
+          chargeRates={
+            detail === null || detail.sourceBoqId === null
+              ? null
+              : { taxRate: detail.taxRate, supervisionPct: detail.supervisionPct }
+          }
           variations={variations}
           canDraftVariation={canDraftVariation}
           canPriceVariation={canPriceVariation}

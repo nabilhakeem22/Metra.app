@@ -20,7 +20,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { findKeyedPayment } from './append';
-import { canonicalIdempotencyKey } from './replay';
+import { canonicalIdempotencyKey } from '../idempotency-key';
 import { lockPaymentRequest } from './request-lock';
 
 export interface CheckPaymentAttemptInput {

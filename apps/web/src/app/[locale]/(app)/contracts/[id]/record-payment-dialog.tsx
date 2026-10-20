@@ -16,6 +16,7 @@ import {
   readContractPayment,
   type ContractPaymentField,
 } from '@/lib/execution/payments/input';
+import { formatMoneyExact } from '@/lib/format/money';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 import { withMoneyParams } from './money-error-params';
 import { paymentActOf } from './payment-attempt-store';
@@ -77,7 +78,7 @@ export function RecordPaymentDialog({
   }));
   const [previousAttempt, setPreviousAttempt] = useState(false);
   const [pending, startTransition] = useTransition();
-  const errors = useFieldErrors({ fields: CONTRACT_PAYMENT_FIELDS, translate: withMoneyParams(te, locale) });
+  const errors = useFieldErrors({ fields: CONTRACT_PAYMENT_FIELDS, translate: withMoneyParams(te, (figure) => formatMoneyExact(figure, locale)) });
   const attempt = usePaymentAttempt(contractId, request.id);
 
   const box = (field: ContractPaymentField) => ({

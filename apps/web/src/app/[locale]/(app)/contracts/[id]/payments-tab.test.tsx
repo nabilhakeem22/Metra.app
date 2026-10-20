@@ -195,6 +195,31 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab (%s)', (locale) => 
     expect(screen.queryByRole('button', { name: at('contracts.execution.payments.ledger.more') })).toBeNull();
   });
 
+  test('F3: "left to bill" is the schedule\'s, and says the measured differences are settled in the final account', async () => {
+    await show();
+    expect(screen.getByText(at('contracts.execution.payments.leftToBill'))).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.payments.leftToBillHint'))).toBeTruthy();
+  });
+
+  test('F6: under an issued final account no row is offered to bill, and only the final account may be voided', async () => {
+    const finalAccount = request('5', { kind: 'final_account', target: null, amount: '4960.0000', outstanding: '4960.0000' });
+    const variation = { id: 'v-1', documentNumber: 'VO-2026-0002', titleAr: null, titleEn: 'Extra niche', charge: '1860.0000' };
+    reads.loadContractBilling.mockResolvedValue({
+      ok: true,
+      data: { ...VIEW, finalAccountIssued: true, variations: [variation], requests: [finalAccount, ...VIEW.requests] },
+    });
+    await show();
+    const voidIt = at('contracts.execution.payments.void.open');
+    expect(buttonsIn(rowOf('5'))).toContain(voidIt);
+    expect(buttonsIn(rowOf('1'))).not.toContain(voidIt);
+    expect(screen.queryByText('Works')).toBeNull();
+    expect(screen.queryByText('Extra niche')).toBeNull();
+    expect(screen.getByText('Advance', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.payments.billedInFinalAccount'))).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.payments.requests.voidClosed'))).toBeTruthy();
+    expect(screen.queryByRole('button', { name: at('contracts.execution.payments.send.open') })).toBeNull();
+  });
+
   test('a refused read is said above the tab', async () => {
     reads.loadContractBilling.mockResolvedValue({ ok: false, error: 'forbidden' });
     await show({ issue: false, record: false });

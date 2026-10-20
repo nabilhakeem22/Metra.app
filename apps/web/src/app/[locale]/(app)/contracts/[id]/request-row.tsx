@@ -26,22 +26,37 @@ function useTargetLabel() {
 }
 
 /**
+ * Whether the studio may void the request now, as the void core decides: a
+ * live one with nothing paid or claimed on it, and, under an issued final
+ * account, only the final account itself (it billed up to every request
+ * before it, so those are refused `final_account_issued`, F6).
+ */
+function mayVoidRequest(request: PaymentRequestRow, may: BillingMay, finalAccountIssued: boolean): boolean {
+  const settled = request.hasPendingClaim || parseMoney4(request.paid) > 0n;
+  const isFinalAccount = request.target === null;
+  return request.status === 'issued' && may.issue && !settled && (isFinalAccount || !finalAccountIssued);
+}
+
+/**
  * One payment request on the Payments tab: what it bills and the note sent
  * with it, when, how much, what is paid and still due, and the two things the
  * studio may do with it. A payment is offered while something is due and no
- * client claim waits (the claims panel answers it first, B4.2); a void only while
- * nothing is paid or claimed. The buttons only ask the tab to open the act: its
+ * client claim waits (the claims panel answers it first, B4.2); a void as
+ * `mayVoidRequest` says. The buttons only ask the tab to open the act: its
  * dialog lives on the tab, so a read of the tab never unmounts it.
  */
 export function RequestRow({
   request,
   may,
+  finalAccountIssued,
   m,
   onRecord,
   onVoid,
 }: {
   request: PaymentRequestRow;
   may: BillingMay;
+  /** The contract's final account is issued: only it may be voided (F6). */
+  finalAccountIssued: boolean;
   m: (value: string) => string;
   onRecord: () => void;
   onVoid: () => void;
@@ -52,7 +67,6 @@ export function RequestRow({
   const live = request.status === 'issued';
   const due = parseMoney4(request.outstanding) > 0n;
   const status = !live ? 'void' : due ? 'issued' : 'paid';
-  const settled = request.hasPendingClaim || parseMoney4(request.paid) > 0n;
 
   return (
     <tr className="border-b align-top last:border-0" data-request-status={status}>
@@ -79,7 +93,7 @@ export function RequestRow({
               {t('record.open')}
             </Button>
           )}
-          {live && may.issue && !settled && (
+          {mayVoidRequest(request, may, finalAccountIssued) && (
             <Button variant="ghost" size="sm" onClick={onVoid}>
               {t('void.open')}
             </Button>

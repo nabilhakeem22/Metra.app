@@ -29,6 +29,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/contracts/[id]/baseline-line-picker.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/charges-form.tsx': 'app/[locale]/(app)/contracts/[id]/execution-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/confirm-claim-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/claims-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/issue-final-account-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/final-account-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/record-measurement-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/final-account-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/record-payment-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/payments-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/send-request-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/payments-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/void-request-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/payments-forms.test.tsx',

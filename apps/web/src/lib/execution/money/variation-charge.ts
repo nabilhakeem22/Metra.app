@@ -27,6 +27,19 @@ export function variationCharge(netDelta: string, taxRate: string, supervisionPc
   };
 }
 
+/**
+ * Σ of each approved change order's full charge (de-scopes lower it), each
+ * order rounded on its own exactly as it is billed: what the orders add to an
+ * execution contract's value.
+ */
+export function approvedVariationsCharge(netDeltas: readonly string[], taxRate: string, supervisionPct: string): string {
+  const total4 = netDeltas.reduce(
+    (total, netDelta) => total + parseMoney4(variationCharge(netDelta, taxRate, supervisionPct).total),
+    0n,
+  );
+  return formatMoney4(total4);
+}
+
 /** A change order may become a payment request only when it adds money (> 0). */
 export function isVariationBillable(netDelta: string): boolean {
   return parseMoney4(netDelta) > 0n;

@@ -49,6 +49,7 @@ const DETAIL: ContractPageDetail = {
   supervisionAmount: '9800.0000',
   originalValue: '121520.0000',
   revisedValue: '121520.0000',
+  approvedExtensionDays: 0,
   totalCost: '70000.0000',
   totalMargin: '28000.0000',
   signed: { on: '2026-10-20', via: 'paper' },

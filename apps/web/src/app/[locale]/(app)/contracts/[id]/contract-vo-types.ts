@@ -16,5 +16,15 @@ export interface DraftVoLine {
   discountPct: string;
 }
 
+/**
+ * What an execution contract charges on top of a change order's works (D4a):
+ * its VAT and supervision rates. Null on a proposal contract, whose register
+ * shows the net change alone, as before Stage 2.
+ */
+export interface VariationChargeRates {
+  taxRate: string;
+  supervisionPct: string;
+}
+
 /** Runs a server action, refreshing on success and saying why it failed. */
 export type ContractAction = (fn: () => Promise<ActionResult>) => void;

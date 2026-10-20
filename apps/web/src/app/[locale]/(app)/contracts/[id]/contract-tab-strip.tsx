@@ -8,6 +8,9 @@ const TAB_LABEL: Record<ContractTab, { namespace: 'contracts' | 'variations'; ke
   overview: { namespace: 'contracts', key: 'contract' },
   schedule: { namespace: 'contracts', key: 'execution.schedule.tab' },
   payments: { namespace: 'contracts', key: 'execution.payments.tab' },
+  final_account: { namespace: 'contracts', key: 'execution.finalAccount.tab' },
+  measurements: { namespace: 'contracts', key: 'execution.measurements.tab' },
+  cost_sheet: { namespace: 'contracts', key: 'execution.costSheet.tab' },
   variations: { namespace: 'variations', key: 'register' },
 };
 

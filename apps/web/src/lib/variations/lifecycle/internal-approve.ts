@@ -2,10 +2,11 @@
 // admission gate (UPDATE ... WHERE status=... RETURNING, check rowCount), owner/
 // admin only (variations_price). Client approve/reject is the unauthenticated
 // token path (app_variation_respond_by_token), never the matrix.
-import { variationOrderEvents, type MetraDb } from '@metra/db';
-import { mutateInOrg } from '@/lib/actions/mutate';
+import { variationOrderEvents, variationOrders, type MetraDb } from '@metra/db';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { holdContractOpen } from '@/lib/execution/final-account/gate';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 import {
   assertContractStillLive,
@@ -48,6 +49,11 @@ async function recordInternalApprovedEvent(
  * the status flip on issue (the SDF keeps the token inert until then).
  * Owner/admin only; a concurrent 2nd call finds status<>'draft' ->
  * variation_not_draft.
+ *
+ * FIRST of all, the contract is held FOR SHARE and refused once its final
+ * account is issued (`final_account_issued`, plan A14): the final account
+ * bills the change orders approved by then, and it refuses while one is
+ * open. Contract before change order is the order termination locks them in.
  */
 export async function internalApproveVariationCore(
   ctx: OrgContext,
@@ -57,6 +63,14 @@ export async function internalApproveVariationCore(
     ctx,
     { capability: 'variations_price', action: 'approve' },
     async (tx, audit) => {
+      const { contractId } = await requireInOrg(
+        tx,
+        variationOrders,
+        input.id,
+        { contractId: variationOrders.contractId },
+        'record_not_found',
+      );
+      await holdContractOpen(tx, contractId);
       const locked = await lockDraftVariation(tx, input.id);
       await assertContractStillLive(tx, locked.status, locked.contractId);
 

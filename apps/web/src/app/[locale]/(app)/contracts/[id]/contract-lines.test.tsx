@@ -32,6 +32,9 @@ vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn()
 vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 vi.mock('@/lib/execution/claims/actions', () => ({ confirmContractClaim: vi.fn(), dismissContractClaim: vi.fn() }));
+vi.mock('@/lib/execution/final-account/actions', () => ({ loadFinalAccount: vi.fn(), loadFinalAccountDifferences: vi.fn(), issueFinalAccount: vi.fn() }));
+vi.mock('@/lib/execution/measurements/actions', () => ({ loadMeasurements: vi.fn(), recordMeasurement: vi.fn() }));
+vi.mock('@/lib/execution/cost-sheet/actions', () => ({ loadCostSheet: vi.fn() }));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,
@@ -67,7 +70,7 @@ function SectionHarness({ summary }: { summary: ContractSectionSummary }) {
   return <ContractSectionList contractId="k-1" sections={sections} lines={lines} m={(v: string) => v} />;
 }
 function VariationFormHarness() {
-  const create = useVariationCreate('k-1');
+  const create = useVariationCreate('k-1', false);
   return <VariationCreateForm create={create} contractId="k-1" />;
 }
 
@@ -139,7 +142,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
-        billingMay={{ issue: false, record: false }}
+        executionMay={{ issue: false, record: false, measure: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
@@ -166,7 +169,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
-          billingMay={{ issue: false, record: false }}
+          executionMay={{ issue: false, record: false, measure: false }}
           tabs={['overview', 'variations']}
           openingTab="overview"
           canSignOffline={false}
@@ -238,7 +241,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={null}
         variations={[]}
         schedule={null}
-        billingMay={{ issue: false, record: false }}
+        executionMay={{ issue: false, record: false, measure: false }}
         tabs={['overview', 'variations']}
         openingTab="variations"
         canSignOffline={false}

@@ -8,16 +8,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
+import { TIME_EXTENSION_FIELD } from '@/lib/variations/time-extension';
+import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 import type { VariationCreateApi } from './use-variation-create';
 import { VariationLineRow } from './variation-line-row';
 
 export const VO_TITLE_ID = 'vo-title';
 export const VO_REASON_ID = 'vo-reason';
+export const VO_DAYS_ID = 'vo-days';
 
 /**
  * The new-variation-order form. A missing title is said under it when Save is
  * pressed; a refused line cell under that cell; a refusal of the whole order
- * (a contract no longer issued, too many lines) above Save.
+ * (a contract no longer issued, too many lines) above Save. An execution
+ * contract's order also says how many days it adds to the finish date
+ * (`create.withDays`), refused under that box.
  */
 export function VariationCreateForm({
   create,
@@ -39,6 +44,23 @@ export function VariationCreateForm({
         <FormField id={VO_REASON_ID} label={tv('reason')} {...create.errors.bind('reason')}>
           <Input value={create.reason} onChange={(e) => create.setReason(e.target.value)} />
         </FormField>
+        {create.withDays && (
+          <FormField
+            id={VO_DAYS_ID}
+            label={tv('timeExtension.label')}
+            hint={tv('timeExtension.hint')}
+            {...create.errors.bind(TIME_EXTENSION_FIELD)}
+          >
+            <Input
+              dir="ltr"
+              inputMode="numeric"
+              className="max-w-40 tabular-nums"
+              value={create.days}
+              onChange={(e) => create.setDays(e.target.value)}
+              onBlur={(e) => create.setDays(normalizeDecimalInput(e.target.value))}
+            />
+          </FormField>
+        )}
         <div className="space-y-2">
           {create.lines.map((line, index) => (
             <VariationLineRow

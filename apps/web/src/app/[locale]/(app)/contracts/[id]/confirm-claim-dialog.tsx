@@ -10,6 +10,7 @@ import type { ContractBillingView } from '@/lib/execution/billing/view';
 import { confirmContractClaim } from '@/lib/execution/claims/actions';
 import { CONFIRM_CLAIM_FIELDS, confirmClaimFieldErrors, type ConfirmClaimField } from '@/lib/execution/claims/input';
 import type { PendingClaimRow } from '@/lib/execution/claims/queries';
+import { formatMoneyExact } from '@/lib/format/money';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 import { withMoneyParams } from './money-error-params';
 
@@ -45,7 +46,7 @@ export function ConfirmClaimDialog({
   const locale = useLocale();
   const [amount, setAmount] = useState(() => claim.claimedAmount.replace(/\.?0+$/, ''));
   const [pending, startTransition] = useTransition();
-  const errors = useFieldErrors({ fields: CONFIRM_CLAIM_FIELDS, translate: withMoneyParams(te, locale) });
+  const errors = useFieldErrors({ fields: CONFIRM_CLAIM_FIELDS, translate: withMoneyParams(te, (figure) => formatMoneyExact(figure, locale)) });
 
   function submit() {
     if (errors.applyLocal(confirmClaimFieldErrors({ amount }))) return;

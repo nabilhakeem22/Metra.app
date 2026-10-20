@@ -193,6 +193,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   final_account_nothing_due: 'bad-request',
   // The balance moved since the studio read it: reload and confirm the new figure.
   final_account_changed: 'conflict',
+  // A reading far beyond its line put the balance past the money cap: correct the reading.
+  final_account_too_large: 'bad-request',
   open_variations: 'conflict',
   cost_entry_not_found: 'not-found',
   cost_entry_voided: 'conflict',

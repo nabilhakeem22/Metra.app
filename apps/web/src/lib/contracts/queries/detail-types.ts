@@ -142,8 +142,11 @@ export interface ContractHeaderDetail {
   taxAmount: string;
   supervisionAmount: string;
   originalValue: string;
-  // Computed aggregate (A3): originalValue + Σ approved-VO netDeltas.
+  // Computed aggregate (A3): originalValue + what the approved VOs add (their
+  // netDeltas; on an execution contract their full charges, D4a).
   revisedValue: string;
+  // Computed aggregate (A24): Σ approved-VO time extensions, in days (0 = none).
+  approvedExtensionDays: number;
   // margin-gated
   totalCost?: string;
   totalMargin?: string;

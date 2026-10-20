@@ -14,9 +14,9 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
-import { formatDate } from '@/lib/format/date';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
+import { dayBeforeIssue } from '@/lib/validation/day-field';
 import { contractIssuedOnInCairo } from '../queries/issued-on';
 import { readOfflineSignature, type TypedOfflineSignature } from '../sign-offline-input';
 
@@ -47,7 +47,8 @@ async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: str
   if (locked.sourceBoqId === null) fail('contract_not_execution');
   if (locked.status !== 'issued') fail('contract_not_signable');
   const issuedOn = await contractIssuedOnInCairo(tx, contractId);
-  if (signedOn < issuedOn) failFields({ signedOn: { code: 'date_before_issue', params: { date: formatDate(issuedOn, 'en') } } });
+  const beforeIssue = dayBeforeIssue(signedOn, issuedOn);
+  if (beforeIssue) failFields({ signedOn: beforeIssue });
   const flipped = await tx
     .update(contracts)
     .set({ status: 'signed', updatedAt: new Date() })
@@ -76,7 +77,7 @@ export async function recordContractSignedOfflineCore(
   if (!read.ok) return fieldsFailed(read.errors);
   const { signedOn, note } = read.values;
 
-  return mutateInOrg(ctx, { immutableCode: 'contract_not_signable' }, async (tx, audit) => {
+  return mutateInOrg(ctx, { immutableCode: 'contract_not_signable', capTransaction: true }, async (tx, audit) => {
     await signIssuedContract(tx, contractId, signedOn);
     await tx.insert(contractEvents).values({
       orgId: ctx.orgId,
