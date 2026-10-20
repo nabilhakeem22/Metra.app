@@ -3208,10 +3208,28 @@ answers.
 
 ### Stage 2 DB step B (the client "I paid" on the delivery page): owner runbook
 
-The second and last Stage 2 database step. It is `db:apply-rls` ONLY: no
-migration, so `db:migrate` is not part of it and the migration count stays 64.
-It is validated on branch `validate/stage2-b4-client-paid`; the code it runs is
-pinned at `<B_SHA>`.
+The second Stage 2 database step. It is `db:apply-rls` ONLY: no migration, so
+`db:migrate` is not part of it and the migration count stays 64. It is
+validated on branch `validate/stage2-b4-client-paid`; the code it runs is
+pinned at `<B_SHA>`: the FINAL code commit of that branch, `386ed0c3` or a
+later one. The lead writes the real SHA in place of `<B_SHA>` everywhere in
+this section when handing the step over; do not start with the placeholder
+still in it.
+
+**Step B is NOT the last database step.** These were asked for in the plan's
+"DB step B" addenda and are deferred, by owner decision, to a later step that
+carries a migration (0064 or later), with its own runbook:
+
+- the stored folded search columns on contract lines, section titles and the
+  price book (`contract_lines.search_text` and its kin), which make a search
+  on a very long contract cheap (the per-member read throttle is the backstop
+  until then);
+- the stored name comparison form on price-book items (`name_ar_form`,
+  `name_en_form`) and its index, for the market "add to my price book" name
+  check;
+- payment reversal (undoing a recorded payment), which has no design yet;
+- optionally, the contract lines index for one very large section, and the
+  contract link's digest stored at issue (both only if measurements ask).
 
 **THE ORDER (do not change it):**
 
@@ -3240,11 +3258,12 @@ Why this order, one sentence each:
   waits for the merge:** the contract link's first answer now carries only its
   first 50 sections (and, between them, the contract's first 50 lines). The
   current page already opens on exactly that, so a client sees the same page;
-  but on a contract with MORE than 50 sections, the current page's "show more
-  sections" finds nothing until this branch is deployed. Every other change
-  only adds, or refuses a write the current code never makes (rehearsed: the
-  current code's own action tests pass on the new database, except the four
-  that test the old uncapped contract link, listed under *Rehearsed*).
+  but on a contract with MORE than 50 sections, the current page counts the
+  sections it was sent, so it shows the first 50 and offers no "show more
+  sections" at all: nothing tells that client more exist until this branch is
+  deployed. Every other change only adds, or refuses a write the current code
+  never makes (rehearsed: see *Rehearsed* for the current code's own action
+  tests on the new database).
 - **A client "I paid" on a payment request now also writes studio
   notifications** ("The client says they paid payment request PR-2026-0004").
   The current Worker shows an unknown notification as an empty line, never as
@@ -3256,10 +3275,11 @@ backfilled.
 
 | Object | Change |
 |---|---|
-| `rls/functions/70-execution-portal.sql` (new) | the delivery page's execution card (`app_delivery_execution_by_token`: the execution contract, its newest 60 payment requests with what is paid and due on each, the newest 60 payments received, and the studio's payment details only while something is due) and the client's "I paid" on one request (`app_delivery_claim_request_by_token`: claims what is still due, the client sends no amount; tells owners, admins and accountants in the same transaction; at most 10 claims per contract per hour; waits at most 4 s on a busy request), plus two internal helpers nobody else may call |
-| `rls/functions/30-contracts-variations.sql` | the contract link's first answer carries its first 50 sections and, between them, the first 50 lines of the WHOLE contract, plus how many sections it has; a new function serves the sections after the first 50, 50 at a time; the digest the client's acknowledgement covers now also covers every section's title and subtotal. The change-order link (/v) adds the contract's end date and its approved extra days |
-| `rls/functions/35-execution.sql`, `rls/policies/35-execution.sql` | two new trigger functions and four triggers: a cost entry never moves to another contract and a voided one stays voided; and the member a payment request, a payment, a void or a cost entry names as its author must be the member who is signed in |
-| `rls/roles.sql` | `metra_app` may update only the 15 columns a cost edit or void writes (it could update every column before); the new functions are callable by `metra_app` only, the two helpers by nobody |
+| `rls/functions/70-execution-portal.sql` (new) | the delivery page's execution card (`app_delivery_execution_by_token`: the execution contract, its newest 60 payment requests with what is paid and due on each, the newest 60 payments received (same-day ones newest first), the client's notices still waiting on an earlier contract of the delivery, and the studio's payment details only while something is due) and the client's "I paid" on one request (`app_delivery_claim_request_by_token`: claims what is still due, the client sends no amount; tells owners, admins and accountants in the same transaction; at most 10 claims per contract per hour; waits at most 4 s on a busy request; never waits on the delivery row), plus two internal helpers nobody else may call |
+| `rls/functions/30-contracts-variations.sql` | the contract link's first answer carries its first 50 sections and, between them, the first 50 lines of the WHOLE contract, plus how many sections it has; a new function serves the sections after the first 50, 50 at a time; the digest the client's acknowledgement covers now also covers every section's title and subtotal. The change-order link (/v) adds the contract's end date and its approved extra days, and a client's approve or reject now waits for a termination in flight and is refused on the terminated contract |
+| `rls/functions/35-execution.sql`, `rls/policies/35-execution.sql` | four new trigger functions and eight triggers: a cost entry never moves to another contract, and a voided one is final; a client's claim keeps what the client sent and is answered once; a site measurement goes only on a signed execution contract with no final account, on a day from its issue to tomorrow; and the member a payment request, a payment, a void, a cost entry, a claim's answer or a measurement names as its author must be the member who is signed in |
+| `rls/roles.sql` | `metra_app` may update only the 15 columns a cost edit or void writes (it could update every column before); on the client's claims it may no longer insert (only the client's link function writes one) and may update only the 5 columns of the studio's answer; the new functions are callable by `metra_app` only, the two helpers by nobody |
+| `packages/db/src/scripts/apply-rls.ts` | a file that loses a lock race with live traffic (40P01 or 55P03) is tried again, up to 3 times, with a line saying so (step 3) |
 
 **1. Put the step B code in the production checkout.** This step adds no
 dependency of `db:apply-rls`, so the installed `node_modules` serve as they
@@ -3315,11 +3335,14 @@ select
       and p.proname in ('app_delivery_execution_by_token', 'app_delivery_claim_request_by_token',
                         'app_delivery_execution_contract', 'app_studio_payment_details',
                         'app_contract_sections_by_token', 'enforce_actor_is_session_user',
-                        'enforce_cost_entry_guarded')) as step_b_functions,
+                        'enforce_cost_entry_guarded', 'enforce_contract_payment_claim_guarded',
+                        'enforce_contract_line_measurement_guarded')) as step_b_functions,
   (select count(*) from pg_trigger t
     where not t.tgisinternal
       and t.tgname in ('trg_payment_requests_actor', 'trg_contract_payments_actor',
-                       'trg_contract_cost_entries_actor', 'trg_contract_cost_entries_guarded')) as step_b_triggers,
+                       'trg_contract_cost_entries_actor', 'trg_contract_cost_entries_guarded',
+                       'trg_contract_payment_claims_actor', 'trg_contract_payment_claims_guarded',
+                       'trg_contract_line_measurements_actor', 'trg_contract_line_measurements_guarded')) as step_b_triggers,
   (select count(*) from public.contract_payment_claims) as client_claims;
 ```
 
@@ -3378,69 +3401,99 @@ kind. In this order: the same first four as every run
 then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`,
 then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`,
 then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`),
-then FOUR new ones, once only:
+then EIGHT new ones, once only:
 `message: 'trigger "trg_contract_cost_entries_guarded" for relation "public.contract_cost_entries" does not exist, skipping',`,
 `message: 'trigger "trg_payment_requests_actor" for relation "public.payment_requests" does not exist, skipping',`,
-`message: 'trigger "trg_contract_payments_actor" for relation "public.contract_payments" does not exist, skipping',`
-and `message: 'trigger "trg_contract_cost_entries_actor" for relation "public.contract_cost_entries" does not exist, skipping',`.
+`message: 'trigger "trg_contract_payments_actor" for relation "public.contract_payments" does not exist, skipping',`,
+`message: 'trigger "trg_contract_cost_entries_actor" for relation "public.contract_cost_entries" does not exist, skipping',`,
+`message: 'trigger "trg_contract_payment_claims_actor" for relation "public.contract_payment_claims" does not exist, skipping',`,
+`message: 'trigger "trg_contract_payment_claims_guarded" for relation "public.contract_payment_claims" does not exist, skipping',`,
+`message: 'trigger "trg_contract_line_measurements_actor" for relation "public.contract_line_measurements" does not exist, skipping',`
+and `message: 'trigger "trg_contract_line_measurements_guarded" for relation "public.contract_line_measurements" does not exist, skipping',`.
 A second `db:apply-rls` prints only the first four.
 
 Only a line that starts `apply-rls failed:` is a failure. Expected:
 
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
   `apply-rls: verified in the catalogues` and goes on
-  `58 tables, 58 policies, 22 triggers, 54 functions, RLS forced on all of them, role metra_app present.`;
+  `58 tables, 58 policies, 26 triggers, 56 functions, RLS forced on all of them, role metra_app present.`;
   the second starts `apply-rls: grants verified` and goes on
-  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; contract_cost_entries updatable on its 15 entry and void columns only; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
+  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; contract_cost_entries updatable on its 15 entry and void columns only; contract_payment_claims updatable on its 5 answer columns only; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
   If that second line is replaced by a problem list, it exits 1: something
   was added by hand. Do not merge; tell the lead.
 - `assert-schema-applied` exits 0 and prints six lines, in this order:
   `assert-schema-applied: OK — 58 declared table(s), every column present.`,
   then `indexes — 133 declared, all present.`, `constraints — 340 declared, all present.`,
-  `functions — 54 declared, all present.`,
+  `functions — 56 declared, all present.`,
   `orphaned org rows — 50 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
   and `composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed to a single non-org_id column.`
 
+**Run it at a quiet hour** (late evening, when no studio is working): ordinary
+traffic is enough to make a file lose a lock race, see below.
+
+**A lock race is retried for you.** A line like
+`apply-rls: policies/00-core.sql rolled back with SQLSTATE 40P01 on attempt 1 of 3 (a lock race with live traffic); trying it again in 2 s.`
+followed by `Applying policies/00-core.sql ... (attempt 2 of 3)` is NOT a
+failure: that one file rolled back whole and is being applied again. Carry on
+reading the output.
+
 **If it fails, it prints the SQLSTATE and what to do,** on two lines:
-`apply-rls failed: SQLSTATE 55P03: canceling statement due to lock timeout`
-(or `SQLSTATE 40P01: deadlock detected`) then
+`apply-rls failed: SQLSTATE 40P01: deadlock detected`
+(or `SQLSTATE 55P03: canceling statement due to lock timeout`) then
 `apply-rls failed: lock wait or deadlock, safe to re-run at a quieter moment (this file rolled back; the files before it stay applied).`
-A long studio transaction held a table for more than 3 s. Run
-`npm run db:apply-rls` again a little later: it prints the EIGHT notices of a
-first run and the two lines above. In between, step 2 (b) may show
-`step_b_functions` 7 and `step_b_triggers` 0 (the functions file ran, the
-policy file rolled back); the current site works on that too. Rehearsed: a
-reader holding `contract_cost_entries` for 12 s gave exactly these two lines
-from `Applying policies/35-execution.sql ...`, and the re-run after it
-finished applied everything. Any other code: tell the lead before running
-anything else.
+That means the same file lost three times in a row. The cause is NOT a broken
+database, and usually not a long transaction either:
+
+- **40P01, almost always at `Applying policies/00-core.sql ...`** (or
+  `policies/40-engagements.sql`): ORDINARY app traffic. That file locks the
+  studios table and then the members table; every studio save takes the two
+  the other way round (members first, for the "is this a member" check, then
+  the studio, for the row's studio link). Two sub-second transactions in
+  opposite orders are a deadlock, and Postgres ends one of them, sometimes the
+  app's (a studio member may see one save fail and try it again). Measured: 3
+  or more studio saves a second are enough.
+- **55P03, usually at `Applying policies/35-execution.sql ...`:** a long
+  studio transaction or report held a table for more than 3 s.
+
+Either way: **run `npm run db:apply-rls` again, and keep re-running it until it
+exits 0** (wait a minute between runs; it is safe, every statement is
+idempotent). The run that exits 0 prints the notices of the files the failed
+run did not get past (all twelve if it failed before `policies/35-execution.sql`
+landed) and the two green lines above. In between, step 2 (b) may show
+`step_b_functions` 9 and `step_b_triggers` 0 (the functions file ran, a policy
+file rolled back); the current site works on that too. Rehearsed: see
+*Rehearsed* below. Any other code: tell the lead before running anything else.
 
 **Safe to re-run.** Every statement under `rls/` is idempotent: a second
 `db:apply-rls` prints only the first four notices and the same two lines.
 `assert-schema-applied` only reads.
 
 **Locks.** Each policy file takes a table lock for an instant per table, and
-waits at most 3 s for it (`MIGRATION_LOCK_TIMEOUT`). The four new triggers are
-attached in `policies/35-execution.sql`, on tables that now hold live rows; so
-a payment, a cost entry or a request being written at that very moment makes
-the file wait up to 3 s per table and, past it, roll back (the 55P03 lines
-above). Pilot volumes are small; run it at a quiet moment anyway.
+waits at most 3 s for it (`MIGRATION_LOCK_TIMEOUT`); every file runs as one
+transaction, so a file that loses rolls back whole and the script tries it
+again (3 attempts, 2 s then 4 s apart). The eight new triggers are attached in
+`policies/35-execution.sql`, on tables that now hold live rows, and every run
+also re-applies `policies/00-core.sql` and `policies/40-engagements.sql` on the
+busiest tables; while a file waits, the app's saves on those tables wait
+behind it (measured: up to about 1.4 s instead of 0.3 s). That is the reason
+for the quiet hour.
 
 **4. Read-only, after: expected results.** Each block ON ITS OWN.
 
 (a) Step 2 (a) again: `migrations` still 64, `newest` still 1792363603266.
 
-(b) Step 2 (b) again: now `step_b_functions` 7, `step_b_triggers` 4,
-`client_claims` 0. Then step 2 (d) again: now `contract_cost_entries` S,I / 15
-/ 2; `contract_line_measurements` S / 0 / 0; `contract_payment_claims` S,I,U /
-15 / 0; `contract_payment_milestones` S,I,U,D / 10 / 1; `contract_payments`
-S,I / 0 / 2; `payment_requests` S,I,U / 18 / 2.
+(b) Step 2 (b) again: now `step_b_functions` 9, `step_b_triggers` 8,
+`client_claims` the same as before (0 before the merge: only the new page has
+the button). Then step 2 (d) again: now `contract_cost_entries` S,I / 15 / 2;
+`contract_line_measurements` S / 0 / 2; `contract_payment_claims` S / 5 / 2;
+`contract_payment_milestones` S,I,U,D / 10 / 1; `contract_payments` S,I / 0 /
+2; `payment_requests` S,I,U / 18 / 2.
 
-(c) Who may call the step B functions: 7 rows. `app_execute` true on the three
-`app_*_by_token` functions and the two `enforce_*` trigger functions, false on
+(c) Who may call the step B functions: 9 rows. `app_execute` true on the three
+`app_*_by_token` functions and the four `enforce_*` trigger functions, false on
 `app_delivery_execution_contract` and `app_studio_payment_details` (internal:
 nobody calls them but the functions beside them); `public_execute` false and
-`api_roles_execute` false on all seven.
+`api_roles_execute` false on all nine.
 
 ```sql
 -- Step B step 4 (c): who may call the step B functions. Run this one alone.
@@ -3454,7 +3507,8 @@ where n.nspname = 'public'
   and p.proname in ('app_delivery_execution_by_token', 'app_delivery_claim_request_by_token',
                     'app_delivery_execution_contract', 'app_studio_payment_details',
                     'app_contract_sections_by_token', 'enforce_actor_is_session_user',
-                    'enforce_cost_entry_guarded')
+                    'enforce_cost_entry_guarded', 'enforce_contract_payment_claim_guarded',
+                    'enforce_contract_line_measurement_guarded')
 order by 1;
 ```
 
@@ -3532,9 +3586,10 @@ git switch --detach origin/main
 the log shows a `42501`, an `MT140` or a studio reports a broken page). Two
 parts: the PREVIOUS `main`'s own `db:apply-rls` (the SHA you wrote down in step
 1, the code the site runs now), which puts back the contract link without the
-cap, the change-order link without the two new keys, and the cost entries'
-full UPDATE; then one SQL block that removes what the previous code does not
-know (the four triggers and the seven functions). Afterwards the database is
+cap, the change-order link without the two new keys and without the wait for
+a termination, the cost entries' full UPDATE and the claims' insert and full
+UPDATE; then one SQL block that removes what the previous code does not know
+(the eight triggers and the nine functions). Afterwards the database is
 exactly as it was before step 3: rehearsed, a catalogue comparison found zero
 differences. Use it only while the site still runs the code from before the
 merge: if the new code is already deployed, undo (1) the code first, then this.
@@ -3551,15 +3606,27 @@ git log --oneline -1    # the commit `git rev-parse --short origin/main` named i
 npm run db:apply-rls
 ```
 
-Run only `db:apply-rls` from this checkout. Expected: it exits 0; only the
-FIRST FOUR notices of step 3; and it ends with the two lines the previous code
-prints, the first going on
+Run only `db:apply-rls` from this checkout, at a quiet hour as in step 3.
+Expected: it exits 0; only the FIRST FOUR notices of step 3; and it ends with
+the two lines the previous code prints, the first going on
 `58 tables, 58 policies, 18 triggers, 47 functions, RLS forced on all of them, role metra_app present.`
-and the second the same as step 3's WITHOUT the part
-`contract_cost_entries updatable on its 15 entry and void columns only; `
+and the second the same as step 3's WITHOUT the two parts
+`contract_cost_entries updatable on its 15 entry and void columns only; ` and
+`contract_payment_claims updatable on its 5 answer columns only; `
 (if `main` changed its database code since this runbook was written, these
-counts may differ: then compare with what the lead tells you). Then, in the
-Supabase SQL editor, this block, on its own:
+counts may differ: then compare with what the lead tells you).
+
+**If this `db:apply-rls` fails** with the two `apply-rls failed:` lines of step
+3 (`SQLSTATE 40P01` or `55P03`), it is the same lock race with live traffic as
+in step 3, and the previous code does NOT retry a file for you: **run
+`npm run db:apply-rls` again from this checkout, and keep re-running it until it
+exits 0.** Any other code: stop and tell the lead.
+
+**Do not run the SQL block below until this `db:apply-rls` has exited 0.** The
+block drops functions the step B triggers call; run before the previous code's
+files have all landed, it can leave the database between the two versions.
+
+Then, in the Supabase SQL editor, this block, on its own:
 
 ```sql
 -- Step B undo (0), part 2: the objects the previous code does not know. Run this one alone.
@@ -3567,6 +3634,10 @@ drop trigger if exists trg_payment_requests_actor on public.payment_requests;
 drop trigger if exists trg_contract_payments_actor on public.contract_payments;
 drop trigger if exists trg_contract_cost_entries_actor on public.contract_cost_entries;
 drop trigger if exists trg_contract_cost_entries_guarded on public.contract_cost_entries;
+drop trigger if exists trg_contract_payment_claims_actor on public.contract_payment_claims;
+drop trigger if exists trg_contract_payment_claims_guarded on public.contract_payment_claims;
+drop trigger if exists trg_contract_line_measurements_actor on public.contract_line_measurements;
+drop trigger if exists trg_contract_line_measurements_guarded on public.contract_line_measurements;
 drop function if exists public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text);
 drop function if exists public.app_delivery_execution_by_token(text);
 drop function if exists public.app_delivery_execution_contract(uuid, uuid);
@@ -3574,6 +3645,8 @@ drop function if exists public.app_studio_payment_details(uuid);
 drop function if exists public.app_contract_sections_by_token(text, integer);
 drop function if exists public.enforce_actor_is_session_user();
 drop function if exists public.enforce_cost_entry_guarded();
+drop function if exists public.enforce_contract_payment_claim_guarded();
+drop function if exists public.enforce_contract_line_measurement_guarded();
 ```
 
 Expected: `Success. No rows returned`. Then, read-only, each block ON ITS OWN:
@@ -3585,8 +3658,8 @@ lead what failed the first time. Do not merge. If step 5 STILL fails after undo
 else.
 
 To go forward again later, only when the lead says so: step 1 again, then step
-3 (`npm run db:apply-rls`, whose first run prints the eight notices again),
-then step 4 and on.
+3 (`npm run db:apply-rls`, whose first run prints the twelve notices again;
+re-run it until it exits 0, as step 3 says), then step 4 and on.
 
 **(1) The code** (a page fails after the deploy): from
 `C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
