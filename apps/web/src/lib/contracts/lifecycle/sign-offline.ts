@@ -14,6 +14,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readOfflineSignature, type TypedOfflineSignature } from '../sign-offline-input';
 
@@ -55,6 +56,8 @@ export async function recordContractSignedOfflineCore(
   input: RecordContractSignedOfflineInput,
 ): Promise<ActionResult> {
   if (!mayRecordSignedOffline(ctx.role)) return err('forbidden');
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.contractId === 'string' ? input.contractId.trim() : '';
   if (!isUuid(contractId)) return err('malformed');
   const read = readOfflineSignature(input, todayInCairo(new Date()));

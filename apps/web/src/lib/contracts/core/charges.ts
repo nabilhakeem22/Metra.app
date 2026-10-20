@@ -8,6 +8,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { contractTotalsFromBoq } from '@/lib/execution/money/charges';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readContractCharges, type ContractChargesInput } from '../charges-input';
 
@@ -52,6 +53,8 @@ export async function setContractChargesCore(
   ctx: OrgContext,
   input: SetContractChargesInput,
 ): Promise<ActionResult> {
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.contractId === 'string' ? input.contractId.trim() : '';
   if (!isUuid(contractId)) return err('malformed');
   const rates = readContractCharges(input);

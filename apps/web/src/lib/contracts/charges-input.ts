@@ -25,13 +25,25 @@ export interface ContractChargeRates {
 /** What the Generate dialog opens with: Egyptian VAT, and no supervision fee. */
 export const DEFAULT_CONTRACT_CHARGES: ContractChargeRates = { taxRate: '14', supervisionPct: '0' };
 
-/** One rate: required, a number, from 0 to 100. */
+/** The decimals a rate is stored to (numeric(18,4)). */
+const RATE_DECIMALS = 4;
+
+/** More decimals than the column keeps: refused, never cut (100.00001 is not 100). */
+function hasExtraDecimals(raw: string): boolean {
+  const fraction = /\.(\d*)$/.exec(raw.trim())?.[1] ?? '';
+  return fraction.length > RATE_DECIMALS;
+}
+
+/** One rate: required, a number of at most 4 decimals, from 0 to 100. */
 function readRate(raw: unknown): FieldRead<string> {
   if (typeof raw !== 'string') return { ok: false, error: { code: 'required' } };
   const missing = requiredText(raw);
   if (missing) return { ok: false, error: missing };
   const read = readMoneyField(raw, {});
   if (!read.ok) return read;
+  if (hasExtraDecimals(raw)) {
+    return { ok: false, error: { code: 'too_many_decimals', params: { max: RATE_DECIMALS } } };
+  }
   if (!isPercentInRange(read.value)) {
     return { ok: false, error: { code: 'out_of_range', params: { min: 0, max: 100 } } };
   }

@@ -131,6 +131,19 @@ describe('the other SQLSTATE answers', () => {
     },
   );
 
+  it.each(['55P03', 'ECONNRESET'])(
+    'leaves one redacted warning for a %s uncertain, and no error line (A3 reliability R5)',
+    async (code) => {
+      const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(rejectWith({ code, query: 'select secret', parameters: ['token-hash'] }))
+        .resolves.toEqual({ ok: false, error: 'uncertain' });
+      expect(warned).toHaveBeenCalledOnce();
+      expect(warned).toHaveBeenCalledWith('mutateInOrg uncertain', { failure: { code } });
+      expect(logged).not.toHaveBeenCalled();
+      warned.mockRestore();
+    },
+  );
+
   it('answers an MT100 immutable by default, and the given code when named (AC 6)', async () => {
     await expect(rejectWith({ code: 'MT100' })).resolves.toEqual({ ok: false, error: 'immutable' });
     await expect(rejectWith({ code: 'MT100' }, { immutableCode: 'contract_not_draft' })).resolves.toEqual({

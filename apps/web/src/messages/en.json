@@ -479,7 +479,9 @@
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting.",
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
       "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
-      "date_in_future": "That day has not come yet. Pick today or an earlier day."
+      "date_in_future": "That day has not come yet. Pick today or an earlier day.",
+      "too_many_decimals": "Use at most {max} decimal places.",
+      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -2795,7 +2797,9 @@
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting.",
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
         "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
-        "date_in_future": "That day has not come yet. Please choose today or an earlier day."
+        "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
+        "too_many_decimals": "Please use at most {max} decimal places.",
+        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",

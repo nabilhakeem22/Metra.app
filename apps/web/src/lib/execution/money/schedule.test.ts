@@ -79,6 +79,19 @@ describe('validateSchedule', () => {
     });
   });
 
+  it('counts a label of only invisible characters as empty (A3 F9), and stores it as none', () => {
+    const invisible = ['​', '‏⁠', '؜  ', '﻿‍'];
+    const rows: ScheduleRowInput[] = invisible.map((label) => ({ labelAr: null, labelEn: label, basis: 'percent', value: '25' }));
+    const refused = validateSchedule(rows, '1000', '0');
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(Object.keys(refused.errors)).toEqual(invisible.map((_, index) => `milestones.${index}.label`));
+      for (const error of Object.values(refused.errors)) expect(error).toEqual({ code: 'required' });
+    }
+    const named = validateSchedule([{ labelAr: 'دفعة', labelEn: '​', basis: 'percent', value: '100' }], '1000', '0');
+    expect(named).toMatchObject({ ok: true, rows: [{ labelAr: 'دفعة', labelEn: null }] });
+  });
+
   it('refuses a zero, a negative or a share over the target under the value box', () => {
     const result = validateSchedule(percentRows('0', '-5', '100.0001'), '1000', '0');
     expect(result).toEqual({

@@ -14,6 +14,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { contractTotalsFromBoq } from '@/lib/execution/money/charges';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readContractCharges, type ContractChargeRates, type ContractChargesInput } from '../charges-input';
 import { copyBoqContentToContract } from './create-from-boq-copy';
@@ -116,6 +117,8 @@ export async function generateExecutionContractCore(
   ctx: OrgContext,
   input: GenerateExecutionContractInput,
 ): Promise<ActionResult & { data?: string }> {
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
   const boqId = typeof input.boqId === 'string' ? input.boqId.trim() : '';
   if (!isUuid(boqId)) return err('malformed');
   const rates = readContractCharges(input);

@@ -9,6 +9,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { validateSchedule, type CleanScheduleRow } from '@/lib/execution/money/schedule';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readScheduleRows } from './input';
 
@@ -69,6 +70,8 @@ export async function saveContractScheduleCore(
   ctx: OrgContext,
   input: SaveContractScheduleInput,
 ): Promise<ActionResult> {
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.contractId === 'string' ? input.contractId.trim() : '';
   if (!isUuid(contractId)) return err('malformed');
   const read = readScheduleRows(input.milestones);

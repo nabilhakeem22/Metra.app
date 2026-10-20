@@ -46,9 +46,10 @@ function isInstance(value: unknown, type: abstract new (...args: never[]) => unk
   }
 }
 
-/** A deadlock or a lost immutability race: expected, answered with its own
- *  code, and still worth one redacted line (a deadlock is a lock-ordering smell). */
-function noteRace(kind: 'busy' | 'immutable', e: unknown): void {
+/** A lock wait that gave up, a dropped connection, a deadlock or a lost
+ *  immutability race: expected, answered with its own code, and still worth one
+ *  redacted line (a "could not confirm" at 3am must say it was a lock wait). */
+function noteRace(kind: 'uncertain' | 'busy' | 'immutable', e: unknown): void {
   console.warn(`mutateInOrg ${kind}`, { failure: loggableFailure(e) });
 }
 
@@ -75,17 +76,21 @@ function refusalAnswer(refusal: ConstraintRefusal): ActionResult {
  * 6. The tail: logged with a reference (a WHITELIST of the failure, never the
  *    object), answered `generic` with the same reference.
  *
- * Steps 1, 2 and 4 are NOT logged: they are expected outcomes the product has a
- * sentence for. Steps 3 and 5 leave one redacted `console.warn` line (no
- * reference): never a defect line, but a deadlock or a lost lock race is worth
- * seeing in `wrangler tail`.
+ * Steps 1 and 4 are NOT logged: they are expected outcomes the product has a
+ * sentence for. Step 2 when the database said it (a lock timeout, a cancelled
+ * statement, a dropped connection), and steps 3 and 5, leave one redacted
+ * `console.warn` line (no reference): never a defect line, but a lock wait, a
+ * deadlock or a lost lock race is worth seeing in `wrangler tail`. A write
+ * deadline (DbWriteUncertainError) is not: it carries no database detail.
  */
 export function mutationFailure(e: unknown, opts: MutationFailureOptions): ActionResult {
   if (isInstance(e, ActionError)) {
     const coded = e as ActionError;
     return { ok: false, error: coded.code, ...coded.detail };
   }
-  if (isInstance(e, DbWriteUncertainError) || isAmbiguousDbOutcome(e)) {
+  if (isInstance(e, DbWriteUncertainError)) return { ok: false, error: 'uncertain' };
+  if (isAmbiguousDbOutcome(e)) {
+    noteRace('uncertain', e);
     return { ok: false, error: 'uncertain' };
   }
   if (sqlstateOf(e) === DEADLOCK_DETECTED) {
