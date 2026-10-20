@@ -62,7 +62,7 @@ export const CASED_RANGES = (
   '1e00-1e94 1e9e-1efe 1f08-1f0f 1f18-1f1d 1f28-1f2f 1f38-1f3f 1f48-1f4d 1f59-1f5f 1f68-1f6f 1f88-1f8f 1f98-1f9f ' +
   '1fa8-1faf 1fb8-1fbc 1fc8-1fcc 1fd8-1fdb 1fe8-1fec 1ff8-1ffc 2126-2132 2160-216f 2183 24b6-24cf 2c00-2c2f ' +
   '2c60-2c75 2c7e-2ce2 2ceb-2cf2 a640-a66c a680-a69a a722-a76e a779-a7dc a7f5 ff21-ff3a 10400-10427 104b0-104d3 ' +
-  '10570-10595 10c80-10cb2 10d50-10d65 118a0-118bf 16e40-16e5f 1e900-1e921'
+  '10570-10595 10c80-10cb2 10d50-10d65 118a0-118bf 16e40-16e5f 16ea0-16eb8 1e900-1e921'
 ).split(' ');
 
 /** The letters comparisonForm folds, `from[i]` to `to[i]`: Persian yeh and kaf, the alef forms, ta marbuta, alef maqsura. */
