@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { CATEGORY_COUNTS, marketBookPageSql } from '@/lib/market-book/page-sql';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
-import { closeMarketFixture, seedBulletin, seedMarketItem } from './market-fixture';
+import { closeMarketFixture, marketRaw, seedBulletin, seedMarketItem } from './market-fixture';
+import { rebuildSeedBook } from './market-seed-fixture';
 
 // The read path's plan shape (R2). The market policies wrap the org-context
 // test and `app_is_current_org_member()` in `(select ...)`, so the planner
@@ -53,6 +55,28 @@ describe('the market read path as metra_app', () => {
     expect(text).toContain('InitPlan');
     expect(text).not.toContain('app_is_current_org_member');
     expect(text).toMatch(/Index Cond: .*period_month >= /);
+  });
+
+  it('reads the newest priced month and the seeded names of each page row by index, one item at a time', async () => {
+    const text = await plan(marketBookPageSql({ categoryKey: null, query: '', page: 1 }, 'en'));
+    expect(text).toMatch(/Index Cond: \(item_id = ANY \(ARRAY\[i(_\d+)?\.id\]\)\)/);
+    expect(text).toMatch(/Index Scan using market_seed_book_pkey on market_seed_book seeded/);
+  });
+
+  it('counts each leaf from the seed book, never reading the observation history, and falls back to the items before the book is built', async () => {
+    await rebuildSeedBook();
+    const counted = () => withOrgContext(ctx, (tx) => tx.execute(sql`select category_id, n from (${CATEGORY_COUNTS}) k order by 1`));
+    const itemCounts = () => withOrgContext(ctx, (tx) => tx.execute(sql`select category_id, count(*)::int as n from market_items group by 1 order by 1`));
+    const analyzed = await withOrgContext(ctx, async (tx) => {
+      const rows = await tx.execute(sql`explain (analyze, costs off) select * from (${CATEGORY_COUNTS}) k`);
+      return (rows as unknown as Array<{ 'QUERY PLAN': string }>).map((row) => row['QUERY PLAN']);
+    });
+    const historyReads = analyzed.filter((line) => line.includes('market_price_observations'));
+    expect(historyReads.length).toBeGreaterThan(0);
+    expect(historyReads.every((line) => line.includes('(never executed)'))).toBe(true);
+    expect(await counted()).toEqual(await itemCounts());
+    await marketRaw()`delete from public.market_seed_book`;
+    expect(await counted()).toEqual(await itemCounts());
   });
 
   it('does the same on the item and details reads', async () => {

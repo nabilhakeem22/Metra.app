@@ -16,6 +16,7 @@ function item(id: string, sectionId: string): PriceBookItem {
     etaItemCode: null,
     etaCodeType: null,
     active: true,
+    marketItemId: null,
   };
 }
 

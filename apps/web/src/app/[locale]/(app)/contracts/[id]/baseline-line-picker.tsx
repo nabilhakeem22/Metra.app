@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
+import { searchBaselineLines } from '@/lib/contracts/lines-actions';
 import { formatNumber } from '@/lib/format/number';
 import { useBaselineLineSearch } from './use-baseline-line-search';
 
@@ -40,7 +41,7 @@ export function BaselineLinePicker({
   const tv = useTranslations('variations');
   const locale = useLocale();
   const [query, setQuery] = useState('');
-  const search = useBaselineLineSearch(contractId, query);
+  const search = useBaselineLineSearch(searchBaselineLines, contractId, query);
   const picked =
     contractLineId && !search.options.some((option) => option.value === contractLineId)
       ? [{ value: contractLineId, label: contractLineLabel }]

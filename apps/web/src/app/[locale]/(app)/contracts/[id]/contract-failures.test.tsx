@@ -31,6 +31,9 @@ const variations = vi.hoisted(() => ({
   issueVariation: vi.fn(),
 }));
 vi.mock('@/lib/variations/actions', () => variations);
+// The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
+vi.mock('@/lib/execution/costs/actions', () => ({}));
+vi.mock('@/lib/price-book/picker-actions', () => ({}));
 
 const DETAIL = {
   id: 'k-1',
@@ -82,6 +85,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
+        canCreateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue
         canDraftVariation={false}

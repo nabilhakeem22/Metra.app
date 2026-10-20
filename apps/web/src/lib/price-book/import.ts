@@ -5,6 +5,8 @@
 import type { CostItemUnit } from '@metra/db';
 import { readMoneyString } from '@/lib/money/read';
 import { unitFromToken } from '@/lib/units/unit-aliases';
+import type { FieldRead } from '@/lib/validation/field-rules';
+import { COST_ITEM_CODE_MAX, COST_ITEM_NAME_MAX, readCostItemCode, readCostItemName } from './cost-item-input';
 
 export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'sqm',
@@ -88,9 +90,13 @@ export function resolveUnit(text: string): CostItemUnit | null {
 export type ImportRowError =
   | 'row_empty'
   | 'code_missing'
+  | 'code_too_long'
+  | 'code_unprintable'
   | 'code_duplicate_in_file'
   | 'code_exists'
   | 'name_missing'
+  | 'name_too_long'
+  | 'name_unprintable'
   | 'category_invalid'
   | 'unit_invalid'
   | 'cost_invalid'
@@ -136,6 +142,19 @@ function cell(row: string[], i: number | undefined): string {
   if (i === undefined) return '';
   const v = row[i];
   return typeof v === 'string' ? v.trim() : '';
+}
+
+/** The values the row errors that name a cap are said with (priceBook.import.errors.*). */
+export const IMPORT_ERROR_PARAMS = { codeMax: COST_ITEM_CODE_MAX, nameMax: COST_ITEM_NAME_MAX } as const;
+
+/**
+ * A code or name cell the cost-item rules refuse (./cost-item-input: the caps
+ * an edit keeps, and no control character), as its row error; null when it
+ * reads. A row imported here can always be edited later.
+ */
+function textError(read: FieldRead<unknown>, field: 'code' | 'name'): ImportRowError | null {
+  if (read.ok) return null;
+  return read.error.code === 'too_long' ? `${field}_too_long` : `${field}_unprintable`;
 }
 
 /** The codes a sheet carries under its mapping, as validateImportRows reads them (blank cells left out). */
@@ -184,11 +203,15 @@ export function validateImportRows(
 
     if (!anyFilled) return fail('row_empty');
     if (!code) return fail('code_missing');
+    const codeError = textError(readCostItemCode(code), 'code');
+    if (codeError) return fail(codeError);
     // Case-SENSITIVE: the DB unique(org_id, code) is case-sensitive, so `ABC`
     // and `abc` are distinct codes and must not be collapsed here.
     if (seen.has(code)) return fail('code_duplicate_in_file');
     if (existingCodes.has(code)) return fail('code_exists');
     if (!nameEn && !nameAr) return fail('name_missing');
+    const nameError = textError(readCostItemName(nameEn), 'name') ?? textError(readCostItemName(nameAr), 'name');
+    if (nameError) return fail(nameError);
 
     const sectionId = resolveSection(categoryRaw, sections);
     if (!sectionId) return fail('category_invalid');

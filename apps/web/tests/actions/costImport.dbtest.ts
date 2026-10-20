@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import type { ColumnMapping } from '@/lib/price-book/import';
+import { updateCostItemCore } from '@/lib/price-book/core';
 import { importCostItemsCore } from '@/lib/price-book/import-core';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
@@ -76,5 +77,37 @@ describe('importCostItemsCore — 500-row partial import', () => {
     const res = await importCostItemsCore(ctx, { rows, mapping: MAPPING });
     expect(res.data?.imported).toBe(1);
     expect(res.data?.results[1].error).toBe('code_duplicate_in_file');
+  });
+});
+
+describe('a long imported item stays editable (N1)', () => {
+  it('imports a long row within the caps, refuses one past them, and edits the price of each without touching its text', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const sectionId = await raw.sectionId(orgId);
+    const longName = 'Supply, fabricate and install tempered laminated glass balustrade with stainless steel fixings. '.repeat(9).trim();
+    const longCode = `BOQ-${'1234567890'.repeat(11)}`;
+    expect([longName.length > 200, longName.length <= 1000, longCode.length <= 120]).toEqual([true, true, true]);
+    const imported = await importCostItemsCore(ctx, {
+      rows: [[longCode, longName, 'civil', 'sqm', '100', '120'], [`${longCode}-TOO-LONG`, longName, 'civil', 'sqm', '100', '120']],
+      mapping: MAPPING,
+    });
+    expect(imported).toMatchObject({ ok: true, data: { imported: 1 } });
+
+    // A row stored before the caps: longer than an import or a new item may be today.
+    await raw.query(`insert into cost_items (org_id, code, name_en, section_id, unit, default_unit_cost, default_unit_price)
+      values ('${orgId}', 'OLD-${'7'.repeat(210)}', '${'Old description '.repeat(80).trim()}', '${sectionId}', 'sqm', 100, 120)`);
+
+    const rows = await raw.query<{ id: string; code: string; name_en: string }>(`select id, code, name_en from cost_items where org_id = '${orgId}' order by code`);
+    for (const row of rows) {
+      const edit = { id: row.id, code: row.code, nameEn: row.name_en, nameAr: '', sectionId, unit: 'sqm' as const, defaultUnitCost: '100', defaultUnitPrice: '150' };
+      expect(await updateCostItemCore(ctx, edit)).toEqual({ ok: true });
+      expect(await updateCostItemCore(ctx, { ...edit, nameEn: `${'x'.repeat(1001)}` })).toEqual({
+        ok: false, error: 'check_fields', fields: { nameEn: { code: 'too_long', params: { max: 1000 } } },
+      });
+    }
+    const prices = await raw.query<{ price: string }>(`select default_unit_price::text as price from cost_items where org_id = '${orgId}'`);
+    expect(prices.map((row) => row.price)).toEqual(['150.0000', '150.0000']);
   });
 });

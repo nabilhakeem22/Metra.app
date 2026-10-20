@@ -26,3 +26,13 @@ export function formatTime(input: Date | string | number, locale: string): strin
   if (Number.isNaN(date.getTime())) return '';
   return cachedDateTimeFormat(latnLocale(locale), TIME_OPTIONS).format(date);
 }
+
+const MONTH_OPTIONS: Intl.DateTimeFormatOptions = Object.freeze({ timeZone: 'UTC', month: 'long', year: 'numeric' });
+const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/** A calendar month 'YYYY-MM' as words, Latin digits: «يوليو 2026», "July 2026"; '' when it is no month. */
+export function formatMonth(month: string, locale: string): string {
+  const match = MONTH.exec(month);
+  if (!match) return '';
+  return cachedDateTimeFormat(latnLocale(locale), MONTH_OPTIONS).format(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
+}

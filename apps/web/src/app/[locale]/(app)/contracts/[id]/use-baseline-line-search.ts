@@ -4,9 +4,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import type { SelectControlOption } from '@/components/ui/select-control';
 import { describeReadFailure, type ShownFailure } from '@/lib/actions/error-message';
-import { searchBaselineLines } from '@/lib/contracts/lines-actions';
-import type { ContractLineOption } from '@/lib/contracts/queries';
+import type { ActionResult } from '@/lib/actions/result';
+import type { ContractLineOption, ContractLineOptionsPage, LineSearchRequest } from '@/lib/contracts/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+
+/** The server action a picker asks: each one gates its own surface (the variation form, the cost entry form). */
+export type LineSearch = (request: LineSearchRequest) => Promise<ActionResult & { data?: ContractLineOptionsPage }>;
 
 /** How long typing rests before the server is asked: one request per pause. */
 const SEARCH_PAUSE_MS = 200;
@@ -28,6 +31,7 @@ function optionLabel(line: ContractLineOption, locale: string): string {
 
 /** The next answer for `query`: the lines after `shown`, appended. A failure keeps `shown`. */
 function askAfter(
+  search: LineSearch,
   contractId: string,
   query: string,
   shown: ContractLineOption[],
@@ -35,7 +39,7 @@ function askAfter(
 ): Promise<Answer> {
   const afterLineId = shown.length > 0 ? shown[shown.length - 1].id : null;
   const failed = (failure: ShownFailure): Answer => ({ query, lines: shown, hasMore: shown.length > 0, failure: describe(failure) });
-  return searchBaselineLines({ contractId, query, afterLineId }).then(
+  return search({ contractId, query, afterLineId }).then(
     (result) =>
       result.ok && result.data
         ? { query, lines: [...shown, ...result.data.lines], hasMore: result.data.hasMore, failure: null }
@@ -45,13 +49,13 @@ function askAfter(
 }
 
 /**
- * The contract lines a variation line may name, asked of the server (at most
- * 50 per answer) for what is typed: the contract's lines from the start while
+ * The contract lines a picker may name, asked of the server through `search`
+ * (at most 50 per answer) for what is typed: the contract's lines from the start while
  * nothing is. "More results" asks for the next 50 after the last one shown, so
  * every line is reachable. An answer that lands after a newer question is
  * dropped; one "more" at a time.
  */
-export function useBaselineLineSearch(contractId: string, query: string) {
+export function useBaselineLineSearch(search: LineSearch, contractId: string, query: string) {
   const te = useTranslations('errors');
   const t = useTranslations('contracts.lines');
   const locale = useLocale();
@@ -69,19 +73,19 @@ export function useBaselineLineSearch(contractId: string, query: string) {
     latestAsked.current = query;
     const timer = setTimeout(
       () =>
-        askAfter(contractId, query, [], describe.current).then(
+        askAfter(search, contractId, query, [], describe.current).then(
           (next) => latestAsked.current === query && setAnswer(next),
         ),
       query.trim() === '' ? 0 : SEARCH_PAUSE_MS,
     );
     return () => clearTimeout(timer);
-  }, [contractId, query]);
+  }, [search, contractId, query]);
 
   function loadMore() {
     if (moreInFlight.current || answer.query !== query || !answer.hasMore) return;
     moreInFlight.current = true;
     setLoadingMore(true);
-    askAfter(contractId, query, answer.lines, describe.current)
+    askAfter(search, contractId, query, answer.lines, describe.current)
       .then((next) => latestAsked.current === next.query && setAnswer(next))
       .finally(() => {
         moreInFlight.current = false;
@@ -91,6 +95,8 @@ export function useBaselineLineSearch(contractId: string, query: string) {
 
   const current = answer.query === query;
   return {
+    /** The lines shown, for a picker that needs more of a line than its label (its section). */
+    lines: answer.lines,
     options: answer.lines.map((line): SelectControlOption => ({ value: line.id, label: optionLabel(line, locale) })),
     hasMore: current && answer.hasMore,
     browsing: query.trim() === '',

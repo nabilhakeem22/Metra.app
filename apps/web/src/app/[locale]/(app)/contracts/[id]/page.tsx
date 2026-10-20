@@ -5,6 +5,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { getContractSchedule } from '@/lib/contracts/schedule/queries';
+import { mayReadCostEntries, mayRecordCostEntries } from '@/lib/execution/costs/access';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
@@ -28,9 +29,11 @@ export default async function ContractDetailPage({
   const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const variations = await listVariations(ctx, { contractId: id });
-  // Only an execution contract has a schedule: at most 12 rows.
+  // Only an execution contract has a schedule: at most 12 rows. Its costs are
+  // asked by the Costs tab when it opens, so this page costs the same however
+  // many the contract holds.
   const schedule = detail.sourceBoqId === null ? null : await getContractSchedule(ctx, detail);
-  const tabs = contractTabsFor(detail);
+  const tabs = contractTabsFor(detail, { readsCosts: mayReadCostEntries(ctx.role) });
   const openingTab = openingContractTab((await searchParams).tab, tabs);
   // Only the overview shows the sections: the schedule and the change orders
   // never read them (A3 reliability R1). Opened elsewhere, the overview asks
@@ -56,6 +59,8 @@ export default async function ContractDetailPage({
         tabs={tabs}
         openingTab={openingTab}
         canSignOffline={mayRecordSignedOffline(ctx.role)}
+        canCreateCosts={mayRecordCostEntries(ctx.role)}
+        canPickCostItem={can(ctx.role, 'proposals_build', 'update')}
         canManage={canManage}
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}

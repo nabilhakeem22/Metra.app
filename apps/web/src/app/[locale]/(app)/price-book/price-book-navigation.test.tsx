@@ -18,6 +18,8 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 vi.mock('@/lib/price-book/actions', () => ({ setCostItemActive: vi.fn(), loadMarketPriceBook: vi.fn() }));
 vi.mock('@/lib/sections/actions', () => ({ addSection: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
+// The edit sheet's market link: its actions are not what these tests are about.
+vi.mock('@/lib/market-book/actions', () => ({ linkCostItemToMarket: vi.fn(), searchMarketLinks: vi.fn() }));
 
 const SECTION = '0b6f3c1e-8a2d-4c5b-9e7f-1a2b3c4d5e6f';
 const SECTIONS = [{ id: SECTION, key: 'civil', nameEn: 'Civil', nameAr: 'مدني' }];
@@ -34,6 +36,7 @@ const rows: PriceBookItem[] = Array.from({ length: 50 }, (_, n) => ({
   etaItemCode: null,
   etaCodeType: null,
   active: true,
+  marketItemId: null,
 }));
 const BOOK: PriceBookPageData = { rows, sectionCounts: { [SECTION]: 447 }, matched: 447, page: 2, pageCount: 9, hasAnyItem: true };
 
@@ -64,7 +67,7 @@ function nextRequestSettledBy(): { settle: () => Promise<void> } {
 
 function show(view: PriceBookView = { ...FIRST_VIEW, page: 2 }, locale: 'en' | 'ar-EG' = 'en') {
   addressAt(view);
-  renderWithIntl(<PriceBookClient view={view} book={BOOK} sections={SECTIONS} canManage={false} />, { locale });
+  renderWithIntl(<PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} />, { locale });
 }
 
 beforeEach(async () => {
@@ -120,7 +123,7 @@ describe('the paged price book', () => {
   describe('with slow answers', () => {
     const client = (view: PriceBookView) => (
       <NextIntlClientProvider locale="en" messages={messagesFor('en')} timeZone="UTC">
-        <PriceBookClient view={view} book={BOOK} sections={SECTIONS} canManage={false} />
+        <PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} />
       </NextIntlClientProvider>
     );
     const box = () => screen.getByPlaceholderText(messageAt('en', 'priceBook.search')) as HTMLInputElement;

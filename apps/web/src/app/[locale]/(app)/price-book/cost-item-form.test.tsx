@@ -12,12 +12,14 @@ const actions = vi.hoisted(() => ({ createCostItem: vi.fn(), updateCostItem: vi.
 vi.mock('@/lib/price-book/actions', () => actions);
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-toast', () => ({ toast }));
+// The edit sheet's market link: its actions are not what these tests are about.
+vi.mock('@/lib/market-book/actions', () => ({ linkCostItemToMarket: vi.fn(), searchMarketLinks: vi.fn() }));
 
 const SECTIONS = [{ id: 's-1', key: 'civil', nameEn: 'Civil', nameAr: 'مدني' }];
 
 function renderForm(locale: TestLocale) {
   document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
-  renderWithIntl(<CostItemForm open onOpenChange={() => {}} sections={SECTIONS} />, { locale });
+  renderWithIntl(<CostItemForm open onOpenChange={() => {}} sections={SECTIONS} market={null} />, { locale });
 }
 
 function type(controlId: string, value: string) {

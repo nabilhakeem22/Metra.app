@@ -4,34 +4,13 @@
 import { costItems } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { costItemColumns, requireWritable } from './cost-item-write';
+import { isUuid } from '@/lib/uuid';
+import { COST_ITEM_REFUSALS, costItemColumns, editedCostItemColumns, hasPriceBookInputShape, requireWritable } from './cost-item-write';
 import type { CostItemInput } from './fields';
 
 export type { CostItemInput } from './fields';
-
-/** A race the read checks in requireWritable can lose, or a CHECK the typed-
- *  value rules already enforce, each answered under its own field. */
-const COST_ITEM_REFUSALS = [
-  { constraint: 'cost_items_org_id_code_unique', field: 'code', error: { code: 'code_taken' } },
-  {
-    constraint: 'cost_items_section_same_org_fk',
-    field: 'sectionId',
-    error: { code: 'no_longer_exists' },
-  },
-  {
-    constraint: 'cost_items_default_unit_cost_nonneg',
-    field: 'defaultUnitCost',
-    error: { code: 'not_negative' },
-  },
-  {
-    constraint: 'cost_items_default_unit_price_nonneg',
-    field: 'defaultUnitPrice',
-    error: { code: 'not_negative' },
-  },
-] as const satisfies readonly ConstraintRefusal[];
 
 export async function createCostItemCore(
   ctx: OrgContext,
@@ -69,13 +48,16 @@ export async function createCostItemCore(
   );
 }
 
+/**
+ * Edit one price-book item. Its typed values are read against the row as
+ * stored, so a code or name left unchanged is kept whatever its length (an
+ * item imported with a long description can still have its price edited).
+ */
 export async function updateCostItemCore(
   ctx: OrgContext,
   input: { id: string } & CostItemInput,
 ): Promise<ActionResult> {
-  const read = costItemColumns(input);
-  if ('refusal' in read) return read.refusal;
-  const { columns } = read;
+  if (!hasPriceBookInputShape(input) || !isUuid(input.id)) return err('malformed');
 
   return mutateInOrg(
     ctx,
@@ -87,6 +69,7 @@ export async function updateCostItemCore(
         .where(eq(costItems.id, input.id))
         .limit(1);
       if (!before) fail('record_not_found');
+      const columns = editedCostItemColumns(input, before);
       await requireWritable(tx, { ...columns, exceptId: input.id });
 
       await tx

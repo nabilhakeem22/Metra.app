@@ -22,6 +22,7 @@ export interface LineSearchRequest {
 
 const OPTION_COLUMNS = {
   id: contractLines.id,
+  sectionId: contractLines.sectionId,
   descriptionAr: contractLines.descriptionAr,
   descriptionEn: contractLines.descriptionEn,
   sectionTitleAr: contractSections.titleAr,

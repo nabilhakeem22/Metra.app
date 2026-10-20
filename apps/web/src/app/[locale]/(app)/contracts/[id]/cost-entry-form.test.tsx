@@ -1,0 +1,150 @@
+import { act, fireEvent, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { ActionResult } from '@/lib/actions/result';
+import { COST_ENTRY_FIELDS } from '@/lib/execution/costs/input';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
+import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { CostEntryForm } from './cost-entry-form';
+import { COST_ENTRY_CONTROL_ID } from './cost-entry-form-state';
+import { useCostEntryForm } from './use-cost-entry-form';
+import type { CostSectionsApi } from './use-cost-sections';
+
+// PR B3.2: the cost entry sheet says every refusal under its own box (AC 19 of
+// the field-errors plan), checks the typed values before sending, and keeps
+// one idempotency key across a retried Save.
+
+const actions = vi.hoisted(() => ({
+  createCostEntry: vi.fn(),
+  updateCostEntry: vi.fn(),
+  voidCostEntry: vi.fn(),
+  loadCostEntries: vi.fn(),
+  loadCostSections: vi.fn(),
+  searchCostEntryLines: vi.fn(),
+}));
+vi.mock('@/lib/execution/costs/actions', () => actions);
+vi.mock('@/lib/price-book/picker-actions', () => ({
+  searchPriceBookPicker: vi.fn().mockResolvedValue({ ok: true, data: { items: [], matched: 0 } }),
+}));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/use-toast', () => ({ toast }));
+
+const SECTIONS: CostSectionsApi = {
+  sections: [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil' }],
+  hasMore: false,
+  pending: false,
+  failure: null,
+  loadMore: () => {},
+};
+
+function Sheet({ canPickCostItem = true }: { canPickCostItem?: boolean }) {
+  const entry = useCostEntryForm('k-1', () => {});
+  return (
+    <>
+      <button type="button" onClick={entry.openNew}>
+        open
+      </button>
+      <CostEntryForm contractId="k-1" sections={SECTIONS} entry={entry} canPickCostItem={canPickCostItem} />
+    </>
+  );
+}
+
+async function openSheet(locale: TestLocale, canPickCostItem = true) {
+  document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
+  renderWithIntl(<Sheet canPickCostItem={canPickCostItem} />, { locale });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+  });
+}
+
+const type = (field: keyof typeof COST_ENTRY_CONTROL_ID, value: string) =>
+  fireEvent.change(document.getElementById(COST_ENTRY_CONTROL_ID[field])!, { target: { value } });
+
+beforeEach(() => {
+  for (const action of Object.values(actions)) action.mockReset();
+  actions.searchCostEntryLines.mockResolvedValue({ ok: true, data: { lines: [], hasMore: false } });
+  toast.mockReset();
+});
+
+describe.each<TestLocale>(['en', 'ar-EG'])('CostEntryForm (%s)', (locale) => {
+  const at = (key: string) => messageAt(locale, key);
+  const under = (field: keyof typeof COST_ENTRY_CONTROL_ID) => document.getElementById(`${COST_ENTRY_CONTROL_ID[field]}-error`)?.textContent;
+  const save = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.form.save') }));
+    });
+  };
+
+  test('every field the server refuses is said under its own control', async () => {
+    await openSheet(locale);
+    type('description', 'Cement');
+    type('amount', '1500');
+    await expectFieldErrorsRenderUnderFields({
+      fields: COST_ENTRY_FIELDS,
+      controlIdOf: (field) => COST_ENTRY_CONTROL_ID[field],
+      answerWith: (result: ActionResult) => actions.createCostEntry.mockResolvedValue(result),
+      submit: save,
+      locale,
+      typed: { [COST_ENTRY_CONTROL_ID.description]: 'Cement', [COST_ENTRY_CONTROL_ID.amount]: '1500' },
+    });
+  });
+
+  test('a role without the price book search sees the item kept, and a refusal of it under that box', async () => {
+    const { searchPriceBookPicker } = await import('@/lib/price-book/picker-actions');
+    vi.mocked(searchPriceBookPicker).mockClear();
+    await openSheet(locale, false);
+    expect(document.getElementById('ce-item-find')).toBeNull();
+    expect((document.getElementById(COST_ENTRY_CONTROL_ID.costItemId) as HTMLInputElement).value).toBe(at('contracts.costs.form.noCostItem'));
+    expect(searchPriceBookPicker).not.toHaveBeenCalled();
+    type('description', 'Cement');
+    type('amount', '1500');
+    actions.createCostEntry.mockResolvedValue({ ok: false, error: 'check_fields', fields: { costItemId: { code: 'no_longer_exists' } } });
+    await save();
+    expect(under('costItemId')).toBe(at('errors.field.no_longer_exists'));
+  });
+
+  test('a blank description, a zero amount and a half-typed quantity are refused before anything is sent', async () => {
+    await openSheet(locale);
+    type('amount', '0');
+    type('qty', '2');
+    await save();
+    expect(actions.createCostEntry).not.toHaveBeenCalled();
+    expect(under('description')).toBe(at('errors.field.required'));
+    expect(under('amount')).toBe(messageAt(locale, 'errors.field.out_of_range').replace('{min}', '0.0001').replace('{max}', '1,000,000,000,000'));
+    expect(under('unit')).toBe(at('errors.field.required'));
+    expect(under('unitCost')).toBe(at('errors.field.required'));
+    expect(document.activeElement?.id).toBe(COST_ENTRY_CONTROL_ID.description);
+  });
+
+  test('a refusal of the whole entry is said above Save, and the retry keeps its key', async () => {
+    actions.createCostEntry.mockResolvedValueOnce({ ok: false, error: 'line_not_in_contract' }).mockResolvedValueOnce({ ok: true, already: true });
+    await openSheet(locale);
+    type('description', 'Cement');
+    type('amount', '1,500');
+    await save();
+    expect(screen.getByRole('alert').textContent).toContain(at('errors.line_not_in_contract'));
+    await save();
+    const [first, second] = actions.createCostEntry.mock.calls.map(([input]) => input as Record<string, unknown>);
+    expect(first).toMatchObject({ contractId: 'k-1', category: 'materials', description: 'Cement', amount: '1,500', contractSectionId: null, qty: null });
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+    expect(toast).toHaveBeenCalledWith({ title: at('contracts.costs.toast.already') });
+  });
+
+  test('values changed after an uncertain Save are sent under a new key, and resent unchanged under that one (R3)', async () => {
+    actions.createCostEntry
+      .mockResolvedValueOnce({ ok: false, error: 'uncertain' })
+      .mockResolvedValueOnce({ ok: false, error: 'uncertain' })
+      .mockResolvedValueOnce({ ok: true, already: false });
+    await openSheet(locale);
+    type('description', 'Cement');
+    type('amount', '111');
+    await save();
+    type('amount', '222');
+    await save();
+    await save();
+    const [first, changed, resent] = actions.createCostEntry.mock.calls.map(([input]) => input as Record<string, unknown>);
+    expect([first.amount, changed.amount, resent.amount]).toEqual(['111', '222', '222']);
+    expect(changed.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(resent.idempotencyKey).toBe(changed.idempotencyKey);
+    expect(toast).toHaveBeenCalledWith({ title: at('contracts.costs.toast.recorded') });
+  });
+});

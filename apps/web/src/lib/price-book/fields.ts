@@ -3,10 +3,12 @@
 // core share it.
 import type { CostItemUnit } from '@metra/db';
 
-/** Every path a cost-item refusal can name; `name` is the Arabic/English pair. */
+/** Every path a cost-item refusal can name; `name` is the Arabic/English pair, `nameEn`/`nameAr` each half. */
 export const COST_ITEM_FIELDS = [
   'code',
   'name',
+  'nameEn',
+  'nameAr',
   'sectionId',
   'unit',
   'defaultUnitCost',

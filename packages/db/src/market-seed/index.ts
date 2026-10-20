@@ -8,6 +8,6 @@ export { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from './lock';
 export { atPriceBookScale, withFivePercentMargin } from './margin';
 export { ITEM_CODE_PREFIX, SECTION_KEY_PREFIX, itemCode, sectionKey } from './naming';
 export { normalizeArabic, toWesternDigits } from './normalize';
-export { canClashByName, planSeed, planSeedRefs } from './plan';
+export { canClashByName, isOwnItem, planSeed, planSeedRefs } from './plan';
 export * from './types';
 export { SEED_BOOK_VERSION_QUERY } from './version';

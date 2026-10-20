@@ -7,6 +7,7 @@ import type { ContractTab } from './tabs';
 const TAB_LABEL: Record<ContractTab, { namespace: 'contracts' | 'variations'; key: string }> = {
   overview: { namespace: 'contracts', key: 'contract' },
   schedule: { namespace: 'contracts', key: 'execution.schedule.tab' },
+  costs: { namespace: 'contracts', key: 'costs.tab' },
   variations: { namespace: 'variations', key: 'register' },
 };
 

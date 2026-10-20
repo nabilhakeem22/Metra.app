@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
 import { loadMarketPriceBookCore, seedNewStudioCore } from '@/lib/market-book/seed-core';
 import { closeFixture, teardown } from './fixture';
@@ -42,12 +42,21 @@ describe('a seed behind a publish that holds the book past the lock timeout', ()
   it('answers market_book_busy from the button and from the sign-up seed, writes nothing, and the next try loads', async () => {
     const studio = await createStudio(orgIds, 'Busy behind a publish');
     const publish = await publishHoldingTheBook();
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       const started = Date.now();
       expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: false, error: 'market_book_busy' });
       expect(Date.now() - started).toBeGreaterThanOrEqual(4_500);
       expect(await seedNewStudioCore(studio)).toEqual({ ok: false, error: 'market_book_busy' });
+      // R5: each busy answer leaves one redacted line naming the locks and the wait.
+      const busyLines = warned.mock.calls.filter(([label]) => label === 'market_book_busy');
+      expect(busyLines).toHaveLength(2);
+      for (const [, detail] of busyLines) {
+        expect(detail).toMatchObject({ locks: ['metra.market.publish', 'metra.market.seed-studio'], failure: { code: '55P03' } });
+        expect((detail as { waitedMs: number }).waitedMs).toBeGreaterThanOrEqual(4_500);
+      }
     } finally {
+      warned.mockRestore();
       await publish.release();
     }
     expect(await seededRows(studio.orgId)).toEqual([]);

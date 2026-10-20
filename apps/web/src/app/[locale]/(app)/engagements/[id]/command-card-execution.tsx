@@ -9,6 +9,7 @@ import type { ExecutionCardView } from '@/lib/execution/card-view';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import {
   NEXT_ACTION_TARGET,
+  STAGES_RECORDING_COSTS,
   STAGES_WAITING_ON_CLIENT,
   executionCardHref,
   isStatusLineAction,
@@ -43,11 +44,16 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
  * The delivery's EXECUTION card, under the closed headline at `execution`:
  * the stage derived from the BOQ contract (lib/execution/stage.ts) and its ONE
  * next action (lib/execution/next-action-target.ts). A role that cannot take
- * that action is told who can, so the card never shows a dead button.
+ * that action is told who can, so the card never shows a dead button. From
+ * works in progress on, a role that records costs also gets "Record costs".
  */
 export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
   const t = useTranslations('execution.card');
   const next = view.next;
+  const costsHref =
+    view.may.recordCosts && STAGES_RECORDING_COSTS.has(view.stage)
+      ? executionCardHref('contract_costs', { projectId: view.projectId, contractId: view.contract?.id ?? null })
+      : null;
 
   return (
     <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4" data-execution-stage={view.stage}>
@@ -68,6 +74,11 @@ export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
         <div className="flex flex-wrap items-center gap-2" data-next-action={next.kind}>
           <NextAction view={view} kind={next.kind} />
         </div>
+      )}
+      {costsHref && (
+        <Button asChild variant="secondary" size="sm">
+          <Link href={costsHref}>{t('recordCosts')}</Link>
+        </Button>
       )}
     </div>
   );

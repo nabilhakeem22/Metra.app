@@ -14,6 +14,7 @@ import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction } from './contract-vo-types';
+import { CostsTab } from './costs-tab';
 import { ScheduleTab } from './schedule-tab';
 import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
@@ -28,6 +29,8 @@ export function ContractDetailClient({
   tabs,
   openingTab,
   canSignOffline,
+  canCreateCosts,
+  canPickCostItem,
   canManage,
   canIssue,
   canDraftVariation,
@@ -39,10 +42,14 @@ export function ContractDetailClient({
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
+  /** Schedule and Costs are among them only on an execution contract; Costs only for a role that reads its costs. */
   tabs: readonly ContractTab[];
   openingTab: ContractTab;
   /** Owner, admin or project manager: may record a paper signature (D5). */
   canSignOffline: boolean;
+  canCreateCosts: boolean;
+  /** The price book search, for the cost entry form's item. */
+  canPickCostItem: boolean;
   canManage: boolean;
   canIssue: boolean;
   canDraftVariation: boolean;
@@ -126,6 +133,15 @@ export function ContractDetailClient({
           canManage={canManage}
           schedule={schedule}
           contract={detail}
+          m={m}
+        />
+      )}
+      {tab === 'costs' && (
+        <CostsTab
+          contractId={detail.id}
+          contractStatus={detail.status}
+          canCreate={canCreateCosts}
+          canPickCostItem={canPickCostItem}
           m={m}
         />
       )}

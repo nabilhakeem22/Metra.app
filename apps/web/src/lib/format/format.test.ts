@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatTime } from './date';
+import { formatDate, formatMonth, formatTime } from './date';
 import { formatDocNumber } from './doc-number';
 import { formatMoney, formatMoneyAmount, moneySymbol } from './money';
 import { formatNumber, formatPercent, formatQuantity } from './number';
@@ -203,5 +203,18 @@ describe('formatDocNumber — BQ', () => {
   it('pads a BOQ number to the same shape as a proposal or contract number', () => {
     expect(formatDocNumber('BQ', 7, 2026)).toBe('BQ-2026-0007');
     expect(formatDocNumber('BQ', 1284, 2026)).toBe('BQ-2026-1284');
+  });
+});
+
+describe('formatMonth: a calendar month in words, Latin digits', () => {
+  it('names the month in each locale', () => {
+    expect(formatMonth('2026-07', 'ar-EG')).toBe('يوليو 2026');
+    expect(formatMonth('2026-07', 'en')).toBe('July 2026');
+    expect(formatMonth('2025-12', 'en')).toBe('December 2025');
+  });
+
+  it('is empty for anything that is no month', () => {
+    expect(formatMonth('2026-13', 'en')).toBe('');
+    expect(formatMonth('July', 'en')).toBe('');
   });
 });

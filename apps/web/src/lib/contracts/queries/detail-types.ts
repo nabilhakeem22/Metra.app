@@ -56,6 +56,8 @@ export interface ContractLinesPage {
 /** A contract line as the variation picker offers it: what it reads as, and its section. */
 export interface ContractLineOption {
   id: string;
+  /** The section the line sits in (a cost entry booked to the line names it too). */
+  sectionId: string;
   descriptionAr: string | null;
   descriptionEn: string | null;
   sectionTitleAr: string | null;

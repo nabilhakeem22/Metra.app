@@ -67,7 +67,8 @@
   //   STUDIO_READ_RATE_LIMITER   30 req / 60s, keyed per surface + workspace +
   //     member: the rescue ledger route.
   //   STUDIO_SEARCH_RATE_LIMITER 120 req / 60s, keyed the same way: the contract
-  //     line picker and the price book picker (one ask per pause in typing).
+  //     line picker and the price book picker (one ask per pause in typing),
+  //     and the market prices search (/market-book?q=).
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.

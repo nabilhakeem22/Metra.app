@@ -11,18 +11,20 @@ import { packOf } from '../history/load';
  * taxonomy's display order. `latestPrice` is the newest month whose EFFECTIVE
  * value (the newest published bulletin reporting that month) is a number: a
  * suspended or empty month is skipped for the one before it.
+ *
+ * Read item by item, newest month first, down the (item_id, period_month)
+ * index: an observation is the month's effective one when no published
+ * bulletin newer than its own reports the month, and the first priced one is
+ * the answer. So the read stops at the item's newest priced month however many
+ * bulletins restate its history (R2: a DISTINCT ON over every observation took
+ * 2 s at 121 bulletins, inside the market write lock). A bulletin counts unless
+ * it is withdrawn: the few withdrawn ids are tested, so no list of every
+ * published bulletin is sorted for each item.
  */
 export async function readMarketSeedItems(sql: Queryable): Promise<MarketSeedItem[]> {
   const rows = await sql<Array<Record<string, string | number | null>>>`
-    with effective as (
-      select distinct on (o.item_id, o.period_month) o.item_id, o.period_month, o.status, o.price
-        from market_price_observations o
-        join market_bulletins b on b.id = o.bulletin_id and b.status = 'published'
-       order by o.item_id, o.period_month, b.period_month desc
-    ), latest as (
-      select distinct on (item_id) item_id, price
-        from effective where status = 'priced'
-       order by item_id, period_month desc
+    with withdrawn as materialized (
+      select coalesce(array_agg(id), '{}') as ids from market_bulletins where status <> 'published'
     )
     select i.id, i.key, i.name_ar, i.name_en, i.spec_ar, i.spec_en, i.unit, i.status,
            i.pack_length_m, i.pack_pieces, i.pack_piece_length_m,
@@ -31,8 +33,16 @@ export async function readMarketSeedItems(sql: Queryable): Promise<MarketSeedIte
       from market_items i
       join market_categories c on c.id = i.category_id
       join market_categories t on t.id = c.parent_id
-      left join latest l on l.item_id = i.id
-     where exists (select 1 from effective e where e.item_id = i.id)
+      left join lateral (
+        select o.price
+          from market_price_observations o
+         where o.item_id = i.id and o.status = 'priced' and o.bulletin_id <> all((select ids from withdrawn)::uuid[])
+           and o.bulletin_period_month = (select max(newest.bulletin_period_month) from market_price_observations newest
+                                           where newest.item_id = o.item_id and newest.period_month = o.period_month
+                                             and newest.bulletin_id <> all((select ids from withdrawn)::uuid[]))
+         order by o.period_month desc
+         limit 1) l on true
+     where exists (select 1 from market_price_observations o where o.item_id = i.id and o.bulletin_id <> all((select ids from withdrawn)::uuid[]))
      order by t.sort_order, c.sort_order, i.key collate "C"`;
   return rows.map((row) => ({
     id: row.id as string,

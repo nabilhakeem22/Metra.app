@@ -26,6 +26,9 @@ const lineReads = vi.hoisted(() => ({ loadSectionLines: vi.fn(), loadContractSec
 vi.mock('@/lib/contracts/lines-actions', () => lineReads);
 vi.mock('@/lib/contracts/actions', () => ({ issueContract: vi.fn(), terminateContract: vi.fn(), saveContractDraft: vi.fn() }));
 vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), saveVariationDraft: vi.fn() }));
+// The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
+vi.mock('@/lib/execution/costs/actions', () => ({}));
+vi.mock('@/lib/price-book/picker-actions', () => ({}));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,
@@ -38,6 +41,7 @@ const line = (n: number): ContractLineView => ({
 });
 const option = (n: number): ContractLineOption => ({
   id: `l-${n}`,
+  sectionId: 's-1',
   descriptionAr: `بند ${n}`,
   descriptionEn: `Line ${n}`,
   sectionTitleAr: 'مدني',
@@ -136,6 +140,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
+        canCreateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue={false}
         canDraftVariation={false}
@@ -162,6 +168,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           tabs={['overview', 'variations']}
           openingTab="overview"
           canSignOffline={false}
+          canCreateCosts={false}
+          canPickCostItem={false}
           canManage={false}
           canIssue={false}
           canDraftVariation={false}
@@ -233,6 +241,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         tabs={['overview', 'variations']}
         openingTab="variations"
         canSignOffline={false}
+        canCreateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue={false}
         canDraftVariation={false}
