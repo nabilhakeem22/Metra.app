@@ -192,6 +192,24 @@ describe('a name an own item of the studio already has (N2, the name-clash rule 
     expect(await add('MKT-MIRROR', mirror.id, { nameAr: 'مرايا فضية 5 مم', nameEn: 'Silver mirror 5 mm (market)' })).toMatchObject({ ok: true });
   });
 
+  it('reads a name as comparisonForm does in either field, archived own items included, and names each holder (R1, compared in SQL)', async () => {
+    const lamp = await seedMarketItem('pcs', { nameAr: 'لمبة إضاءة', nameEn: 'Lamp' });
+    await seedBulletin('2096-10', [[lamp.id, '2096-10', '45']]);
+    await rebuildSeedBook();
+    await marketRaw()`insert into public.cost_items (org_id, code, name_ar, section_id, unit, active)
+                      values (${owner.orgId}, 'MY-LAMP-AR', 'لـمـبَة  اضاءه', ${sectionId}, 'pcs', false)`;
+    await marketRaw()`insert into public.cost_items (org_id, code, name_ar, name_en, section_id, unit)
+                      values (${owner.orgId}, 'MY-LAMP-EN', 'مصباح', 'LAMP', ${sectionId}, 'pcs')`;
+    expect(await add('MKT-LAMP', lamp.id)).toEqual({
+      ok: false, error: 'check_fields',
+      fields: { nameAr: { code: 'name_taken', params: { code: 'MY-LAMP-AR' } }, nameEn: { code: 'name_taken', params: { code: 'MY-LAMP-EN' } } },
+    });
+    expect(await add('MKT-LAMP', lamp.id, { nameAr: 'لمبة سقف', nameEn: 'مصباح' })).toEqual({
+      ok: false, error: 'check_fields', fields: { nameEn: { code: 'name_taken', params: { code: 'MY-LAMP-EN' } } },
+    });
+    expect(await add('MKT-LAMP', lamp.id, { nameAr: 'لمبة سقف', nameEn: 'Ceiling lamp' })).toMatchObject({ ok: true });
+  });
+
   it('never counts an item linked to the market, or carrying a seed code, as an own item', async () => {
     const twin = await seedMarketItem('sqm', { nameAr: 'زجاج توأم', nameEn: 'Twin glass' });
     await seedBulletin('2096-11', [[twin.id, '2096-11', '50']]);

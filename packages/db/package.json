@@ -14,6 +14,7 @@
     "./market-units": "./src/market-units.ts",
     "./market-percent": "./src/market-percent.ts",
     "./market-seed": "./src/market-seed/index.ts",
+    "./market-seed/compare-sql": "./src/market-seed/compare-sql.ts",
     "./market-seed/db": "./src/market-seed/db.ts"
   },
   "scripts": {

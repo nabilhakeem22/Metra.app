@@ -128,4 +128,23 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostEntryForm (%s)', (locale) => {
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
     expect(toast).toHaveBeenCalledWith({ title: at('contracts.costs.toast.already') });
   });
+
+  test('values changed after an uncertain Save are sent under a new key, and resent unchanged under that one (R3)', async () => {
+    actions.createCostEntry
+      .mockResolvedValueOnce({ ok: false, error: 'uncertain' })
+      .mockResolvedValueOnce({ ok: false, error: 'uncertain' })
+      .mockResolvedValueOnce({ ok: true, already: false });
+    await openSheet(locale);
+    type('description', 'Cement');
+    type('amount', '111');
+    await save();
+    type('amount', '222');
+    await save();
+    await save();
+    const [first, changed, resent] = actions.createCostEntry.mock.calls.map(([input]) => input as Record<string, unknown>);
+    expect([first.amount, changed.amount, resent.amount]).toEqual(['111', '222', '222']);
+    expect(changed.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(resent.idempotencyKey).toBe(changed.idempotencyKey);
+    expect(toast).toHaveBeenCalledWith({ title: at('contracts.costs.toast.recorded') });
+  });
 });

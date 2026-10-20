@@ -17,7 +17,9 @@ import { costItemLabel, lineLabel, sectionLabel } from './cost-entry-labels';
  * server knows (a line no longer in the section, an entry voided meanwhile)
  * comes back the same way, or above the footer. A new entry carries one
  * idempotency key from opening to success, so a Save retried after a lost
- * answer records it once. `onSaved` runs after every saved entry.
+ * answer records it once; values changed after a Save that did not succeed
+ * are a new entry, sent under a new key (R3: the old key answered "already
+ * recorded" and kept the first values). `onSaved` runs after every saved entry.
  */
 export function useCostEntryForm(contractId: string, onSaved: () => void) {
   const t = useTranslations('contracts.costs');
@@ -28,11 +30,14 @@ export function useCostEntryForm(contractId: string, onSaved: () => void) {
   const [form, setForm] = useState<CostEntryFormState>(() => emptyCostEntryForm(todayInCairo(new Date())));
   const [pending, startTransition] = useTransition();
   const key = useRef<string>('');
+  /** The values the current key was last sent with; null until a Save sends it. */
+  const sentWithKey = useRef<string | null>(null);
   const errors = useFieldErrors({ fields: COST_ENTRY_FIELDS, translate: te });
 
   function openNew() {
     errors.clear();
     key.current = crypto.randomUUID();
+    sentWithKey.current = null;
     setEditing(null);
     setForm(emptyCostEntryForm(todayInCairo(new Date())));
     setOpen(true);
@@ -49,6 +54,14 @@ export function useCostEntryForm(contractId: string, onSaved: () => void) {
     setForm((current) => ({ ...current, ...patch }));
   }
 
+  /** The key a create is sent under: the same for the same values, a new one once they changed. */
+  function idempotencyKeyFor(payload: ReturnType<typeof costEntryPayload>): string {
+    const values = JSON.stringify(payload);
+    if (sentWithKey.current !== null && sentWithKey.current !== values) key.current = crypto.randomUUID();
+    sentWithKey.current = values;
+    return key.current;
+  }
+
   function submit() {
     const payload = costEntryPayload(form);
     if (errors.applyLocal(costEntryFieldErrors(payload, todayInCairo(new Date())))) return;
@@ -56,7 +69,7 @@ export function useCostEntryForm(contractId: string, onSaved: () => void) {
       try {
         const result = editing
           ? await updateCostEntry({ id: editing.id, ...payload })
-          : await createCostEntry({ contractId, idempotencyKey: key.current, ...payload });
+          : await createCostEntry({ contractId, idempotencyKey: idempotencyKeyFor(payload), ...payload });
         if (errors.applyResult(result)) return;
         toast({ title: t(editing ? 'toast.updated' : result.already ? 'toast.already' : 'toast.recorded') });
         setOpen(false);
