@@ -152,6 +152,9 @@ describe('R4: a page of lines reads one section, not the contract', () => {
   it('no scan of contract_lines returns more rows than the page asks for, beside a 3,000-line section', async () => {
     const contract = await seedExecutionContract(orgId, { linesPerSection: [3000, 120], state: 'issued' });
     const hash = hashShareToken(contract.rawToken!);
+    // The plan under the statistics autovacuum keeps. Right after a bulk seed
+    // they still describe a near-empty table, and any plan is a guess.
+    await ownerQuery(`analyze public.contract_lines`);
     const plans: string[] = [];
     // postgres.js directly: createSql does not pass a notice handler through,
     // and auto_explain hands each nested plan back as a NOTICE.
@@ -193,5 +196,8 @@ describe('R4: a page of lines reads one section, not the contract', () => {
     // The section holds 120 lines: the count reads 120, the page 101 at most,
     // each picked line one row; never the 3,000 lines beside it.
     for (const rows of scans) expect(rows).toBeLessThanOrEqual(120);
+    // The JSON is built for the page only: one primary-key probe per line shown.
+    const probes = planLines.find((line) => /contract_lines_pkey on contract_lines/.test(line));
+    expect(probes).toMatch(/rows=1 loops=100\)/);
   }, 60_000);
 });
