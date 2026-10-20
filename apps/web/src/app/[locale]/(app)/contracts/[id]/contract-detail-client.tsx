@@ -2,20 +2,23 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractPageDetail, ContractSectionsPage } from '@/lib/contracts/queries';
 import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
+import type { ContractBillingView } from '@/lib/execution/billing/view';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction } from './contract-vo-types';
+import { PaymentsTab } from './payments-tab';
+import type { BillingMay } from './request-row';
 import { ScheduleTab } from './schedule-tab';
+import { ShareLinkCard } from './share-link-card';
 import type { ContractTab } from './tabs';
+import { useContractBilling } from './use-contract-billing';
 import { useKeptSectionLines } from './use-kept-section-lines';
 import { useKeptSections } from './use-kept-sections';
 import { VariationRegister } from './variation-register';
@@ -25,6 +28,8 @@ export function ContractDetailClient({
   openingSections,
   variations,
   schedule,
+  openingBilling,
+  billingMay,
   tabs,
   openingTab,
   canSignOffline,
@@ -39,6 +44,9 @@ export function ContractDetailClient({
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
+  /** The Payments tab's data when the page opened on it; null otherwise (read when shown). */
+  openingBilling: ContractBillingView | null;
+  billingMay: BillingMay;
   tabs: readonly ContractTab[];
   openingTab: ContractTab;
   /** Owner, admin or project manager: may record a paper signature (D5). */
@@ -48,13 +56,13 @@ export function ContractDetailClient({
   canDraftVariation: boolean;
   canPriceVariation: boolean;
 }) {
-  const t = useTranslations('contracts');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<ContractTab>(openingTab);
   const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
+  const billing = useContractBilling(detail.id, openingBilling);
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,23 +93,7 @@ export function ContractDetailClient({
           {error}
         </p>
       )}
-      {link && (
-        <Card>
-          <CardContent className="flex items-center gap-2 py-3 text-body">
-            <span className="text-muted-foreground">{t('shareLink')}:</span>
-            <code className="flex-1 truncate" dir="ltr">
-              {link}
-            </code>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigator.clipboard?.writeText(link)}
-            >
-              {t('copyLink')}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {link && <ShareLinkCard link={link} />}
 
       <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />
 
@@ -129,6 +121,7 @@ export function ContractDetailClient({
           m={m}
         />
       )}
+      {tab === 'payments' && <PaymentsTab billing={billing} may={billingMay} m={m} />}
       {tab === 'variations' && (
         <VariationRegister
           contractId={detail.id}

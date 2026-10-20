@@ -26,6 +26,10 @@ const lineReads = vi.hoisted(() => ({ loadSectionLines: vi.fn(), loadContractSec
 vi.mock('@/lib/contracts/lines-actions', () => lineReads);
 vi.mock('@/lib/contracts/actions', () => ({ issueContract: vi.fn(), terminateContract: vi.fn(), saveContractDraft: vi.fn() }));
 vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), saveVariationDraft: vi.fn() }));
+// The Payments tab's server actions: never called on these tabs, mocked so the page loads.
+vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
+vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
+vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,
@@ -133,6 +137,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
+        openingBilling={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
@@ -159,6 +165,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
+          openingBilling={null}
+          billingMay={{ issue: false, record: false }}
           tabs={['overview', 'variations']}
           openingTab="overview"
           canSignOffline={false}
@@ -230,6 +238,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={null}
         variations={[]}
         schedule={null}
+        openingBilling={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="variations"
         canSignOffline={false}

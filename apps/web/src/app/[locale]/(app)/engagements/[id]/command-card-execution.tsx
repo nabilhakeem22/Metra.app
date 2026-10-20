@@ -30,7 +30,7 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
     return view.may.signOffline && view.contract ? <SignOfflineDialog contractId={view.contract.id} /> : null;
   }
   const href = executionCardHref(target.page, { projectId: view.projectId, contractId: view.contract?.id ?? null });
-  const opens = target.page === 'project_boq' || view.may.openContract;
+  const opens = target.page === 'project_boq' || (target.page === 'contract_payments' ? view.may.openPayments : view.may.openContract);
   if (!href || !opens) return null;
   return (
     <Button asChild variant="default">
@@ -77,16 +77,17 @@ export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
 function NextAction({ view, kind }: { view: ExecutionCardView; kind: ExecutionNextActionKind }) {
   const t = useTranslations('execution.card');
   const locale = useLocale();
-  if (isStatusLineAction(kind)) {
-    const named = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
-    return <p className="text-body">{t(`upcoming.${kind}`, { instalment: named || t('upcoming.anInstalment') })}</p>;
-  }
-  const label = t(`next.${kind}`);
-  const control = nextActionControl(view, NEXT_ACTION_TARGET[kind], label);
+  if (isStatusLineAction(kind)) return <p className="text-body">{t(`upcoming.${kind}`)}</p>;
+  const named = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
+  const label = t(`next.${kind}`, { instalment: named || t('anInstalment') });
+  const target = NEXT_ACTION_TARGET[kind];
+  const control = nextActionControl(view, target, label);
+  // Money is billed and recorded by the owner, an admin or the accountant (A18).
+  const money = target.kind === 'link' && target.page === 'contract_payments';
   return (
     control ?? (
       <p className="text-body">
-        {label} <span className="text-muted-foreground">{t('someoneElse')}</span>
+        {label} <span className="text-muted-foreground">{t(money ? 'someoneElseMoney' : 'someoneElse')}</span>
       </p>
     )
   );

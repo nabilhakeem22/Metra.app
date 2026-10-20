@@ -21,6 +21,8 @@ export interface ExecutionCardView {
     signOffline: boolean;
     /** `contracts_generate` read: the contract page opens for this role. */
     openContract: boolean;
+    /** `payments` read: the contract's Payments tab opens for this role (A4.3). */
+    openPayments: boolean;
   };
 }
 

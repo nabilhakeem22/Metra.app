@@ -5,6 +5,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { forwardMovesOf } from '@/lib/engagements/command-card';
 import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
+import { maySeeBilling } from '@/lib/execution/billing/access';
 import { executionCardView } from '@/lib/execution/card-view';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
@@ -115,6 +116,7 @@ export default async function EngagementDetailPage({
               generateContract: can(ctx.role, 'contracts_generate', 'create'),
               signOffline: mayRecordSignedOffline(ctx.role),
               openContract: can(ctx.role, 'contracts_generate', 'read'),
+              openPayments: maySeeBilling(ctx.role),
             },
           })
         }

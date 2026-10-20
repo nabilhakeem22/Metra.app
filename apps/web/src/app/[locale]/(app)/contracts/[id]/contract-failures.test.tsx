@@ -31,6 +31,10 @@ const variations = vi.hoisted(() => ({
   issueVariation: vi.fn(),
 }));
 vi.mock('@/lib/variations/actions', () => variations);
+// The Payments tab's server actions: never called on these tabs, mocked so the page loads.
+vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
+vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
+vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
 
 const DETAIL = {
   id: 'k-1',
@@ -79,6 +83,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
+        openingBilling={null}
+        billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}

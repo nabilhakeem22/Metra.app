@@ -300,7 +300,7 @@ describe('a closed delivery', () => {
       boqId: null,
       contract: null,
       nextInstalment: null,
-      may: { generateContract: true, signOffline: true, openContract: true },
+      may: { generateContract: true, signOffline: true, openContract: true, openPayments: true },
     };
     renderWithIntl(<EngagementCommandCard {...closedProps('execution', { execution })} />);
     expect(screen.getByText(ar('engagements.command.closed.execution.headline'))).toBeTruthy();

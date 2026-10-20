@@ -10,7 +10,12 @@ export const EXECUTION_CARD_DIALOGS = ['generate_contract', 'sign_offline'] as c
 export type ExecutionCardDialog = (typeof EXECUTION_CARD_DIALOGS)[number];
 
 /** The pages a next action links to. */
-export type ExecutionCardPage = 'project_boq' | 'contract' | 'contract_schedule' | 'contract_variations';
+export type ExecutionCardPage =
+  | 'project_boq'
+  | 'contract'
+  | 'contract_schedule'
+  | 'contract_payments'
+  | 'contract_variations';
 
 export type NextActionTarget =
   | { kind: 'link'; page: ExecutionCardPage }
@@ -21,11 +26,10 @@ const link = (page: ExecutionCardPage): NextActionTarget => ({ kind: 'link', pag
 const dialog = (name: ExecutionCardDialog): NextActionTarget => ({ kind: 'dialog', dialog: name });
 
 /**
- * A money step whose screen is not built yet (payment requests, payments and
- * claims arrive with PR A4, the final account with A5): the card SAYS it as a
- * plain status line ("Next: payment request for the advance"), with no button
- * and no link, so it never sends the studio to a page that cannot do it (lead
- * ruling F2). The buttons replace these with A4 and A5.
+ * A money step whose screen is not built yet (the final account arrives with
+ * A5): the card SAYS it as a plain status line ("Next: the final account"),
+ * with no button and no link, so it never sends the studio to a page that
+ * cannot do it (lead ruling F2). A5 replaces these with its own links.
  */
 const STATUS_LINE: NextActionTarget = { kind: 'status' };
 
@@ -35,10 +39,12 @@ export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextAc
   set_schedule: link('contract_schedule'),
   send_contract: link('contract'),
   record_signed_offline: dialog('sign_offline'),
-  review_payment_claim: STATUS_LINE,
-  send_milestone_request: STATUS_LINE,
-  send_variation_request: STATUS_LINE,
-  record_payment: STATUS_LINE,
+  // The Payments tab (A4.3): the request a claim is on shows it, and recording
+  // a payment waits for the claim's answer (B4 brings confirm and dismiss).
+  review_payment_claim: link('contract_payments'),
+  send_milestone_request: link('contract_payments'),
+  send_variation_request: link('contract_payments'),
+  record_payment: link('contract_payments'),
   await_variation_answer: link('contract_variations'),
   prepare_final_account: STATUS_LINE,
   review_final_account: STATUS_LINE,
@@ -46,10 +52,6 @@ export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextAc
 
 /** The next actions the card says as a status line, never as a control. */
 export const STATUS_LINE_ACTIONS = [
-  'review_payment_claim',
-  'send_milestone_request',
-  'send_variation_request',
-  'record_payment',
   'prepare_final_account',
   'review_final_account',
 ] as const satisfies readonly ExecutionNextActionKind[];
@@ -72,6 +74,7 @@ export function executionCardHref(
   if (ids.contractId === null) return null;
   const base = `/contracts/${ids.contractId}`;
   if (page === 'contract_schedule') return `${base}?tab=schedule`;
+  if (page === 'contract_payments') return `${base}?tab=payments`;
   if (page === 'contract_variations') return `${base}?tab=variations`;
   return base;
 }
