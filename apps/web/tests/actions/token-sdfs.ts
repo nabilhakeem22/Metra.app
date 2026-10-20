@@ -22,6 +22,8 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   { name: 'app_proposal_respond_by_token', args: 'text, text, text, text, text' },
   { name: 'app_contract_by_token', args: 'text' },
   { name: 'app_contract_ack_by_token', args: 'text, text, text, text, text' },
+  // Stage 2 (0063): one section's lines of the token's contract, 100 at a time.
+  { name: 'app_contract_section_lines_by_token', args: 'text, uuid, integer' },
   { name: 'app_variation_by_token', args: 'text' },
   { name: 'app_variation_respond_by_token', args: 'text, text, text, text, text' },
   { name: 'app_delivery_by_token', args: 'text' },

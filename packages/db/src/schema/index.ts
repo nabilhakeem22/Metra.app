@@ -40,6 +40,12 @@ export * from './boq-lines';
 export * from './variation-orders';
 export * from './variation-order-lines';
 export * from './variation-order-events';
+export * from './contract-payment-milestones';
+export * from './payment-requests';
+export * from './contract-payments';
+export * from './contract-payment-claims';
+export * from './contract-cost-entries';
+export * from './contract-line-measurements';
 export * from './design-engagements';
 export * from './engagement-transitions';
 export * from './engagement-milestones';
@@ -85,6 +91,12 @@ import { boqLines } from './boq-lines';
 import { variationOrders } from './variation-orders';
 import { variationOrderLines } from './variation-order-lines';
 import { variationOrderEvents } from './variation-order-events';
+import { contractPaymentMilestones } from './contract-payment-milestones';
+import { paymentRequests } from './payment-requests';
+import { contractPayments } from './contract-payments';
+import { contractPaymentClaims } from './contract-payment-claims';
+import { contractCostEntries } from './contract-cost-entries';
+import { contractLineMeasurements } from './contract-line-measurements';
 import { designEngagements } from './design-engagements';
 import { engagementTransitions } from './engagement-transitions';
 import { engagementMilestones } from './engagement-milestones';
@@ -132,6 +144,12 @@ export const orgScopedTables = {
   variationOrders,
   variationOrderLines,
   variationOrderEvents,
+  contractPaymentMilestones,
+  paymentRequests,
+  contractPayments,
+  contractPaymentClaims,
+  contractCostEntries,
+  contractLineMeasurements,
   designEngagements,
   engagementTransitions,
   engagementMilestones,

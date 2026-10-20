@@ -51,6 +51,12 @@
 -- Decision matrix for "cannot be edited once issued":
 --   * append-only ledgers (e.g. audit_log) -> use GRANTs (no UPDATE/DELETE), and
 --   * status-locked business rows (invoice/contract/variation) -> use THIS trigger.
+--   Stage 2 (0063): contract_payments and contract_line_measurements are
+--   ledgers, append-only by GRANT (SELECT + INSERT). payment_requests is a
+--   status-locked document whose one allowed change (issued -> void) also
+--   stamps two columns, which this factory cannot express, so it has its own
+--   trigger function (enforce_payment_request_frozen, functions/35-execution.sql).
+--   The payment schedule freezes with its contract through the child-draft guard.
 --
 -- Raises SQLSTATE MT100 (reserved: immutability violation) on any illegal change.
 -- Idempotent (create or replace); attached to no table here.

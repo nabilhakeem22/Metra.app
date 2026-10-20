@@ -18,6 +18,13 @@ import { orgScopedTableNames } from './schema-catalogue';
  * this block references proposals/contracts/variation_orders.
  */
 export const TRIGGER_GUARDED_TABLES = [
+  // Stage 2 (0063), FIRST: payment requests reference variation orders and the
+  // schedule (restrict) and are frozen by trg_payment_requests_frozen, the
+  // schedule by the contract child-draft guard. Claims -> payments -> requests
+  // -> milestones, then measurements and cost entries (3-column FKs into
+  // contract_lines / contract_sections, restrict).
+  'contract_payment_claims', 'contract_payments', 'payment_requests',
+  'contract_payment_milestones', 'contract_line_measurements', 'contract_cost_entries',
   'variation_order_events', 'variation_order_lines', 'variation_orders',
   'contract_events', 'contract_lines', 'contract_sections', 'contracts',
   'proposal_events', 'proposal_lines', 'proposal_sections', 'proposals',

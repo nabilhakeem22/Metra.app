@@ -1,9 +1,11 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   index,
   integer,
   pgTable,
+  text,
   unique,
   uuid,
   type AnyPgColumn,
@@ -15,11 +17,14 @@ import { costItems } from './cost-items';
 import { costItemUnit } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
-import { sameOrgFk } from './org-ref';
+import { sameContractFk, sameOrgFk } from './org-ref';
 
 /**
  * A frozen baseline line within a contract section — deep-copied from the source
- * proposal line at generation. `costItemId` (nullable, set-null) is only a
+ * proposal line (or, Stage 2, the source BOQ line) at generation. `itemCode` and
+ * `provisional` (0063) come from a BOQ line; a proposal contract's lines carry
+ * null / false. A provisional line (بند تقديري) is billed by site measurement in
+ * the final account; a firm one is not (owner decision D2a). `costItemId` (nullable, set-null) is only a
  * snapshot of the price-book source; cost/margin caches are SERVER-written and
  * must never leak to a client surface.
  */
@@ -34,6 +39,7 @@ export const contractLines = pgTable(
     contractId: uuid('contract_id').notNull(),
     sectionId: uuid('section_id').notNull(),
     costItemId: uuid('cost_item_id'),
+    itemCode: text('item_code'),
     ...bilingual('description'),
     qty: money('qty').notNull(),
     unit: costItemUnit('unit').notNull(),
@@ -43,10 +49,14 @@ export const contractLines = pgTable(
     lineCost: money('line_cost').notNull().default('0'),
     lineTotal: money('line_total').notNull().default('0'),
     lineMargin: money('line_margin').notNull().default('0'),
+    provisional: boolean('provisional').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (t) => [
     unique('contract_lines_org_id_id_unique').on(t.orgId, t.id),
+    // The target of the 3-column FKs from cost entries and measurements (0063):
+    // "this line belongs to THIS contract" is a database fact, not a core check.
+    unique('contract_lines_org_contract_id_unique').on(t.orgId, t.contractId, t.id),
     bilingualCheck('contract_lines', 'description'),
     check(
       'contract_lines_discount_pct_range',
@@ -54,6 +64,10 @@ export const contractLines = pgTable(
     ),
     ...sameOrgFk(t, 'contract', contracts, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'section', contractSections, { onDelete: 'cascade' }),
+    // 0063: a line's section is a section of ITS OWN contract, as a database
+    // fact (the /c snapshot groups lines by section). Added NOT VALID, then
+    // VALIDATEd over the existing lines.
+    sameContractFk(t, 'section', contractSections, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'costItem', costItems, { onDelete: 'set null' }),
     index('contract_lines_org_section_sort_idx').on(
       t.orgId,

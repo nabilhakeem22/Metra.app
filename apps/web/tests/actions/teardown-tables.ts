@@ -27,6 +27,16 @@
 // it can't globally disable prod immutability or serialize concurrent test runs
 // (the bug of the old `ALTER TABLE ... DISABLE TRIGGER`, which is global).
 export const TEARDOWN_TABLES_IN_FK_ORDER = [
+  // Stage 2 execution (0063) before everything on a contract: a claim points at
+  // a payment (set null) and a request; a payment at a request; a request at a
+  // schedule milestone and a variation order (restrict). Measurements and cost
+  // entries point at contract lines / sections through 3-column restrict FKs.
+  'contract_payment_claims',
+  'contract_payments',
+  'payment_requests',
+  'contract_payment_milestones',
+  'contract_line_measurements',
+  'contract_cost_entries',
   // Contracts + VOs first: VOs reference contracts (restrict) and contracts
   // reference proposals (restrict), so tear these down BEFORE proposals.
   'variation_order_events',

@@ -366,6 +366,37 @@ export const clientPaymentClaimStatus = pgEnum(
 );
 
 /**
+ * Stage 2 execution (migration 0063) — what a payment request (مطالبة دفع) bills.
+ * `milestone` = one row of the contract's payment schedule; `variation` = one
+ * approved change order's charge; `final_account` = the contract's closing
+ * balance (one live per contract). Order is a contract; append only.
+ */
+export const PAYMENT_REQUEST_KINDS = ['milestone', 'variation', 'final_account'] as const;
+export const paymentRequestKind = pgEnum('payment_request_kind', PAYMENT_REQUEST_KINDS);
+
+/**
+ * A payment request is `issued` when sent and `void` when withdrawn (only with
+ * no payment and no pending claim). Nothing else: what is paid is DERIVED from
+ * the append-only `contract_payments` ledger, never a stored status.
+ */
+export const PAYMENT_REQUEST_STATUSES = ['issued', 'void'] as const;
+export const paymentRequestStatus = pgEnum('payment_request_status', PAYMENT_REQUEST_STATUSES);
+
+/**
+ * The six fixed categories of an actual cost recorded against an execution
+ * contract (المصروفات). Categories as data is stage 4. Order is a contract.
+ */
+export const COST_CATEGORIES = [
+  'materials',
+  'labour',
+  'subcontractor',
+  'equipment',
+  'transport',
+  'other',
+] as const;
+export const costCategory = pgEnum('cost_category', COST_CATEGORIES);
+
+/**
  * Market price book (platform-level reference data, migration 0061). Order is a
  * contract; append only. `mhuc_cabm` = the Ministry of Housing's Central
  * Administration for Building Materials; `capmas` may be appended later.
@@ -435,3 +466,6 @@ export type MarketBulletinStatus = (typeof MARKET_BULLETIN_STATUSES)[number];
 export type MarketUnit = (typeof MARKET_UNITS)[number];
 export type MarketItemStatus = (typeof MARKET_ITEM_STATUSES)[number];
 export type MarketObservationStatus = (typeof MARKET_OBSERVATION_STATUSES)[number];
+export type PaymentRequestKind = (typeof PAYMENT_REQUEST_KINDS)[number];
+export type PaymentRequestStatus = (typeof PAYMENT_REQUEST_STATUSES)[number];
+export type CostCategory = (typeof COST_CATEGORIES)[number];

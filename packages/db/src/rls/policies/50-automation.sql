@@ -18,13 +18,13 @@ alter table public.notifications force  row level security;
 drop policy if exists org_isolation on public.notifications;
 create policy org_isolation on public.notifications
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
-    and recipient_user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
+    and recipient_user_id = (select nullif(current_setting('app.current_user_id', true), '')::uuid)
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- automation_settings (standard org_isolation)
@@ -33,12 +33,12 @@ alter table public.automation_settings force  row level security;
 drop policy if exists org_isolation on public.automation_settings;
 create policy org_isolation on public.automation_settings
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- api_keys (Public API v1; standard org_isolation — the row is only ever read
@@ -49,12 +49,12 @@ alter table public.api_keys force  row level security;
 drop policy if exists org_isolation on public.api_keys;
 create policy org_isolation on public.api_keys
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- automation_run_log (append-only via grants; standard org_isolation)
@@ -63,12 +63,12 @@ alter table public.automation_run_log force  row level security;
 drop policy if exists org_isolation on public.automation_run_log;
 create policy org_isolation on public.automation_run_log
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- workspace_entitlements (Epic A2; per-workspace flow/limit/feature grant —
@@ -82,10 +82,10 @@ alter table public.workspace_entitlements force  row level security;
 drop policy if exists org_isolation on public.workspace_entitlements;
 create policy org_isolation on public.workspace_entitlements
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
