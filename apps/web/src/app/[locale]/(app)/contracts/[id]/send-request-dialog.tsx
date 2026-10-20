@@ -11,6 +11,7 @@ import { todayInCairo } from '@/lib/automation/clock';
 import type { ContractBillingView } from '@/lib/execution/billing/view';
 import { issueMilestoneRequest, issueVariationRequest } from '@/lib/execution/requests/actions';
 import { REQUEST_TERM_FIELDS, requestTermsFieldErrors, type RequestTermField } from '@/lib/execution/requests/input';
+import { requestSentFor } from './act-done';
 import { balanceFit, type BalanceFit } from './billing-balance';
 
 /** The DOM id of a box of the dialog: its refusal sits under it. */
@@ -50,7 +51,9 @@ function BalanceNote({ fit, balance, sent, m }: { fit: BalanceFit; balance: stri
  * still sendable (A4.1 addendum). The SERVER decides that under the contract
  * lock: when it answers that the sent request went past the balance
  * (`balanceWarning`), the dialog stays open to say so (A4 F3), and its button
- * only closes it. Every answer re-reads the tab.
+ * only closes it. Every answer re-reads the tab; an answer that was lost, or a
+ * refusal because it already happened, is checked against that read, and a
+ * request that stands is said as sent, never as "try again" (A4 L2).
  */
 export function SendRequestDialog({
   contractId,
@@ -65,8 +68,8 @@ export function SendRequestDialog({
   /** What is left to bill on the contract: a row above it is warned about. */
   balance: string;
   m: (value: string) => string;
-  /** Any answer, or none: the view it came with, else the tab reads itself. */
-  onAnswered: (view?: ContractBillingView) => void;
+  /** Any answer, or none: the view it came with, else the tab reads itself; resolves to the view now shown. */
+  onAnswered: (view?: ContractBillingView) => Promise<ContractBillingView | null>;
   onClose: () => void;
 }) {
   const t = useTranslations('contracts.execution.payments.send');
@@ -84,18 +87,32 @@ export function SendRequestDialog({
     if (sent) return onClose();
     if (errors.applyLocal(requestTermsFieldErrors({ dueOn, note }, today))) return;
     startTransition(async () => {
+      let res: Awaited<ReturnType<typeof issueMilestoneRequest>>;
       try {
-        const res: Awaited<ReturnType<typeof issueMilestoneRequest>> = await sendRequest(target, { dueOn, note }, contractId);
-        onAnswered(res.ok ? res.view : undefined);
-        if (errors.applyResult(res)) return;
-        const warning = res.balanceWarning;
-        if (warning) setSent({ fit: balanceFit(target.amount, warning.balance), balance: warning.balance });
-        else onClose();
+        res = await sendRequest(target, { dueOn, note }, contractId);
       } catch (rejection) {
-        onAnswered();
-        errors.applyRejection(rejection);
+        if (!(await sentAfterAll())) errors.applyRejection(rejection);
+        return;
       }
+      if (!res.ok) {
+        if (!(await sentAfterAll())) errors.applyResult(res);
+        return;
+      }
+      void onAnswered(res.view);
+      errors.applyResult(res);
+      const warning = res.balanceWarning;
+      if (warning) setSent({ fit: balanceFit(target.amount, warning.balance), balance: warning.balance });
+      else onClose();
     });
+  }
+
+  /** After an answer that is not "sent": the tab read again; if the request stands now, say it is sent (L2). */
+  async function sentAfterAll(): Promise<boolean> {
+    const now = await onAnswered();
+    if (!now || !requestSentFor(target, now)) return false;
+    errors.clear();
+    setSent({ fit: 'within', balance });
+    return true;
   }
 
   return (

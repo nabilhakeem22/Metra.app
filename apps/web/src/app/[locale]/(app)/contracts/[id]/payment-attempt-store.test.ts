@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearPaymentAttempt,
+  mayStillBeRunning,
+  PAYMENT_WRITE_WINDOW_MS,
   paymentActOf,
   paymentAttemptStorageKey,
   readPaymentAttempt,
@@ -28,7 +30,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('the held payment attempt', () => {
   it('is kept per contract and request, and cleared', () => {
-    const attempt = { key: KEY, act: paymentActOf('r-1', PAYMENT) };
+    const attempt = { key: KEY, act: paymentActOf('r-1', PAYMENT), sentAt: 1_700_000_000_000 };
     writePaymentAttempt('c-1', 'r-1', attempt);
     expect(readPaymentAttempt('c-1', 'r-1')).toEqual(attempt);
     expect(readPaymentAttempt('c-1', 'r-2')).toBeNull();
@@ -43,12 +45,19 @@ describe('the held payment attempt', () => {
     expect(act).not.toBe(paymentActOf('r-1', { ...PAYMENT, amount: '5000.0001' }));
     expect(act).not.toBe(paymentActOf('r-2', PAYMENT));
     expect(act).not.toBe(paymentActOf('r-1', { ...PAYMENT, reference: 'TX-2' }));
-    writePaymentAttempt('c-1', 'r-1', { key: KEY, act });
+    writePaymentAttempt('c-1', 'r-1', { key: KEY, act, sentAt: 1 });
     expect(store.get(paymentAttemptStorageKey('c-1', 'r-1'))).not.toContain('5000');
   });
 
-  it('drops, and erases, an entry that is not a uuid key and an act hash: it would be sent to the server', () => {
-    for (const poisoned of ['{"key":"not-a-uuid","act":"0123456789abcdef"}', `{"key":"${KEY}","act":"x"}`, '[1]', 'nonsense']) {
+  it('drops, and erases, an entry that is not a uuid key, an act hash and an instant: it would be sent to the server', () => {
+    for (const poisoned of [
+      '{"key":"not-a-uuid","act":"0123456789abcdef","sentAt":1}',
+      `{"key":"${KEY}","act":"x","sentAt":1}`,
+      `{"key":"${KEY}","act":"0123456789abcdef"}`,
+      `{"key":"${KEY}","act":"0123456789abcdef","sentAt":"soon"}`,
+      '[1]',
+      'nonsense',
+    ]) {
       store.set(paymentAttemptStorageKey('c-1', 'r-1'), poisoned);
       expect(readPaymentAttempt('c-1', 'r-1'), poisoned).toBeNull();
     }
@@ -70,7 +79,15 @@ describe('the held payment attempt', () => {
       },
     });
     expect(readPaymentAttempt('c-1', 'r-1')).toBeNull();
-    expect(() => writePaymentAttempt('c-1', 'r-1', { key: KEY, act: '0123456789abcdef' })).not.toThrow();
+    expect(() => writePaymentAttempt('c-1', 'r-1', { key: KEY, act: '0123456789abcdef', sentAt: 1 })).not.toThrow();
     expect(() => clearPaymentAttempt('c-1', 'r-1')).not.toThrow();
+  });
+
+  it('a sent attempt may still be running for the server write window (lock_timeout 5 s + the 15 s deadline), then no longer (N1)', () => {
+    const attempt = { key: KEY, act: '0123456789abcdef', sentAt: 1_000_000 };
+    expect(PAYMENT_WRITE_WINDOW_MS).toBe(20_000);
+    expect(mayStillBeRunning(attempt, 1_000_000)).toBe(true);
+    expect(mayStillBeRunning(attempt, 1_000_000 + 19_999)).toBe(true);
+    expect(mayStillBeRunning(attempt, 1_000_000 + 20_000)).toBe(false);
   });
 });

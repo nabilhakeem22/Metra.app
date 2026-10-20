@@ -36,9 +36,13 @@ export function PaymentsActDialog({
   onAlreadyRecorded: () => void;
   onClose: () => void;
 }) {
-  const onAnswered = (next?: ContractBillingView) => {
-    if (next) billing.apply(next);
-    else void billing.reload();
+  // Any answer, or none: the view it came with, else a read. Resolves to the
+  // view the tab now shows (null when the read failed), so a dialog whose
+  // answer was lost can see whether its act is done after all (L2).
+  const onAnswered = async (next?: ContractBillingView): Promise<ContractBillingView | null> => {
+    if (!next) return billing.reload();
+    billing.apply(next);
+    return next;
   };
   if (act.kind === 'send') {
     return (
@@ -64,7 +68,6 @@ export function PaymentsActDialog({
       m={m}
       onAnswered={onAnswered}
       onAlreadyRecorded={onAlreadyRecorded}
-      onCheckPayments={billing.reload}
       onClose={onClose}
     />
   );

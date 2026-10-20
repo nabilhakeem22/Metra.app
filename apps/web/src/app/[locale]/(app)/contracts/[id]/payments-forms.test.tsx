@@ -28,7 +28,7 @@ const requests = vi.hoisted(() => ({
   voidPaymentRequest: vi.fn(),
 }));
 vi.mock('@/lib/execution/requests/actions', () => requests);
-const payments = vi.hoisted(() => ({ recordContractPayment: vi.fn() }));
+const payments = vi.hoisted(() => ({ recordContractPayment: vi.fn(), checkPaymentAttempt: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => payments);
 
 const CONTRACT = 'c0000000-0000-4000-8000-000000000001';
@@ -64,7 +64,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab dialogs (%s)', (loc
       m={m}
       onAnswered={vi.fn()}
       onAlreadyRecorded={vi.fn()}
-      onCheckPayments={vi.fn().mockResolvedValue(true)}
       onClose={vi.fn()}
       {...props}
     />
@@ -151,7 +150,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab dialogs (%s)', (loc
     show(<SendRequestDialog contractId={CONTRACT} target={MILESTONE} balance="100000.0000" m={m} onAnswered={onAnswered} onClose={onClose} />);
     requests.issueMilestoneRequest.mockResolvedValue({ ok: false, error: 'contract_not_active' });
     await press(at('contracts.execution.payments.send.submit'))();
-    expect(onAnswered).toHaveBeenCalledWith(undefined);
+    expect(onAnswered).toHaveBeenCalledWith();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe(at('errors.contract_not_active'));
   });
@@ -181,26 +180,39 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab dialogs (%s)', (loc
     expect(sessionStorage.getItem(paymentAttemptStorageKey(CONTRACT, REQUEST.id))).toBeNull();
   });
 
-  test('a different payment while a key is held is not sent: check the payments first, then it gets a new key', async () => {
+  /** A first payment of 5,000 whose answer was lost, then the dialog reopened on the same request. */
+  async function afterALostAnswer(props: Partial<Parameters<typeof RecordPaymentDialog>[0]> = {}) {
     payments.recordContractPayment.mockResolvedValueOnce({ ok: false, error: 'uncertain' });
     const first = show(recordDialog());
     type(recordPaymentControlId('amount'), '5000');
     await saveRecord();
-    const [held] = keysSent();
     first.unmount();
-
-    const onCheckPayments = vi.fn().mockResolvedValue(true);
-    const onClose = vi.fn();
-    const second = show(recordDialog({ onCheckPayments, onClose }));
+    const reopened = show(recordDialog(props));
     // The amount opens on what is due: a different payment from the one in doubt.
     await saveRecord();
+    return { held: keysSent()[0], reopened };
+  }
+  const check = press(at('contracts.execution.payments.record.checkPayments'));
+  const stored = () => sessionStorage.getItem(paymentAttemptStorageKey(CONTRACT, REQUEST.id));
+  const notice = () => document.querySelector('[data-previous-attempt]')?.textContent ?? '';
+  const SENT_VIEW = { ...VIEW, schedule: [{ id: 'm-1', labelAr: null, labelEn: 'Handover', amount: '24800.0000', billed: true }] } as ContractBillingView;
+
+  test('a different payment while a key is held is not sent; a check that finds the first one landed closes on it', async () => {
+    const onClose = vi.fn();
+    const onAlreadyRecorded = vi.fn();
+    const onAnswered = vi.fn();
+    const { held, reopened } = await afterALostAnswer({ onClose, onAlreadyRecorded, onAnswered });
     expect(payments.recordContractPayment).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[data-previous-attempt]')?.textContent).toContain(at('contracts.execution.payments.record.previousAttempt'));
-    await press(at('contracts.execution.payments.record.checkPayments'))();
-    expect(onCheckPayments).toHaveBeenCalledTimes(1);
+    expect(notice()).toContain(at('contracts.execution.payments.record.previousAttempt'));
+    payments.checkPaymentAttempt.mockResolvedValueOnce({ ok: true, data: { landed: true }, view: VIEW });
+    await check();
+    // Asked behind the request's lock, with the key in doubt, and the tab shown as it is now.
+    expect(payments.checkPaymentAttempt).toHaveBeenCalledWith({ requestId: REQUEST.id, idempotencyKey: held }, { contractId: CONTRACT });
+    expect(onAnswered).toHaveBeenCalledWith(VIEW);
+    expect(onAlreadyRecorded).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.getItem(paymentAttemptStorageKey(CONTRACT, REQUEST.id))).toBeNull();
-    second.unmount();
+    expect(stored()).toBeNull();
+    reopened.unmount();
 
     payments.recordContractPayment.mockResolvedValueOnce({ ok: true, data: 'p-2', already: false, view: VIEW });
     show(recordDialog());
@@ -208,17 +220,78 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab dialogs (%s)', (loc
     expect(keysSent()[1]).not.toBe(held);
   });
 
-  test('a check that cannot read the payments keeps the key and says so', async () => {
-    payments.recordContractPayment.mockResolvedValueOnce({ ok: false, error: 'uncertain' });
-    const first = show(recordDialog());
-    type(recordPaymentControlId('amount'), '5000');
-    await saveRecord();
+  test('"not there" inside the write window keeps the key and asks to check again; past it, the key is released (N1)', async () => {
+    const onClose = vi.fn();
+    const { held } = await afterALostAnswer({ onClose });
+    payments.checkPaymentAttempt.mockResolvedValue({ ok: true, data: { landed: false }, view: VIEW });
+    await check();
+    expect(notice()).toContain(at('contracts.execution.payments.record.stillRunning'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(stored()).toContain(held);
+    const later = Date.now() + 20_001;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(later);
+    try {
+      await check();
+    } finally {
+      clock.mockRestore();
+    }
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(stored()).toBeNull();
+  });
+
+  test('a check that cannot answer keeps the key and says so', async () => {
+    await afterALostAnswer();
+    payments.checkPaymentAttempt.mockResolvedValueOnce({ ok: false, error: 'uncertain' });
+    await check();
+    expect(notice()).toContain(at('contracts.execution.payments.record.checkFailed'));
+    payments.checkPaymentAttempt.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await check();
+    expect(notice()).toContain(at('contracts.execution.payments.record.checkFailed'));
+    expect(stored()).not.toBeNull();
+  });
+
+  test('a send whose answer was lost, but which stands in the re-read tab, is said as sent, not "try again" (L2)', async () => {
+    const onAnswered = vi.fn().mockResolvedValue(SENT_VIEW);
+    show(<SendRequestDialog contractId={CONTRACT} target={MILESTONE} balance="100000.0000" m={m} onAnswered={onAnswered} onClose={vi.fn()} />);
+    requests.issueMilestoneRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await press(at('contracts.execution.payments.send.submit'))();
+    expect(onAnswered).toHaveBeenCalledWith();
+    expect(screen.getByRole('status').textContent).toContain(at('contracts.execution.payments.send.sent'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: at('contracts.execution.payments.send.submit') })).toBeNull();
+  });
+
+  test('a send refused as already sent, when the re-read shows it, is said as sent; one that is not there says the refusal', async () => {
+    const notSent = { ...VIEW, schedule: [{ ...SENT_VIEW.schedule[0], billed: false }] } as ContractBillingView;
+    const first = show(
+      <SendRequestDialog contractId={CONTRACT} target={MILESTONE} balance="100000.0000" m={m} onAnswered={vi.fn().mockResolvedValue(SENT_VIEW)} onClose={vi.fn()} />,
+    );
+    requests.issueMilestoneRequest.mockResolvedValueOnce({ ok: false, error: 'request_exists' });
+    await press(at('contracts.execution.payments.send.submit'))();
+    expect(screen.getByRole('status').textContent).toContain(at('contracts.execution.payments.send.sent'));
     first.unmount();
-    show(recordDialog({ onCheckPayments: vi.fn().mockResolvedValue(false) }));
-    await saveRecord();
-    await press(at('contracts.execution.payments.record.checkPayments'))();
-    expect(screen.getByRole('alert').textContent).toBe(at('contracts.execution.payments.record.checkFailed'));
-    expect(sessionStorage.getItem(paymentAttemptStorageKey(CONTRACT, REQUEST.id))).not.toBeNull();
+    show(<SendRequestDialog contractId={CONTRACT} target={MILESTONE} balance="100000.0000" m={m} onAnswered={vi.fn().mockResolvedValue(notSent)} onClose={vi.fn()} />);
+    requests.issueMilestoneRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await press(at('contracts.execution.payments.send.submit'))();
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('button', { name: at('contracts.execution.payments.send.submit') })).toBeTruthy();
+  });
+
+  test('a void whose answer was lost, when the re-read shows the request void, says it is voided and only closes (L2)', async () => {
+    const voidView = { ...VIEW, requests: [{ id: REQUEST.id, status: 'void' }] } as ContractBillingView;
+    const onClose = vi.fn();
+    show(<VoidRequestDialog contractId={CONTRACT} request={REQUEST} onAnswered={vi.fn().mockResolvedValue(voidView)} onClose={onClose} />);
+    type(voidRequestControlId('reason'), 'Sent twice');
+    requests.voidPaymentRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await press(at('contracts.execution.payments.void.submit'))();
+    expect(screen.getByRole('status').textContent).toBe(at('contracts.execution.payments.void.done'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    const closeButton = screen.getAllByRole('button', { name: at('common.close') }).find((button) => button.getAttribute('type') === 'submit');
+    await act(async () => {
+      fireEvent.click(closeButton!);
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(requests.voidPaymentRequest).toHaveBeenCalledTimes(1);
   });
 
   test('a definite refusal releases the key and re-reads the tab; the box keeps what was typed', async () => {

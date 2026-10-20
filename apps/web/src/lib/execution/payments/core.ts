@@ -19,8 +19,8 @@
 // that payment with `already: true`, so a retry after a lost answer is never
 // refused for the money it already counted; anything else is
 // `idempotency_conflict`, never `already`.
-import { paymentRequests, type MetraDb } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
+import type { MetraDb } from '@metra/db';
+import { sql } from 'drizzle-orm';
 import { failFields, fieldsFailed, hasFieldErrors, type FieldError } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
@@ -34,23 +34,11 @@ import { requestOutstanding } from '../money/outstanding';
 import { appendKeyedContractPayment, findKeyedPayment } from './append';
 import { readContractPayment, receivedBeforeIssue, type CleanContractPayment, type TypedContractPayment } from './input';
 import { canonicalIdempotencyKey, isSamePayment, type KeyedPayment } from './replay';
+import { lockPaymentRequest, type LockedRequest } from './request-lock';
 
 export interface RecordContractPaymentInput extends TypedContractPayment {
   requestId?: unknown;
   idempotencyKey?: unknown;
-}
-
-type LockedRequest = { contractId: string; status: string; amount: string };
-
-async function lockRequest(tx: MetraDb, requestId: string): Promise<LockedRequest> {
-  const [row] = await tx
-    .select({ contractId: paymentRequests.contractId, status: paymentRequests.status, amount: paymentRequests.amount })
-    .from(paymentRequests)
-    .where(eq(paymentRequests.id, requestId))
-    .limit(1)
-    .for('update');
-  if (!row) fail('request_not_found');
-  return row;
 }
 
 /** Paid so far and whether a claim waits, read after the lock (RLS scopes both tables). */
@@ -101,7 +89,7 @@ export async function recordContractPaymentCore(
   // Set inside the transaction; the assertion keeps TypeScript from narrowing it to false.
   let already = false as boolean;
   const result = await mutateInOrg(ctx, { capability: 'payments', action: 'create' }, async (tx, audit) => {
-    const request = await lockRequest(tx, requestId);
+    const request = await lockPaymentRequest(tx, requestId);
     if (request.status !== 'issued') fail('request_void');
     const stored = await findKeyedPayment(tx, request.contractId, idempotencyKey);
     if (stored !== null) {

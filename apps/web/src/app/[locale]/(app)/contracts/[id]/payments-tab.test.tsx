@@ -19,7 +19,7 @@ const reads = vi.hoisted(() => ({ loadContractBilling: vi.fn(), loadContractPaym
 vi.mock('@/lib/execution/billing/actions', () => reads);
 const writes = vi.hoisted(() => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
 vi.mock('@/lib/execution/requests/actions', () => writes);
-const payments = vi.hoisted(() => ({ recordContractPayment: vi.fn() }));
+const payments = vi.hoisted(() => ({ recordContractPayment: vi.fn(), checkPaymentAttempt: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => payments);
 
 const request = (id: string, fields: Partial<PaymentRequestRow>): PaymentRequestRow => ({

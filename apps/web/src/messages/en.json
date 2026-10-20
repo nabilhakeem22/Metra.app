@@ -1786,14 +1786,16 @@
           "already": "That payment was already recorded.",
         "previousAttempt": "An earlier try to record a payment on this request got no answer, so it may already be recorded. Check the payments before you record a different one.",
         "checkPayments": "Check the payments",
-        "checkFailed": "The payments could not be read. Try again in a moment."
+        "checkFailed": "The payments could not be read. Try again in a moment.",
+        "stillRunning": "The earlier try may still be in progress. Wait a few seconds, then check again."
         },
         "void": {
           "open": "Void",
           "title": "Void {request}",
           "description": "A void request bills nothing and keeps its number. Its instalment or change order can then be requested again.",
           "reason": "Reason",
-          "submit": "Void the request"
+          "submit": "Void the request",
+        "done": "The request was voided."
         },
         "ledger": {
           "title": "Payments received",

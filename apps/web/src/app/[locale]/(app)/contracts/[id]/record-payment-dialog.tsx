@@ -2,7 +2,6 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
@@ -20,6 +19,7 @@ import {
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 import { withMoneyParams } from './money-error-params';
 import { paymentActOf } from './payment-attempt-store';
+import { PreviousAttemptNotice } from './previous-attempt-notice';
 import { usePaymentAttempt } from './use-payment-attempt';
 
 /** The DOM id of a box of the dialog: its refusal sits under it. */
@@ -38,8 +38,9 @@ type TypedPayment = Record<ContractPaymentField, string>;
  * request across a close, a tab switch and a remount (use-payment-attempt.ts):
  * the same payment retried carries it, and the server answers the row it
  * already has. A different payment while that key is held is not sent: the
- * dialog says the first may be recorded and offers to check the payments, and
- * only once they were read again does a new key exist. Any answer closes the
+ * dialog says the first may be recorded and offers to check the payments
+ * (previous-attempt-notice.tsx), and only once that check settles the first
+ * attempt does a new key exist. Any answer closes the
  * dialog when it says what happened, "already recorded" included, so Save is
  * never left live on a payment that was counted; every answer re-reads the tab.
  */
@@ -50,7 +51,6 @@ export function RecordPaymentDialog({
   m,
   onAnswered,
   onAlreadyRecorded,
-  onCheckPayments,
   onClose,
 }: {
   contractId: string;
@@ -61,8 +61,6 @@ export function RecordPaymentDialog({
   /** Any answer, or none: the view it came with, else the tab reads itself. */
   onAnswered: (view?: ContractBillingView) => void;
   onAlreadyRecorded: () => void;
-  /** Read the tab again; true when it was read. */
-  onCheckPayments: () => Promise<boolean>;
   onClose: () => void;
 }) {
   const t = useTranslations('contracts.execution.payments.record');
@@ -78,7 +76,6 @@ export function RecordPaymentDialog({
     note: '',
   }));
   const [previousAttempt, setPreviousAttempt] = useState(false);
-  const [checkFailed, setCheckFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   const errors = useFieldErrors({ fields: CONTRACT_PAYMENT_FIELDS, translate: withMoneyParams(te, locale) });
   const attempt = usePaymentAttempt(contractId, request.id);
@@ -110,22 +107,8 @@ export function RecordPaymentDialog({
     const read = readContractPayment(typed, today);
     if (!read.ok) return;
     const idempotencyKey = attempt.keyFor(paymentActOf(request.id, read.values));
-    setCheckFailed(false);
     setPreviousAttempt(idempotencyKey === null);
     if (idempotencyKey !== null) send(idempotencyKey);
-  }
-
-  function checkPayments() {
-    setCheckFailed(false);
-    startTransition(async () => {
-      if (!(await onCheckPayments())) {
-        setCheckFailed(true);
-        return;
-      }
-      // The studio now sees the ledger as it is: the next payment is a new act.
-      attempt.forget();
-      onClose();
-    });
   }
 
   return (
@@ -139,16 +122,18 @@ export function RecordPaymentDialog({
       cancelLabel={tc('cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      formError={errors.formError ?? (checkFailed ? t('checkFailed') : null)}
+      formError={errors.formError}
       invalidAttempt={errors.invalidAttempt}
     >
       {previousAttempt && (
-        <div data-previous-attempt className="space-y-2 rounded-item border border-[color:var(--warn)] p-3" role="status">
-          <p className="text-body">{t('previousAttempt')}</p>
-          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={checkPayments}>
-            {t('checkPayments')}
-          </Button>
-        </div>
+        <PreviousAttemptNotice
+          contractId={contractId}
+          requestId={request.id}
+          attempt={attempt}
+          onAnswered={onAnswered}
+          onAlreadyRecorded={onAlreadyRecorded}
+          onClose={onClose}
+        />
       )}
       <p className="text-body">
         {t('due')} <span dir="ltr" className="font-mono tabular-nums">{m(request.outstanding)}</span>

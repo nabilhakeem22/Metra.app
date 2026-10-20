@@ -13,8 +13,8 @@ export interface ContractBilling {
   /** What the last read or "show more" was refused with, said above the tab. */
   error: string | null;
   loading: boolean;
-  /** Read the whole tab again; true when the read worked. */
-  reload: () => Promise<boolean>;
+  /** Read the whole tab again: the view it read, or null when the read failed. */
+  reload: () => Promise<ContractBillingView | null>;
   /** Show the view a write answered with (after-write.ts), instead of reading again. */
   apply: (view: ContractBillingView) => void;
   /** The ledger's next 50 rows, after the ones shown. */
@@ -46,7 +46,7 @@ export function useContractBilling(contractId: string): ContractBilling {
       const res = await loadContractBilling({ contractId });
       if (res.ok && res.data) {
         setView(res.data);
-        return true;
+        return res.data;
       }
       setError(describeFailure(res, te));
     } catch (rejection) {
@@ -54,7 +54,7 @@ export function useContractBilling(contractId: string): ContractBilling {
     } finally {
       setLoading(false);
     }
-    return false;
+    return null;
   }, [contractId, te]);
 
   const apply = useCallback((next: ContractBillingView) => {
