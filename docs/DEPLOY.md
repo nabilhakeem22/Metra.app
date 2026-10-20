@@ -2743,9 +2743,12 @@ delivery page) is apply-rls only, around Nov 18, with its own runbook.
 
 1. **The database goes first**, from the branch (steps 1 to 4 below), while
    production still runs the current `main`.
-2. **Then, right after `db:apply-rls`,** the lead merges the branch to `main`
-   and the Deploy workflow deploys it, and you run the smoke test (step 5).
-   Do not leave a gap between the two (see the last reason).
+2. **Then a short check of the live site on the new database (step 5),**
+   still before any merge: a few pages and one harmless save in your own
+   studio. If it fails, undo (0) puts the previous policies back.
+3. **Then, right after that check,** the lead merges the branch to `main` and
+   the Deploy workflow deploys it, and you run the smoke test (step 6). Do not
+   leave a gap (see the last reason).
 
 Why this order, one sentence each:
 
@@ -2770,7 +2773,7 @@ Why this order, one sentence each:
   teaches the bell to show them ("The client signed contract C-2026-0007",
   "approved change order VO-..."). Until it is deployed, the current Worker
   shows them as an empty line (it renders an unknown notification as nothing,
-  never as an error), which is why the merge follows `db:apply-rls` at once.
+  never as an error), which is why the merge follows step 5 at once.
 
 **What it changes.** No existing row is updated and nothing is backfilled.
 
@@ -2785,7 +2788,7 @@ Why this order, one sentence each:
 | `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and three triggers: the schedule freezes with its contract; a payment request can only go issued to void, never once paid; a payment fits its request (issued, and never more than its amount, under the request's row lock) |
 | `rls/functions/35-execution.sql` | the payment request's frozen guard and the payment-fits guard |
 | `enforce_contract_child_draft()` (`30-contracts-variations.sql`) | reads the parent contract `FOR SHARE`, so a schedule edit racing an issue waits for it and is refused, instead of landing in a sent contract |
-| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes and the provisional flag, and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page); signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
+| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes, the provisional flag and the day and way a signed contract was signed (online or on paper), and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page, reading that section only); signing notifies owners, admins and project managers, and waits at most 4 s behind a studio save holding the contract (the client is then told to refresh and check, and nothing is signed later); the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
 | every `rls/policies/*.sql` | **the policy speed-up:** each studio policy now reads the org context and the membership check ONCE per query instead of once per row (`(select ...)`). Same answer, about 40 times faster on a big contract (measured: 492.6 ms before, 11.4 ms after, on a 50,000-line contract). Applied by this same `db:apply-rls`; nothing extra to run |
 | `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments insert and read only; measurements read, and insert on every column but `seq`. Each written `revoke all`, then the exact grant. The new functions are callable by `metra_app` only |
 
@@ -2798,11 +2801,17 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/stage2-a2-schema
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat <A2_SHA> HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (<A2_SHA>)
+git diff --stat a2f397b4 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (a2f397b4)
+git diff --stat b415d66b origin/main -- packages/db    # MUST print nothing: main's database code is still the one undo (0) restores
 ```
 
-`<A2_SHA>` is filled in by the lead after the testers' rounds. If it still
-reads `<A2_SHA>`, or the diff lists any other file, STOP and tell the lead.
+Two STOPs, tell the lead in either case:
+
+- The first diff lists any file other than `docs/DEPLOY.md`: the code is not
+  the code that was rehearsed.
+- The second diff prints anything: someone changed the database code on
+  `main` after this branch was cut, so this branch's `db:apply-rls` would
+  remove that change and undo (0) would not restore it.
 
 **2. Read-only, before** (Supabase SQL editor). The editor shows only the
 LAST result of what you run, so run each block below ON ITS OWN.
@@ -3047,19 +3056,59 @@ where a.attrelid = 'public.contract_line_measurements'::regclass and a.attnum > 
 order by a.attnum;
 ```
 
-**5. Afterwards: merge, smoke test, return the checkout to main.**
+**Stop and do not go on** if any output in steps 3 or 4 differs from what
+is written there. Tell the lead what you saw instead.
 
-1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
-   is written there. Tell the lead what you saw instead.
-2. Tell the lead the database step is done; the lead merges the branch and
-   the Deploy workflow deploys it (within the hour, see THE ORDER).
-3. Smoke test on your own studio, with the log open (from
-   `C:\Users\HP\merta-main\apps\web`: `npx wrangler tail metra-web`): open a
-   project, its contracts list and one contract, and the price book. Expected:
-   every page loads, and the log shows no `42703`, no `42501` and no
-   `mutateInOrg failed`. If a client contract link of yours exists, open it:
-   it shows the contract as before.
-4. Put the production checkout back on main:
+**5. Before the merge: the live site on the new database.** The site still
+runs the current `main`; this checks it against the policies step 3 just
+replaced. About ten minutes, in your own studio only. Open the log first, in
+a second window, and leave it open:
+
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler tail metra-web
+```
+
+Then, signed in to your own studio:
+
+1. **Page loads.** Open the dashboard, Clients and one client, Projects and
+   one project, then **Contracts** in the sidebar and one contract (and, on
+   that contract's **Variation register** tab, سجل أوامر التغيير, one change
+   order if it has any), and the price book. Expected: every page
+   loads and shows your data as before. A list that is suddenly EMPTY counts
+   as a failure too: a policy that refuses hides rows, it does not show an
+   error.
+2. **One harmless save.** Pick one of your own clients, open its **Details**
+   tab, add a word at the end of **Notes** (for example `check`), press
+   **Save details**: expected `Details saved`. Then delete that word, press
+   **Save details** again: expected `Details saved`. In Arabic the same
+   labels read التفاصيل, ملاحظات, حفظ التفاصيل and تم حفظ التفاصيل. Reload the page: Notes
+   read exactly as before. (Notes are private to your studio and never shown
+   to the client; your audit log records the two edits, nothing else
+   changes.)
+3. **The client links, only if you have a test one.** If a test project of
+   yours has a contract link (`/c/...`) or a change-order link (`/v/...`)
+   you sent to yourself, open each: it shows the document as before. Only
+   look: do not sign, acknowledge, approve or reject anything. No test link:
+   skip this; do not create one for it.
+
+Expected in the log for all of the above: no `42501`, no `42703`, no
+`mutateInOrg failed`.
+
+**If anything in step 5 fails** (a page errors or shows a list empty that was
+not, the save does not say `Details saved`, or the log shows one of those
+three): do not merge. Run undo (0) below now, then tell the lead what you
+saw. If everything passes, go straight to step 6.
+
+**6. Then: merge, smoke test, return the checkout to main.**
+
+1. Tell the lead steps 1 to 5 are done; the lead merges the branch and the
+   Deploy workflow deploys it (within the hour, see THE ORDER).
+2. Smoke test on your own studio, the log still open: the page loads of step
+   5 (1) again, now on the new code. Expected: every page loads, and the log
+   shows no `42703`, no `42501` and no `mutateInOrg failed`. If a test client
+   contract link of yours exists, open it: it shows the contract as before.
+3. Put the production checkout back on main:
 
 ```powershell
 cd C:\Users\HP\merta-main
@@ -3068,6 +3117,83 @@ git switch --detach origin/main
 ```
 
 **Undo, if ever needed.**
+
+**(0) The policies, before the merge** (step 5 fails, or before the merge the
+log shows a `42501` or a studio reports a broken page). This is the PREVIOUS
+`main`'s own `db:apply-rls` (the code at `b415d66b`, the one the site runs
+now), run on the 0063 database. It puts back, exactly as they were before
+step 3: every studio policy (in the once-per-row form), the contract and
+change-order client functions (the /c read and acknowledgement, the /v read
+and response; a signature stops writing studio notifications again) and the
+child-draft guard. It leaves 0063 itself alone: the new columns, the six new
+tables with their RLS, policies, grants and triggers, and the three new
+functions stay exactly as step 3 made them (the current site never touches
+them). Use it only while the site still runs the code from before the merge:
+if the new code is already deployed, undo (1) the code first, then this.
+
+The checkout you switch to below does not contain this runbook, so first
+save a copy and read the rest of undo (0) from that copy:
+
+```powershell
+cd C:\Users\HP\merta-main
+Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-0063.md
+git fetch origin
+git switch --detach b415d66b
+git log --oneline -1    # b415d66b merge: main (A1 money engine) into the bounded contract pages
+npm run db:apply-rls
+```
+
+Run only `db:apply-rls` from this checkout: the previous code does not know
+0063, and nothing else is needed. Expected:
+
+- It exits 0. NOTICE blocks: only the FIRST FOUR of step 3 (the two `does not
+  exist, skipping` functions, `role "postgres" has already been granted
+  membership ...` and `policy "self_memberships" ... does not exist,
+  skipping`), nothing about the six new tables.
+- It ends with two lines. The first starts
+  `apply-rls: verified in the catalogues` and goes on
+  `52 tables, 52 policies, 15 triggers, 44 functions, RLS forced on all of them, role metra_app present.`;
+  the second starts `apply-rls: grants verified` and goes on
+  `design_engagements update narrowed to 19 columns with no table-level update, and 11 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+  The numbers are smaller than step 3's on purpose: the previous code counts
+  only what it declares, and the six new tables are not in its list (it does
+  not touch them).
+- A failure prints `apply-rls failed: ...` with the SQLSTATE, as in step 3,
+  and the same advice holds (55P03 or 40P01: run it again a little later).
+
+Then, read-only (Supabase SQL editor, each block ON ITS OWN):
+
+- Step 2 (d) again: `policies` 58 and `per_row` 46. The 46 studio policies
+  are back in the per-row form; the six market policies and the six new ones
+  were written in the once-per-query form and stay so.
+- Step 4 (c) again: exactly what step 4 (c) expects (the six new tables are
+  untouched).
+- Step 4 (f) again: exactly the 6 rows step 4 (f) expects.
+
+Then step 5 again: everything works as it did before step 3. Put the
+checkout back on main (step 6 (3)) and tell the lead what failed the first
+time. Do not merge. If step 5 STILL fails after undo (0), the policies were
+not the cause: tell the lead at once and run nothing else.
+
+To go forward again later, only when the lead says so: step 1 again, then
+from step 3 only `npm run db:apply-rls` (0063 is still applied, so
+`db:migrate` is not needed). Expected: the step 3 lines of a SECOND run (the
+first four notices only, and the same two verified lines), then step 4 (d)
+`policies` 58 and `per_row` 0, then step 5 and on.
+
+Rehearsed on a local database built by the 0062 code: 0063 and this branch's
+`db:apply-rls`, then the previous `main`'s `db:apply-rls` printed exactly the
+lines above and exited 0. A catalogue comparison then found every policy,
+function, trigger and grant of the previous `main` identical to the database
+before step 3, and the 0063 objects identical to after step 3. The previous
+`main`'s own action tests (contracts, change orders, clients, projects, the
+price book and the rest: 1,139 of 1,141; the other two only count schema
+objects, and count the ones 0063 adds on any 0063 database) and its
+cross-tenant isolation gate (58 of 58) passed on it. The same tests passed
+before the undo too, on this branch's policies, which is what step 5 checks
+on the live site.
+This branch's `db:apply-rls` afterwards gave a database identical to the
+first run's, and this branch's tests passed on it.
 
 **(1) The code** (a contract page fails after the deploy): from
 `C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
