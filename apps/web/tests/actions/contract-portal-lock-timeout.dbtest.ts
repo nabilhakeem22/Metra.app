@@ -175,13 +175,23 @@ describe('R4: a page of lines reads one section, not the contract', () => {
     } finally {
       await probe.end();
     }
-    const inner = plans.filter((plan) => !plan.includes('select public.app_contract_section_lines_by_token($1'));
-    const nodes = inner
-      .flatMap((plan) => plan.split('\n'))
-      .filter((line) => / on contract_lines /.test(line))
-      .map((line) => Number(/actual time=[\d.]+\.\.[\d.]+ rows=(\d+)/.exec(line)?.[1]));
-    expect(nodes.length).toBeGreaterThan(0);
-    // The section holds 120 lines: the count reads 120, the page 101 at most.
-    for (const rows of nodes) expect(rows).toBeLessThanOrEqual(120);
+    // The rows each scan of contract_lines touched: what it returned, plus what
+    // its filter read and threw away.
+    const touched: number[] = [];
+    const planLines = plans
+      .filter((plan) => !plan.includes('app_contract_section_lines_by_token($1'))
+      .flatMap((plan) => plan.split('\n'));
+    for (const line of planLines) {
+      const node = / on contract_lines .*actual time=[\d.]+\.\.[\d.]+ rows=(\d+)/.exec(line);
+      if (node) touched.push(Number(node[1]));
+      else if (/^\s*->/.test(line)) touched.push(-1);
+      const removed = /Rows Removed by (?:Filter|Index Recheck): (\d+)/.exec(line);
+      if (removed && touched.length > 0 && touched[touched.length - 1] >= 0) touched[touched.length - 1] += Number(removed[1]);
+    }
+    const scans = touched.filter((rows) => rows >= 0);
+    expect(scans.length).toBeGreaterThan(0);
+    // The section holds 120 lines: the count reads 120, the page 101 at most,
+    // each picked line one row; never the 3,000 lines beside it.
+    for (const rows of scans) expect(rows).toBeLessThanOrEqual(120);
   }, 60_000);
 });

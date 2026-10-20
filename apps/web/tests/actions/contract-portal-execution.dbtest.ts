@@ -1,6 +1,7 @@
 import { createTranslator } from 'next-intl';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { notificationBody, notificationHref } from '@/components/notifications/feed-item';
+import { todayInCairo } from '@/lib/automation/clock';
 import { cairoYear } from '@/lib/format/doc-number';
 import { loadNotificationFeed } from '@/lib/notifications/feed';
 import en from '@/messages/en.json';
@@ -312,6 +313,28 @@ describe('the acknowledgement covers every line and the schedule (AC12)', () => 
       [orgId, contract.contractId],
     );
     expect(count.n).toBe(3);
+  });
+});
+
+describe('app_contract_by_token says when and how the contract was signed (A3 fix round F3, F4)', () => {
+  it('null until signed; online is the Cairo day of the acknowledgement', async () => {
+    const contract = await seedExecutionContract(orgId, { linesPerSection: [2], state: 'issued' });
+    expect((await snapshotOf(contract.rawToken!)).signed).toBeNull();
+    expect(await acknowledgeContractByToken(contract.rawToken!, { actorName: 'Client' })).toEqual({ ok: true });
+    expect((await snapshotOf(contract.rawToken!)).signed).toEqual({ on: todayInCairo(new Date()), via: 'online' });
+  });
+
+  it('paper is the day the studio recorded, in Cairo, never the UTC day before it', async () => {
+    const contract = await seedExecutionContract(orgId, { linesPerSection: [2], state: 'issued' });
+    // What the paper-signature core writes: Cairo midnight of the day, which is
+    // 21:00 or 22:00 UTC of the PREVIOUS day.
+    await ownerQuery(
+      `insert into public.contract_events (org_id, contract_id, kind, actor_user_id, from_status, to_status, decided_at)
+       values ($1, $2, 'acknowledged_offline', $3, 'issued', 'signed', ('2026-10-15'::date)::timestamp at time zone 'Africa/Cairo')`,
+      [orgId, contract.contractId, members.pm],
+    );
+    await ownerQuery(`update public.contracts set status = 'signed' where id = $1`, [contract.contractId]);
+    expect((await snapshotOf(contract.rawToken!)).signed).toEqual({ on: '2026-10-15', via: 'paper' });
   });
 });
 

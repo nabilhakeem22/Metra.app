@@ -151,7 +151,12 @@ $$;
 --     plus the schedule. The acknowledgement hash covers the snapshot, so once
 --     step B caps the lines the client still acknowledges every line;
 --   * `time_extension_days_total`: the days the APPROVED change orders add to
---     the finish date.
+--     the finish date;
+--   * `signed` (A3 fix round, F3/F4): null until the contract is signed, then
+--     {on, via}: the signing DAY in Cairo as `YYYY-MM-DD` (never a UTC
+--     timestamp, which shows the day before for a paper signature recorded at
+--     Cairo midnight) and how: 'online' (the client's acknowledgement here) or
+--     'paper' (recorded by the studio), read from the contract's own events.
 -- Every sub-read names `org_id = c.org_id`: the indexes lead with org_id, and
 -- this definer function gets no RLS predicate to supply it. The per-section
 -- line reads also name `l.contract_id = s.contract_id` (security review S3);
@@ -201,6 +206,17 @@ as $$
     'original_value', c.original_value,
     'total', c.original_value,
     'share_expires_at', c.share_expires_at,
+    'signed', (
+      select jsonb_build_object(
+        'on', to_char(e.decided_at at time zone 'Africa/Cairo', 'YYYY-MM-DD'),
+        'via', case e.kind when 'acknowledged_offline' then 'paper' else 'online' end
+      )
+      from public.contract_events e
+      where e.org_id = c.org_id and e.contract_id = c.id
+        and e.kind in ('acknowledged', 'acknowledged_offline')
+      order by e.decided_at desc, e.id desc
+      limit 1
+    ),
     'source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
     'time_extension_days_total', coalesce((
       select sum(v.time_extension_days)
@@ -334,7 +350,9 @@ $$;
 -- the lines: contract_lines_section_same_contract_fk (0063) already makes every
 -- line of a section a line of that section's contract. The page picks its 100
 -- ids (walking past `start_at` on the index) BEFORE building any JSON, so a
--- skipped line is never turned into a jsonb object.
+-- skipped line is never turned into a jsonb object; each picked line is then
+-- read by its id, one primary-key probe each (a correlated sub-select, so the
+-- planner cannot trade it for a join over every line of the studio).
 create or replace function public.app_contract_section_lines_by_token(
   p_hash text,
   p_section_id uuid,
@@ -375,8 +393,8 @@ as $$
       where l.org_id = t.org_id and l.section_id = t.section_id
     ),
     'lines', coalesce((
-      select jsonb_agg(
-        jsonb_build_object(
+      select jsonb_agg((
+        select jsonb_build_object(
           'id', l.id,
           'item_code', l.item_code,
           'description_ar', l.description_ar,
@@ -388,10 +406,11 @@ as $$
           'line_total', l.line_total,
           'provisional', l.provisional,
           'sort_order', l.sort_order
-        ) order by k.sort_order, k.id
-      )
+        )
+        from public.contract_lines l
+        where l.id = k.id
+      ) order by k.sort_order, k.id)
       from picked k
-      join public.contract_lines l on l.org_id = t.org_id and l.id = k.id
     ), '[]'::jsonb)
   )
   from target t;
