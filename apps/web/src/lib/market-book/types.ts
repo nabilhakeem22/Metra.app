@@ -2,6 +2,7 @@
 // safe: the server query (./queries.ts) builds them, the page and its client
 // components render them. Months are 'YYYY-MM'; prices are scale-4 strings.
 import type { MarketItemStatus, MarketUnit } from '@metra/db';
+import type { MarketVarianceReason } from './variance';
 
 /** One month of an item's EFFECTIVE price: what the newest published bulletin reporting that month says. */
 export interface MarketPoint {
@@ -97,4 +98,46 @@ export interface MarketBookPage {
   matched: number;
   /** The page shown: the one asked for, or the last one when it asked past the end. */
   page: number;
+}
+
+/**
+ * The price book's Market column for one linked cost item: the market item's
+ * newest priced month (the figure the seed and an add use) and how far the
+ * item's own cost is from it. Reference only; nothing is ever written from it.
+ */
+export interface MarketPriceRef {
+  marketItemId: string;
+  nameAr: string;
+  nameEn: string;
+  unit: MarketUnit;
+  unitLabelAr: string;
+  /** Null when no month was ever priced (or the item is no longer published). */
+  price: string | null;
+  month: string | null;
+  variancePct: string | null;
+  reason: MarketVarianceReason;
+}
+
+/** The Market column of one price book page: absent (null bulletin) until a bulletin is published. */
+export interface PriceBookMarketColumn {
+  bulletin: MarketBulletinSummary | null;
+  /** By cost item id; only the page's linked items. */
+  refs: Record<string, MarketPriceRef>;
+}
+
+/** A market item the link combobox offers: one whose studio unit is the cost item's own. */
+export interface MarketLinkOption {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  leafNameAr: string;
+  leafNameEn: string;
+  /** The seed book's cost (its newest priced month); null when never priced. */
+  unitCost: string | null;
+}
+
+export interface MarketLinkSearch {
+  items: MarketLinkOption[];
+  /** More items matched than the answer carries: typing more narrows it. */
+  more: boolean;
 }

@@ -14,6 +14,8 @@ export interface PriceBookItem {
   etaItemCode: string | null;
   etaCodeType: string | null;
   active: boolean;
+  /** The market item it follows (advisory, never changes its cost or price), or null. */
+  marketItemId: string | null;
 }
 
 /** A section option for the Price Book filter/group + form select. */

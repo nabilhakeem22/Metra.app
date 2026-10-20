@@ -27,6 +27,8 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
+// The edit sheet's market link: its actions are not what these tests are about.
+vi.mock('@/lib/market-book/actions', () => ({ linkCostItemToMarket: vi.fn(), searchMarketLinks: vi.fn() }));
 
 /** A book with nothing in it at all (not a filter that matched nothing). */
 const EMPTY_BOOK: PriceBookPageData = { rows: [], sectionCounts: {}, matched: 0, page: 1, pageCount: 1, hasAnyItem: false };
@@ -39,7 +41,7 @@ beforeEach(() => {
 describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale) => {
   async function load(data: { book: 'ready' | 'preparing' | 'unpublished'; sections: number; items: number }) {
     priceBook.loadMarketPriceBook.mockResolvedValue({ ok: true, data });
-    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} sections={[]} canManage />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage />, { locale });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') }));
     });
@@ -66,7 +68,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale)
   });
 
   it('offers no load to a studio member who cannot manage the book', () => {
-    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} sections={[]} canManage={false} />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage={false} />, { locale });
     expect(screen.queryByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') })).toBeNull();
   });
 });

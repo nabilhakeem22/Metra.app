@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { PriceBookMarketColumn } from '@/lib/market-book/types';
 import type { PriceBookView } from '@/lib/price-book/page-params';
 import { cn } from '@/lib/utils';
 import { BulkUpdateDialog } from './bulk-update-dialog';
@@ -18,6 +19,7 @@ import { usePriceBookNavigation } from './use-price-book-navigation';
 export interface PriceBookClientProps {
   view: PriceBookView;
   book: PriceBookPageData;
+  market: PriceBookMarketColumn;
   sections: SectionOption[];
   canManage: boolean;
 }
@@ -29,7 +31,7 @@ const ALL_SECTIONS = 'all';
  * One page of the price book (the server filtered, searched and paged it), its
  * toolbar and its pager. Every filter is in the URL (use-price-book-navigation).
  */
-export function PriceBookClient({ view, book, sections, canManage }: PriceBookClientProps) {
+export function PriceBookClient({ view, book, market, sections, canManage }: PriceBookClientProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PriceBookItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -42,7 +44,13 @@ export function PriceBookClient({ view, book, sections, canManage }: PriceBookCl
   // whose open state belongs to the page, not to the toolbar button that opens it.
   const dialogs = canManage && (
     <>
-      <CostItemForm open={formOpen} onOpenChange={setFormOpen} item={editing} sections={sections} />
+      <CostItemForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        item={editing}
+        sections={sections}
+        market={market.bulletin === null ? null : { ref: editing ? market.refs[editing.id] : undefined }}
+      />
       <BulkUpdateDialog open={bulkOpen} onOpenChange={setBulkOpen} sections={sections} />
       <ImportWizard open={importOpen} onOpenChange={setImportOpen} sections={sections} />
       {actions.confirmDialog}
@@ -90,6 +98,7 @@ export function PriceBookClient({ view, book, sections, canManage }: PriceBookCl
       >
         <PriceBookTable
           groups={groups}
+          market={market}
           canManage={canManage}
           pending={actions.pending}
           onEdit={(item) => {

@@ -1,32 +1,32 @@
 'use client';
 
-import { Pencil } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { OverflowMenu } from '@/components/ui/overflow-menu';
-import { formatMoney } from '@/lib/format/money';
 import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import type { PriceBookMarketColumn } from '@/lib/market-book/types';
 import type { PriceBookGroup } from './price-book-groups';
+import { PriceBookRow } from './price-book-row';
 import type { PriceBookItem, SectionOption } from './types';
 
 export function PriceBookTable({
   groups,
+  market,
   canManage,
   pending,
   onEdit,
   onToggleActive,
 }: {
   groups: PriceBookGroup[];
+  /** The Market column: shown only once a bulletin is published (market plan AC 18). */
+  market: PriceBookMarketColumn;
   canManage: boolean;
   pending: boolean;
   onEdit: (item: PriceBookItem) => void;
   onToggleActive: (item: PriceBookItem) => void;
 }) {
   const t = useTranslations('priceBook');
-  const tc = useTranslations('common');
   const locale = useLocale();
   const sectionName = (s: SectionOption) =>
     pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value;
@@ -73,6 +73,7 @@ export function PriceBookTable({
                     <th className="px-4 py-2 text-end font-medium">
                       {t('table.price')}
                     </th>
+                    {market.bulletin !== null && <th className="px-4 py-2 text-end font-medium">{t('market.column')}</th>}
                     <th className="px-4 py-2 text-start font-medium">
                       {t('table.status')}
                     </th>
@@ -80,73 +81,18 @@ export function PriceBookTable({
                   </tr>
                 </thead>
                 <tbody>
-                  {group.rows.map((item) => {
-                    const name = pickLocale(
-                      { nameAr: item.nameAr, nameEn: item.nameEn },
-                      'name',
-                      locale,
-                    ).value;
-                    return (
-                      <tr
-                        key={item.id}
-                        className="border-b last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="px-4 py-2 font-mono text-caption" dir="ltr">
-                          {item.code}
-                        </td>
-                        <td className="px-4 py-2">{name}</td>
-                        <td className="px-4 py-2 text-muted-foreground">
-                          {t(`units.${item.unit}`)}
-                        </td>
-                        <td className="px-4 py-2 text-end" dir="ltr">
-                          {formatMoney(item.defaultUnitCost, locale)}
-                        </td>
-                        <td className="px-4 py-2 text-end" dir="ltr">
-                          {formatMoney(item.defaultUnitPrice, locale)}
-                        </td>
-                        <td className="px-4 py-2">
-                          <span
-                            className={
-                              item.active
-                                ? 'rounded-pill bg-[color:var(--success-tint)] px-2 py-0.5 text-caption text-[color:var(--success)]'
-                                : 'rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground'
-                            }
-                          >
-                            {t(item.active ? 'status.active' : 'status.inactive')}
-                          </span>
-                        </td>
-                        {canManage && (
-                          <td className="px-4 py-2">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onEdit(item)}
-                                aria-label={t('actions.edit')}
-                              >
-                                <Pencil className="size-4" aria-hidden />
-                              </Button>
-                              <OverflowMenu
-                                label={tc('moreActions')}
-                                disabled={pending}
-                                actions={[
-                                  {
-                                    key: 'active',
-                                    label: t(
-                                      item.active ? 'actions.deactivate' : 'actions.activate',
-                                    ),
-                                    destructive: item.active,
-                                    onSelect: () => onToggleActive(item),
-                                  },
-                                ]}
-                              />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
+                  {group.rows.map((item) => (
+                    <PriceBookRow
+                      key={item.id}
+                      item={item}
+                      showsMarket={market.bulletin !== null}
+                      marketRef={market.refs[item.id]}
+                      canManage={canManage}
+                      pending={pending}
+                      onEdit={onEdit}
+                      onToggleActive={onToggleActive}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>

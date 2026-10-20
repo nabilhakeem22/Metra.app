@@ -760,6 +760,26 @@
   "priceBook": {
     "title": "Price Book",
     "subtitle": "Your catalogue of cost items: costs, prices, and bulk updates.",
+    "market": {
+      "column": "Market",
+      "unlinked": "Not linked to a market item",
+      "unitMismatch": "The market item is priced in another unit, so there is no comparison",
+      "noPrice": "No market price yet",
+      "variance": "{value} against the market price",
+      "link": {
+        "label": "Linked market item",
+        "none": "Not linked",
+        "find": "Find a market item",
+        "pick": "Market item",
+        "unlink": "Unlink",
+        "hint": "Only items priced in this item's unit are offered. Linking never changes the cost or the price.",
+        "more": "Type more words to narrow the list.",
+        "noMatch": "No market item in this unit matches.",
+        "loadFailed": "We couldn't search the market items. Check your connection and try again.",
+        "linked": "Linked to the market item",
+        "unlinked": "Unlinked from the market item"
+      }
+    },
     "search": "Search code or name",
     "allCategories": "All sections",
     "addSection": "Add section",
