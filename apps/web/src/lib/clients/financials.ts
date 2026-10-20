@@ -10,7 +10,7 @@ import 'server-only';
 // The client columns are deliberately KEPT (and still served by Public API v1 as
 // `advance_pct` / `retention_pct`) — removing them would be a breaking API change
 // for no gain, and they remain a usable default when a contract is drafted.
-import { contracts } from '@metra/db';
+import { contracts, type MetraDb } from '@metra/db';
 import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { weightedRates, type ClientEffectiveRates } from './rates';
@@ -19,6 +19,21 @@ import { weightedRates, type ClientEffectiveRates } from './rates';
  *  work-in-progress and must not drag the client's effective rate around;
  *  `terminated` is no longer a commitment. That leaves issued + signed. */
 export const COMMITTED_STATUSES = ['issued', 'signed'] as const;
+
+/**
+ * The ORIGINAL value of the committed (issued or signed) EXECUTION contracts
+ * `scope` selects, as a scale-4 string: the part of a contracted value with no
+ * accepted proposal behind it (A5 fix round F4). A proposal contract is its
+ * accepted proposal, so a caller adding this to its accepted-proposal sum
+ * counts that contract once. Draft and terminated contracts are not counted.
+ */
+export async function committedExecutionValue(tx: MetraDb, scope: SQL): Promise<string> {
+  const [row] = await tx
+    .select({ total: sql<string>`coalesce(sum(${contracts.originalValue}), 0)::text` })
+    .from(contracts)
+    .where(and(scope, isNotNull(contracts.sourceBoqId), inArray(contracts.status, [...COMMITTED_STATUSES])));
+  return row?.total ?? '0';
+}
 
 /** The effective rates, and how many committed EXECUTION contracts sit beside them. */
 export interface EffectiveRates extends ClientEffectiveRates {

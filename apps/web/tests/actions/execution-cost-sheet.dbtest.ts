@@ -4,6 +4,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { getClientEffectiveRates, getProjectEffectiveRates } from '@/lib/clients/financials';
 import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { loadCostSheetCore } from '@/lib/execution/cost-sheet/read-core';
+import { getClientOverview } from '@/lib/clients/queries';
 import { getProjectOverview } from '@/lib/projects/queries';
 import { mintShareToken } from '@/lib/share/token';
 import { seedPayment } from './execution-billing-fixture';
@@ -20,8 +21,8 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // a new-scope de-scope counts as it is (F2), cost booked to no section is never
 // over budget (F5), a PM who may not see margin gets billing only on the sheet
 // and on the project's Financials (F10, S1), and the project's contracted
-// value counts its execution contract (F4), and the client's rates leave
-// execution contracts out the same way.
+// value counts its execution contract (F4); the client's contracted value
+// counts its execution contracts and its rates leave them out the same way.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -52,16 +53,16 @@ async function cost(contractId: string, sectionId: string | null, amount: string
   );
 }
 
-/** An ISSUED proposal contract on the client and project, with its own advance and retention. */
+/** An ISSUED proposal contract on the client and project, its accepted proposal worth `value`, with its own advance and retention. */
 async function seedIssuedProposalContract(
   clientId: string,
   projectId: string,
   terms: { advancePct: string; retentionPct: string; value: string },
 ): Promise<void> {
   const [proposal] = await ownerQuery<{ id: string }>(
-    `insert into public.proposals (org_id, number, title_en, client_id, project_id, status)
-     values ($1, 800000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted') returning id`,
-    [orgId, clientId, projectId],
+    `insert into public.proposals (org_id, number, title_en, client_id, project_id, status, total)
+     values ($1, 800000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted', $4) returning id`,
+    [orgId, clientId, projectId, terms.value],
   );
   const token = mintShareToken();
   await ownerQuery(
@@ -214,6 +215,22 @@ describe('getCostSheet', () => {
     const withProposal = { advancePct: '20.0000', retentionPct: '5.0000', contractCount: 1, executionContractCount: 1 };
     expect(await getClientEffectiveRates(ctx.owner!, contract.clientId)).toEqual(withProposal);
     expect(await getProjectEffectiveRates(ctx.owner!, contract.projectId)).toEqual(withProposal);
+  });
+
+  it('F4: the client\'s contracted value counts its committed execution contracts once, never a draft or terminated one', async () => {
+    const signed = await seedExecutionContract(orgId, { state: 'signed' });
+    expect((await getClientOverview(ctx.owner!, signed.clientId)).contractedTotal).toBe('124000.0000');
+    // The proposal contract is its accepted proposal: 1,000 more, not 2,000.
+    await seedIssuedProposalContract(signed.clientId, signed.projectId, { advancePct: '20', retentionPct: '5', value: '1000' });
+    expect((await getClientOverview(ctx.owner!, signed.clientId)).contractedTotal).toBe('125000.0000');
+    const issued = await seedExecutionContract(orgId, { state: 'issued' });
+    expect((await getClientOverview(ctx.owner!, issued.clientId)).contractedTotal).toBe('124000.0000');
+    const draft = await seedExecutionContract(orgId, { state: 'draft' });
+    expect((await getClientOverview(ctx.owner!, draft.clientId)).contractedTotal).toBe('0.0000');
+    const terminated = await seedExecutionContract(orgId, { state: 'signed' });
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [terminated.contractId]);
+    expect((await getClientOverview(ctx.owner!, terminated.clientId)).contractedTotal).toBe('0.0000');
+    expect((await getClientEffectiveRates(ctx.owner!, terminated.clientId)).executionContractCount).toBe(0);
   });
 
   it('answers record_not_found for a proposal contract or another org\'s, and malformed for a bad id', async () => {

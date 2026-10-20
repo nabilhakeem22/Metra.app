@@ -12,9 +12,9 @@ import {
   type ProjectStage,
   type ProjectStatus,
 } from '@metra/db';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { COMMITTED_STATUSES } from '@/lib/clients/financials';
+import { committedExecutionValue } from '@/lib/clients/financials';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { currentStage } from '@/lib/project-stages/queries';
 
@@ -171,16 +171,7 @@ export function getProjectOverview(
           eq(proposals.status, 'accepted'),
         ),
       );
-    const [executionRow] = await tx
-      .select({ total: sql<string>`coalesce(sum(${contracts.originalValue}), 0)::text` })
-      .from(contracts)
-      .where(
-        and(
-          eq(contracts.projectId, projectId),
-          isNotNull(contracts.sourceBoqId),
-          inArray(contracts.status, [...COMMITTED_STATUSES]),
-        ),
-      );
+    const executionTotal = await committedExecutionValue(tx, eq(contracts.projectId, projectId));
 
     const recentActivity = await tx
       .select()
@@ -200,7 +191,7 @@ export function getProjectOverview(
       totalStages: stages.length,
       doneStages,
       overallProgress,
-      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionRow?.total)),
+      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionTotal)),
       recentActivity,
     };
   });

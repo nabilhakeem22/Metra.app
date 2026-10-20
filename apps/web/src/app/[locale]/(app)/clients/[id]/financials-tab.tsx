@@ -22,6 +22,8 @@ export async function FinancialsTab({
   const t = await getTranslations('clients.profile.financials');
   const locale = await getLocale();
   const showRates = showsContractRates(contractCount, executionContractCount);
+  // The contracts the contracted value stands on: proposal AND execution ones (F4).
+  const committedCount = contractCount + executionContractCount;
 
   // A figure is pinned LTR; a word (a status, "no contracts yet") follows the page.
   const Stat = ({ label, value, figure = true }: { label: string; value: string; figure?: boolean }) => (
@@ -73,9 +75,9 @@ export async function FinancialsTab({
         <Locked label={t('invoiced')} />
         <Locked label={t('outstanding')} />
       </div>
-      {contractCount > 0 && (
+      {committedCount > 0 && (
         <p className="text-caption text-muted-foreground">
-          {t('derivedFrom', { n: contractCount })}
+          {t('derivedFrom', { n: committedCount })}
         </p>
       )}
       <p className="text-body text-muted-foreground">{t('lockedBody')}</p>
