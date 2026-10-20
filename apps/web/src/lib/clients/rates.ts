@@ -60,3 +60,14 @@ export function weightedRates(
   };
 }
 
+
+/**
+ * Whether a Financials tab shows the Advance and Retention cards. Only proposal
+ * contracts (`contractCount`) carry the two terms; an execution contract has
+ * none (A5 fix round F4). With nothing committed the cards say "no contracts
+ * yet"; with only execution contracts they would read 0.00% for terms that do
+ * not exist, so they are hidden.
+ */
+export function showsContractRates(contractCount: number, executionContractCount: number): boolean {
+  return contractCount > 0 || executionContractCount === 0;
+}

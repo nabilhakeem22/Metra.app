@@ -1,10 +1,11 @@
 import type { MemberRole } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
-import { getProjectEffectiveRates } from '@/lib/clients/financials';
+import { getClientEffectiveRates, getProjectEffectiveRates } from '@/lib/clients/financials';
 import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { loadCostSheetCore } from '@/lib/execution/cost-sheet/read-core';
 import { getProjectOverview } from '@/lib/projects/queries';
+import { mintShareToken } from '@/lib/share/token';
 import { seedPayment } from './execution-billing-fixture';
 import { seedOrderWithLines } from './execution-final-account-fixture';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest } from './execution-fixture';
@@ -19,7 +20,8 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // a new-scope de-scope counts as it is (F2), cost booked to no section is never
 // over budget (F5), a PM who may not see margin gets billing only on the sheet
 // and on the project's Financials (F10, S1), and the project's contracted
-// value counts its execution contract (F4).
+// value counts its execution contract (F4), and the client's rates leave
+// execution contracts out the same way.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -48,6 +50,28 @@ async function cost(contractId: string, sectionId: string | null, amount: string
              case when $6::boolean then now() end, case when $6::boolean then $5::uuid end)`,
     [orgId, contractId, sectionId, amount, ctx.owner!.userId, voided],
   );
+}
+
+/** An ISSUED proposal contract on the client and project, with its own advance and retention. */
+async function seedIssuedProposalContract(
+  clientId: string,
+  projectId: string,
+  terms: { advancePct: string; retentionPct: string; value: string },
+): Promise<void> {
+  const [proposal] = await ownerQuery<{ id: string }>(
+    `insert into public.proposals (org_id, number, title_en, client_id, project_id, status)
+     values ($1, 800000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted') returning id`,
+    [orgId, clientId, projectId],
+  );
+  const token = mintShareToken();
+  await ownerQuery(
+    `insert into public.contracts (org_id, number, title_en, source_proposal_id, client_id, project_id,
+                                   status, advance_pct, retention_pct, original_value, token_hash, share_expires_at)
+     values ($1, 700000 + floor(random() * 99999)::int, 'Quote contract', $2, $3, $4, 'draft', $5, $6, $7, $8,
+             now() + interval '30 days')`,
+    [orgId, proposal.id, clientId, projectId, terms.advancePct, terms.retentionPct, terms.value, token.hash],
+  );
+  await ownerQuery(`update public.contracts set status = 'issued' where token_hash = $1`, [token.hash]);
 }
 
 async function sheet(contractId: string, member = ctx.owner!) {
@@ -179,6 +203,17 @@ describe('getCostSheet', () => {
     const draft = await seedExecutionContract(orgId, { state: 'draft' });
     expect((await getProjectOverview(ctx.owner!, draft.projectId)).contractedTotal).toBe('0.0000');
     expect((await getProjectEffectiveRates(ctx.owner!, draft.projectId)).executionContractCount).toBe(0);
+  });
+
+  it('F4: the client\'s rates leave its execution contracts out too, and weigh its proposal contracts alone', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    const executionOnly = { advancePct: null, retentionPct: null, contractCount: 0, executionContractCount: 1 };
+    expect(await getClientEffectiveRates(ctx.owner!, contract.clientId)).toEqual(executionOnly);
+    await seedIssuedProposalContract(contract.clientId, contract.projectId, { advancePct: '20', retentionPct: '5', value: '1000' });
+    // Weighted with the execution contract's stored 0% on 124,000, the advance would read 0.16%.
+    const withProposal = { advancePct: '20.0000', retentionPct: '5.0000', contractCount: 1, executionContractCount: 1 };
+    expect(await getClientEffectiveRates(ctx.owner!, contract.clientId)).toEqual(withProposal);
+    expect(await getProjectEffectiveRates(ctx.owner!, contract.projectId)).toEqual(withProposal);
   });
 
   it('answers record_not_found for a proposal contract or another org\'s, and malformed for a bad id', async () => {

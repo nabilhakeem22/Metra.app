@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { weightedRates } from './rates';
+import { showsContractRates, weightedRates } from './rates';
 
 // The Financials tab used to show a percentage somebody typed into the client form.
 // It now shows what the client's committed contracts actually say — so this is the
@@ -75,5 +75,20 @@ describe('weightedRates', () => {
     // 10% on 1 and 20% on 2  ->  (10 + 40) / 3 = 16.666...  -> 16.6666
     const result = weightedRates([row('10', '0', '1'), row('20', '0', '2')]);
     expect(result.advancePct).toBe('16.6666');
+  });
+});
+
+describe('showsContractRates', () => {
+  it('shows the cards while a proposal contract carries the rates, even beside execution contracts', () => {
+    expect(showsContractRates(1, 0)).toBe(true);
+    expect(showsContractRates(2, 3)).toBe(true);
+  });
+
+  it('shows them with nothing committed, where they say "no contracts yet"', () => {
+    expect(showsContractRates(0, 0)).toBe(true);
+  });
+
+  it('hides them when only execution contracts are committed: those have no advance or retention terms (F4)', () => {
+    expect(showsContractRates(0, 1)).toBe(false);
   });
 });
