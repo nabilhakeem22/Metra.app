@@ -40,7 +40,13 @@ function asRanges(points: number[]): string {
 describe('the tables comparisonFormSql folds with', () => {
   it('deletes exactly what comparisonForm deletes: every format character, non-spacing mark and tatweel', () => {
     const deleted = everyCodePoint((character) => /\p{Mn}|\p{Cf}|\u0640/u.test(character));
-    expect(asRanges([...codePointsOf(DELETED_RANGES)].sort((a, b) => a - b))).toBe(asRanges(deleted));
+    const table = codePointsOf(DELETED_RANGES);
+    expect(asRanges(deleted.filter((point) => !table.has(point)))).toBe('');
+    // The table follows the newest Unicode CI runs; on an older runtime its extra points are still unassigned.
+    const deletedHere = new Set(deleted);
+    const unassigned = (point: number) => /\p{Cn}/u.test(String.fromCodePoint(point));
+    const extra = [...table].filter((point) => !deletedHere.has(point) && !unassigned(point));
+    expect(asRanges(extra.sort((a, b) => a - b))).toBe('');
   });
 
   it('reads the case table from blocks holding every non-ASCII character toLowerCase changes', () => {
