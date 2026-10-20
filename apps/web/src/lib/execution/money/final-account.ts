@@ -7,7 +7,7 @@
 // PROVISIONAL line is billed by measurement; a firm line whose residual is not
 // zero is flagged "needs a change order" and adds nothing.
 import { computeLine, formatMoney4, parseMoney4, pctOf } from '@/lib/aggregates/proposal-totals';
-import { variationCharge } from './variation-charge';
+import { approvedVariationsCharge, variationCharge } from './variation-charge';
 
 export interface MeasuredLine {
   lineId: string;
@@ -54,10 +54,7 @@ function residualQty4(line: MeasuredLine): bigint {
 
 /** Every approved change order's full charge, de-scopes included (they lower it). */
 function variationsCharge4(input: Omit<FinalAccountInput, 'measuredLines'>): bigint {
-  return input.approvedVariationNetDeltas.reduce(
-    (total, netDelta) => total + parseMoney4(variationCharge(netDelta, input.taxRate, input.supervisionPct).total),
-    0n,
-  );
+  return parseMoney4(approvedVariationsCharge(input.approvedVariationNetDeltas, input.taxRate, input.supervisionPct));
 }
 
 /** The figures that follow from the measured works (Σ billed line works, before

@@ -66,7 +66,7 @@ function SectionHarness({ summary }: { summary: ContractSectionSummary }) {
   return <ContractSectionList contractId="k-1" sections={sections} lines={lines} m={(v: string) => v} />;
 }
 function VariationFormHarness() {
-  const create = useVariationCreate('k-1');
+  const create = useVariationCreate('k-1', false);
   return <VariationCreateForm create={create} contractId="k-1" />;
 }
 

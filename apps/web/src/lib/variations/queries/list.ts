@@ -16,6 +16,8 @@ export interface VariationListRow {
   titleEn: string | null;
   status: VariationStatus;
   netDelta: string;
+  /** Days the order adds to the contract's finish date; null = none (0063). */
+  timeExtensionDays: number | null;
   contractId: string;
   contractNumber: number | null;
   createdAt: string;
@@ -43,6 +45,7 @@ const VARIATION_LIST_COLUMNS = {
   titleEn: variationOrders.titleEn,
   status: variationOrders.status,
   netDelta: variationOrders.netDelta,
+  timeExtensionDays: variationOrders.timeExtensionDays,
   contractId: variationOrders.contractId,
   contractNumber: contracts.number,
   createdAt: variationOrders.createdAt,

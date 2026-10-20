@@ -121,6 +121,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       <VariationRegister
         contractId="k-1"
         contractStatus="issued"
+        chargeRates={null}
         variations={[]}
         canDraftVariation
         canPriceVariation={false}

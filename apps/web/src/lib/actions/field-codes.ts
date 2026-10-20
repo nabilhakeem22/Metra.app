@@ -39,6 +39,9 @@ export const FIELD_CODE_PARAMS = {
   // A figure typed with more decimals than it is kept to (a rate past 4
   // decimals), refused rather than silently cut.
   too_many_decimals: ['max'],
+  // A count that must be whole (days a change order adds) typed with a
+  // fraction: the range is not what is wrong, so the range is not said.
+  not_whole_number: [],
 } as const satisfies Record<string, readonly string[]>;
 
 export type FieldCode = keyof typeof FIELD_CODE_PARAMS;

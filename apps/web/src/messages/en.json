@@ -482,7 +482,8 @@
       "date_in_future": "That day has not come yet. Pick today or an earlier day.",
       "date_in_past": "That day has already passed. Pick today or a later day.",
       "too_many_decimals": "Use at most {max} decimal places.",
-      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one."
+      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
+      "not_whole_number": "Enter a whole number, without a fraction."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -1806,6 +1807,10 @@
           "details": "Details",
           "more": "Show more payments"
         }
+      },
+      "finish": {
+        "revised": "Revised finish date: {date}, {count, plural, one {{n} day} other {{n} days}} added by approved change orders",
+        "added": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the works"
       }
     }
   },
@@ -1863,7 +1868,27 @@
       "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
       "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it.",
       "heading": "Variation order",
-      "netDelta": "Net change"
+      "netDelta": "Net change",
+      "charge": {
+        "works": "Works value",
+        "tax": "VAT",
+        "supervision": "Supervision fee",
+        "total": "Total charge",
+        "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the duration of the works.",
+        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved."
+      }
+    },
+    "timeExtension": {
+      "label": "Days added to the finish date",
+      "hint": "Leave it empty if this change order does not move the finish date. From 0 to 3650 days."
+    },
+    "charge": {
+      "works": "Works",
+      "tax": "VAT",
+      "supervision": "Supervision",
+      "total": "Total",
+      "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the finish date",
+      "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the finish date if approved"
     }
   },
   "engagements": {
@@ -2900,7 +2925,8 @@
         "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
         "date_in_past": "That day has already passed. Please choose today or a later day.",
         "too_many_decimals": "Please use at most {max} decimal places.",
-        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one."
+        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
+        "not_whole_number": "Please enter a whole number, without a fraction."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
