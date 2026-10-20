@@ -7,7 +7,7 @@ import { getProjectBoq } from '@/lib/boqs/queries';
 import { getContractIdForBoq } from '@/lib/contracts/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
-import type { BoqExecution } from './boq-tab';
+import type { BoqExecution } from './boq-tab-sheet';
 
 export async function loadBoqTab(ctx: OrgContext, projectId: string) {
   const canBuild = can(ctx.role, 'boq_build', 'create');

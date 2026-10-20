@@ -1,33 +1,8 @@
 import { useTranslations } from 'next-intl';
-import { GenerateExecutionContract } from '@/components/contracts/generate-execution-contract';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Link } from '@/i18n/routing';
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { BoqCostedCopy } from './boq-costed-copy';
-import { BoqIssue } from './boq-issue';
-import { BoqSheet } from './boq-sheet';
 import { BoqStart } from './boq-start';
-
-/** What an issued BOQ offers for execution: its contract, or to create one. */
-export interface BoqExecution {
-  contractId: string | null;
-  /** May generate an execution contract (`contracts_generate` create). */
-  canGenerate: boolean;
-}
-
-/** An issued BOQ's way into execution: open its contract, or create it. */
-function BoqExecutionAction({ execution, boqId }: { execution: BoqExecution; boqId: string }) {
-  const t = useTranslations('contracts.execution.generate');
-  if (execution.contractId) {
-    return (
-      <Button asChild variant="secondary">
-        <Link href={`/contracts/${execution.contractId}`}>{t('openContract')}</Link>
-      </Button>
-    );
-  }
-  return execution.canGenerate ? <GenerateExecutionContract boqId={boqId} /> : null;
-}
+import { BoqTabSheet, type BoqExecution } from './boq-tab-sheet';
 
 /**
  * The project's Bill of Quantities — the priced schedule of works that the
@@ -38,6 +13,10 @@ function BoqExecutionAction({ execution, boqId }: { execution: BoqExecution; boq
  * refused server-side regardless (lib/boqs/edit.ts re-checks the status and the
  * capability on every write) — hiding the inputs on an issued BOQ is a courtesy
  * to the studio, not the rule that protects the document.
+ *
+ * A SERVER component, so it hands `BoqTabSheet` plain data only: the header
+ * controls are a function of the BOQ as shown, and that function has to be made
+ * on the client side of the boundary (src/test/no-function-props-to-client.test.ts).
  */
 export function BoqTab({
   projectId,
@@ -71,22 +50,12 @@ export function BoqTab({
   const canEdit = canBuild && boq.status === 'draft';
 
   return (
-    <BoqSheet
+    <BoqTabSheet
       boq={boq}
       canEdit={canEdit}
-      actions={(shown) => (
-        <>
-          {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
-          {boq.status === 'issued' && <BoqExecutionAction execution={execution} boqId={boq.id} />}
-          {canEdit && (
-            <BoqIssue
-              boqId={boq.id}
-              disabled={shown.lineCount === 0}
-              clientCanOpen={clientCanOpenOnIssue}
-            />
-          )}
-        </>
-      )}
+      canSeeCost={canSeeCost}
+      clientCanOpenOnIssue={clientCanOpenOnIssue}
+      execution={execution}
     />
   );
 }
