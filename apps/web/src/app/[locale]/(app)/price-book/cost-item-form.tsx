@@ -24,8 +24,13 @@ export interface CostItemFormProps {
   onOpenChange: (open: boolean) => void;
   item?: PriceBookItem | null;
   sections: SectionOption[];
-  /** Null while no market bulletin is published (no link to offer); else the edited item's market reference. */
-  market: { ref: MarketPriceRef | undefined } | null;
+  /**
+   * The edited item's market link as the page last read it (not as it was
+   * when the sheet opened): whether it is linked, and its market reference.
+   * Null while no market bulletin is published (no link to offer), or on a
+   * new item.
+   */
+  market: { linked: boolean; ref: MarketPriceRef | undefined } | null;
 }
 
 /**
@@ -102,7 +107,7 @@ export function CostItemForm({ open, onOpenChange, item, sections, market }: Cos
         sections={sections}
         bind={errors.bind}
       />
-      {item && market && <MarketLinkField costItemId={item.id} linked={item.marketItemId !== null} reference={market.ref} />}
+      {item && market && <MarketLinkField costItemId={item.id} linked={market.linked} reference={market.ref} />}
     </FormSheet>
   );
 }

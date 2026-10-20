@@ -7,18 +7,27 @@ import { formatNumber } from '@/lib/format/number';
 import type { MarketPriceRef, PriceBookMarketColumn } from '@/lib/market-book/types';
 import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { FIRST_VIEW } from '@/lib/price-book/page-params';
 import { CostItemForm } from './cost-item-form';
 import { MarketLinkField } from './market-link-field';
+import { PriceBookClient } from './price-book-client';
 import { PriceBookTable } from './price-book-table';
 import type { PriceBookItem } from './types';
 
 // Market plan task 18 (Stage 2 PR B3.3): the price book's Market column (AC 15,
 // AC 18) and the link combobox. Reference only: the link saves on its own and
-// a refusal is said under the picker.
+// a refusal is said under the picker. Fix round (F2, F7): the sheet says the
+// link as the refreshed page reads it, and says a saved link in the field, not
+// as a toast over the sheet's footer.
 
 const market = vi.hoisted(() => ({ linkCostItemToMarket: vi.fn(), searchMarketLinks: vi.fn() }));
 vi.mock('@/lib/market-book/actions', () => market);
-vi.mock('@/lib/price-book/actions', () => ({ createCostItem: vi.fn(), updateCostItem: vi.fn() }));
+vi.mock('@/lib/price-book/actions', () => ({ createCostItem: vi.fn(), updateCostItem: vi.fn(), setCostItemActive: vi.fn(), loadMarketPriceBook: vi.fn() }));
+vi.mock('@/lib/sections/actions', () => ({ addSection: vi.fn() }));
+vi.mock('@/i18n/routing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/i18n/routing')>()),
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-toast', () => ({ toast }));
 
@@ -34,11 +43,11 @@ const BULLETIN = { periodMonth: '2026-07', publishedAt: '2026-08-01T00:00:00Z', 
 
 /** The edit sheet as the page drives it: a bulletin published later, then a refresh handing a new item object of the same id. */
 function EditSheet() {
-  const [column, setColumn] = useState<{ ref: MarketPriceRef | undefined } | null>(null);
+  const [column, setColumn] = useState<{ linked: boolean; ref: MarketPriceRef | undefined } | null>(null);
   const [edited, setEdited] = useState(item('linked', 'm-1'));
   return (
     <>
-      <button type="button" onClick={() => setColumn({ ref: TILE })}>publish</button>
+      <button type="button" onClick={() => setColumn({ linked: true, ref: TILE })}>publish</button>
       <button type="button" onClick={() => setEdited({ ...edited, marketItemId: 'm-2' })}>refresh</button>
       <CostItemForm open onOpenChange={() => {}} item={edited} sections={[SECTION]} market={column} />
     </>
@@ -95,7 +104,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Market column (%s)', (locale) =>
       screen.getByRole('button', { name: at('priceBook.market.link.unlink') }).click();
     });
     expect(market.linkCostItemToMarket).toHaveBeenLastCalledWith({ costItemId: 'c-1', marketItemId: null });
-    expect(toast).toHaveBeenCalledWith({ title: at('priceBook.market.link.unlinked') });
+    expect(screen.getByRole('status').textContent).toBe(at('priceBook.market.link.unlinked'));
+    expect(toast).not.toHaveBeenCalled();
   });
 
   test('the edit sheet offers the link only while a bulletin is published, and a refresh keeps what is typed', async () => {
@@ -107,4 +117,46 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Market column (%s)', (locale) =>
     fireEvent.click(screen.getByRole('button', { name: 'refresh', hidden: true }));
     expect((document.getElementById('ci-code') as HTMLInputElement).value).toBe('TYPED');
   });
+
+  test('the sheet says the link as the refreshed page reads it: Unlink after a link, "not linked" after an unlink (F2)', async () => {
+    market.linkCostItemToMarket.mockResolvedValue({ ok: true });
+    renderWithIntl(<PageAfterLinks />, { locale });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('priceBook.actions.edit') }));
+    });
+    const label = () => screen.getByText(at('priceBook.market.link.label'), { exact: false }).parentElement?.textContent ?? '';
+    const unlink = () => screen.queryByRole('button', { name: at('priceBook.market.link.unlink') });
+    expect(label()).toContain(at('priceBook.market.link.none'));
+    expect(unlink()).toBeNull();
+    await pickOption('ci-market', `${locale === 'en' ? 'Matt tile (Tiles)' : 'بلاط مط (بلاط)'} ${formatMoney('410.0000', locale)}`);
+    fireEvent.click(screen.getByRole('button', { name: 'refresh linked', hidden: true }));
+    expect(unlink()).toBeTruthy();
+    expect(label()).toContain(locale === 'en' ? 'Tile' : 'بلاط');
+    await act(async () => {
+      unlink()!.click();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'refresh unlinked', hidden: true }));
+    expect(unlink()).toBeNull();
+    expect(label()).toContain(at('priceBook.market.link.none'));
+    expect(label()).not.toContain(at('priceBook.market.noPrice'));
+  });
 });
+
+/** The price book page as the server refreshes it after a link and after an unlink: a NEW item object of the same id each time. */
+function PageAfterLinks() {
+  const [linkedTo, setLinkedTo] = useState<string | null>(null);
+  const row = item('tile', linkedTo);
+  return (
+    <>
+      <button type="button" onClick={() => setLinkedTo('m-2')}>refresh linked</button>
+      <button type="button" onClick={() => setLinkedTo(null)}>refresh unlinked</button>
+      <PriceBookClient
+        view={FIRST_VIEW}
+        book={{ rows: [row], sectionCounts: { [SECTION.id]: 1 }, matched: 1, page: 1, pageCount: 1, hasAnyItem: true }}
+        market={{ bulletin: BULLETIN, refs: linkedTo ? { tile: TILE } : {} }}
+        sections={[SECTION]}
+        canManage
+      />
+    </>
+  );
+}

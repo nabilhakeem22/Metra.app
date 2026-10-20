@@ -39,6 +39,9 @@ export function PriceBookClient({ view, book, market, sections, canManage }: Pri
   const actions = usePriceBookActions();
   const navigation = usePriceBookNavigation(view);
   const groups = groupPageRows(book.rows, sections, book.sectionCounts);
+  // The edited item as the page now reads it: a market link saved from the
+  // sheet refreshes the page, and the sheet must say the link as it now is.
+  const edited = editing ? (book.rows.find((row) => row.id === editing.id) ?? editing) : null;
 
   // The four dialogs stay CHILDREN of this component: each is a Radix portal
   // whose open state belongs to the page, not to the toolbar button that opens it.
@@ -49,7 +52,11 @@ export function PriceBookClient({ view, book, market, sections, canManage }: Pri
         onOpenChange={setFormOpen}
         item={editing}
         sections={sections}
-        market={market.bulletin === null ? null : { ref: editing ? market.refs[editing.id] : undefined }}
+        market={
+          market.bulletin === null || edited === null
+            ? null
+            : { linked: edited.marketItemId !== null, ref: market.refs[edited.id] }
+        }
       />
       <BulkUpdateDialog open={bulkOpen} onOpenChange={setBulkOpen} sections={sections} />
       <ImportWizard open={importOpen} onOpenChange={setImportOpen} sections={sections} />

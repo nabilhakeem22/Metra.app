@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectControl } from '@/components/ui/select-control';
-import { toast } from '@/hooks/use-toast';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { linkCostItemToMarket } from '@/lib/market-book/actions';
@@ -25,7 +24,10 @@ const inLocale = (locale: string, ar: string, en: string) => (locale.startsWith(
  * item follows. Picking one links it at once and unlinking is one button; it
  * saves on its own, apart from the sheet's Save, and never changes the cost
  * or the price. Only items in the item's own unit are offered. A refusal is
- * said under the picker.
+ * said under the picker. What was saved is said IN the field, not as a toast:
+ * a toast over the sheet would cover its footer and take the first Escape.
+ * `linked` and `reference` are the page's latest read, so the field says the
+ * link as it now stands.
  */
 export function MarketLinkField({ costItemId, linked, reference }: { costItemId: string; linked: boolean; reference: MarketPriceRef | undefined }) {
   const t = useTranslations('priceBook.market');
@@ -34,6 +36,7 @@ export function MarketLinkField({ costItemId, linked, reference }: { costItemId:
   const locale = useLocale();
   const [query, setQuery] = useState('');
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const search = useMarketLinkSearch(costItemId, query);
   const current = reference
@@ -42,10 +45,11 @@ export function MarketLinkField({ costItemId, linked, reference }: { costItemId:
 
   function link(marketItemId: string | null) {
     setRefusal(null);
+    setSaved(null);
     startTransition(async () => {
       try {
         const result = await linkCostItemToMarket({ costItemId, marketItemId });
-        if (result.ok) toast({ title: t(marketItemId ? 'link.linked' : 'link.unlinked') });
+        if (result.ok) setSaved(t(marketItemId ? 'link.linked' : 'link.unlinked'));
         else setRefusal(describeFailure(result, te));
       } catch (rejection) {
         setRefusal(describeRejection(rejection, te));
@@ -61,6 +65,9 @@ export function MarketLinkField({ costItemId, linked, reference }: { costItemId:
         <span>
           <span className="text-muted-foreground">{t('link.label')}: </span>
           {current}
+          <span role="status" className="ms-2 text-caption text-muted-foreground">
+            {saved}
+          </span>
         </span>
         {linked && (
           <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => link(null)}>
