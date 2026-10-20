@@ -137,7 +137,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
-        openingBilling={null}
         billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"
@@ -165,7 +164,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
-          openingBilling={null}
           billingMay={{ issue: false, record: false }}
           tabs={['overview', 'variations']}
           openingTab="overview"
@@ -238,7 +236,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         openingSections={null}
         variations={[]}
         schedule={null}
-        openingBilling={null}
         billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="variations"

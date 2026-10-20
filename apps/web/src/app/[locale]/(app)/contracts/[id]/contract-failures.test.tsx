@@ -83,7 +83,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
-        openingBilling={null}
         billingMay={{ issue: false, record: false }}
         tabs={['overview', 'variations']}
         openingTab="overview"

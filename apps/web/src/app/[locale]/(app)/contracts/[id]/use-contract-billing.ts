@@ -20,14 +20,17 @@ export interface ContractBilling {
 }
 
 /**
- * The tab is read on demand, not with the page: the overview never pays for
- * it. `opening` is what the server read for a page opened on the tab (a link
- * from the delivery card); null otherwise. Every change the tab makes reloads
- * it, which also brings the ledger back to its first page.
+ * The tab is ALWAYS read on demand, through its action, never rendered with
+ * the page, even when the page opens on it (a link from the delivery card):
+ * up to 100 requests and 50 payments rendered by the server made the page 26%
+ * heavier on the Worker with 60 requests and 500 payments (A4 workerd
+ * measurement), while the read alone grows 9%. The rows render in the browser.
+ * Every change the tab makes reloads it, which also brings the ledger back to
+ * its first page.
  */
-export function useContractBilling(contractId: string, opening: ContractBillingView | null): ContractBilling {
+export function useContractBilling(contractId: string): ContractBilling {
   const te = useTranslations('errors');
-  const [view, setView] = useState<ContractBillingView | null>(opening);
+  const [view, setView] = useState<ContractBillingView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 

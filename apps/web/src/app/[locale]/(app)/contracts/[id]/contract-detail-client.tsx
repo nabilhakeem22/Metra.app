@@ -8,7 +8,6 @@ import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractPageDetail, ContractSectionsPage } from '@/lib/contracts/queries';
 import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
-import type { ContractBillingView } from '@/lib/execution/billing/view';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
@@ -28,7 +27,6 @@ export function ContractDetailClient({
   openingSections,
   variations,
   schedule,
-  openingBilling,
   billingMay,
   tabs,
   openingTab,
@@ -44,8 +42,6 @@ export function ContractDetailClient({
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
-  /** The Payments tab's data when the page opened on it; null otherwise (read when shown). */
-  openingBilling: ContractBillingView | null;
   billingMay: BillingMay;
   tabs: readonly ContractTab[];
   openingTab: ContractTab;
@@ -62,7 +58,7 @@ export function ContractDetailClient({
   const [tab, setTab] = useState<ContractTab>(openingTab);
   const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
-  const billing = useContractBilling(detail.id, openingBilling);
+  const billing = useContractBilling(detail.id);
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

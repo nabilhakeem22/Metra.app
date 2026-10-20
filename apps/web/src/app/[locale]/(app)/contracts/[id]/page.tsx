@@ -6,7 +6,6 @@ import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import { mayIssueRequests, mayRecordPayments, maySeeBilling } from '@/lib/execution/billing/access';
-import { getContractBilling } from '@/lib/execution/billing/view';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
@@ -41,8 +40,6 @@ export default async function ContractDetailPage({
   // never read them (A3 reliability R1). Opened elsewhere, the overview asks
   // for its first page when it is shown.
   const openingSections = openingTab === 'overview' ? await getContractSectionsPage(ctx, id, null) : null;
-  // The same for the Payments tab: read with the page only when it opens on it.
-  const openingBilling = openingTab === 'payments' ? await getContractBilling(ctx, id) : null;
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
@@ -60,7 +57,6 @@ export default async function ContractDetailPage({
         openingSections={openingSections}
         variations={variations}
         schedule={schedule}
-        openingBilling={openingBilling}
         billingMay={{ issue: mayIssueRequests(ctx.role), record: mayRecordPayments(ctx.role) }}
         tabs={tabs}
         openingTab={openingTab}
