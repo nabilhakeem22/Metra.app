@@ -15,6 +15,9 @@ import { variationStatusKey } from '@/lib/variations/status-label';
 import type { ContractAction, VariationChargeRates } from './contract-vo-types';
 import { VariationChargeSummary } from './variation-charge-summary';
 
+/** A cell: a table cell from sm up, a piece of the stacked row below it. */
+const CELL = 'block sm:table-cell sm:px-4 sm:py-2';
+
 /**
  * The contract's variation orders, each with the next step its status allows.
  * On an execution contract (`chargeRates`) each also says what it charges the
@@ -51,33 +54,39 @@ export function VariationTable({
   return (
     <Card>
       <CardContent className="overflow-x-auto p-0">
-        <table className="w-full text-body">
-          <tbody>
+        {/* Below sm each row stacks as a card (F3): number, then the title and
+            its breakdown across the full width, then status, net change and the
+            next step, so nothing is pushed off a phone screen. */}
+        <table className="block w-full text-body sm:table">
+          <tbody className="block sm:table-row-group">
             {variations.map((v) => {
               const statusKey = variationStatusKey(v);
               return (
-                <tr key={v.id} className="border-b last:border-0">
-                  <td className="px-4 py-2 font-mono text-caption" dir="ltr">
+                <tr
+                  key={v.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 last:border-0 sm:table-row sm:p-0"
+                >
+                  <td className={`${CELL} whitespace-nowrap font-mono text-caption`} dir="ltr">
                     {formatDocNumber('VO', v.number, docYear(null, v.createdAt))}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className={`${CELL} basis-full`}>
                     {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
                     {chargeRates && (
                       <VariationChargeSummary
                         netDelta={v.netDelta}
+                        status={v.status}
                         timeExtensionDays={v.timeExtensionDays}
                         rates={chargeRates}
-                        m={m}
                       />
                     )}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className={CELL}>
                     <StatusChip tone={VARIATION_STATUS_TONE[statusKey]} label={tv(`status.${statusKey}`)} />
                   </td>
-                  <td className="px-4 py-2 text-end" dir="ltr">
+                  <td className={`${CELL} ms-auto whitespace-nowrap text-end sm:ms-0`} dir="ltr">
                     {m(v.netDelta)}
                   </td>
-                  <td className="px-4 py-2 text-end">
+                  <td className={`${CELL} text-end`}>
                     {canPriceVariation && v.status === 'draft' && (
                       <Button
                         size="sm"

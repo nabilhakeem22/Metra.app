@@ -90,8 +90,12 @@ function toCharges(source: unknown, taxRate: unknown, supervisionPct: unknown): 
   return RATE_TEXT.test(taxRate) && RATE_TEXT.test(supervisionPct) ? { taxRate, supervisionPct } : null;
 }
 
-/** A whole, non-negative day count, or null for anything else. */
-function toExtensionDays(value: unknown): number | null {
+/**
+ * A BOQ contract's whole, non-negative day count, or null for anything else: a
+ * proposal contract's order carries no days in the studio, so none here (F6).
+ */
+function toExtensionDays(source: unknown, value: unknown): number | null {
+  if (source !== 'boq') return null;
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
@@ -121,7 +125,7 @@ export async function getVariationByToken(
     contractActive: contractActive !== false,
     rejectionChannel: toRejectionChannel(rejectionChannel),
     charges: toCharges(contractSource, taxRate, supervisionPct),
-    timeExtensionDays: toExtensionDays(timeExtensionDays),
+    timeExtensionDays: toExtensionDays(contractSource, timeExtensionDays),
   };
 }
 

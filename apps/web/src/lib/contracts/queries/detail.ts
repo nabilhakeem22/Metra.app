@@ -9,6 +9,7 @@ import { variationOrders, type MetraDb } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { computeRevisedContractValue } from '@/lib/aggregates/contract-value';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { approvedVariationsCharge } from '@/lib/execution/money/variation-charge';
 import { loadContractHeader } from './detail-header';
 import { loadContractSections } from './detail-sections';
 import type { ContractDetail, ContractHeaderDetail, ContractPageDetail } from './detail-types';
@@ -29,20 +30,41 @@ export type {
   ContractSigning,
 } from './detail-types';
 
+/** What a contract's value is made of, as far as its change orders are concerned. */
+interface ContractValueBasis {
+  originalValue: string;
+  sourceBoqId: string | null;
+  taxRate: string;
+  supervisionPct: string;
+}
+
 /**
- * What the APPROVED VOs change, summed in SQL (one row, however many orders):
- * revised value = original + Σ netDelta (A3, computed), and the days they add
- * to the finish date (A24). numeric sums exactly, so the BigInt engine adds one
- * figure instead of every order's.
+ * Revised value (computed, A3) = original + what the approved orders add. A
+ * proposal contract adds their net change, as it always has. An execution
+ * contract's original value already carries VAT and supervision, so it adds
+ * each order's full charge (D4a, F1), rounded per order as it is billed.
+ */
+function revisedValueOf(contract: ContractValueBasis, approvedNetDeltas: string[]): string {
+  if (contract.sourceBoqId === null) {
+    return computeRevisedContractValue(contract.originalValue, approvedNetDeltas);
+  }
+  const charge = approvedVariationsCharge(approvedNetDeltas, contract.taxRate, contract.supervisionPct);
+  return computeRevisedContractValue(contract.originalValue, [charge]);
+}
+
+/**
+ * What the APPROVED VOs change, in ONE SQL row: their net changes (the money
+ * rule rounds per order, so each crosses the wire as one short figure) and
+ * the days they add to the finish date (A24), summed in SQL.
  */
 async function computeApprovedChanges(
   tx: MetraDb,
   contractId: string,
-  originalValue: string,
+  contract: ContractValueBasis,
 ): Promise<{ revisedValue: string; approvedExtensionDays: number }> {
   const [approved] = await tx
     .select({
-      netDelta: sql<string>`coalesce(sum(${variationOrders.netDelta}), 0)::text`,
+      netDeltas: sql<string[]>`coalesce(jsonb_agg(${variationOrders.netDelta}::text), '[]'::jsonb)`,
       extensionDays: sql<number>`coalesce(sum(${variationOrders.timeExtensionDays}), 0)::int`,
     })
     .from(variationOrders)
@@ -53,7 +75,7 @@ async function computeApprovedChanges(
       ),
     );
   return {
-    revisedValue: computeRevisedContractValue(originalValue, [approved.netDelta]),
+    revisedValue: revisedValueOf(contract, approved.netDeltas),
     approvedExtensionDays: approved.extensionDays,
   };
 }
@@ -71,7 +93,7 @@ async function loadHeaderDetail(
   return {
     ...rest,
     createdAt: createdAt.toISOString(),
-    ...(await computeApprovedChanges(tx, id, header.originalValue)),
+    ...(await computeApprovedChanges(tx, id, header)),
     // Absent, not null, when the caller may not see margin.
     ...(canSeeMargin ? { totalCost, totalMargin } : {}),
   };

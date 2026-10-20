@@ -1,5 +1,6 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { formatMoneyExact } from '@/lib/format/money';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractFinishDate } from './contract-finish-date';
@@ -114,17 +115,53 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
     expect(document.activeElement?.id).toBe(VO_DAYS_ID);
   });
 
-  test('each order of an execution contract says its works, VAT, supervision, total and days (D4a)', () => {
+  const table = (rows: VariationListRow[]) =>
     renderWithIntl(
-      <VariationTable variations={[row()]} chargeRates={RATES} canPriceVariation={false} pending={false} m={(v) => v} act={() => {}} />,
+      <VariationTable variations={rows} chargeRates={RATES} canPriceVariation={false} pending={false} m={(v) => v} act={() => {}} />,
       { locale },
     );
-    for (const figure of ['10000.0000', '1400.0000', '1000.0000', '12400.0000']) {
-      expect(screen.getAllByText(figure).length).toBeGreaterThan(0);
+  /** A days sentence, recognised by the words its message opens with in this locale. */
+  const opening = (key: 'addsDays' | 'wouldAddDays') => at(`variations.charge.${key}`).split('{')[0].trim();
+  const hasLine = (key: 'addsDays' | 'wouldAddDays') =>
+    [...document.querySelectorAll('p')].some((p) => (p.textContent ?? '').startsWith(opening(key)));
+
+  test('a fraction of a day is refused as not whole, typed Arabic or Latin (F5)', async () => {
+    await openRegister(RATES);
+    typeDays('١٫٥');
+    await press(at('variations.saveDraft'));
+    expect(variations.createVariationDraft).not.toHaveBeenCalled();
+    expect(document.getElementById(`${VO_DAYS_ID}-error`)?.textContent).toBe(at('errors.field.not_whole_number'));
+  });
+
+  test('each order of an execution contract says its works, VAT, supervision and total (D4a)', () => {
+    table([row()]);
+    for (const figure of ['10000', '1400', '1000', '12400']) {
+      expect(screen.getAllByText(formatMoneyExact(figure, locale)).length).toBeGreaterThan(0);
     }
     expect(screen.getByText(at('variations.charge.supervision'))).toBeTruthy();
-    expect(document.body.textContent).toContain('15');
     expect(document.body.textContent).not.toMatch(/[٠-٩]/);
+  });
+
+  test('a 4-decimal net change shows exact parts that add up to the total as shown (F4)', () => {
+    table([row({ netDelta: '1000.0043' })]);
+    for (const figure of ['1000.0043', '140.0006', '100.0004', '1240.0053']) {
+      expect(screen.getByText(formatMoneyExact(figure, locale))).toBeTruthy();
+    }
+  });
+
+  test('the days are worded by status: approved adds, open would add, rejected says nothing (F2)', () => {
+    const first = table([row({ status: 'approved' })]);
+    expect(hasLine('addsDays')).toBe(true);
+    expect(hasLine('wouldAddDays')).toBe(false);
+    first.unmount();
+    for (const open of ['draft', 'internal_approved', 'issued'] as const) {
+      const view = table([row({ status: open })]);
+      expect(hasLine('wouldAddDays')).toBe(true);
+      expect(hasLine('addsDays')).toBe(false);
+      view.unmount();
+    }
+    table([row({ status: 'rejected' })]);
+    expect(hasLine('wouldAddDays') || hasLine('addsDays')).toBe(false);
   });
 
   test('a proposal contract\'s register shows the net change alone, as before', () => {

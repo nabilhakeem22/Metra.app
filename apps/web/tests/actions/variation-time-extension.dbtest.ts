@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getContractPage } from '@/lib/contracts/queries';
+import { getContractForPdf, getContractPage } from '@/lib/contracts/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { revisedFinishDate } from '@/lib/execution/finish-date';
 import {
@@ -76,8 +76,8 @@ describe('the days a change order adds (A24)', () => {
     expect(after!.approvedExtensionDays).toBe(30);
     expect(after!.endDate).toBe('2026-12-31');
     expect(revisedFinishDate(after!.endDate, after!.approvedExtensionDays)).toBe('2027-01-30');
-    // Two approved orders of 1,000 each: the revised value still adds up (one SQL sum).
-    expect(after!.revisedValue).toBe('126000.0000');
+    // Two approved orders of 1,000 works each, charged 1,240 each (D4a, F1).
+    expect(after!.revisedValue).toBe('126480.0000');
   });
 
   it('a blank box stores no extension; whole days from 0 to 3650 are stored as typed', async () => {
@@ -92,7 +92,7 @@ describe('the days a change order adds (A24)', () => {
       `select count(*)::int as count from public.variation_orders where org_id = $1`,
       [orgId],
     );
-    for (const [days, code] of [['3651', 'out_of_range'], ['-1', 'out_of_range'], ['1.5', 'out_of_range'], ['abc', 'not_a_number'], [{}, 'not_a_number']] as const) {
+    for (const [days, code] of [['3651', 'out_of_range'], ['-1', 'out_of_range'], ['1.5', 'not_whole_number'], ['abc', 'not_a_number'], [{}, 'not_a_number']] as const) {
       const res = await createVariationDraftCore(owner, { contractId: contract.contractId, titleEn: 'Delay', timeExtensionDays: days });
       expect(res).toMatchObject({ ok: false, error: 'check_fields', fields: { timeExtensionDays: { code } } });
     }
@@ -151,6 +151,20 @@ describe('the days a change order adds (A24)', () => {
     expect(count).toBe(1);
     expect(await storedDays(id)).toBeNull();
     expect((await getContractPage(owner, proposalContractId, true))!.approvedExtensionDays).toBe(0);
+  });
+});
+
+describe("the revised value of an execution contract carries each approved order's full charge (F1)", () => {
+  it("the tester's repro: 124,000 + 12,400 + 12,400 + 0 + 1,240.0053 - 620 = 149,420.0053, on the page and the PDF", async () => {
+    const repro = await seedExecutionContract(orgId, { linesPerSection: [1], state: 'signed' });
+    for (const netDelta of ['10000', '10000', '0', '1000.0043', '-500']) {
+      await seedVariation(orgId, repro, 'approved', { netDelta });
+    }
+    // Neither an open nor a rejected order moves the value.
+    await seedVariation(orgId, repro, 'issued', { netDelta: '7000' });
+    await seedVariation(orgId, repro, 'rejected', { netDelta: '9000' });
+    expect((await getContractPage(owner, repro.contractId, true))!.revisedValue).toBe('149420.0053');
+    expect((await getContractForPdf(owner, repro.contractId, false))!.revisedValue).toBe('149420.0053');
   });
 });
 

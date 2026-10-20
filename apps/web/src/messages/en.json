@@ -481,7 +481,8 @@
       "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
       "date_in_future": "That day has not come yet. Pick today or an earlier day.",
       "too_many_decimals": "Use at most {max} decimal places.",
-      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one."
+      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
+      "not_whole_number": "Enter a whole number, without a fraction."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -1784,7 +1785,8 @@
         "tax": "VAT",
         "supervision": "Supervision fee",
         "total": "Total charge",
-        "addsDays": "This change order extends the works by {count, plural, one {{n} day} other {{n} days}}."
+        "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the duration of the works.",
+        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved."
       }
     },
     "timeExtension": {
@@ -1796,7 +1798,8 @@
       "tax": "VAT",
       "supervision": "Supervision",
       "total": "Total",
-      "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the finish date"
+      "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the finish date",
+      "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the finish date if approved"
     }
   },
   "engagements": {
@@ -2832,7 +2835,8 @@
         "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
         "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
         "too_many_decimals": "Please use at most {max} decimal places.",
-        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one."
+        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
+        "not_whole_number": "Please enter a whole number, without a fraction."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
-import { formatMoney } from '@/lib/format/money';
+import { formatMoney, formatMoneyExact } from '@/lib/format/money';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { PublicVariation } from '@/lib/variations/public';
 import type { VariationDecidedKey } from '@/lib/variations/decided-message';
@@ -248,18 +248,56 @@ describe('PublicVariationView — the charge breakdown', () => {
     expect(screen.queryByText(label('supervision'))).toBeNull();
   });
 
-  test('the days it adds are said in Latin digits, and nothing is said for none', () => {
-    const { unmount } = renderWithIntl(
-      <PublicVariationView token={TOKEN} variation={variationWith({ timeExtensionDays: 15 })} />,
-    );
-    const days = screen.getByText((text) => text.startsWith('يمدّد'));
+  // F2: the ar fusha sentences open with these words.
+  const WOULD_ADD = 'سيضيف';
+  const ADDS = 'يضيف';
+  const daysLine = () => screen.queryByText((text) => text.startsWith(WOULD_ADD) || text.startsWith(ADDS));
+
+  test('an open order says it WOULD add its days if approved, in Latin digits', () => {
+    renderWithIntl(<PublicVariationView token={TOKEN} variation={variationWith({ timeExtensionDays: 15 })} />);
+    const days = daysLine()!;
+    expect(days.textContent!.startsWith(WOULD_ADD)).toBe(true);
     expect(days.textContent).toContain('15');
     expect(days.textContent).not.toMatch(/[٠-٩]/);
+  });
+
+  test('an approved order adds its days; the client approving on the page turns the wording', async () => {
+    const { unmount } = renderWithIntl(
+      <PublicVariationView token={TOKEN} variation={variationWith({ status: 'approved', timeExtensionDays: 15 })} />,
+    );
+    expect(daysLine()!.textContent!.startsWith(ADDS)).toBe(true);
     unmount();
-    for (const none of [0, null]) {
-      const view = renderWithIntl(<PublicVariationView token={TOKEN} variation={variationWith({ timeExtensionDays: none })} />);
-      expect(screen.queryByText((text) => text.startsWith('يمدّد'))).toBeNull();
+    respondToVariation.mockResolvedValue({ ok: true });
+    renderWithIntl(<PublicVariationView token={TOKEN} variation={variationWith({ timeExtensionDays: 15 })} />);
+    fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'variations.client.approve') }));
+    expect(await screen.findByText(decidedText('approved'))).toBeTruthy();
+    expect(daysLine()!.textContent!.startsWith(ADDS)).toBe(true);
+  });
+
+  test('a rejected order, or one with no days, says nothing about days', () => {
+    for (const variation of [
+      variationWith({ status: 'rejected', rejectionChannel: 'client', timeExtensionDays: 100 }),
+      variationWith({ status: 'rejected', rejectionChannel: 'staff', timeExtensionDays: 100 }),
+      variationWith({ timeExtensionDays: 0 }),
+      variationWith({ timeExtensionDays: null }),
+    ]) {
+      const view = renderWithIntl(<PublicVariationView token={TOKEN} variation={variation} />);
+      expect(daysLine()).toBeNull();
       view.unmount();
     }
+  });
+
+  test('a 4-decimal net change shows exact rows that add up to the total as shown (F4)', () => {
+    renderWithIntl(
+      <PublicVariationView
+        token={TOKEN}
+        variation={variationWith({ net_delta: '1000.0043', charges: { taxRate: '14.0000', supervisionPct: '10.0000' } })}
+      />,
+    );
+    const shown = (key: string) => screen.getByText(label(key)).parentElement!.querySelector('[dir="ltr"]')!.textContent;
+    expect(shown('works')).toBe(formatMoneyExact('1000.0043', 'ar-EG'));
+    expect(shown('tax')).toBe(formatMoneyExact('140.0006', 'ar-EG'));
+    expect(shown('supervision')).toBe(formatMoneyExact('100.0004', 'ar-EG'));
+    expect(shown('total')).toBe(formatMoneyExact('1240.0053', 'ar-EG'));
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readTimeExtensionDays, timeExtensionFieldErrors } from './time-extension';
+import { extensionDaysWording, readTimeExtensionDays, timeExtensionFieldErrors } from './time-extension';
 
 const RANGE = { code: 'out_of_range', params: { min: 0, max: 3650 } };
 
@@ -17,10 +17,17 @@ describe('readTimeExtensionDays', () => {
     expect(readTimeExtensionDays(30)).toEqual({ ok: true, value: 30 });
   });
 
-  it('refuses a fraction, a minus or past 3650 with the range', () => {
-    for (const outside of ['1.5', '-1', '3651', '99999999999', 2.5, -3]) {
+  it('refuses a minus or past 3650 with the range', () => {
+    for (const outside of ['-1', '3651', '99999999999', -3]) {
       expect(readTimeExtensionDays(outside)).toEqual({ ok: false, error: RANGE });
     }
+  });
+
+  it('refuses a fraction by saying the days must be whole (F5), even inside the range', () => {
+    for (const fraction of ['1.5', '-1.5', '0.1', 2.5]) {
+      expect(readTimeExtensionDays(fraction)).toEqual({ ok: false, error: { code: 'not_whole_number' } });
+    }
+    expect(readTimeExtensionDays('15.0')).toEqual({ ok: true, value: 15 });
   });
 
   it('refuses what is not a number, including Arabic-Indic digits the form did not convert', () => {
@@ -35,5 +42,18 @@ describe('timeExtensionFieldErrors', () => {
     expect(timeExtensionFieldErrors('12')).toEqual({});
     expect(timeExtensionFieldErrors('')).toEqual({});
     expect(timeExtensionFieldErrors('4000')).toEqual({ timeExtensionDays: RANGE });
+  });
+});
+
+describe('extensionDaysWording (F2)', () => {
+  it('an approved order adds its days; an open one would; a rejected one says nothing', () => {
+    expect(extensionDaysWording('approved', 15)).toBe('adds');
+    for (const open of ['draft', 'internal_approved', 'issued']) expect(extensionDaysWording(open, 15)).toBe('wouldAdd');
+    expect(extensionDaysWording('rejected', 15)).toBeNull();
+  });
+
+  it('no days, or zero, says nothing whatever the status', () => {
+    expect(extensionDaysWording('approved', 0)).toBeNull();
+    expect(extensionDaysWording('issued', null)).toBeNull();
   });
 });

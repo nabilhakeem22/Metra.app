@@ -69,7 +69,11 @@ export function PublicVariationView({
     rejectionChannel: variation.rejectionChannel,
   };
   const decided = variationIsDecided(decisionState);
-  const decidedMessage = t(variationDecidedKey(decisionState));
+  const decidedKey = variationDecidedKey(decisionState);
+  const decidedMessage = t(decidedKey);
+  // The order as the page now stands (F2): open, approved (by the client's
+  // click too), or closed any other way, which says no days at all.
+  const standing = decided ? (decidedKey === 'approved' ? 'approved' : null) : variation.status;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -107,7 +111,7 @@ export function PublicVariationView({
         </CardContent>
       </Card>
 
-      <VariationChargeCard variation={variation} m={m} />
+      <VariationChargeCard variation={variation} standing={standing} m={m} />
 
       {decided ? (
         <Card>

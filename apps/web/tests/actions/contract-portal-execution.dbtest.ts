@@ -379,8 +379,10 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
       [proposalContractId],
     );
     const token = mintShareToken();
+    // Days written past the cores (legacy or bypass data) stay off /v too (F6).
     await seedVariation(orgId, { contractId: proposalContractId, projectId: project.project_id }, 'issued', {
       tokenHash: token.hash,
+      timeExtensionDays: 9,
     });
     expect(await getVariationByToken(token.raw)).toMatchObject({ charges: null, timeExtensionDays: null });
   });
