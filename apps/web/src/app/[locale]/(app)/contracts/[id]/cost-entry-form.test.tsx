@@ -29,7 +29,7 @@ vi.mock('@/hooks/use-toast', () => ({ toast }));
 const SECTIONS = [{ id: 's-1', titleAr: 'مدني', titleEn: 'Civil', sortOrder: 0, sectionSubtotal: '0', lineCount: 0, openingLines: [] }];
 
 function Sheet() {
-  const entry = useCostEntryForm('k-1');
+  const entry = useCostEntryForm('k-1', () => {});
   return (
     <>
       <button type="button" onClick={entry.openNew}>

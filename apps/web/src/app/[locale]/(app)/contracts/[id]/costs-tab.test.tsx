@@ -6,9 +6,10 @@ import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CostsTab } from './costs-tab';
 
-// PR B3.2: the Costs tab lists what the server read (50 a page), asks the
-// server for a filter or the next page, shows the market price only where the
-// read joined one, and voids after a confirm.
+// PR B3.2: the Costs tab asks the server for its list when it opens (the
+// contract page never carries it), asks again for a filter, the next page or
+// after a write, shows the market price only where the read joined one, and
+// voids after a confirm.
 
 const actions = vi.hoisted(() => ({
   createCostEntry: vi.fn(),
@@ -39,51 +40,70 @@ const FIRST: CostEntriesPage = {
   next: { incurredOn: '2026-10-01', id: row(2).id },
   totals: { count: 1, amount: '100.0000' },
 };
+const ALL = { category: null, sectionId: null };
 
-function renderTab(locale: TestLocale, contractStatus: 'draft' | 'signed' = 'signed') {
-  renderWithIntl(
-    <CostsTab contractId="k-1" contractStatus={contractStatus} sections={[]} initial={FIRST} canCreate canUpdate m={(value) => value} />,
-    { locale },
-  );
+async function renderTab(locale: TestLocale, contractStatus: 'draft' | 'signed' = 'signed') {
+  renderWithIntl(<CostsTab contractId="k-1" contractStatus={contractStatus} sections={[]} canCreate canUpdate m={(value) => value} />, { locale });
+  await act(async () => {});
 }
 
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockReset();
+  actions.loadCostEntries.mockResolvedValue({ ok: true, data: FIRST });
   toast.mockReset();
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
   const at = (key: string) => messageAt(locale, key);
 
-  test('shows the market price beside a matched entry only, and a voided entry without actions', async () => {
-    renderTab(locale);
+  test('asks for the first page when it opens, then shows the market price beside a matched entry only', async () => {
+    await renderTab(locale);
+    expect(actions.loadCostEntries).toHaveBeenCalledWith({ contractId: 'k-1', filter: ALL, cursor: null });
     expect(screen.getAllByText(at('contracts.costs.market').replace('{price}', '400.0000'))).toHaveLength(1);
     expect(screen.getByText(at('contracts.costs.voided'))).toBeTruthy();
     expect(screen.getAllByRole('button', { name: at('common.moreActions') })).toHaveLength(1);
   });
 
+  test('says it is loading until the first answer', async () => {
+    let answer: (page: unknown) => void = () => {};
+    actions.loadCostEntries.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    await renderTab(locale);
+    expect(screen.getByText(at('contracts.costs.loading'))).toBeTruthy();
+    // Settled, so no async transition is left pending for the next test to be entangled with.
+    await act(async () => answer({ ok: true, data: FIRST }));
+    expect(screen.queryByText(at('contracts.costs.loading'))).toBeNull();
+  });
+
+  test('says why a first load failed, and no longer that it is loading', async () => {
+    actions.loadCostEntries.mockResolvedValue({ ok: false, error: 'generic', reference: 'ref-1' });
+    await renderTab(locale);
+    expect(screen.getByRole('alert').textContent).toContain(at('contracts.costs.loadFailed'));
+    expect(screen.queryByText(at('contracts.costs.loading'))).toBeNull();
+  });
+
   test('asks for the next page after the last entry shown, and appends it', async () => {
+    await renderTab(locale);
     actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(3)], next: null, totals: null } });
-    renderTab(locale);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.showMore') }));
     });
-    expect(actions.loadCostEntries).toHaveBeenCalledWith({ contractId: 'k-1', filter: { category: null, sectionId: null }, cursor: FIRST.next });
+    expect(actions.loadCostEntries).toHaveBeenLastCalledWith({ contractId: 'k-1', filter: ALL, cursor: FIRST.next });
+    expect(screen.getByText('Entry 1')).toBeTruthy();
     expect(screen.getByText('Entry 3')).toBeTruthy();
     expect(screen.queryByRole('button', { name: at('contracts.costs.showMore') })).toBeNull();
   });
 
   test('a category asks the server for its first page and its total', async () => {
+    await renderTab(locale);
     actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [], next: null, totals: { count: 0, amount: '0.0000' } } });
-    renderTab(locale);
     await pickOption('costs-filter-category', at('contracts.costs.categories.labour'));
-    expect(actions.loadCostEntries).toHaveBeenCalledWith({ contractId: 'k-1', filter: { category: 'labour', sectionId: null }, cursor: null });
+    expect(actions.loadCostEntries).toHaveBeenLastCalledWith({ contractId: 'k-1', filter: { category: 'labour', sectionId: null }, cursor: null });
     expect(screen.getByText(at('contracts.costs.noMatch'))).toBeTruthy();
   });
 
-  test('voids only after the confirm, and says a refusal', async () => {
+  test('voids only after the confirm, says a refusal, and asks for the list again', async () => {
     actions.voidCostEntry.mockResolvedValue({ ok: false, error: 'cost_entry_voided' });
-    renderTab(locale);
+    await renderTab(locale);
     openMenu(at('common.moreActions'));
     await act(async () => {
       fireEvent.click(await screen.findByRole('menuitem', { name: at('contracts.costs.void') }));
@@ -94,10 +114,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
     });
     expect(actions.voidCostEntry).toHaveBeenCalledWith(row(1).id);
     expect(toast).toHaveBeenCalledWith({ title: at('errors.cost_entry_voided'), variant: 'destructive' });
+    expect(actions.loadCostEntries).toHaveBeenCalledTimes(2);
   });
 
-  test('offers no Record on a draft contract, and says why', () => {
-    renderTab(locale, 'draft');
+  test('offers no Record on a draft contract, and says why', async () => {
+    await renderTab(locale, 'draft');
     expect(screen.queryByRole('button', { name: at('contracts.costs.record') })).toBeNull();
     expect(screen.getByText(at('contracts.costs.draftNote'))).toBeTruthy();
   });

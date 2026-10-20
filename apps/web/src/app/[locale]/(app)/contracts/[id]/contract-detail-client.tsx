@@ -9,7 +9,6 @@ import { describeFailure, describeRejection } from '@/lib/actions/error-message'
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
-import type { CostEntriesPage } from '@/lib/execution/costs/types';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import type { ContractAction } from './contract-vo-types';
@@ -21,7 +20,6 @@ import { VariationRegister } from './variation-register';
 export function ContractDetailClient({
   detail,
   variations,
-  costs,
   tabs,
   canCreateCosts,
   canUpdateCosts,
@@ -32,8 +30,7 @@ export function ContractDetailClient({
 }: {
   detail: ContractPageDetail;
   variations: VariationListRow[];
-  /** The first page of an execution contract's costs; null when the Costs tab is not shown. */
-  costs: CostEntriesPage | null;
+  /** Costs is among them only on an execution contract, for a role that reads its costs. */
   tabs: readonly ContractTab[];
   canCreateCosts: boolean;
   canUpdateCosts: boolean;
@@ -126,12 +123,11 @@ export function ContractDetailClient({
           onTerminate={() => act(() => terminateContract(detail.id))}
         />
       )}
-      {tab === 'costs' && costs && (
+      {tab === 'costs' && (
         <CostsTab
           contractId={detail.id}
           contractStatus={detail.status}
           sections={detail.sections}
-          initial={costs}
           canCreate={canCreateCosts}
           canUpdate={canUpdateCosts}
           m={m}

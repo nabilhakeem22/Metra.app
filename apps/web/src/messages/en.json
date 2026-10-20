@@ -1653,6 +1653,7 @@
       "record": "Record a cost",
       "empty": "No costs recorded on this contract yet.",
       "noMatch": "No cost matches this filter.",
+      "loading": "Loading the costs",
       "filterCategory": "Category",
       "filterSection": "Section",
       "all": "All",

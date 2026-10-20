@@ -17,9 +17,9 @@ import { costItemLabel, lineLabel } from './cost-entry-labels';
  * server knows (a line no longer in the section, an entry voided meanwhile)
  * comes back the same way, or above the footer. A new entry carries one
  * idempotency key from opening to success, so a Save retried after a lost
- * answer records it once.
+ * answer records it once. `onSaved` runs after every saved entry.
  */
-export function useCostEntryForm(contractId: string) {
+export function useCostEntryForm(contractId: string, onSaved: () => void) {
   const t = useTranslations('contracts.costs');
   const te = useTranslations('errors');
   const locale = useLocale();
@@ -60,6 +60,7 @@ export function useCostEntryForm(contractId: string) {
         if (errors.applyResult(result)) return;
         toast({ title: t(editing ? 'toast.updated' : result.already ? 'toast.already' : 'toast.recorded') });
         setOpen(false);
+        onSaved();
       } catch (rejection) {
         errors.applyRejection(rejection);
       }

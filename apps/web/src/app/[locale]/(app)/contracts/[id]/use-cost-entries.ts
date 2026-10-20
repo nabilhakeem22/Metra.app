@@ -1,42 +1,38 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { describeReadFailure, type ShownFailure } from '@/lib/actions/error-message';
 import { loadCostEntries } from '@/lib/execution/costs/actions';
 import { NO_COST_FILTER, type CostEntriesFilter, type CostEntriesPage } from '@/lib/execution/costs/types';
 
 interface ListState {
   filter: CostEntriesFilter;
-  page: CostEntriesPage;
+  /** Null until the first answer lands. */
+  page: CostEntriesPage | null;
 }
 
 /**
- * The Costs tab's list: the first page the server rendered, a filter asked of
- * the server (its first page and its totals), and "show more" appending the
- * next 50. After any write the page re-renders with a new first page, shown
- * unfiltered (the new entry on top). An answer that lands after a newer
- * question is dropped; a failure keeps what is shown and says why.
+ * The Costs tab's list, asked of the server when the tab opens (never with
+ * the contract page, so the page costs the same however many costs the
+ * contract holds): a filter asks for its first page and its total, "show
+ * more" appends the next 50, and `reload` asks the current filter again after
+ * a write. An answer that lands after a newer question is dropped; a failure
+ * keeps what is shown and says why.
  */
-export function useCostEntries(contractId: string, initial: CostEntriesPage) {
+export function useCostEntries(contractId: string) {
   const te = useTranslations('errors');
   const t = useTranslations('contracts.costs');
-  const [list, setList] = useState<ListState>({ filter: NO_COST_FILTER, page: initial });
-  const [shownInitial, setShownInitial] = useState(initial);
+  const [list, setList] = useState<ListState>({ filter: NO_COST_FILTER, page: null });
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const latest = useRef(0);
 
-  if (shownInitial !== initial) {
-    setShownInitial(initial);
-    setList({ filter: NO_COST_FILTER, page: initial });
-    setFailure(null);
-  }
-
   function ask(filter: CostEntriesFilter, append: boolean) {
     const asked = (latest.current += 1);
-    const cursor = append ? list.page.next : null;
-    const fail = (shown: ShownFailure) => latest.current === asked && setFailure(describeReadFailure(shown, te, t('loadFailed')));
+    const shown = list.page;
+    const cursor = append && shown ? shown.next : null;
+    const fail = (refusal: ShownFailure) => latest.current === asked && setFailure(describeReadFailure(refusal, te, t('loadFailed')));
     startTransition(async () => {
       try {
         const result = await loadCostEntries({ contractId, filter, cursor });
@@ -48,7 +44,7 @@ export function useCostEntries(contractId: string, initial: CostEntriesPage) {
         const answer = result.data;
         setFailure(null);
         setList((current) =>
-          append
+          append && current.page
             ? { filter, page: { entries: [...current.page.entries, ...answer.entries], next: answer.next, totals: current.page.totals } }
             : { filter, page: answer },
         );
@@ -58,14 +54,19 @@ export function useCostEntries(contractId: string, initial: CostEntriesPage) {
     });
   }
 
+  const first = useRef(() => ask(NO_COST_FILTER, false));
+  useEffect(() => first.current(), []);
+
   return {
     filter: list.filter,
-    entries: list.page.entries,
-    totals: list.page.totals,
-    hasMore: list.page.next !== null,
+    loaded: list.page !== null,
+    entries: list.page?.entries ?? [],
+    totals: list.page?.totals ?? null,
+    hasMore: (list.page?.next ?? null) !== null,
     pending,
     failure,
     applyFilter: (filter: CostEntriesFilter) => ask(filter, false),
     loadMore: () => ask(list.filter, true),
+    reload: () => ask(list.filter, false),
   };
 }

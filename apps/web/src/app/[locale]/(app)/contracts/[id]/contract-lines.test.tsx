@@ -131,7 +131,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
       <ContractDetailClient
         detail={detail as unknown as ContractPageDetail}
         variations={[]}
-        costs={null}
         tabs={contractTabsFor(false)}
         canCreateCosts={false}
         canUpdateCosts={false}

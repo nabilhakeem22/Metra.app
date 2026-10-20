@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import type { ContractSectionSummary } from '@/lib/contracts/queries';
 import { voidCostEntry } from '@/lib/execution/costs/actions';
-import { COST_ENTRY_CATEGORIES, type CostEntriesPage, type CostEntryRow as CostEntry } from '@/lib/execution/costs/types';
+import { COST_ENTRY_CATEGORIES, type CostEntryRow as CostEntry } from '@/lib/execution/costs/types';
 import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { CostEntryForm } from './cost-entry-form';
@@ -24,14 +24,14 @@ const ALL = '__all__';
 
 /**
  * The Costs tab (المصروفات) of an execution contract: what was recorded, 50 at
- * a time newest first, narrowed by category or section, with the live total
- * of what is shown; record, edit and void for a role that may.
+ * a time newest first (asked when the tab opens), narrowed by category or
+ * section, with the live total of what is shown; record, edit and void for a
+ * role that may, each followed by the list asked again.
  */
 export function CostsTab({
   contractId,
   contractStatus,
   sections,
-  initial,
   canCreate,
   canUpdate,
   m,
@@ -39,7 +39,6 @@ export function CostsTab({
   contractId: string;
   contractStatus: ContractStatus;
   sections: ContractSectionSummary[];
-  initial: CostEntriesPage;
   canCreate: boolean;
   canUpdate: boolean;
   m: (value: string) => string;
@@ -47,8 +46,8 @@ export function CostsTab({
   const t = useTranslations('contracts.costs');
   const te = useTranslations('errors');
   const locale = useLocale();
-  const list = useCostEntries(contractId, initial);
-  const entry = useCostEntryForm(contractId);
+  const list = useCostEntries(contractId);
+  const entry = useCostEntryForm(contractId, list.reload);
   const { confirm, dialog } = useConfirm();
   const [voiding, startVoid] = useTransition();
   const filtered = list.filter.category !== null || list.filter.sectionId !== null;
@@ -62,6 +61,7 @@ export function CostsTab({
       try {
         const result = await voidCostEntry(target.id);
         toast(result.ok ? { title: t('toast.voided') } : { title: describeFailure(result, te), variant: 'destructive' });
+        list.reload();
       } catch (rejection) {
         toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
@@ -112,7 +112,10 @@ export function CostsTab({
       <Card aria-busy={list.pending}>
         <CardContent className="overflow-x-auto p-0">
           {list.entries.length === 0 ? (
-            <p className="py-6 text-center text-body text-muted-foreground">{t(filtered ? 'noMatch' : 'empty')}</p>
+            // A first load that failed says so above (the alert), not "loading" for ever.
+            !(list.failure && !list.loaded) && (
+              <p className="py-6 text-center text-body text-muted-foreground">{t(!list.loaded ? 'loading' : filtered ? 'noMatch' : 'empty')}</p>
+            )
           ) : (
             <table className="w-full text-body">
               <tbody>
