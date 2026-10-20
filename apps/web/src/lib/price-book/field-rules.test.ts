@@ -52,4 +52,9 @@ describe('readCostItemInput', () => {
   test('one name of the pair is enough', () => {
     expect(costItemFieldErrors({ ...VALID, nameEn: null, nameAr: 'لوح' })).toEqual({});
   });
+
+  test('a name that is only too long or unprintable is said under its own half, not as missing', () => {
+    expect(costItemFieldErrors({ ...VALID, nameEn: 'B'.repeat(201) })).toEqual({ nameEn: { code: 'too_long', params: { max: 200 } } });
+    expect(costItemFieldErrors({ ...VALID, nameEn: null, nameAr: `لوح${String.fromCharCode(7)}` })).toEqual({ nameAr: { code: 'unprintable' } });
+  });
 });

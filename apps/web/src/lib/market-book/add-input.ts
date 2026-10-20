@@ -1,27 +1,33 @@
-// "Add to my price book": what the studio types, the names and code it is
-// offered, and the rules the typed values keep. Pure and client-safe: the add
-// form pre-checks with the same rules the server core runs again. The unit and
-// the cost are NOT typed: the core takes them from the market item (its studio
-// unit, its latest effective priced value).
+// "Add to my price book": what the studio types, the code it is offered, and
+// the rules the typed values keep. Pure and client-safe: the add form
+// pre-checks with the same rules the server core runs again. The code and name
+// rules, and the input's shape, are every cost-item create's own
+// (lib/price-book/cost-item-input). The unit, the cost and the default selling
+// price are NOT typed: the core takes them from the market item, as the seed
+// does (its studio unit, its newest priced month, cost x 1.05).
 import { itemCode } from '@metra/db/market-seed';
 import type { FieldErrors } from '@/lib/actions/field-errors';
+import { readCostItemCode, readCostItemName } from '@/lib/price-book/cost-item-input';
 import { readTypedMoney } from '@/lib/validation/amount-field';
 import { clean } from '@/lib/validation/text';
 import { readFields, type FieldRead } from '@/lib/validation/field-rules';
 
 /** Every path an add refusal can name. */
-export const ADD_MARKET_ITEM_FIELDS = ['code', 'sectionId', 'defaultUnitPrice'] as const;
+export const ADD_MARKET_ITEM_FIELDS = ['code', 'nameAr', 'nameEn', 'sectionId', 'defaultUnitPrice'] as const;
 
 export type AddMarketItemField = (typeof ADD_MARKET_ITEM_FIELDS)[number];
+
+/** The add's own field beyond the ones every cost-item create takes. */
+export const ADD_MARKET_ITEM_OWN_FIELDS = ['marketItemId'] as const;
 
 export interface AddMarketItemInput {
   marketItemId: string;
   code: string;
   sectionId: string;
-  /** Blank (both) takes the market item's own names with its spec. */
+  /** Blank (both) takes the names the seed gives the market item. */
   nameAr?: string | null;
   nameEn?: string | null;
-  /** Blank sells at the cost. */
+  /** Blank sells at the cost x 1.05, as the seed does. */
   defaultUnitPrice?: string | null;
 }
 
@@ -30,32 +36,13 @@ export interface AddMarketItemValues {
   sectionId: string;
   nameAr: string | null;
   nameEn: string | null;
-  /** Null: the same as the cost. */
+  /** Null: the seed's selling price for the cost. */
   defaultUnitPrice: string | null;
 }
 
-interface NamedMarketItem {
-  key: string;
-  nameAr: string;
-  nameEn: string;
-  specAr: string | null;
-  specEn: string | null;
-}
-
-/** The names a market item is offered under: its name and its spec, in each language. */
-export function suggestedNames(item: NamedMarketItem): { nameAr: string; nameEn: string } {
-  const withSpec = (name: string, spec: string | null) => (spec ? `${name} ${spec}` : name);
-  return { nameAr: withSpec(item.nameAr, item.specAr), nameEn: withSpec(item.nameEn, item.specEn) };
-}
-
 /** The code it is offered under: the market seed's own (MKT-<market key>), so a seeded studio and an added item read alike. */
-export function suggestedCode(item: Pick<NamedMarketItem, 'key'>): string {
+export function suggestedCode(item: { key: string }): string {
   return itemCode(item.key);
-}
-
-function readCode(value: string | null | undefined): FieldRead<string> {
-  const code = clean(value);
-  return code ? { ok: true, value: code } : { ok: false, error: { code: 'code_required' } };
 }
 
 /** A section must be picked; whether it still exists is the core's to say (no_longer_exists). */
@@ -64,7 +51,7 @@ function readSection(value: string | null | undefined): FieldRead<string> {
   return sectionId ? { ok: true, value: sectionId } : { ok: false, error: { code: 'required' } };
 }
 
-/** An empty price box sells at the cost; anything typed is read as every money box reads it. */
+/** An empty price box takes the seed's selling price; anything typed is read as every money box reads it. */
 function readPrice(value: string | null | undefined): FieldRead<string | null> {
   return clean(value) === null ? { ok: true, value: null } : readTypedMoney(value);
 }
@@ -73,11 +60,11 @@ function readPrice(value: string | null | undefined): FieldRead<string | null> {
 export function readAddMarketItemInput(
   input: AddMarketItemInput,
 ): { ok: true; values: AddMarketItemValues } | { ok: false; errors: FieldErrors<AddMarketItemField> } {
-  const read = readFields({
-    code: readCode(input.code),
+  return readFields({
+    code: readCostItemCode(input.code),
+    nameAr: readCostItemName(input.nameAr),
+    nameEn: readCostItemName(input.nameEn),
     sectionId: readSection(input.sectionId),
     defaultUnitPrice: readPrice(input.defaultUnitPrice),
   });
-  if (!read.ok) return read;
-  return { ok: true, values: { ...read.values, nameAr: clean(input.nameAr), nameEn: clean(input.nameEn) } };
 }

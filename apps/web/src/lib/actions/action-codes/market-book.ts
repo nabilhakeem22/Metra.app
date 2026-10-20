@@ -7,4 +7,10 @@ export type MarketBookActionCode =
   | 'market_item_not_found'
   // The market item's unit has no studio unit (bag, pack, 1000 bricks), or not
   // the price-book item's unit: a guide price is never compared across units.
-  | 'market_unit_incompatible';
+  | 'market_unit_incompatible'
+  // The studio already has an active price-book item linked to this market
+  // item (an earlier add, or the seed): a second one is never created.
+  | 'market_item_already_added'
+  // No published month ever priced this item (every month suspended), so it
+  // has no cost to start from: the seed skips it too.
+  | 'market_item_unpriced';

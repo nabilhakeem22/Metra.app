@@ -14,7 +14,8 @@ function row(id: string, overrides: Partial<MarketItemRow> = {}): MarketItemRow 
   return {
     id, key: `finishing.glass.${id}`, categoryKey: 'finishing.glass', nameAr: `زجاج ${id}`, nameEn: `Glass ${id}`,
     specAr: null, specEn: null, unit: 'sqm', unitLabelAr: 'م2', basisNoteAr: null, status: 'active',
-    latest: series[1], series, momPct: '5.3', ytdPct: null, yoyPct: null, linkedCostItem: null, ...overrides,
+    latest: series[1], series, momPct: '5.3', ytdPct: null, yoyPct: null, linkedCostItem: null,
+    latestPriced: { month: '2026-07', price: '400.0000' }, seededNames: { nameAr: `زجاج ${id}`, nameEn: `Glass ${id}` }, ...overrides,
   };
 }
 
@@ -23,12 +24,17 @@ const CATEGORIES: MarketCategory[] = [
   { key: 'finishing.glass', nameAr: 'الزجاج', nameEn: 'Glass', parentKey: 'finishing', itemCount: 3 },
 ];
 
-const ITEMS = [row('a'), row('bag', { unit: 'bag' }), row('linked', { linkedCostItem: { id: 'c-1', code: 'MKT-x' } })].map(marketRowView);
+const ITEMS = [
+  row('a'),
+  row('bag', { unit: 'bag' }),
+  row('never', { latestPriced: null }),
+  row('linked', { linkedCostItem: { id: 'c-1', code: 'MKT-x' } }),
+].map((item) => marketRowView(item, '2026-07'));
 
 function renderClient(locale: TestLocale, props: Partial<MarketBookClientProps>) {
   renderWithIntl(
     <MarketBookClient
-      items={ITEMS} matched={3} categoryKey="finishing.glass" query="" categories={CATEGORIES}
+      items={ITEMS} matched={4} categoryKey="finishing.glass" query="" categories={CATEGORIES}
       sections={[]} canAdd={false} attribution={<p>attribution</p>} {...props}
     />,
     { locale },
@@ -45,10 +51,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('MarketBookClient (%s)', (locale) => 
     expect(document.body.textContent).toContain('400.00');
   });
 
-  test('an owner sees Add, disabled for a unit no price book has, and the link for an item already in it', () => {
+  test('an owner sees Add, disabled for a unit no price book has and for an item never priced, and the link for an item already in it', () => {
     renderClient(locale, { canAdd: true });
     const adds = screen.getAllByRole('button', { name: at('marketBook.add') });
-    expect(adds.map((button) => (button as HTMLButtonElement).disabled)).toEqual([false, true]);
+    expect(adds.map((button) => (button as HTMLButtonElement).disabled)).toEqual([false, true, true]);
     const link = screen.getByRole('link', { name: at('marketBook.inPriceBook') });
     expect(link.getAttribute('href')).toContain('/price-book?q=MKT-x');
   });
@@ -56,7 +62,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('MarketBookClient (%s)', (locale) => 
   test('a search says what matched, and when the list is cut', () => {
     renderClient(locale, { categoryKey: null, query: 'glass', matched: 80 });
     expect(screen.getByRole('heading').textContent).toContain('glass');
-    expect(document.body.textContent).toContain(at('marketBook.results.truncated').replace('{shown}', '3'));
+    expect(document.body.textContent).toContain(at('marketBook.results.truncated').replace('{shown}', '4'));
   });
 
   test('a search with nothing matching says so', () => {

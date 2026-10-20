@@ -2,7 +2,7 @@
 
 import { sectionKey } from '@metra/db/market-seed';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, type ReactNode } from 'react';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { addMarketItemToPriceBook } from '@/lib/market-book/actions';
-import { ADD_MARKET_ITEM_FIELDS, readAddMarketItemInput, suggestedCode, suggestedNames, type AddMarketItemField } from '@/lib/market-book/add-input';
+import { ADD_MARKET_ITEM_FIELDS, readAddMarketItemInput, suggestedCode, type AddMarketItemField } from '@/lib/market-book/add-input';
 import { studioUnitFor } from '@/lib/market-book/units';
 import { MarketAddCost } from './market-add-cost';
 import type { MarketRowView } from './market-row-view';
@@ -26,6 +26,8 @@ export interface MarketSectionOption {
 /** The control each refusal sits under. */
 export const MARKET_ADD_CONTROL_ID: Record<AddMarketItemField, string> = {
   code: 'ma-code',
+  nameAr: 'ma-nameAr',
+  nameEn: 'ma-nameEn',
   sectionId: 'ma-section',
   defaultUnitPrice: 'ma-price',
 };
@@ -38,18 +40,32 @@ interface AddFormState {
   defaultUnitPrice: string;
 }
 
-/** The offer: the seed's code and names, and the section the seed files this sub-category under when the studio has it. */
+/**
+ * The offer: the seed's code and names (blank only before the seed book is
+ * built; the server then answers that the book is being prepared), and the
+ * section the seed files this sub-category under when the studio has it.
+ */
 function offerFor(item: MarketRowView, sections: readonly MarketSectionOption[]): AddFormState {
   const seeded = sections.find((section) => section.key === sectionKey(item.categoryKey));
-  return { code: suggestedCode(item), ...suggestedNames(item), sectionId: (seeded ?? sections[0])?.id ?? '', defaultUnitPrice: '' };
+  const names = item.seededNames ?? { nameAr: '', nameEn: '' };
+  return { code: suggestedCode(item), ...names, sectionId: (seeded ?? sections[0])?.id ?? '', defaultUnitPrice: '' };
+}
+
+export interface MarketAddFormProps {
+  /** The item being added; null closes the form. */
+  item: MarketRowView | null;
+  sections: readonly MarketSectionOption[];
+  onClose: () => void;
+  /** The attribution block, rendered by the server page: every market surface carries it. */
+  attribution: ReactNode;
 }
 
 /**
- * "Add to my price book": a new cost item linked to the market item. The unit
- * and the cost are the market item's (shown, not typed); every refusal the
- * studio can fix is said under its field.
+ * "Add to my price book": a new cost item linked to the market item. The unit,
+ * the cost and the default selling price are the market item's (shown, not
+ * typed); every refusal the studio can fix is said under its field.
  */
-export function MarketAddForm({ item, sections, onClose }: { item: MarketRowView | null; sections: readonly MarketSectionOption[]; onClose: () => void }) {
+export function MarketAddForm({ item, sections, onClose, attribution }: MarketAddFormProps) {
   const t = useTranslations('marketBook');
   const tp = useTranslations('priceBook');
   const te = useTranslations('errors');
@@ -103,10 +119,10 @@ export function MarketAddForm({ item, sections, onClose }: { item: MarketRowView
           <FormField id={MARKET_ADD_CONTROL_ID.code} label={tp('form.code')} required {...errors.bind('code')}>
             <Input dir="ltr" value={form.code} onChange={(event) => set('code')(event.target.value)} />
           </FormField>
-          <FormField id="ma-nameAr" label={tp('form.nameAr')}>
+          <FormField id={MARKET_ADD_CONTROL_ID.nameAr} label={tp('form.nameAr')} {...errors.bind('nameAr')}>
             <Input dir="rtl" value={form.nameAr} onChange={(event) => set('nameAr')(event.target.value)} />
           </FormField>
-          <FormField id="ma-nameEn" label={tp('form.nameEn')}>
+          <FormField id={MARKET_ADD_CONTROL_ID.nameEn} label={tp('form.nameEn')} {...errors.bind('nameEn')}>
             <Input dir="ltr" value={form.nameEn} onChange={(event) => set('nameEn')(event.target.value)} />
           </FormField>
           <FormField id={MARKET_ADD_CONTROL_ID.sectionId} label={tp('form.category')} required {...errors.bind('sectionId')}>
@@ -116,10 +132,11 @@ export function MarketAddForm({ item, sections, onClose }: { item: MarketRowView
               options={sections.map((section) => ({ value: section.id, label: pickLocale({ nameAr: section.nameAr, nameEn: section.nameEn }, 'name', locale).value }))}
             />
           </FormField>
-          <MarketAddCost item={item} unitLabel={unit ? tp(`units.${unit}`) : ''} />
+          {item.latestPriced && <MarketAddCost priced={item.latestPriced} isOld={item.latestPricedIsOld} unitLabel={unit ? tp(`units.${unit}`) : ''} />}
           <FormField id={MARKET_ADD_CONTROL_ID.defaultUnitPrice} label={tp('form.price')} hint={t('addForm.priceHint')} {...errors.bind('defaultUnitPrice')}>
             <Input dir="ltr" inputMode="decimal" value={form.defaultUnitPrice} onChange={(event) => set('defaultUnitPrice')(event.target.value)} />
           </FormField>
+          {attribution}
         </>
       )}
     </FormSheet>

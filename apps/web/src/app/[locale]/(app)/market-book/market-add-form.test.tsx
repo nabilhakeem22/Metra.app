@@ -19,20 +19,25 @@ const SECTIONS = [
   { id: 's-glass', key: 'market.finishing.glass', nameEn: 'Glass', nameAr: 'الزجاج' },
 ];
 
-const GLASS = marketRowView({
+const glassRow = (overrides: Partial<MarketItemRow> = {}): MarketItemRow => ({
   id: 'm-1', key: 'finishing.glass.clear_4mm', categoryKey: 'finishing.glass',
   nameAr: 'زجاج شفاف', nameEn: 'Clear glass', specAr: '4 مم', specEn: '4 mm',
   unit: 'sqm', unitLabelAr: 'م2', basisNoteAr: null, status: 'active',
-  latest: { month: '2026-07', status: 'priced', price: '400.0000', bulletinMonth: '2026-07', sourcePage: 65 },
-  series: [{ month: '2026-07', status: 'priced', price: '400.0000', bulletinMonth: '2026-07', sourcePage: 65 }],
+  latest: { month: '2026-07', status: 'priced', price: '13.1440', bulletinMonth: '2026-07', sourcePage: 65 },
+  series: [{ month: '2026-07', status: 'priced', price: '13.1440', bulletinMonth: '2026-07', sourcePage: 65 }],
   momPct: null, ytdPct: null, yoyPct: null, linkedCostItem: null,
-} satisfies MarketItemRow);
+  latestPriced: { month: '2026-07', price: '13.1440' },
+  seededNames: { nameAr: 'زجاج شفاف 4 مم (الزجاج)', nameEn: 'Clear glass 4 mm (Glass)' },
+  ...overrides,
+});
+
+const GLASS = marketRowView(glassRow(), '2026-07');
 
 const onClose = vi.fn();
 
-function renderForm(locale: TestLocale) {
+function renderForm(locale: TestLocale, item = GLASS) {
   document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
-  renderWithIntl(<MarketAddForm item={GLASS} sections={SECTIONS} onClose={onClose} />, { locale });
+  renderWithIntl(<MarketAddForm item={item} sections={SECTIONS} onClose={onClose} attribution={<p>attribution block</p>} />, { locale });
 }
 
 const control = (field: keyof typeof MARKET_ADD_CONTROL_ID) => document.getElementById(MARKET_ADD_CONTROL_ID[field]) as HTMLInputElement;
@@ -53,13 +58,28 @@ beforeEach(() => {
 describe.each<TestLocale>(['en', 'ar-EG'])('MarketAddForm (%s)', (locale) => {
   const at = (key: string) => messageAt(locale, key);
 
-  test('offers the seed code, the name with its spec, the seeded section, and shows the cost it will save', () => {
+  test('offers the seed code, the seed names, the seeded section, and shows the cost and price it will save', () => {
     renderForm(locale);
     expect(control('code').value).toBe('MKT-finishing.glass.clear_4mm');
-    expect((document.getElementById('ma-nameEn') as HTMLInputElement).value).toBe('Clear glass 4 mm');
-    expect((document.getElementById('ma-nameAr') as HTMLInputElement).value).toBe('زجاج شفاف 4 مم');
+    expect(control('nameEn').value).toBe('Clear glass 4 mm (Glass)');
+    expect(control('nameAr').value).toBe('زجاج شفاف 4 مم (الزجاج)');
     expect(control('sectionId').textContent).toContain(locale === 'en' ? 'Glass' : 'الزجاج');
-    expect(document.body.textContent).toContain('400.00');
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('13.144');
+    expect(text).not.toContain('13.14 ');
+    expect(text).toContain(at('marketBook.addForm.costFrom').replace('{month}', locale === 'en' ? 'July 2026' : 'يوليو 2026'));
+    expect(text).toContain('13.8012');
+    expect(text).not.toContain(at('marketBook.addForm.oldPrice'));
+    expect(text).toContain('attribution block');
+  });
+
+  test('a cost from before the row window is shown with its month and a warning', () => {
+    renderForm(locale, marketRowView(glassRow({ latestPriced: { month: '2024-06', price: '777.0000' } }), '2026-09'));
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('777.00');
+    expect(text).toContain(at('marketBook.addForm.costFrom').replace('{month}', locale === 'en' ? 'June 2024' : 'يونيو 2024'));
+    expect(text).toContain(at('marketBook.addForm.oldPrice'));
+    expect(text).toContain('815.85');
   });
 
   test('every field the server refuses is said under its own control', async () => {

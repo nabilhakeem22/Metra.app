@@ -164,6 +164,8 @@ const ALL_CODES: ActionCode[] = [
   'line_not_in_contract',
   'market_item_not_found',
   'market_unit_incompatible',
+  'market_item_already_added',
+  'market_item_unpriced',
   'phone_invalid',
   'studio_phone_invalid',
   'whatsapp_invalid',

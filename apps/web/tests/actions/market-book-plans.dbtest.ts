@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { marketBookPageSql } from '@/lib/market-book/page-sql';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 import { closeMarketFixture, seedBulletin, seedMarketItem } from './market-fixture';
 
@@ -53,6 +54,12 @@ describe('the market read path as metra_app', () => {
     expect(text).toContain('InitPlan');
     expect(text).not.toContain('app_is_current_org_member');
     expect(text).toMatch(/Index Cond: .*period_month >= /);
+  });
+
+  it('reads the newest priced month and the seeded names of each page row by index, one item at a time', async () => {
+    const text = await plan(marketBookPageSql({ categoryKey: null, query: '', page: 1 }, 'en'));
+    expect(text).toMatch(/Index Cond: \(item_id = ANY \(ARRAY\[i(_\d+)?\.id\]\)\)/);
+    expect(text).toMatch(/Index Scan using market_seed_book_pkey on market_seed_book seeded/);
   });
 
   it('does the same on the item and details reads', async () => {

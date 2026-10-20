@@ -10,9 +10,11 @@ import type { OrgContext } from '@/lib/db/context';
 // in apps/web/wrangler.jsonc ONLY (one line each):
 //   STUDIO_READ_RATE_LIMITER   the rescue ledger route (fetched on mount, on a
 //                              range change and on retry; never polled);
-//   STUDIO_SEARCH_RATE_LIMITER the two typed searches, the contract's baseline
+//   STUDIO_SEARCH_RATE_LIMITER the typed searches: the contract's baseline
 //                              line picker and the price book picker, which
-//                              ask once per pause in typing.
+//                              ask once per pause in typing, and the market
+//                              prices search (/market-book?q=, once per
+//                              submitted search).
 //
 // THE KEY is the surface, the workspace and the member: one budget per member
 // per surface in each workspace, so one picker never spends the other's.
@@ -34,6 +36,7 @@ const STUDIO_READ_BINDINGS = {
   rescue_ledger: 'STUDIO_READ_RATE_LIMITER',
   contract_line_search: 'STUDIO_SEARCH_RATE_LIMITER',
   price_book_picker: 'STUDIO_SEARCH_RATE_LIMITER',
+  market_search: 'STUDIO_SEARCH_RATE_LIMITER',
 } as const;
 
 export type StudioReadSurface = keyof typeof STUDIO_READ_BINDINGS;

@@ -7,6 +7,9 @@ import type { MarketChanges, MarketPoint } from './types';
 
 const NO_CHANGES: MarketChanges = { momPct: null, ytdPct: null, yoyPct: null };
 
+/** How far back a row reaches from the newest bulletin's month: its series and trend cover 13 months, latest - 12 to latest. */
+export const MARKET_WINDOW_MONTHS = 12;
+
 /** 'YYYY-MM' moved by `months` calendar months (negative goes back). */
 export function shiftMonth(month: string, months: number): string {
   const [year, monthOfYear] = month.split('-').map(Number);

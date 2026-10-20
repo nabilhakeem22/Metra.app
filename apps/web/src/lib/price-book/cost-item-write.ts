@@ -10,6 +10,7 @@ import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
 import { clean } from '@/lib/validation/text';
+import { hasCostItemInputShape } from './cost-item-input';
 import { readCostItemInput, type CostItemValues } from './field-rules';
 import type { CostItemInput } from './fields';
 import { UNIT_TOKENS } from './import';
@@ -48,11 +49,16 @@ export interface CostItemColumns extends CostItemValues {
   etaCodeType: string | null;
 }
 
-/** The row's columns, or the refusal: every typed-value error at once, then the
- *  shape no form can send (a section id that is not a uuid, an unknown unit). */
+/** The price book's own fields beyond the ones every cost-item create takes. */
+const PRICE_BOOK_INPUT_FIELDS = ['unit', 'defaultUnitCost', 'taxCode', 'etaItemCode', 'etaCodeType'] as const;
+
+/** The row's columns, or the refusal: an input no form can send (not an object,
+ *  a field that is not text), then every typed-value error at once, then the
+ *  values no form can send (a section id that is not a uuid, an unknown unit). */
 export function costItemColumns(
   input: CostItemInput,
 ): { refusal: ActionResult } | { columns: CostItemColumns } {
+  if (!hasCostItemInputShape(input, PRICE_BOOK_INPUT_FIELDS)) return { refusal: err('malformed') };
   const read = readCostItemInput(input);
   if (!read.ok) return { refusal: fieldsFailed(read.errors) };
   if (!isUuid(input.sectionId) || !isUnit(input.unit)) return { refusal: err('malformed') };

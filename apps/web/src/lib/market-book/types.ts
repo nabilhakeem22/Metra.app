@@ -22,6 +22,18 @@ export interface MarketChanges {
   yoyPct: string | null;
 }
 
+/** A month the item was priced in, and the price. */
+export interface MarketPricedMonth {
+  month: string;
+  price: string;
+}
+
+/** The names the price-book seed gives a market item, in each language. */
+export interface MarketSeededNames {
+  nameAr: string;
+  nameEn: string;
+}
+
 /** The studio's own price-book item linked to a market item (RLS: this studio's only). */
 export interface LinkedCostItem {
   id: string;
@@ -44,6 +56,10 @@ export interface MarketItemRow extends MarketChanges {
   latest: MarketPoint | null;
   /** At most 13 months, ascending, ending at the newest published bulletin's month. */
   series: MarketPoint[];
+  /** The newest priced month of the item's WHOLE history (it may be older than `series`): the cost an add saves. */
+  latestPriced: MarketPricedMonth | null;
+  /** How the seed names it (and so how an add names it); null only before the seed book is built. */
+  seededNames: MarketSeededNames | null;
   linkedCostItem: LinkedCostItem | null;
 }
 

@@ -34,18 +34,42 @@ export const POINT_JSON = sql`json_build_array(to_char(e.period_month, 'YYYY-MM'
   to_char(e.bulletin_month, 'YYYY-MM'), e.page)`;
 
 /**
- * An item as ./decode.ts reads it (ITEM_FIELDS order), `i` a market_items row
- * joined to its leaf `c`, and `series` the item's points. The studio's own
- * linked price-book item comes from a lateral join named `linked`.
+ * The newest month whose EFFECTIVE value is a price, over the item's WHOLE
+ * history (a suspended month gives way to the one before it, however old):
+ * [period_month, price]. The seed book's cost is this month's price
+ * (market-ingest seed/read.ts), so the add form shows, and the add saves, the
+ * same figure. `itemId` is a uuid expression (correlated in a lateral join).
+ */
+export function latestPricedSql(itemId: SQL): SQL {
+  return sql`select e.period_month, e.price
+      from (${effectiveSql(sql`array[${itemId}]::uuid[]`, null)}) e
+     where e.status = 'priced'
+     order by e.period_month desc
+     limit 1`;
+}
+
+/**
+ * An item as ./decode.ts reads it (ItemTuple order), `i` a market_items row
+ * joined to its leaf `c` and to ITEM_JOINS, and `series` the item's points.
  */
 export function itemJson(series: SQL): SQL {
   return sql`json_build_array(i.id, i.key, c.key, i.name_ar, i.name_en, i.spec_ar, i.spec_en, i.unit, i.unit_label_ar,
-    i.basis_note_ar, i.status, linked.id, linked.code, ${series})`;
+    i.basis_note_ar, i.status, linked.id, linked.code, to_char(priced.period_month, 'YYYY-MM'), priced.price::text,
+    seeded.name_ar, seeded.name_en, ${series})`;
 }
 
-/** The studio's item linked to market item `i` (the active one first): at most one row. */
-export const LINKED_COST_ITEM = sql`left join lateral (
+/**
+ * What itemJson reads beside the item, each at most one row:
+ *  - `linked`, the studio's item linked to market item `i` (the active one first);
+ *  - `priced`, its newest priced month (latestPricedSql);
+ *  - `seeded`, its names as the seed names it (market_seed_book, built by
+ *    @metra/db/market-seed over the whole published set: a roll's pack, the
+ *    sub-category when two items would read alike, « - » as «، »).
+ */
+export const ITEM_JOINS = sql`left join lateral (
     select ci.id, ci.code from cost_items ci
      where ci.market_item_id = i.id
      order by ci.active desc, ci.created_at, ci.id
-     limit 1) linked on true`;
+     limit 1) linked on true
+  left join lateral (${latestPricedSql(sql`i.id`)}) priced on true
+  left join market_seed_book seeded on seeded.item_id = i.id`;

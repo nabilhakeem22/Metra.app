@@ -1,11 +1,11 @@
 import 'server-only';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { shiftMonth } from './change';
+import { MARKET_WINDOW_MONTHS, shiftMonth } from './change';
 import {
   decodeBulletin,
   decodeCategory,
   decodeItem,
-  decodePoint,
+  itemPoints,
   type BulletinTuple,
   type CategoryTuple,
   type ItemTuple,
@@ -32,7 +32,7 @@ export async function readMarketBookPage(ctx: OrgContext, view: MarketBookView, 
     categoryKey,
     matched,
     page,
-    items: items.map((tuple) => decodeItem(tuple, tuple[13].map(decodePoint))),
+    items: items.map((tuple) => decodeItem(tuple, itemPoints(tuple))),
   };
 }
 
@@ -41,7 +41,7 @@ export async function readMarketItem(ctx: OrgContext, itemId: string): Promise<M
   const rows = (await withOrgContext(ctx, (tx) => tx.execute(marketItemSql(itemId)))) as unknown as Array<{ item: string }>;
   const [latestMonth, tuple] = JSON.parse(rows[0].item) as [string | null, ItemTuple | null];
   if (tuple === null || latestMonth === null) return null;
-  const allPoints = tuple[13].map(decodePoint);
-  const firstShown = shiftMonth(latestMonth, -12);
+  const allPoints = itemPoints(tuple);
+  const firstShown = shiftMonth(latestMonth, -MARKET_WINDOW_MONTHS);
   return { ...decodeItem(tuple, allPoints.filter((point) => point.month >= firstShown)), allPoints };
 }

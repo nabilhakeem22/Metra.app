@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { formatMonth } from '@/lib/format/date';
-import { formatMoney } from '@/lib/format/money';
+import { formatMoneyExact } from '@/lib/format/money';
 import { formatNumber } from '@/lib/format/number';
 import type { MarketPoint } from '@/lib/market-book/types';
 
@@ -22,7 +22,7 @@ export function MarketItemMonths({ points }: { points: readonly MarketPoint[] })
           </div>
           {point.status === 'priced' ? (
             <div dir="ltr" className="whitespace-nowrap text-end font-mono tabular-nums">
-              {formatMoney(point.price, locale)}
+              {formatMoneyExact(point.price, locale)}
             </div>
           ) : (
             <span className="rounded-pill bg-[color:var(--warn-tint)] px-2 py-0.5 text-caption text-[color:var(--warn)]">{t('suspended')}</span>

@@ -3,6 +3,7 @@
 // server; the sparkline travels as its finished geometry. Each row's props are
 // serialised into the page, so every field here is paid for on every render.
 // Pure; the server page builds it from the query's MarketItemRow.
+import { MARKET_WINDOW_MONTHS, shiftMonth } from '@/lib/market-book/change';
 import type { MarketItemRow } from '@/lib/market-book/types';
 import { sparklineGeometry, type SparklineGeometry } from './sparkline-geometry';
 
@@ -11,22 +12,23 @@ export const SPARKLINE = { width: 96, height: 24 } as const;
 export interface MarketRowView
   extends Pick<
     MarketItemRow,
-    'id' | 'key' | 'categoryKey' | 'nameAr' | 'nameEn' | 'specAr' | 'specEn' | 'unit' | 'unitLabelAr' | 'basisNoteAr' | 'status' | 'momPct' | 'ytdPct' | 'linkedCostItem'
+    | 'id' | 'key' | 'categoryKey' | 'nameAr' | 'nameEn' | 'specAr' | 'specEn' | 'unit' | 'unitLabelAr' | 'basisNoteAr' | 'status'
+    | 'momPct' | 'ytdPct' | 'latestPriced' | 'seededNames' | 'linkedCostItem'
   > {
   /** The newest month; a null price is a suspended month. */
   latest: { month: string; price: string | null } | null;
-  /** The newest priced month the row shows: the cost an add saves, as far as the row can tell. */
-  latestPriced: { month: string; price: string } | null;
+  /** The cost an add saves (`latestPriced`) is from before the row's window: the add form says so. */
+  latestPricedIsOld: boolean;
   trend: SparklineGeometry;
 }
 
-export function marketRowView(row: MarketItemRow): MarketRowView {
+/** `windowEnd` is the newest published bulletin's month, where every row's window ends. */
+export function marketRowView(row: MarketItemRow, windowEnd: string): MarketRowView {
   const { series, latest, yoyPct: _yoyPct, ...shown } = row;
-  const priced = [...series].reverse().find((point) => point.status === 'priced' && point.price !== null);
   return {
     ...shown,
     latest: latest && { month: latest.month, price: latest.status === 'priced' ? latest.price : null },
-    latestPriced: priced ? { month: priced.month, price: priced.price as string } : null,
-    trend: sparklineGeometry(series, SPARKLINE.width, SPARKLINE.height),
+    latestPricedIsOld: row.latestPriced !== null && row.latestPriced.month < shiftMonth(windowEnd, -MARKET_WINDOW_MONTHS),
+    trend: sparklineGeometry(series, windowEnd, SPARKLINE.width, SPARKLINE.height),
   };
 }

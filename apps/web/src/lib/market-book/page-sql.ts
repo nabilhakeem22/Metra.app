@@ -2,7 +2,8 @@ import 'server-only';
 import { sql, type SQL } from 'drizzle-orm';
 import { nameInSql, nameSortKeySql } from '@/lib/price-book/search-sql';
 import { everyWordSql } from '@/lib/search/words-sql';
-import { effectiveSql, itemJson, LINKED_COST_ITEM, POINT_JSON } from './effective-sql';
+import { MARKET_WINDOW_MONTHS } from './change';
+import { effectiveSql, ITEM_JOINS, itemJson, POINT_JSON } from './effective-sql';
 import { MARKET_PAGE_SIZE, type MarketBookView } from './page-params';
 
 // /market-book in ONE statement (R6: one snapshot, so a withdrawal between two
@@ -63,7 +64,7 @@ export function marketBookPageSql(view: MarketBookView, locale: string): SQL {
       select id, matched, position from ranked, page_start
        where position > page_start.skip and position <= page_start.skip + ${MARKET_PAGE_SIZE}::int
     ), effective as (
-      ${effectiveSql(sql`(select array_agg(id) from picked)::uuid[]`, sql`(select (period_month - interval '12 months')::date from bulletin)`)}
+      ${effectiveSql(sql`(select array_agg(id) from picked)::uuid[]`, sql`(select (period_month - ${MARKET_WINDOW_MONTHS}::int * interval '1 month')::date from bulletin)`)}
     ), series as (
       select e.item_id, json_agg(${POINT_JSON} order by e.period_month) as points from effective e group by e.item_id
     )
@@ -80,6 +81,6 @@ export function marketBookPageSql(view: MarketBookView, locale: string): SQL {
                   join market_items i on i.id = p.id
                   join market_categories c on c.id = i.category_id
                   left join series s on s.item_id = i.id
-                  ${LINKED_COST_ITEM}), '[]')
+                  ${ITEM_JOINS}), '[]')
     )::text as page`;
 }

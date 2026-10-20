@@ -56,7 +56,7 @@ export function MarketBookClient({ items, matched, categoryKey, query, categorie
       )}
 
       <MarketItemDrawer item={opened} onClose={() => setOpened(null)} attribution={attribution} />
-      {canAdd && <MarketAddForm item={adding} sections={sections} onClose={() => setAdding(null)} />}
+      {canAdd && <MarketAddForm item={adding} sections={sections} onClose={() => setAdding(null)} attribution={attribution} />}
     </div>
   );
 }

@@ -2734,8 +2734,8 @@ No database step. The deploy adds two Rate Limiting bindings, which
 `wrangler deploy` creates from `apps/web/wrangler.jsonc`:
 `STUDIO_READ_RATE_LIMITER` (namespace 1005, 30 per 60 s: the rescue ledger
 route) and `STUDIO_SEARCH_RATE_LIMITER` (namespace 1006, 120 per 60 s: the
-contract line picker and the price book picker). Each is keyed per surface,
-workspace and member.
+contract line picker, the price book picker and the market prices search).
+Each is keyed per surface, workspace and member.
 
 **Smoke test, right after the Deploy workflow is green (owner, 3 minutes),**
 with `npx wrangler tail metra-web` open in a terminal (from `apps/web`):

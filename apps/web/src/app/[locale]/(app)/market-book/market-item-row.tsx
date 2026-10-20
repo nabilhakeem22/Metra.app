@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from '@/i18n/routing';
 import { formatMonth } from '@/lib/format/date';
-import { formatMoney } from '@/lib/format/money';
+import { formatMoneyExact } from '@/lib/format/money';
 import { studioUnitFor } from '@/lib/market-book/units';
 import { MarketChangeChip } from './market-change-chip';
 import { itemName, itemSpec, itemUnit } from './market-item-text';
@@ -31,7 +31,7 @@ function LatestPrice({ item }: { item: Row }) {
     <div className="space-y-0.5">
       {latest.price !== null ? (
         <div dir="ltr" className="whitespace-nowrap font-mono tabular-nums text-[color:var(--text)]">
-          {formatMoney(latest.price, locale)}
+          {formatMoneyExact(latest.price, locale)}
         </div>
       ) : (
         <span className="rounded-pill bg-[color:var(--warn-tint)] px-2 py-0.5 text-caption text-[color:var(--warn)]">{t('suspended')}</span>
@@ -51,13 +51,15 @@ function PriceBookAction({ item, canAdd, onAdd }: Pick<MarketItemRowProps, 'item
     );
   }
   if (!canAdd || item.status !== 'active') return null;
+  // What the seed skips cannot be added either: no studio unit, or never priced.
+  const refusal = studioUnitFor(item.unit) === null ? t('unitNotSupported') : item.latestPriced === null ? t('neverPriced') : null;
   const add = (
-    <Button type="button" variant="secondary" size="sm" disabled={studioUnitFor(item.unit) === null} onClick={() => onAdd(item)}>
+    <Button type="button" variant="secondary" size="sm" disabled={refusal !== null} onClick={() => onAdd(item)}>
       <Plus className="size-4" aria-hidden />
       {t('add')}
     </Button>
   );
-  if (studioUnitFor(item.unit) !== null) return add;
+  if (refusal === null) return add;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
@@ -65,7 +67,7 @@ function PriceBookAction({ item, canAdd, onAdd }: Pick<MarketItemRowProps, 'item
           {/* A disabled button fires no pointer events, so the wrapper carries the tooltip. */}
           <span tabIndex={0} className="inline-flex">{add}</span>
         </TooltipTrigger>
-        <TooltipContent>{t('unitNotSupported')}</TooltipContent>
+        <TooltipContent>{refusal}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

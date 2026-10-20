@@ -1,6 +1,6 @@
 import 'server-only';
 import { sql, type SQL } from 'drizzle-orm';
-import { effectiveSql, itemJson, LINKED_COST_ITEM, POINT_JSON } from './effective-sql';
+import { effectiveSql, ITEM_JOINS, itemJson, POINT_JSON } from './effective-sql';
 
 // One market item for its drawer, in ONE statement (one snapshot): the newest
 // published bulletin's month, and the item with every effective month, newest
@@ -21,7 +21,7 @@ export function marketItemSql(itemId: string): SQL {
       (select ${itemJson(sql`coalesce((select json_agg(${POINT_JSON} order by e.period_month) from newest e), '[]')`)}
          from market_items i
          join market_categories c on c.id = i.category_id
-         ${LINKED_COST_ITEM}
+         ${ITEM_JOINS}
         where i.id = ${itemId}::uuid)
     )::text as item`;
 }

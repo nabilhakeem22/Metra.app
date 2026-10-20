@@ -3,64 +3,40 @@
 // RLS through mutateInOrg, and never change a cost or a price from market data
 // after the add: a link is advisory. The 'use server' wrappers in ./actions
 // delegate here; exercised directly by *.dbtest.ts.
-import { costItems, marketItems, type MarketUnit, type MetraDb } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
+//
+// An add gives the item what the seed would give it (@metra/db/market-seed):
+// the seed's names (read from the stored seed book), its studio unit, the
+// newest priced month of its whole history as the cost, and cost x 1.05 as the
+// selling price unless one is typed. It refuses what the seed skips: an item
+// already linked, one with no studio unit, one never priced.
+import { costItems } from '@metra/db';
+import { atPriceBookScale, withFivePercentMargin } from '@metra/db/market-seed';
+import { eq } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { hasCostItemInputShape } from '@/lib/price-book/cost-item-input';
 import { COST_ITEM_REFUSALS, requireWritable } from '@/lib/price-book/cost-item-write';
 import { isUuid } from '@/lib/uuid';
-import { readAddMarketItemInput, suggestedNames, type AddMarketItemInput } from './add-input';
-import { effectiveSql } from './effective-sql';
-import { studioUnitFor, unitsCompatible } from './units';
+import { ADD_MARKET_ITEM_OWN_FIELDS, readAddMarketItemInput, type AddMarketItemInput } from './add-input';
+import { activeMarketItem, latestPricedMonth, refuseWhenAlreadyAdded, seededNames, studioUnitOf } from './market-item-reads';
+import { holdStudioBookOrBusy } from './studio-hold';
+import { unitsCompatible } from './units';
 
 export type { AddMarketItemInput } from './add-input';
 
-/** The market item, as RLS lets the studio see it (a published bulletin prices it), if the ministry still prices it. */
-async function activeMarketItem(tx: MetraDb, marketItemId: string) {
-  const [item] = await tx
-    .select({
-      id: marketItems.id,
-      key: marketItems.key,
-      nameAr: marketItems.nameAr,
-      nameEn: marketItems.nameEn,
-      specAr: marketItems.specAr,
-      specEn: marketItems.specEn,
-      unit: marketItems.unit,
-      status: marketItems.status,
-    })
-    .from(marketItems)
-    .where(eq(marketItems.id, marketItemId))
-    .limit(1);
-  if (!item || item.status !== 'active') fail('market_item_not_found');
-  return item;
-}
-
-/** The newest month whose EFFECTIVE value is a price (a suspended month gives way to the one before): the seed's rule. */
-async function latestPricedValue(tx: MetraDb, marketItemId: string): Promise<string | null> {
-  const rows = (await tx.execute(sql`
-    with effective as (${effectiveSql(sql`array[${marketItemId}::uuid]`, null)})
-    select price::text as price from effective where status = 'priced' order by period_month desc limit 1`)) as unknown as Array<{ price: string }>;
-  return rows[0]?.price ?? null;
-}
-
-function studioUnitOf(unit: MarketUnit) {
-  const studioUnit = studioUnitFor(unit);
-  if (!studioUnit) fail('market_unit_incompatible');
-  return studioUnit;
-}
-
 /**
  * Add a market item to the studio's price book as a new cost item linked to
- * it: its studio unit, its latest effective priced value as the cost ('0' when
- * it has none), the typed price or else the cost. Names left blank take the
- * item's own with its spec. A taken code answers `code_taken` under `code`.
+ * it, under the studio's seed lock (so two adds, or an add and a seed, never
+ * both create it). Names left blank take the seed's. A taken code answers
+ * `code_taken` under `code`.
  */
 export async function addMarketItemToPriceBookCore(
   ctx: OrgContext,
   input: AddMarketItemInput,
 ): Promise<ActionResult & { data?: string }> {
+  if (!hasCostItemInputShape(input, ADD_MARKET_ITEM_OWN_FIELDS)) return err('malformed');
   const read = readAddMarketItemInput(input);
   if (!read.ok) return fieldsFailed(read.errors);
   const typed = read.values;
@@ -70,17 +46,19 @@ export async function addMarketItemToPriceBookCore(
     ctx,
     { capability: 'price_book', action: 'create', refusals: COST_ITEM_REFUSALS },
     async (tx, audit) => {
+      await holdStudioBookOrBusy(tx);
       const item = await activeMarketItem(tx, input.marketItemId);
+      await refuseWhenAlreadyAdded(tx, item.id);
       const unit = studioUnitOf(item.unit);
-      const cost = (await latestPricedValue(tx, item.id)) ?? '0';
-      const names = typed.nameAr || typed.nameEn ? { nameAr: typed.nameAr, nameEn: typed.nameEn } : suggestedNames(item);
+      const priced = await latestPricedMonth(tx, item.id);
+      const names = typed.nameAr || typed.nameEn ? { nameAr: typed.nameAr, nameEn: typed.nameEn } : await seededNames(tx, item.id);
       const columns = {
         code: typed.code,
         ...names,
         sectionId: typed.sectionId,
         unit,
-        defaultUnitCost: cost,
-        defaultUnitPrice: typed.defaultUnitPrice ?? cost,
+        defaultUnitCost: atPriceBookScale(priced.price),
+        defaultUnitPrice: typed.defaultUnitPrice ?? withFivePercentMargin(priced.price),
         marketItemId: item.id,
       };
       await requireWritable(tx, columns);
@@ -96,7 +74,7 @@ export async function addMarketItemToPriceBookCore(
           nameAr: columns.nameAr,
           section_id: columns.sectionId,
           unit,
-          default_unit_cost: cost,
+          default_unit_cost: columns.defaultUnitCost,
           default_unit_price: columns.defaultUnitPrice,
           market_item_id: item.id,
         },
@@ -104,6 +82,13 @@ export async function addMarketItemToPriceBookCore(
       return row.id;
     },
   );
+}
+
+/** A link input as no form can fail to send it: an object, a cost item id, and a market item id or null. Never a throw. */
+function isLinkInputShape(input: unknown): input is { costItemId: string; marketItemId: string | null } {
+  if (typeof input !== 'object' || input === null) return false;
+  const { costItemId, marketItemId } = input as Record<string, unknown>;
+  return isUuid(costItemId) && (marketItemId === null || isUuid(marketItemId));
 }
 
 /**
@@ -114,7 +99,7 @@ export async function linkCostItemToMarketCore(
   ctx: OrgContext,
   input: { costItemId: string; marketItemId: string | null },
 ): Promise<ActionResult> {
-  if (!isUuid(input.costItemId) || (input.marketItemId !== null && !isUuid(input.marketItemId))) return err('malformed');
+  if (!isLinkInputShape(input)) return err('malformed');
 
   return mutateInOrg(ctx, { capability: 'price_book', action: 'update' }, async (tx, audit) => {
     const before = await requireInOrg(
