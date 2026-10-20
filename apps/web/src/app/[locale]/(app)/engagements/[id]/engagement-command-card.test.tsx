@@ -299,6 +299,7 @@ describe('a closed delivery', () => {
       projectId: 'p-1',
       boqId: null,
       contract: null,
+      nextInstalment: null,
       may: { generateContract: true, signOffline: true, openContract: true },
     };
     renderWithIntl(<EngagementCommandCard {...closedProps('execution', { execution })} />);

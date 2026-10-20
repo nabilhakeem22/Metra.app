@@ -41,7 +41,7 @@ export default async function ContractDetailPage({
     <div className="space-y-6">
       <PageHeader
         title={formatDocNumber('C', detail.number, docYear(null, detail.createdAt))}
-        description={t('subtitle')}
+        description={t(detail.sourceBoqId === null ? 'subtitle' : 'subtitleBoq')}
       />
       <ContractDetailClient
         detail={detail}

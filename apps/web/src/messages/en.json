@@ -1579,6 +1579,7 @@
   "contracts": {
     "title": "Contracts",
     "subtitle": "Generated from accepted proposals. Issue for the client's electronic acknowledgement.",
+    "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
     "empty": "No contracts yet. Generate one from an accepted proposal.",
     "generate": "Generate contract",
     "generateFromProposal": "Generate contract from this proposal",
@@ -2860,13 +2861,16 @@
         "set_schedule": "Set the payment schedule",
         "send_contract": "Send the contract",
         "record_signed_offline": "Record signed on paper",
-        "review_payment_claim": "Review the client's payment",
-        "send_milestone_request": "Send the next payment request",
-        "send_variation_request": "Bill the approved change order",
-        "record_payment": "Record a payment",
-        "await_variation_answer": "Follow up on the change order",
-        "prepare_final_account": "Prepare the final account",
-        "review_final_account": "Review the final account"
+        "await_variation_answer": "Follow up on the change order"
+      },
+      "upcoming": {
+        "send_milestone_request": "Next: a payment request for {instalment}.",
+        "send_variation_request": "Next: a payment request for the approved change order.",
+        "record_payment": "Next: the client's payment on the open payment request.",
+        "review_payment_claim": "Next: checking the payment the client reported.",
+        "prepare_final_account": "Next: the final account.",
+        "review_final_account": "Next: reviewing the final account.",
+        "anInstalment": "the next instalment"
       }
     }
   }

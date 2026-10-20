@@ -27,7 +27,9 @@ import { TRANSITIONS } from './transitions';
 import {
   EXECUTION_CARD_DIALOGS,
   NEXT_ACTION_TARGET,
+  STATUS_LINE_ACTIONS,
   executionCardHref,
+  isStatusLineAction,
 } from '@/lib/execution/next-action-target';
 import {
   EXECUTION_NEXT_ACTION_KINDS,
@@ -543,16 +545,21 @@ describe('the execution card offers an action it can take, at every derived stag
       }
       expect(result.next, `"${stage}" shows no next action: the card would be a dead end.`).not.toBeNull();
       const target = NEXT_ACTION_TARGET[result.next!.kind];
-      if (target.kind === 'dialog') expect(EXECUTION_CARD_DIALOGS).toContain(target.dialog);
+      // A money step whose screen is not built yet is said, not offered (F2): never a dead link.
+      if (target.kind === 'status') expect(STATUS_LINE_ACTIONS).toContain(result.next!.kind);
+      else if (target.kind === 'dialog') expect(EXECUTION_CARD_DIALOGS).toContain(target.dialog);
       else expect(executionCardHref(target.page, { projectId: 'p-1', contractId: 'c-1' })).toMatch(/^\/(projects|contracts)\//);
     });
   }
 
-  it('every next action kind has a target and its label in both languages', () => {
+  it('every next action kind has a target and its label (or status line) in both languages', () => {
     for (const kind of EXECUTION_NEXT_ACTION_KINDS) {
       expect(NEXT_ACTION_TARGET[kind], `no target for "${kind}"`).toBeDefined();
       for (const [locale, catalog] of Object.entries(messageCatalogs)) {
-        expect(catalog.execution.card.next[kind], `${locale} execution.card.next.${kind}`).toBeTruthy();
+        const card: { next: Record<string, string>; upcoming: Record<string, string> } = catalog.execution.card;
+        const key = isStatusLineAction(kind) ? `upcoming.${kind}` : `next.${kind}`;
+        const said = isStatusLineAction(kind) ? card.upcoming[kind] : card.next[kind];
+        expect(said, `${locale} execution.card.${key}`).toBeTruthy();
       }
     }
     for (const stage of EXECUTION_STAGES) {

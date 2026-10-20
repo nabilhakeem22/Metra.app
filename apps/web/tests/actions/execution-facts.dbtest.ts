@@ -76,6 +76,8 @@ describe('the execution card, stage by stage', () => {
     await recordContractSignedOfflineCore(owner, { contractId, signedOn: todayInCairo(new Date()) });
     const signed = await stageOf(engagementId);
     expect(signed).toMatchObject({ stage: 'in_progress', next: { kind: 'send_milestone_request' } });
+    // The card names the instalment the next payment request bills (F2).
+    expect(signed.card.nextInstalment).toEqual({ labelAr: null, labelEn: 'Advance' });
     const milestones = await ownerQuery<{ id: string }>(
       `select id from public.contract_payment_milestones where contract_id = $1 order by sort_order`,
       [contractId],

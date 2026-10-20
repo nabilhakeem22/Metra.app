@@ -12,6 +12,8 @@ export interface ExecutionCardView {
   projectId: string;
   boqId: string | null;
   contract: { id: string; documentNumber: string } | null;
+  /** The schedule row the next payment request would bill, by its labels; null when none is next. */
+  nextInstalment: { labelAr: string | null; labelEn: string | null } | null;
   may: {
     /** `contracts_generate` create: owner and admin. */
     generateContract: boolean;
@@ -38,6 +40,7 @@ export function executionCardView(
           documentNumber: formatDocNumber('C', card.contract.number, docYear(null, card.contract.createdAt)),
         }
       : null,
+    nextInstalment: card.nextInstalment,
     may: context.may,
   };
 }

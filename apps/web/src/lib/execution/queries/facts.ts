@@ -26,6 +26,8 @@ export interface ExecutionCardFacts {
   /** The delivery's issued BOQ: what "create contract" generates from. */
   boqId: string | null;
   contract: ExecutionCardContract | null;
+  /** The labels of the schedule row the next payment request bills (the card names it). */
+  nextInstalment: { labelAr: string | null; labelEn: string | null } | null;
 }
 
 /** The newest contract on a BOQ of this delivery, a live one before a terminated one. */
@@ -56,11 +58,11 @@ async function loadIssuedBoqId(tx: MetraDb, engagementId: string): Promise<strin
 
 type DeliveryContract = NonNullable<Awaited<ReturnType<typeof loadDeliveryContract>>>;
 
-/** The first schedule row no issued request bills yet, with what it would bill. */
-function firstUnbilled(rows: ScheduleRowView[], money: ContractMoneyFacts): { id: string; amount: string } | null {
+/** The first schedule row no issued request bills yet. */
+function firstUnbilled(rows: ScheduleRowView[], money: ContractMoneyFacts): (ScheduleRowView & { amount: string }) | null {
   const billed = new Set(money.billedMilestoneIds);
   const row = rows.find((candidate) => !billed.has(candidate.id) && candidate.amount !== null);
-  return row?.amount ? { id: row.id, amount: row.amount } : null;
+  return row?.amount ? { ...row, amount: row.amount } : null;
 }
 
 /** Once the final account request is issued, both balances are its figures (plan A3.5 addendum). */
@@ -69,8 +71,11 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
   return formatMoney4(parseMoney4(money.finalAccount.finalValue) - parseMoney4(money.issuedRequestsTotal));
 }
 
-/** A signed contract's billing facts; a draft or an unsigned one bills nothing yet. */
-async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<ExecutionContractFacts> {
+/** A signed contract's billing facts, and the row it bills next; a draft or an unsigned one bills nothing yet. */
+async function contractFacts(
+  tx: MetraDb,
+  contract: DeliveryContract,
+): Promise<{ facts: ExecutionContractFacts; next: { labelAr: string | null; labelEn: string | null } | null }> {
   const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
   const idle: ExecutionContractFacts = {
     status: contract.status,
@@ -84,7 +89,7 @@ async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<E
     billingBalance: '0',
     finalAccountBalance: '0',
   };
-  if (contract.status !== 'signed') return idle;
+  if (contract.status !== 'signed') return { facts: idle, next: null };
 
   const money = await loadContractMoneyFacts(tx, contract.id);
   const billing = {
@@ -96,9 +101,10 @@ async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<E
   // Before a final account request: steering on billingBalance, the end state
   // on the full balance with the measured provisional lines (A3.5 addendum).
   const full = issued ?? finalAccountBalance(billing, await loadMeasuredWorks(tx, contract.id));
-  return {
+  const next = firstUnbilled(schedule.rows, money);
+  const facts: ExecutionContractFacts = {
     ...idle,
-    nextUnbilledMilestone: firstUnbilled(schedule.rows, money),
+    nextUnbilledMilestone: next && { id: next.id, amount: next.amount },
     pendingClaimCount: money.pendingClaimCount,
     unbilledVariationCount: money.unbilledVariationCount,
     finalAccountOutstanding: money.finalAccount?.outstanding ?? null,
@@ -107,6 +113,7 @@ async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<E
     billingBalance: issued ?? billingBalance(billing),
     finalAccountBalance: full,
   };
+  return { facts, next: next && { labelAr: next.labelAr, labelEn: next.labelEn } };
 }
 
 /** The execution card's facts for a delivery at `execution`. */
@@ -118,12 +125,14 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
     // issued one: the card offers to contract that one instead.
     const replaced = newest?.status === 'terminated' && boqId !== null && newest.sourceBoqId !== boqId;
     const contract = replaced ? null : newest;
+    const billing = contract ? await contractFacts(tx, contract) : null;
     return {
       boqId,
       contract: contract
         ? { id: contract.id, number: contract.number, createdAt: contract.createdAt.toISOString(), status: contract.status }
         : null,
-      facts: { hasIssuedBoq: boqId !== null, contract: contract ? await contractFacts(tx, contract) : null },
+      nextInstalment: billing?.next ?? null,
+      facts: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
     };
   });
 }

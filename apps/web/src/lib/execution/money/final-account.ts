@@ -53,7 +53,7 @@ function residualQty4(line: MeasuredLine): bigint {
 }
 
 /** Every approved change order's full charge, de-scopes included (they lower it). */
-function variationsCharge4(input: FinalAccountInput): bigint {
+function variationsCharge4(input: Omit<FinalAccountInput, 'measuredLines'>): bigint {
   return input.approvedVariationNetDeltas.reduce(
     (total, netDelta) => total + parseMoney4(variationCharge(netDelta, input.taxRate, input.supervisionPct).total),
     0n,

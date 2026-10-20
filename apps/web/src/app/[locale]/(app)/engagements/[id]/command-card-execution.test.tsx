@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
-import { NEXT_ACTION_TARGET } from '@/lib/execution/next-action-target';
+import { NEXT_ACTION_TARGET, STATUS_LINE_ACTIONS } from '@/lib/execution/next-action-target';
 import { EXECUTION_NEXT_ACTION_KINDS, type ExecutionNextActionKind } from '@/lib/execution/stage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CommandCardExecution } from './command-card-execution';
@@ -9,7 +9,8 @@ import { CommandCardExecution } from './command-card-execution';
 // AC10: at `execution` the delivery card shows exactly one next action per
 // derived stage, and that action is a control the studio can press: a link to
 // the page that does it, or the dialog that does it in place. A role that may
-// not take it is told who can, never shown a dead button.
+// not take it is told who can, never shown a dead button. A money step whose
+// screen arrives with PR A4 or A5 is a plain status line (lead ruling F2).
 
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
@@ -30,6 +31,7 @@ function view(kind: ExecutionNextActionKind, may = EVERYTHING): ExecutionCardVie
     projectId: 'p-1',
     boqId: 'b-1',
     contract: { id: 'c-1', documentNumber: 'C-2026-0007' },
+    nextInstalment: { labelAr: 'دفعة مقدمة', labelEn: 'Advance' },
     may,
   };
 }
@@ -43,10 +45,15 @@ const DIALOG_BUTTON = {
 describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) => {
   const at = (key: string) => messageAt(locale, key);
 
-  test.each([...EXECUTION_NEXT_ACTION_KINDS])('%s: one control that takes the action', (kind) => {
+  test.each([...EXECUTION_NEXT_ACTION_KINDS])('%s: one control that takes the action, or its status line', (kind) => {
     renderWithIntl(<CommandCardExecution view={view(kind)} />, { locale });
     const target = NEXT_ACTION_TARGET[kind];
-    if (target.kind === 'dialog') {
+    if (target.kind === 'status') {
+      expect(screen.queryAllByRole('button')).toHaveLength(0);
+      expect(screen.queryAllByRole('link')).toHaveLength(0);
+      const instalment = locale === 'en' ? 'Advance' : 'دفعة مقدمة';
+      expect(screen.getByText(at(`execution.card.upcoming.${kind}`).replace('{instalment}', instalment))).toBeTruthy();
+    } else if (target.kind === 'dialog') {
       expect(screen.getAllByRole('button')).toHaveLength(1);
       expect(screen.getByRole('button', { name: at(DIALOG_BUTTON[target.dialog]) })).toBeTruthy();
       expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -56,6 +63,16 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
       expect(links[0].textContent).toBe(at(`execution.card.next.${kind}`));
       expect(links[0].getAttribute('href')).toMatch(target.page === 'project_boq' ? /\/projects\/p-1\?tab=boq$/ : /\/contracts\/c-1/);
     }
+  });
+
+  test('the money steps A4 and A5 build are status lines, the next payment request naming its instalment (F2)', () => {
+    expect([...STATUS_LINE_ACTIONS].sort()).toEqual(
+      EXECUTION_NEXT_ACTION_KINDS.filter((kind) => NEXT_ACTION_TARGET[kind].kind === 'status').sort(),
+    );
+    renderWithIntl(<CommandCardExecution view={{ ...view('send_milestone_request'), nextInstalment: null }} />, { locale });
+    const text = at('execution.card.upcoming.send_milestone_request').replace('{instalment}', at('execution.card.upcoming.anInstalment'));
+    expect(screen.getByText(text)).toBeTruthy();
+    expect(screen.queryByText(at('execution.card.someoneElse'))).toBeNull();
   });
 
   test('a role that may not take the action is told who can, with no button and no link', () => {

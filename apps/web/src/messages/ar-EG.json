@@ -1579,6 +1579,7 @@
   "contracts": {
     "title": "العقود",
     "subtitle": "بتتولد من العروض المقبولة. ابعت العميل عشان يمضي عليها إلكترونيًا.",
+    "subtitleBoq": "بيتولد من المقايسة اللي اتصدرت. ابعته للعميل عشان يمضي عليه إلكترونيًا.",
     "empty": "مفيش عقود لحد دلوقتي. اصنع واحد من عرض سعر مقبول.",
     "generate": "إنشاء العقد",
     "generateFromProposal": "إنشاء عقد من عرض السعر ده",
@@ -2860,13 +2861,16 @@
         "set_schedule": "حدد جدول الدفعات",
         "send_contract": "ابعت العقد",
         "record_signed_offline": "سجّل إن العميل وقّع ورقيًا",
-        "review_payment_claim": "راجع دفعة العميل",
-        "send_milestone_request": "ابعت مطالبة الدفع الجاية",
-        "send_variation_request": "طالب بأمر التغيير المعتمد",
-        "record_payment": "سجّل دفعة",
-        "await_variation_answer": "تابع أمر التغيير",
-        "prepare_final_account": "جهّز الحساب الختامي",
-        "review_final_account": "راجع الحساب الختامي"
+        "await_variation_answer": "تابع أمر التغيير"
+      },
+      "upcoming": {
+        "send_milestone_request": "الخطوة الجاية: مطالبة دفع عن {instalment}.",
+        "send_variation_request": "الخطوة الجاية: مطالبة دفع عن أمر التغيير المعتمد.",
+        "record_payment": "الخطوة الجاية: دفعة العميل على مطالبة الدفع المفتوحة.",
+        "review_payment_claim": "الخطوة الجاية: مراجعة الدفعة اللي العميل بلّغ عنها.",
+        "prepare_final_account": "الخطوة الجاية: الحساب الختامي.",
+        "review_final_account": "الخطوة الجاية: مراجعة الحساب الختامي.",
+        "anInstalment": "الدفعة الجاية"
       }
     }
   }

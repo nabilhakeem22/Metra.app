@@ -14,29 +14,51 @@ export type ExecutionCardPage = 'project_boq' | 'contract' | 'contract_schedule'
 
 export type NextActionTarget =
   | { kind: 'link'; page: ExecutionCardPage }
-  | { kind: 'dialog'; dialog: ExecutionCardDialog };
+  | { kind: 'dialog'; dialog: ExecutionCardDialog }
+  | { kind: 'status' };
 
 const link = (page: ExecutionCardPage): NextActionTarget => ({ kind: 'link', page });
 const dialog = (name: ExecutionCardDialog): NextActionTarget => ({ kind: 'dialog', dialog: name });
 
 /**
- * Money actions (requests, payments, claims, the final account) open the
- * contract: its payments tab arrives with PR A4, on that same page.
+ * A money step whose screen is not built yet (payment requests, payments and
+ * claims arrive with PR A4, the final account with A5): the card SAYS it as a
+ * plain status line ("Next: payment request for the advance"), with no button
+ * and no link, so it never sends the studio to a page that cannot do it (lead
+ * ruling F2). The buttons replace these with A4 and A5.
  */
+const STATUS_LINE: NextActionTarget = { kind: 'status' };
+
 export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextActionTarget>> = {
   open_boq: link('project_boq'),
   create_contract: dialog('generate_contract'),
   set_schedule: link('contract_schedule'),
   send_contract: link('contract'),
   record_signed_offline: dialog('sign_offline'),
-  review_payment_claim: link('contract'),
-  send_milestone_request: link('contract'),
-  send_variation_request: link('contract_variations'),
-  record_payment: link('contract'),
+  review_payment_claim: STATUS_LINE,
+  send_milestone_request: STATUS_LINE,
+  send_variation_request: STATUS_LINE,
+  record_payment: STATUS_LINE,
   await_variation_answer: link('contract_variations'),
-  prepare_final_account: link('contract'),
-  review_final_account: link('contract'),
+  prepare_final_account: STATUS_LINE,
+  review_final_account: STATUS_LINE,
 };
+
+/** The next actions the card says as a status line, never as a control. */
+export const STATUS_LINE_ACTIONS = [
+  'review_payment_claim',
+  'send_milestone_request',
+  'send_variation_request',
+  'record_payment',
+  'prepare_final_account',
+  'review_final_account',
+] as const satisfies readonly ExecutionNextActionKind[];
+
+export type StatusLineAction = (typeof STATUS_LINE_ACTIONS)[number];
+
+export function isStatusLineAction(kind: ExecutionNextActionKind): kind is StatusLineAction {
+  return (STATUS_LINE_ACTIONS as readonly ExecutionNextActionKind[]).includes(kind);
+}
 
 /** The stages whose action waits on the client: the card says so beside it. */
 export const STAGES_WAITING_ON_CLIENT: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['awaiting_signature']);
