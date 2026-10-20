@@ -24,6 +24,8 @@ const writes = vi.hoisted(() => ({
   addDeliveryCommentByToken: vi.fn(async () => ({ ok: true })),
   getDeliveryDocumentCommentsByToken: vi.fn(async () => [{ body: 'hello' }]),
   withStudioNotified: vi.fn(async (_token: string, result: object) => ({ ...result, studioNotified: true })),
+  claimExecutionRequestByToken: vi.fn(async () => ({ ok: true, already: false })),
+  getDeliveryExecutionByToken: vi.fn(async () => null),
 }));
 vi.mock('@/lib/engagements/client-acts/concept-acts', () => writes);
 vi.mock('@/lib/engagements/client-acts/design-acts', () => writes);
@@ -33,9 +35,11 @@ vi.mock('@/lib/engagements/client-acts/notify', () => writes);
 vi.mock('@/lib/engagements/client-acts/acts', () => ({ paymentClaimedAct: (kind: string) => ({ kind }) }));
 vi.mock('@/lib/engagements/public', () => writes);
 vi.mock('@/lib/engagements/public-comments', () => writes);
+vi.mock('@/lib/engagements/public/execution', () => writes);
 
 const review = await import('./review-actions');
 const portal = await import('./actions');
+const execution = await import('./execution-actions');
 
 const TOKEN = 'portal-link-token';
 const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -54,6 +58,8 @@ const ACTS: Act[] = [
   ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', TOO_MANY_OUTCOME],
   ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit'), 'claimPaymentByToken', TOO_MANY_RESULT],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_RESULT],
+  // Stage 2 (B4.3): the client's "I paid" on a payment request of the execution card.
+  ['claimExecutionRequest', () => execution.claimExecutionRequest(TOKEN, DOCUMENT_ID), 'claimExecutionRequestByToken', { ok: false, error: 'too_many' }],
 ];
 
 beforeEach(() => {
@@ -104,5 +110,14 @@ describe('the read budget on a comment thread', () => {
     writes.getDeliveryDocumentCommentsByToken.mockClear();
     expect(await portal.loadDeliveryDocumentComments(TOKEN, DOCUMENT_ID)).toEqual({ refused: true });
     expect(writes.getDeliveryDocumentCommentsByToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('the read budget on the execution card (B4.3)', () => {
+  it('the read past the ceiling answers too_many and looks nothing up', async () => {
+    for (let index = 0; index < PORTAL_READ_CEILING; index += 1) await execution.loadDeliveryExecution(TOKEN);
+    writes.getDeliveryExecutionByToken.mockClear();
+    expect(await execution.loadDeliveryExecution(TOKEN)).toEqual({ ok: false, error: 'too_many' });
+    expect(writes.getDeliveryExecutionByToken).not.toHaveBeenCalled();
   });
 });
