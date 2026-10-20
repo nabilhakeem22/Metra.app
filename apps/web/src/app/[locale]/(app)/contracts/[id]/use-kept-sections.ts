@@ -22,7 +22,13 @@ export function useKeptSections(opening: ContractSectionsPage | null): KeptSecti
   const [page, setPage] = useState<ContractSectionsPage | null>(opening);
   return {
     page,
+    // Idempotent: a page that lands twice (the overview left and came back while
+    // its first ask was still out) adds each section once.
     append: (next) =>
-      setPage((current) => ({ sections: [...(current?.sections ?? []), ...next.sections], hasMore: next.hasMore })),
+      setPage((current) => {
+        const shown = current?.sections ?? [];
+        const known = new Set(shown.map((section) => section.id));
+        return { sections: [...shown, ...next.sections.filter((section) => !known.has(section.id))], hasMore: next.hasMore };
+      }),
   };
 }

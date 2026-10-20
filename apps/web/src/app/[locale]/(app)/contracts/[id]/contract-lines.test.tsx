@@ -191,6 +191,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     expect(screen.queryByRole('button', { name: messageAt(locale, 'contracts.lines.moreSections') })).toBeNull();
   });
 
+  test('a sections page that lands twice adds each section once (R1)', async () => {
+    let kept: ReturnType<typeof useKeptSections> | null = null;
+    function Probe() {
+      kept = useKeptSections(null);
+      return <p>{kept.page?.sections.length ?? 'none'}</p>;
+    }
+    renderWithIntl(<Probe />, { locale });
+    const page = { sections: [section(1, [], 's-1'), section(1, [], 's-2')], hasMore: false };
+    await act(async () => {
+      kept!.append(page);
+      kept!.append(page);
+    });
+    expect(screen.getByText('2')).toBeTruthy();
+  });
+
   test('opened on another tab, the sections load once when the overview is first shown, and stay (R1)', async () => {
     lineReads.loadContractSections.mockResolvedValue({ ok: true, data: { sections: [section(2, [line(1), line(2)])], hasMore: false } });
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
