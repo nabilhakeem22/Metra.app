@@ -1,5 +1,6 @@
 // What the studio types when it records that the client signed the contract on
-// paper: the day (required, not after today in Cairo) and an optional note.
+// paper: the day (required, not after today in Cairo; the core also refuses a
+// day before the issue, which only it knows) and an optional note.
 // PURE and CLIENT-SAFE: the dialog checks it on Save, the core again on arrival.
 import type { FieldErrors } from '@/lib/actions/field-errors';
 import { readFields, readOptionalText, type FieldRead } from '@/lib/validation/field-rules';
@@ -17,11 +18,14 @@ export interface TypedOfflineSignature {
   note?: unknown;
 }
 
+/** Year 0 is a day JavaScript knows and Postgres refuses (22008): not a day. */
+const FIRST_STORABLE_DAY = '0001-01-01';
+
 function readSignedOn(raw: unknown, todayInCairo: string): FieldRead<string> {
   const value = typeof raw === 'string' ? raw.trim() : '';
   const missing = requiredText(value);
   if (missing) return { ok: false, error: missing };
-  if (!validIsoDate(value)) return { ok: false, error: { code: 'invalid_date' } };
+  if (!validIsoDate(value) || value < FIRST_STORABLE_DAY) return { ok: false, error: { code: 'invalid_date' } };
   if (value > todayInCairo) return { ok: false, error: { code: 'date_in_future' } };
   return { ok: true, value };
 }

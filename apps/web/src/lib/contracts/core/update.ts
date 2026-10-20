@@ -72,6 +72,15 @@ function executionPercentRefusals(validated: ValidatedContractHeader): FieldErro
 }
 
 /**
+ * An execution contract's signing day is its signing event's (online on /c, or
+ * recorded on paper), so its header never takes a typed one (A3 F4): the form
+ * does not show the box, and a direct call's value is left unwritten.
+ */
+function withoutSignatureDate(header: ContractHeaderInput): ContractHeaderInput {
+  return { ...header, signatureDate: undefined };
+}
+
+/**
  * Edit a DRAFT contract's header only (lines/totals are the frozen baseline from
  * generation and are never edited here). Rejects a non-draft contract with
  * `contract_not_draft`. Percentages are [0,100]; dates must be well-formed.
@@ -105,7 +114,7 @@ export async function saveContractDraftCore(
       }
       await tx
         .update(contracts)
-        .set(contractHeaderPatch(header, validated))
+        .set(contractHeaderPatch(row.sourceBoqId === null ? header : withoutSignatureDate(header), validated))
         .where(and(eq(contracts.id, id), eq(contracts.status, 'draft')));
       await auditContractHeaderSaved(audit, id);
     },

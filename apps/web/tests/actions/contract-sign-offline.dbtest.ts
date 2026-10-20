@@ -43,9 +43,19 @@ async function trail(contractId: string) {
   return row;
 }
 
+/** The contract's `issued` event, at `at` (a timestamptz literal): what issueContractCore writes. */
+async function issuedAt(contractId: string, at: string): Promise<void> {
+  await ownerQuery(
+    `insert into public.contract_events (org_id, contract_id, kind, from_status, to_status, decided_at)
+     values ($1, $2, 'issued', 'draft', 'issued', $3::timestamptz)`,
+    [orgId, contractId, at],
+  );
+}
+
 describe('recordContractSignedOfflineCore', () => {
   it('flips issued -> signed and records the day the client signed and who recorded it', async () => {
     const contract = await seedExecutionContract(orgId, { state: 'issued' });
+    await issuedAt(contract.contractId, '2026-09-28 11:00+03');
     const res = await recordContractSignedOfflineCore(ctx.owner!, {
       contractId: contract.contractId,
       signedOn: '2026-10-01',
@@ -112,6 +122,37 @@ describe('recordContractSignedOfflineCore', () => {
       fields: { signedOn: { code: 'date_in_future' }, note: { code: 'too_long', params: { max: 500 } } },
     });
     expect((await trail(id)).status).toBe('issued');
+  });
+
+  it('refuses a day before the Cairo issue day under its box, and takes the issue day itself (A3 F6, S1)', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'issued' });
+    // 00:30 in Cairo on Oct 5 is still Oct 4 in UTC: the Cairo day decides.
+    await issuedAt(contract.contractId, '2026-10-05 00:30+03');
+    const id = contract.contractId;
+    for (const signedOn of ['2026-10-04', '2001-01-01', '0001-01-01']) {
+      expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: id, signedOn }), signedOn).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { signedOn: { code: 'date_before_issue', params: { date: '2026-10-05' } } },
+      });
+    }
+    expect((await trail(id)).status).toBe('issued');
+    expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: id, signedOn: '2026-10-05' })).toMatchObject({ ok: true });
+    expect(await trail(id)).toMatchObject({ status: 'signed', day: '2026-10-05' });
+  });
+
+  it('says year 0 is not a day (never a 22008), and a null or non-object payload is malformed', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'issued' });
+    expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: contract.contractId, signedOn: '0000-01-01' })).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { signedOn: { code: 'invalid_date' } },
+    });
+    for (const payload of [null, undefined, 'x', 7, true]) {
+      const call = recordContractSignedOfflineCore as (ctx: OrgContext, input: unknown) => ReturnType<typeof recordContractSignedOfflineCore>;
+      expect(await call(ctx.owner!, payload), String(payload)).toEqual({ ok: false, error: 'malformed' });
+    }
+    expect((await trail(contract.contractId)).status).toBe('issued');
   });
 
   it('two concurrent recordings sign once and write one event', async () => {

@@ -2,16 +2,16 @@ import 'server-only';
 // Everything the delivery's execution card needs to derive its stage: the
 // delivery's issued BOQ, the contract on it (plan A26), and that contract's
 // money facts. One transaction, and nothing in it grows with the number of
-// lines: the schedule has at most 12 rows, money is aggregated in SQL, and only
-// measured provisional lines are read.
+// lines: the schedule has at most 12 rows, and money, the measured works
+// included, is aggregated in SQL to single figures.
 import { boqs, contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { loadScheduleRows, scheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { billingBalance, computeFinalAccount } from '../money/final-account';
+import { billingBalance, finalAccountBalance } from '../money/final-account';
 import type { ExecutionContractFacts, ExecutionFacts } from '../stage';
-import { loadBilledMeasuredLines } from './measured-lines';
+import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from './money-facts';
 
 export interface ExecutionCardContract {
@@ -95,7 +95,7 @@ async function contractFacts(tx: MetraDb, contract: DeliveryContract): Promise<E
   const issued = issuedFinalBalance(money);
   // Before a final account request: steering on billingBalance, the end state
   // on the full balance with the measured provisional lines (A3.5 addendum).
-  const full = issued ?? computeFinalAccount({ ...billing, measuredLines: await loadBilledMeasuredLines(tx, contract.id) }).balance;
+  const full = issued ?? finalAccountBalance(billing, await loadMeasuredWorks(tx, contract.id));
   return {
     ...idle,
     nextUnbilledMilestone: firstUnbilled(schedule.rows, money),

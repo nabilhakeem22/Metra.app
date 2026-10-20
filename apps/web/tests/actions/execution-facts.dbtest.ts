@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { todayInCairo } from '@/lib/automation/clock';
 import {
   generateExecutionContractCore,
   issueContractCore,
@@ -72,7 +73,7 @@ describe('the execution card, stage by stage', () => {
     await issueContractCore(owner, { id: contractId });
     expect(await stageOf(engagementId)).toMatchObject({ stage: 'awaiting_signature', next: { kind: 'record_signed_offline' } });
 
-    await recordContractSignedOfflineCore(owner, { contractId, signedOn: '2026-10-01' });
+    await recordContractSignedOfflineCore(owner, { contractId, signedOn: todayInCairo(new Date()) });
     const signed = await stageOf(engagementId);
     expect(signed).toMatchObject({ stage: 'in_progress', next: { kind: 'send_milestone_request' } });
     const milestones = await ownerQuery<{ id: string }>(

@@ -12,6 +12,7 @@ import { SelectControl } from '@/components/ui/select-control';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { SCHEDULE_FIELD } from '@/lib/contracts/schedule/input';
 import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
+import { formatMoneyExact } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { ScheduleRows } from './schedule-rows';
@@ -34,11 +35,14 @@ interface ScheduleTabProps {
 }
 
 /** The draft schedule's editor: one basis, 1 to 12 rows, a live total that the sum refusal sits under. */
-function ScheduleEditor({ contractId, schedule, contract, m }: ScheduleTabProps) {
+function ScheduleEditor({ contractId, schedule, contract }: ScheduleTabProps) {
   const t = useTranslations('contracts.execution.schedule');
   const tc = useTranslations('contracts');
   const form = useScheduleForm({ contractId, saved: schedule, contract });
-  const target = form.basis === 'percent' ? '100' : m(contract.originalValue);
+  const locale = useLocale();
+  // The exact figure the validator enforces, to the 4th decimal: a rounded
+  // target would ask for 1,600.75 and refuse it for not being 1,600.7453.
+  const target = form.basis === 'percent' ? '100' : formatMoneyExact(contract.originalValue, locale);
   const formRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalid(formRef, form.errors.invalidAttempt);
 

@@ -96,7 +96,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {shown.includes('advancePct') && field('advancePct', th('advancePct'))}
           {shown.includes('retentionPct') && field('retentionPct', th('retentionPct'))}
-          {field('signatureDate', th('signatureDate'))}
+          {shown.includes('signatureDate') && field('signatureDate', th('signatureDate'))}
           {field('startDate', th('startDate'))}
           {field('endDate', th('endDate'))}
           {field('paymentTermsDays', th('paymentTermsDays'))}
