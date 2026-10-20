@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
-import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS, STATUS_LINE_ACTIONS } from '@/lib/execution/next-action-target';
+import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS } from '@/lib/execution/next-action-target';
 import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES, type ExecutionNextActionKind } from '@/lib/execution/stage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CommandCardExecution } from './command-card-execution';
@@ -9,9 +9,10 @@ import { CommandCardExecution } from './command-card-execution';
 // AC10: at `execution` the delivery card shows exactly one next action per
 // derived stage, and that action is a control the studio can press: a link to
 // the page that does it, or the dialog that does it in place. A role that may
-// not take it is told who can, never shown a dead button. The money steps PR A4
-// built link to the contract's Payments tab (lead ruling, A3 fix round); the
-// final account steps, which A5 builds, are a plain status line (F2).
+// not take it is told who can, never shown a dead button. The money steps link
+// to the contract's Payments tab (A4) or its Final account tab (A5); a role
+// that records measurements gets "Record measurements" beside the next action
+// while the works are in progress (A5.1).
 
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
@@ -22,10 +23,27 @@ vi.mock('@/lib/contracts/actions', () => ({
   recordContractSignedOffline: vi.fn(),
 }));
 
-// "Record costs" sits beside the next action, not in its place: the per-action
-// counts below leave it off, and the costs test turns it on.
-const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, recordCosts: false, sendRequests: true, recordPayments: true };
-const NOTHING = { generateContract: false, signOffline: false, openContract: false, recordCosts: false, sendRequests: false, recordPayments: false };
+// "Record costs" and "Record measurements" sit beside the next action, not in
+// its place: the per-action counts below leave them off, and their own tests
+// turn them on.
+const EVERYTHING = {
+  generateContract: true,
+  signOffline: true,
+  openContract: true,
+  recordCosts: false,
+  sendRequests: true,
+  recordPayments: true,
+  recordMeasurements: false,
+};
+const NOTHING = {
+  generateContract: false,
+  signOffline: false,
+  openContract: false,
+  recordCosts: false,
+  sendRequests: false,
+  recordPayments: false,
+  recordMeasurements: false,
+};
 /** A project manager or a viewer: reads the Payments tab, can take none of its money steps (A4 F6). */
 const READS_MONEY_ONLY = { ...EVERYTHING, sendRequests: false, recordPayments: false };
 const INSTALMENT = { en: 'Advance', 'ar-EG': 'دفعة مقدمة' } as const;
@@ -51,14 +69,10 @@ const DIALOG_BUTTON = {
 describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) => {
   const at = (key: string) => messageAt(locale, key);
 
-  test.each([...EXECUTION_NEXT_ACTION_KINDS])('%s: one control that takes the action, or its status line', (kind) => {
+  test.each([...EXECUTION_NEXT_ACTION_KINDS])('%s: one control that takes the action', (kind) => {
     renderWithIntl(<CommandCardExecution view={view(kind)} />, { locale });
     const target = NEXT_ACTION_TARGET[kind];
-    if (target.kind === 'status') {
-      expect(screen.queryAllByRole('button')).toHaveLength(0);
-      expect(screen.queryAllByRole('link')).toHaveLength(0);
-      expect(screen.getByText(at(`execution.card.upcoming.${kind}`))).toBeTruthy();
-    } else if (target.kind === 'dialog') {
+    if (target.kind === 'dialog') {
       expect(screen.getAllByRole('button')).toHaveLength(1);
       expect(screen.getByRole('button', { name: at(DIALOG_BUTTON[target.dialog]) })).toBeTruthy();
       expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -70,13 +84,29 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     }
   });
 
-  test('only the final account steps (A5) are status lines; the A4 money steps open the Payments tab', () => {
-    expect([...STATUS_LINE_ACTIONS].sort()).toEqual(['prepare_final_account', 'review_final_account']);
-    expect(STATUS_LINE_ACTIONS.filter((kind) => NEXT_ACTION_TARGET[kind].kind !== 'status')).toEqual([]);
+  test('the money steps open the Payments tab; the final account steps (A5) the Final account tab', () => {
     for (const kind of ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment'] as const) {
       const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind)} />, { locale });
       expect(screen.getByRole('link').getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=payments$/);
       unmount();
+    }
+    for (const kind of ['prepare_final_account', 'review_final_account'] as const) {
+      const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind)} />, { locale });
+      expect(screen.getByRole('link', { name: at(`execution.card.next.${kind}`) }).getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=final_account$/);
+      unmount();
+    }
+  });
+
+  test('"Record measurements" is offered beside the next action while the works are in progress, to a role that records them', () => {
+    const measures = { ...READS_MONEY_ONLY, recordMeasurements: true };
+    const { unmount } = renderWithIntl(<CommandCardExecution view={view('record_payment', measures)} />, { locale });
+    const link = screen.getByRole('link', { name: at('execution.card.recordMeasurements') });
+    expect(link.getAttribute('href')).toMatch(/\/contracts\/c-1\/measurements$/);
+    unmount();
+    for (const [stage, may] of [['in_progress', READS_MONEY_ONLY], ['final_account', measures], ['awaiting_signature', measures]] as const) {
+      const { unmount: close } = renderWithIntl(<CommandCardExecution view={{ ...view('record_payment', may), stage }} />, { locale });
+      expect(screen.queryByRole('link', { name: at('execution.card.recordMeasurements') }), stage).toBeNull();
+      close();
     }
   });
 
@@ -87,7 +117,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
   });
 
   test('a role that can only read the money is told the owner, an admin or the accountant does each money step', () => {
-    for (const kind of ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment'] as const) {
+    const steps = ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment', 'prepare_final_account', 'review_final_account'] as const;
+    for (const kind of steps) {
       const { unmount } = renderWithIntl(<CommandCardExecution view={view(kind, READS_MONEY_ONLY)} />, { locale });
       expect(screen.queryAllByRole('link'), kind).toHaveLength(0);
       expect(screen.queryAllByRole('button'), kind).toHaveLength(0);

@@ -10,9 +10,9 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import {
   NEXT_ACTION_TARGET,
   STAGES_RECORDING_COSTS,
+  STAGES_RECORDING_MEASUREMENTS,
   STAGES_WAITING_ON_CLIENT,
   executionCardHref,
-  isStatusLineAction,
   type NextActionTarget,
 } from '@/lib/execution/next-action-target';
 import type { ExecutionNextActionKind } from '@/lib/execution/stage';
@@ -20,7 +20,7 @@ import type { ExecutionNextActionKind } from '@/lib/execution/stage';
 /** May this role take the step a link leads to? The BOQ needs nothing; a money step its capability (A18). */
 function mayFollow(view: ExecutionCardView, target: Extract<NextActionTarget, { kind: 'link' }>): boolean {
   if (target.page === 'project_boq') return true;
-  if (target.page === 'contract_payments') return view.may[target.needs];
+  if ('needs' in target) return view.may[target.needs];
   return view.may.openContract;
 }
 
@@ -30,7 +30,6 @@ function mayFollow(view: ExecutionCardView, target: Extract<NextActionTarget, { 
  * say who can take the action instead.
  */
 function nextActionControl(view: ExecutionCardView, target: NextActionTarget, label: string) {
-  if (target.kind === 'status') return null;
   if (target.kind === 'dialog') {
     if (target.dialog === 'generate_contract') {
       return view.may.generateContract && view.boqId ? <GenerateExecutionContract boqId={view.boqId} /> : null;
@@ -52,13 +51,19 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
  * next action (lib/execution/next-action-target.ts). A role that cannot take
  * that action is told who can, so the card never shows a dead button. From
  * works in progress on, a role that records costs also gets "Record costs".
+ * While the works are in progress, a role that records measurements also gets
+ * "Record measurements": the site engineer and the PM measure without opening
+ * the contract page (A5.1).
  */
 export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
   const t = useTranslations('execution.card');
   const next = view.next;
+  const ids = { projectId: view.projectId, contractId: view.contract?.id ?? null };
   const costsHref =
-    view.may.recordCosts && STAGES_RECORDING_COSTS.has(view.stage)
-      ? executionCardHref('contract_costs', { projectId: view.projectId, contractId: view.contract?.id ?? null })
+    view.may.recordCosts && STAGES_RECORDING_COSTS.has(view.stage) ? executionCardHref('contract_costs', ids) : null;
+  const measurementsHref =
+    view.may.recordMeasurements && STAGES_RECORDING_MEASUREMENTS.has(view.stage)
+      ? executionCardHref('contract_measurements', ids)
       : null;
 
   return (
@@ -81,26 +86,34 @@ export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
           <NextAction view={view} kind={next.kind} />
         </div>
       )}
-      {costsHref && (
-        <Button asChild variant="secondary" size="sm">
-          <Link href={costsHref}>{t('recordCosts')}</Link>
-        </Button>
+      {(costsHref || measurementsHref) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {costsHref && (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={costsHref}>{t('recordCosts')}</Link>
+            </Button>
+          )}
+          {measurementsHref && (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={measurementsHref}>{t('recordMeasurements')}</Link>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-/** The next action: a status line for a money step not built yet (F2), else its control, or who takes it. */
+/** The next action: its control, or who takes it. */
 function NextAction({ view, kind }: { view: ExecutionCardView; kind: ExecutionNextActionKind }) {
   const t = useTranslations('execution.card');
   const locale = useLocale();
-  if (isStatusLineAction(kind)) return <p className="text-body">{t(`upcoming.${kind}`)}</p>;
   const named = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
   const label = t(`next.${kind}`, { instalment: named || t('anInstalment') });
   const target = NEXT_ACTION_TARGET[kind];
   const control = nextActionControl(view, target, label);
   // Money is billed and recorded by the owner, an admin or the accountant (A18).
-  const money = target.kind === 'link' && target.page === 'contract_payments';
+  const money = target.kind === 'link' && 'needs' in target;
   return (
     control ?? (
       <p className="text-body">

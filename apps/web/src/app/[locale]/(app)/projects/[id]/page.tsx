@@ -21,6 +21,9 @@ import { ActivityTab } from './activity-tab';
 import { DetailsTab } from './details-tab';
 import { DocumentsTab } from './documents-tab';
 import { getProjectEffectiveRates } from '@/lib/clients/financials';
+import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
+import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
+import { resolveSeeMargin } from '@/lib/org/queries';
 import { FinancialsTab } from './financials-tab';
 import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 import { OverviewTab } from './overview-tab';
@@ -141,6 +144,11 @@ export default async function ProjectProfilePage({
           <FinancialsTab
             contractedTotal={(await getProjectOverview(ctx, id)).contractedTotal}
             {...(await getProjectEffectiveRates(ctx, id))}
+            cost={
+              mayOpenCostSheet(ctx.role)
+                ? { visible: true, summary: await getProjectCostSummary(ctx, id, await resolveSeeMargin(ctx)) }
+                : { visible: false }
+            }
           />
         )}
         {tab === 'team' && <TeamTab />}

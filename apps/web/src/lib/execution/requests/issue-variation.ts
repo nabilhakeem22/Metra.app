@@ -42,6 +42,7 @@ export async function issueVariationRequestCore(
     {
       capability: 'invoices_issue',
       action: 'approve',
+      capTransaction: true,
       refusals: [{ constraint: 'payment_requests_one_per_variation', code: 'request_exists' }],
     },
     async (tx, audit) => {

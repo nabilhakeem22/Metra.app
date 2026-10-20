@@ -2,13 +2,16 @@ import 'server-only';
 import {
   activities,
   clients,
+  contracts,
   projects,
   proposals,
   type Activity,
   type Client,
 } from '@metra/db';
 import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { committedExecutionValue } from './financials';
 
 export interface ListClientsFilter {
   active?: boolean;
@@ -127,7 +130,12 @@ export function getClientById(
 export interface ClientOverview {
   projectCount: number;
   activeProposalCount: number;
-  /** Sum of ACCEPTED proposal totals for this client (scale-4 money string). */
+  /**
+   * Sum of ACCEPTED proposal totals for this client, plus the value of its
+   * committed (issued or signed) EXECUTION contracts, which come from a BOQ and
+   * have no proposal behind them (A5 fix round F4, as on a project). A proposal
+   * contract is its accepted proposal, so it is counted once. Scale-4 money string.
+   */
   contractedTotal: string;
   recentActivity: Activity[];
   // Invoiced/outstanding are intentionally ABSENT — the UI renders a locked
@@ -168,6 +176,7 @@ export function getClientOverview(
           eq(proposals.status, 'accepted'),
         ),
       );
+    const executionTotal = await committedExecutionValue(tx, eq(contracts.clientId, clientId));
 
     const recentActivity = await tx
       .select()
@@ -184,7 +193,7 @@ export function getClientOverview(
     return {
       projectCount: Number(projRow?.n ?? 0),
       activeProposalCount: Number(activeRow?.n ?? 0),
-      contractedTotal: contractedRow?.total ?? '0',
+      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionTotal)),
       recentActivity,
     };
   });

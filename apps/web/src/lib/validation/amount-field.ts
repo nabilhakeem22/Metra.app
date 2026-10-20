@@ -52,6 +52,8 @@ function typedDecimals(raw: string): number {
   return canonical === null ? 0 : (/\.(\d*)$/.exec(canonical)?.[1].length ?? 0);
 }
 
+const TOO_MANY_DECIMALS: FieldRead<string> = { ok: false, error: { code: 'too_many_decimals', params: { max: STORED_DECIMALS } } };
+
 /**
  * readPositiveAmount, except that a figure typed with more decimals than it is
  * stored to is refused (`too_many_decimals`), never cut: 100.12345 is not
@@ -59,8 +61,19 @@ function typedDecimals(raw: string): number {
  * its amount this way (A4 F8); the older callers keep readPositiveAmount.
  */
 export function readPositiveExactAmount(raw: unknown, missing: FieldError): FieldRead<string> {
-  if (typeof raw === 'string' && typedDecimals(raw) > STORED_DECIMALS) {
-    return { ok: false, error: { code: 'too_many_decimals', params: { max: STORED_DECIMALS } } };
-  }
+  if (typeof raw === 'string' && typedDecimals(raw) > STORED_DECIMALS) return TOO_MANY_DECIMALS;
   return readPositiveAmount(raw, missing);
+}
+
+/**
+ * A typed figure that may be ZERO (a line measured at nothing is a real
+ * reading), canonical at scale 4, a fifth decimal refused, read the way every
+ * box reads ("1,500", Arabic digits). An empty box is `required`; below zero
+ * is `not_negative`. The site measurement reads its quantity this way.
+ */
+export function readNonNegativeExactFigure(raw: unknown): FieldRead<string> {
+  if (typeof raw !== 'string' || clean(raw) === null) return { ok: false, error: { code: 'required' } };
+  if (typedDecimals(raw) > STORED_DECIMALS) return TOO_MANY_DECIMALS;
+  const read = readTypedMoney(raw);
+  return read.ok ? { ok: true, value: formatMoney4(parseMoney4(read.value)) } : read;
 }

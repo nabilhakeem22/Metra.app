@@ -79,7 +79,7 @@ export async function saveContractScheduleCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'contracts_generate', action: 'update', immutableCode: 'contract_not_draft' },
+    { capability: 'contracts_generate', action: 'update', immutableCode: 'contract_not_draft', capTransaction: true },
     async (tx, audit) => {
       const contract = await lockDraftExecutionContract(tx, contractId);
       // Validated against the value it is locked at: the sum check needs it.

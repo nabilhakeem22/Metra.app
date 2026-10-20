@@ -10,10 +10,12 @@ import type { RequestTarget } from './send-request-dialog';
  * What the studio can bill next: each row of the signed schedule (with "send
  * request" until a live request bills it) and each approved change order that
  * adds money and has no request yet. `canSend` is false for a role without
- * `invoices_issue` and for a contract that cannot be billed (not signed,
- * terminated, or under an issued final account): the rows are then listed with
- * no button. A button only asks the tab to open the send dialog, which lives on
- * the tab so a read of the tab never unmounts it.
+ * `invoices_issue` and for a contract that cannot be billed (not signed or
+ * terminated): the rows are then listed with no button. Under an issued final
+ * account the rows still to bill are not listed at all, because the final
+ * account bills them (F6): only the requested schedule rows stay, with a line
+ * saying why the rest went. A button only asks the tab to open the send
+ * dialog, which lives on the tab so a read of the tab never unmounts it.
  */
 export function BillingToSend({
   view,
@@ -28,6 +30,11 @@ export function BillingToSend({
 }) {
   const t = useTranslations('contracts.execution.payments');
   const locale = useLocale();
+  const underFinalAccount = view.finalAccountIssued;
+  const schedule = underFinalAccount ? view.schedule.filter((row) => row.billed) : view.schedule;
+  const variations = underFinalAccount ? [] : view.variations;
+  const billedInFinalAccount =
+    underFinalAccount && (schedule.length < view.schedule.length || view.variations.length > 0);
   const sendButton = (target: RequestTarget) => (
     <Button variant="default" size="sm" onClick={() => onSend(target)}>
       {t('send.open')}
@@ -39,7 +46,7 @@ export function BillingToSend({
       <section className="space-y-2">
         <h3 className="text-body font-semibold">{t('schedule.title')}</h3>
         <ul className="divide-y">
-          {view.schedule.map((row) => {
+          {schedule.map((row) => {
             const label = pickLocale({ labelAr: row.labelAr, labelEn: row.labelEn }, 'label', locale).value;
             return (
               <li key={row.id} className="flex flex-wrap items-center gap-3 py-2 text-body" data-milestone-billed={row.billed}>
@@ -55,11 +62,12 @@ export function BillingToSend({
           })}
         </ul>
       </section>
-      {view.variations.length > 0 && (
+      {billedInFinalAccount && <p className="text-body text-muted-foreground">{t('billedInFinalAccount')}</p>}
+      {variations.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-body font-semibold">{t('variations.title')}</h3>
           <ul className="divide-y">
-            {view.variations.map((order) => {
+            {variations.map((order) => {
               const title = pickLocale({ titleAr: order.titleAr, titleEn: order.titleEn }, 'title', locale).value;
               return (
                 <li key={order.id} className="flex flex-wrap items-center gap-3 py-2 text-body">

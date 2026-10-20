@@ -20,11 +20,3 @@ export interface KeyedPayment {
 export function isSamePayment(stored: KeyedPayment, attempt: { requestId: string; amount: string }): boolean {
   return stored.requestId === attempt.requestId && parseMoney4(stored.amount) === parseMoney4(attempt.amount);
 }
-
-/**
- * The idempotency key as the ledger keeps it: trimmed and lower-case, so the
- * upper-case spelling of a uuid is the same key and never a second payment.
- */
-export function canonicalIdempotencyKey(raw: unknown): string {
-  return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
-}

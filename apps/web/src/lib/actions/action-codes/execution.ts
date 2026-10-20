@@ -33,6 +33,8 @@ export type ExecutionActionCode =
   | 'final_account_issued'
   | 'final_account_nothing_due'
   | 'final_account_changed'
+  // Its balance is past the money cap: a reading far beyond its line (A5 S3).
+  | 'final_account_too_large'
   | 'open_variations'
   // Cost entries and site measurements against the contract's lines.
   | 'cost_entry_not_found'

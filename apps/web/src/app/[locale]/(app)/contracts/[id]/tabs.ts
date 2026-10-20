@@ -1,37 +1,61 @@
 // Server-safe tab constants for the contract detail page. PLAIN module (NOT
 // 'use client') so both the server page and the client tab component can import
 // it without turning it into a client-reference proxy.
-export const CONTRACT_TABS = ['overview', 'schedule', 'payments', 'costs', 'variations'] as const;
+export const CONTRACT_TABS = [
+  'overview',
+  'schedule',
+  'payments',
+  'final_account',
+  'measurements',
+  'costs',
+  'cost_sheet',
+  'variations',
+] as const;
 
 export type ContractTab = (typeof CONTRACT_TABS)[number];
 
 /** The tabs only an execution contract (from a BOQ) has. */
-const EXECUTION_TABS: ReadonlySet<ContractTab> = new Set(['schedule', 'payments', 'costs']);
+const EXECUTION_TABS: ReadonlySet<ContractTab> = new Set([
+  'schedule',
+  'payments',
+  'final_account',
+  'measurements',
+  'costs',
+  'cost_sheet',
+]);
 
 /** What this person may open on a contract page, each from its own matrix row. */
 export interface ContractTabAccess {
   /** `contracts_generate` read: the contract itself (overview, schedule, change orders). */
   seeContract: boolean;
-  /** `payments` read: its payments. */
+  /** `payments` read: its payments and its final account. */
   seeBilling: boolean;
+  /** `site_measurements` read. */
+  seeMeasurements: boolean;
   /** `cost_entries` read: its costs, on this page only alongside the contract itself. */
   readsCosts: boolean;
+  /** `margin_pnl` read: the cost sheet. */
+  seeCostSheet: boolean;
 }
 
 function mayOpen(tab: ContractTab, access: ContractTabAccess): boolean {
-  if (tab === 'payments') return access.seeBilling;
+  if (tab === 'payments' || tab === 'final_account') return access.seeBilling;
+  if (tab === 'measurements') return access.seeMeasurements;
   if (tab === 'costs') return access.seeContract && access.readsCosts;
+  if (tab === 'cost_sheet') return access.seeCostSheet;
   return access.seeContract;
 }
 
 /**
  * The tabs this person sees on this contract. Only an execution contract has a
- * schedule, payments and costs. `seeContract` (`contracts_generate` read) opens
- * the contract itself; `seeBilling` (`payments` read) opens its payments, so a
- * project manager or an accountant, who bill and record without editing the
- * contract, see the Payments tab alone. Costs show here only to a role that
- * reads both the contract and its costs; the others record costs on the costs
- * page (./costs/page.tsx). None at all: the page is not theirs.
+ * schedule, payments, a final account, measurements, costs and a cost sheet.
+ * A project manager or an accountant, who bill, measure and read costs without
+ * editing the contract, see those tabs alone, all but the costs: the Costs tab
+ * shows here only to a role that reads both the contract and its costs, and the
+ * others record costs on the costs page (./costs/page.tsx). The page itself
+ * opens only for a role that reads the contract or its payments (page.tsx); the
+ * site engineer measures on the measurements page instead
+ * (./measurements/page.tsx) and records costs on the costs page.
  */
 export function contractTabsFor(contract: { sourceBoqId: string | null }, access: ContractTabAccess): readonly ContractTab[] {
   const execution = contract.sourceBoqId !== null;

@@ -65,7 +65,7 @@ export async function voidPaymentRequestCore(ctx: OrgContext, input: VoidPayment
 
   return mutateInOrg(
     ctx,
-    { capability: 'invoices_issue', action: 'approve', immutableCode: 'request_void' },
+    { capability: 'invoices_issue', action: 'approve', immutableCode: 'request_void', capTransaction: true },
     async (tx, audit) => {
       const located = await requireInOrg(
         tx,

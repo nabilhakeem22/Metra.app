@@ -1,6 +1,7 @@
 import { Lock } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card, CardContent } from '@/components/ui/card';
+import { showsContractRates } from '@/lib/clients/rates';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
 
@@ -9,14 +10,20 @@ export async function FinancialsTab({
   advancePct,
   retentionPct,
   contractCount,
+  executionContractCount,
 }: {
   contractedTotal: string;
   advancePct: string | null;
   retentionPct: string | null;
+  /** Committed PROPOSAL contracts: the two rates are theirs. */
   contractCount: number;
+  executionContractCount: number;
 }) {
   const t = await getTranslations('clients.profile.financials');
   const locale = await getLocale();
+  const showRates = showsContractRates(contractCount, executionContractCount);
+  // The contracts the contracted value stands on: proposal AND execution ones (F4).
+  const committedCount = contractCount + executionContractCount;
 
   // A figure is pinned LTR; a word (a status, "no contracts yet") follows the page.
   const Stat = ({ label, value, figure = true }: { label: string; value: string; figure?: boolean }) => (
@@ -44,31 +51,33 @@ export async function FinancialsTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${showRates ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <Stat label={t('contracted')} value={formatMoney(contractedTotal, locale)} />
-        {/* Derived from the client's committed contracts, value-weighted — not a
-            typed-in default. Null means nothing is committed yet, which is a
+        {/* Derived from the client's committed proposal contracts, value-weighted:
+            not a typed-in default. Null means nothing is committed yet, which is a
             different fact from 0% and must not render as one. */}
-        <Stat
-          label={t('advance')}
-          value={advancePct === null ? t('noContracts') : formatPercent(advancePct, locale)}
-          figure={advancePct !== null}
-        />
-        <Stat
-          label={t('retention')}
-          figure={retentionPct !== null}
-          value={
-            retentionPct === null ? t('noContracts') : formatPercent(retentionPct, locale)
-          }
-        />
+        {showRates && (
+          <>
+            <Stat
+              label={t('advance')}
+              value={advancePct === null ? t('noContracts') : formatPercent(advancePct, locale)}
+              figure={advancePct !== null}
+            />
+            <Stat
+              label={t('retention')}
+              value={retentionPct === null ? t('noContracts') : formatPercent(retentionPct, locale)}
+              figure={retentionPct !== null}
+            />
+          </>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Locked label={t('invoiced')} />
         <Locked label={t('outstanding')} />
       </div>
-      {contractCount > 0 && (
+      {committedCount > 0 && (
         <p className="text-caption text-muted-foreground">
-          {t('derivedFrom', { n: contractCount })}
+          {t('derivedFrom', { n: committedCount })}
         </p>
       )}
       <p className="text-body text-muted-foreground">{t('lockedBody')}</p>
