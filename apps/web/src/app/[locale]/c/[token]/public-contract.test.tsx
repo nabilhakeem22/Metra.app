@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
-import type { PublicContractOpening } from '@/lib/contracts/public-types';
+import type { PublicContract } from '@/lib/contracts/public-types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { PublicContractView } from './public-contract';
 
@@ -16,7 +16,7 @@ const signedContract = (via: 'paper' | 'online') =>
     number: 7, status: 'signed', title_ar: null, title_en: 'Fit-out', total: '114', advance_pct: '0',
     retention_pct: '0', org: ORG, sections: [], section_count: 0, source: 'boq', payment_schedule: [],
     signed: { on: '2026-10-15', via },
-  }) as unknown as PublicContractOpening;
+  }) as unknown as PublicContract;
 
 describe.each<TestLocale>(['en', 'ar-EG'])('a signed contract on /c (%s)', (locale) => {
   test.each(['paper', 'online'] as const)('signed %s: the day and the way, with no acknowledgement box', (via) => {

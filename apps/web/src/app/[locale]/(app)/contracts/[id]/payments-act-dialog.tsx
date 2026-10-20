@@ -1,7 +1,10 @@
 'use client';
 
 import type { ContractBillingView } from '@/lib/execution/billing/view';
+import type { PendingClaimRow } from '@/lib/execution/claims/queries';
 import type { PaymentRequestRow } from '@/lib/execution/requests/queries';
+import { ConfirmClaimDialog } from './confirm-claim-dialog';
+import { DismissClaimDialog } from './dismiss-claim-dialog';
 import { RecordPaymentDialog } from './record-payment-dialog';
 import { SendRequestDialog, type RequestTarget } from './send-request-dialog';
 import type { ContractBilling } from './use-contract-billing';
@@ -11,7 +14,9 @@ import { VoidRequestDialog } from './void-request-dialog';
 export type PaymentsAct =
   | { kind: 'send'; target: RequestTarget }
   | { kind: 'record'; request: PaymentRequestRow }
-  | { kind: 'void'; request: PaymentRequestRow };
+  | { kind: 'void'; request: PaymentRequestRow }
+  | { kind: 'confirmClaim'; claim: PendingClaimRow }
+  | { kind: 'dismissClaim'; claim: PendingClaimRow };
 
 /**
  * The dialog of the open act, held by the TAB rather than by the row that
@@ -27,6 +32,7 @@ export function PaymentsActDialog({
   billing,
   m,
   onAlreadyRecorded,
+  onAlreadyConfirmed,
   onClose,
 }: {
   act: PaymentsAct;
@@ -34,6 +40,7 @@ export function PaymentsActDialog({
   billing: ContractBilling;
   m: (value: string) => string;
   onAlreadyRecorded: () => void;
+  onAlreadyConfirmed: () => void;
   onClose: () => void;
 }) {
   // Any answer, or none: the view it came with, else a read. Resolves to the
@@ -55,6 +62,14 @@ export function PaymentsActDialog({
         onClose={onClose}
       />
     );
+  }
+  if (act.kind === 'confirmClaim') {
+    return (
+      <ConfirmClaimDialog contractId={view.contractId} claim={act.claim} onAnswered={onAnswered} onAlreadyConfirmed={onAlreadyConfirmed} onClose={onClose} />
+    );
+  }
+  if (act.kind === 'dismissClaim') {
+    return <DismissClaimDialog contractId={view.contractId} claim={act.claim} onAnswered={onAnswered} onClose={onClose} />;
   }
   const request = view.requests.find((row) => row.id === act.request.id) ?? act.request;
   if (act.kind === 'void') {

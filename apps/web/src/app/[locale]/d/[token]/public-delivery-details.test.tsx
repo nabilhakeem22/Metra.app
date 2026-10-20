@@ -10,6 +10,7 @@ import { PublicDeliveryView } from './public-delivery';
 
 vi.mock('./actions', () => ({}));
 vi.mock('./review-actions', () => ({}));
+vi.mock('./execution-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),

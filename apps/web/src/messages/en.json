@@ -1556,6 +1556,7 @@
       "client_contract_signed": "{hasDocument, select, yes {The client signed contract {document} on its link.} other {The client signed a contract on its link.}}",
       "client_variation_approved": "{hasDocument, select, yes {The client approved change order {document}.} other {The client approved a change order.}}",
       "client_variation_rejected": "{hasDocument, select, yes {The client rejected change order {document}.} other {The client rejected a change order.}}",
+      "client_request_claimed": "The client says they paid {hasDocument, select, yes {payment request {document}} other {a payment request}}. Confirm it on the contract's Payments tab.",
       "client_page_details_changed": "{hasActor, select, yes {{actor} changed the contact and payment details your clients see. Check them in Settings.} other {The contact and payment details your clients see were changed. Check them in Settings.}}"
     },
     "viewAll": "View all"
@@ -1805,6 +1806,24 @@
           "amount": "Amount",
           "details": "Details",
           "more": "Show more payments"
+        },
+        "claims": {
+          "title": "The client says they paid",
+          "claimedOn": "Sent on {date}",
+          "confirm": {
+            "open": "Confirm payment",
+            "title": "Confirm the payment on {request}",
+            "description": "Confirm the money arrived. A payment is recorded on the request for this amount, dated today.",
+            "amount": "Amount received",
+            "submit": "Confirm and record",
+            "already": "This payment was already confirmed."
+          },
+          "dismiss": {
+            "open": "Not received",
+            "title": "Money not received on {request}?",
+            "description": "No payment is recorded, and the client can say they paid again later.",
+            "submit": "Not received"
+          }
         }
       }
     }
@@ -2797,6 +2816,45 @@
       "receipts": {
         "title": "Payments received",
         "receivedOn": "Received on {date}",
+        "truncated": "Showing the latest {count} payments."
+      }
+    },
+    "execution": {
+      "title": "Construction contract",
+      "contract": "Contract {number}",
+      "contractValue": "Contract value {amount}",
+      "status": {
+        "issued": "Waiting for your signature",
+        "signed": "Signed",
+        "terminated": "Ended"
+      },
+      "requests": {
+        "title": "Payment requests",
+        "empty": "No payment request has been sent yet.",
+        "truncated": "Showing the latest {count} requests.",
+        "issuedOn": "Issued on {date}",
+        "dueOn": "Due on {date}",
+        "paidOf": "{paid} of {amount} paid",
+        "outstanding": "{amount} still due",
+        "paid": "Paid",
+        "void": "Withdrawn by your designer",
+        "finalAccount": "Final account",
+        "variation": "Change order {number}",
+        "variationUnnumbered": "A change order",
+        "instalment": "Instalment"
+      },
+      "claim": "I made this payment",
+      "confirmTitle": "Did you make this payment?",
+      "confirmBody": "{request}: {amount}. Your designer confirms it once it arrives.",
+      "claimedOn": "Thank you, we are checking your payment. Sent on {date}.",
+      "claimNotified": "Your designer has been told.",
+      "error": {
+        "wrong_state": "This request cannot take a payment notice now. The page now shows where it stands.",
+        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact your designer."
+      },
+      "receipts": {
+        "title": "Payments received",
+        "receivedOn": "Received on {date} for {request}",
         "truncated": "Showing the latest {count} payments."
       }
     },

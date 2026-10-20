@@ -35,6 +35,7 @@ export const RLS_APPLY_ORDER = [
   'functions/40-delivery-read.sql',
   'functions/50-delivery-write.sql',
   'functions/60-delivery-documents.sql',
+  'functions/70-execution-portal.sql',
   'immutability.sql',
   'rom-issue-trigger.sql',
   'roles.sql',

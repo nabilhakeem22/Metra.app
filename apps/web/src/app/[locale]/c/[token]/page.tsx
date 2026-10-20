@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getContractByToken, openingContract } from '@/lib/contracts/public';
+import { getContractByToken } from '@/lib/contracts/public';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 import { PublicContractView } from './public-contract';
 
@@ -15,5 +15,5 @@ export default async function PublicContractPage({
 }) {
   const { token } = await params;
   const contract = await getContractByToken(token);
-  return <PublicContractView token={token} contract={contract && openingContract(contract)} />;
+  return <PublicContractView token={token} contract={contract} />;
 }

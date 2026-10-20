@@ -9,12 +9,11 @@ import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-cal
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
-import type { PublicContract, PublicContractOpening, PublicSectionLinesPage, PublicSectionsPage } from './public-types';
+import type { PublicContract, PublicSectionLinesPage, PublicSectionsPage } from './public-types';
 
 export type {
   PublicContract,
   PublicContractLine,
-  PublicContractOpening,
   PublicContractSection,
   PublicScheduleRow,
   PublicSectionLinesPage,
@@ -24,15 +23,17 @@ export type {
 /** The furthest a "show more" may start, the SQL's own clamp. */
 const MAX_LINE_OFFSET = 100_000;
 
-/** The lines the /c page opens with, across the whole contract; the rest load on demand. */
-const OPENING_LINES = 50;
-
-/** The sections the /c page holds per page: the first 50 open with it, the rest come 50 at a time. */
-export const SECTIONS_PAGE_SIZE = 50;
-
 /** The furthest a "show more sections" may start: past the BOQ caps, never a real contract. */
 const MAX_SECTION_OFFSET = 100_000;
 
+/**
+ * The snapshot is the page's opening (DB step B caps it in SQL): the first 50
+ * sections, holding the first 50 lines of the WHOLE contract between them, and
+ * how many sections there are. A section past those lines opens collapsed,
+ * with its line count and "show lines"; the sections past the first 50 come
+ * with "show more sections". So the page a client downloads does not grow
+ * with the contract's lines OR its sections.
+ */
 export async function getContractByToken(
   rawToken: string,
 ): Promise<PublicContract | null> {
@@ -45,42 +46,20 @@ export async function getContractByToken(
 }
 
 /**
- * The snapshot as the page opens it: its first 50 sections, holding the first
- * 50 lines of the WHOLE contract in section order between them, the way the
- * studio's contract page opens (B1, A3 R1). A section past those lines opens
- * collapsed, with its line count and "show lines"; the sections past the first
- * 50 come with "show more sections". So the page a client downloads does not
- * grow with the contract's lines OR its sections.
- */
-export function openingContract(contract: PublicContract): PublicContractOpening {
-  let budget = OPENING_LINES;
-  return {
-    ...contract,
-    section_count: contract.sections.length,
-    sections: contract.sections.slice(0, SECTIONS_PAGE_SIZE).map((section) => {
-      const lines = section.lines.slice(0, budget);
-      budget -= lines.length;
-      return { ...section, lines };
-    }),
-  };
-}
-
-/**
  * Up to 50 sections of the token's contract from `offset`, collapsed (their
- * lines load through "show lines"). Null, uniformly, for an unknown token, a
- * contract not issued or signed, or an offset that is not a whole number in
- * range. Read off the snapshot until DB step B gives the sections their own
- * SQL page: the act costs what the snapshot costs, the page it feeds does not.
+ * lines load through "show lines"), read by their own SQL page
+ * (app_contract_sections_by_token, DB step B), never off the whole snapshot.
+ * Null, uniformly, for an unknown token, a contract not issued or signed, or
+ * an offset that is not a whole number in range.
  */
 export async function getContractSectionsByToken(rawToken: string, offset: unknown): Promise<PublicSectionsPage | null> {
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
   if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_SECTION_OFFSET) return null;
-  const contract = await getContractByToken(rawToken);
-  if (!contract) return null;
-  return {
-    offset,
-    section_count: contract.sections.length,
-    sections: contract.sections.slice(offset, offset + SECTIONS_PAGE_SIZE).map((section) => ({ ...section, lines: [] })),
-  };
+  const hash = hashShareToken(token);
+  return readSdfJson<PublicSectionsPage>(
+    sql`select public.app_contract_sections_by_token(${hash}, ${offset}::int) as data`,
+  );
 }
 
 /**
@@ -108,10 +87,10 @@ export async function getContractSectionLinesByToken(
  * A stable content hash of the acknowledged document (the "PDF hash" per A5).
  *
  * Over the snapshot WITHOUT its per-section `lines`, which `lines_digest`
- * already covers in full (every line's client-visible fields and the schedule,
- * computed in SQL). So the hash says the same thing whether the snapshot
- * carries every line (DB step A) or the first 50 per section (step B), and it
- * changes when any line or schedule row does.
+ * already covers in full (every line's and every section's client-visible
+ * fields and the schedule, computed in SQL). So it covers the whole document
+ * although the snapshot carries only its opening (DB step B), and it changes
+ * when any line, section or schedule row does.
  */
 export function contractPayloadHash(contract: PublicContract): string {
   const document = {

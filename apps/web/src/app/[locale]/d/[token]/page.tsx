@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { cache } from 'react';
 import { getDeliveryByToken } from '@/lib/engagements/public';
+import { executionCardForPage } from '@/lib/engagements/public/execution';
 import { deliveryMetadata, type DeliveryTranslator } from './delivery-metadata';
 import { PublicDeliveryView } from './public-delivery';
 
@@ -38,10 +39,15 @@ export default async function PublicDeliveryPage({
   // WHICH failure occurred.
   const { document } = await searchParams;
   const read = await readDelivery(token);
+  // The execution card (Stage 2, D1a) is a second, bounded read, made only for
+  // a delivery at `execution` (its client word is `construction`), so no other
+  // delivery page pays for it.
+  const execution = read.status === 'ok' && read.delivery.stageKey === 'construction' ? await executionCardForPage(token) : null;
   return (
     <PublicDeliveryView
       token={token}
       read={read}
+      execution={execution}
       documentUnavailable={document === 'unavailable'}
     />
   );

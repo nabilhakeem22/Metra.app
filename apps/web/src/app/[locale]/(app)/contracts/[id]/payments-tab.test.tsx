@@ -21,6 +21,7 @@ const writes = vi.hoisted(() => ({ issueMilestoneRequest: vi.fn(), issueVariatio
 vi.mock('@/lib/execution/requests/actions', () => writes);
 const payments = vi.hoisted(() => ({ recordContractPayment: vi.fn(), checkPaymentAttempt: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => payments);
+vi.mock('@/lib/execution/claims/actions', () => ({ confirmContractClaim: vi.fn(), dismissContractClaim: vi.fn() }));
 
 const request = (id: string, fields: Partial<PaymentRequestRow>): PaymentRequestRow => ({
   id: `r0000000-0000-4000-8000-00000000000${id}`,
@@ -50,6 +51,7 @@ const VIEW: ContractBillingView = {
     { id: 'm-2', labelAr: null, labelEn: 'Works', amount: '37200.0000', billed: false },
   ],
   variations: [],
+  claims: [],
   requests: [
     request('1', { note: 'Wire to the NBE account' }),
     request('2', { paid: '100.0000', outstanding: '61900.0000' }),

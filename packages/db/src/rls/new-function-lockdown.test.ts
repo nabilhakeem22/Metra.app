@@ -99,6 +99,20 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   },
   // A2 fix round (R2): the payment-fits guard, an invoker trigger function (S5).
   { file: 'functions/35-execution.sql', signature: 'public.enforce_contract_payment_fits()', grantsApp: true },
+  // DB step B: the /c sections page; the /d execution card, the client's
+  // "I paid" and their two INTERNAL helpers (no grant, metra_app included);
+  // the cost entry's guard and the actor check (trigger functions).
+  { file: 'functions/30-contracts-variations.sql', signature: 'public.app_contract_sections_by_token(text, integer)', grantsApp: true },
+  { file: 'functions/70-execution-portal.sql', signature: 'public.app_delivery_execution_by_token(text)', grantsApp: true },
+  {
+    file: 'functions/70-execution-portal.sql',
+    signature: 'public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text)',
+    grantsApp: true,
+  },
+  { file: 'functions/70-execution-portal.sql', signature: 'public.app_delivery_execution_contract(uuid, uuid)', grantsApp: false },
+  { file: 'functions/70-execution-portal.sql', signature: 'public.app_studio_payment_details(uuid)', grantsApp: false },
+  { file: 'functions/35-execution.sql', signature: 'public.enforce_cost_entry_guarded()', grantsApp: true },
+  { file: 'functions/35-execution.sql', signature: 'public.enforce_actor_is_session_user()', grantsApp: true },
   { file: 'functions/30-contracts-variations.sql', signature: 'public.app_contract_by_token(text)', grantsApp: true },
   {
     file: 'functions/30-contracts-variations.sql',

@@ -1556,6 +1556,7 @@
       "client_contract_signed": "{hasDocument, select, yes {العميل وقّع العقد {document} من اللينك.} other {العميل وقّع عقد من اللينك.}}",
       "client_variation_approved": "{hasDocument, select, yes {العميل وافق على أمر التغيير {document}.} other {العميل وافق على أمر تغيير.}}",
       "client_variation_rejected": "{hasDocument, select, yes {العميل رفض أمر التغيير {document}.} other {العميل رفض أمر تغيير.}}",
+      "client_request_claimed": "العميل بيقول إنه دفع {hasDocument, select, yes {مطالبة الدفع {document}} other {مطالبة دفع}}. أكدها من تبويب الدفعات في العقد.",
       "client_page_details_changed": "{hasActor, select, yes {{actor} غيّر بيانات التواصل والدفع اللي العملاء بيشوفوها. راجعها من الإعدادات.} other {بيانات التواصل والدفع اللي العملاء بيشوفوها اتغيّرت. راجعها من الإعدادات.}}"
     },
     "viewAll": "عرض الكل"
@@ -1805,6 +1806,24 @@
           "amount": "المبلغ",
           "details": "التفاصيل",
           "more": "اعرض دفعات أكتر"
+        },
+        "claims": {
+          "title": "العميل قال إنه دفع",
+          "claimedOn": "قال كده يوم {date}",
+          "confirm": {
+            "open": "أكّد الدفعة",
+            "title": "أكّد الدفعة على {request}",
+            "description": "أكّد إن الفلوس وصلت. هتتسجل دفعة على المطالبة بالمبلغ ده بتاريخ النهارده.",
+            "amount": "المبلغ اللي وصل",
+            "submit": "أكّد وسجّل الدفعة",
+            "already": "الدفعة دي اتأكدت قبل كده."
+          },
+          "dismiss": {
+            "open": "ماوصلتش",
+            "title": "الفلوس ماوصلتش على {request}؟",
+            "description": "مش هتتسجل أي دفعة، والعميل يقدر يقول إنه دفع تاني بعد كده.",
+            "submit": "ماوصلتش"
+          }
         }
       }
     }
@@ -2797,6 +2816,45 @@
       "receipts": {
         "title": "الدفعات المستلمة",
         "receivedOn": "استُلمت في {date}",
+        "truncated": "تُعرض أحدث {count} دفعة."
+      }
+    },
+    "execution": {
+      "title": "عقد التنفيذ",
+      "contract": "العقد {number}",
+      "contractValue": "قيمة العقد {amount}",
+      "status": {
+        "issued": "بانتظار توقيعك",
+        "signed": "موقّع",
+        "terminated": "أُنهي العقد"
+      },
+      "requests": {
+        "title": "مطالبات الدفع",
+        "empty": "لم تُرسَل أي مطالبة دفع بعد.",
+        "truncated": "تُعرض أحدث {count} مطالبة.",
+        "issuedOn": "أُصدرت في {date}",
+        "dueOn": "تستحق في {date}",
+        "paidOf": "سُدِّد {paid} من {amount}",
+        "outstanding": "المتبقي {amount}",
+        "paid": "مسددة",
+        "void": "ألغاها فريق التصميم",
+        "finalAccount": "الحساب الختامي",
+        "variation": "أمر التغيير {number}",
+        "variationUnnumbered": "أمر تغيير",
+        "instalment": "دفعة"
+      },
+      "claim": "قمتُ بهذه الدفعة",
+      "confirmTitle": "هل قمتَ بهذه الدفعة؟",
+      "confirmBody": "{request}: {amount}. سيؤكدها فريق التصميم عند وصولها.",
+      "claimedOn": "شكرًا لك، نتحقق من دفعتك. أُرسلت في {date}.",
+      "claimNotified": "تم إبلاغ فريق التصميم.",
+      "error": {
+        "wrong_state": "لا يمكن تسجيل دفعة على هذه المطالبة الآن. تعرض الصفحة الآن وضعها الحالي.",
+        "busy": "أُرسلت إشعارات دفع كثيرة على هذا العقد خلال الساعة الأخيرة. يُرجى المحاولة لاحقًا، أو التواصل مع فريق التصميم."
+      },
+      "receipts": {
+        "title": "المبالغ المستلمة",
+        "receivedOn": "استُلمت في {date} عن {request}",
         "truncated": "تُعرض أحدث {count} دفعة."
       }
     },

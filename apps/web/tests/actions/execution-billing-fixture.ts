@@ -3,16 +3,27 @@
 // a test file. The contract is execution-fixture.ts's (value 124,000.0000, VAT
 // 14,000.0000), so the rows bill 62,000 / 37,200 / 24,800 with VAT 7,000 /
 // 4,200 / 2,800. Teardown is fixture.ts's.
-import { ownerQuery, seedExecutionContract, type ContractState, type ExecutionContract } from './execution-fixture';
+import {
+  ownerQuery,
+  seedExecutionContract,
+  type ContractState,
+  type DeliveryRef,
+  type ExecutionContract,
+} from './execution-fixture';
 
 export interface BilledContract extends ExecutionContract {
   /** The schedule rows, by sort order. */
   milestoneIds: string[];
 }
 
-export async function seedBillableContract(orgId: string, state: ContractState = 'signed'): Promise<BilledContract> {
+export async function seedBillableContract(
+  orgId: string,
+  state: ContractState = 'signed',
+  delivery?: DeliveryRef,
+): Promise<BilledContract> {
   const contract = await seedExecutionContract(orgId, {
     state,
+    delivery,
     schedule: [
       { labelEn: 'Advance', basis: 'percent', value: '50' },
       { labelEn: 'Works', basis: 'percent', value: '30' },

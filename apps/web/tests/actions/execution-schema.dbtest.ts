@@ -694,7 +694,9 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
         order by 1`,
     );
     expect(Object.fromEntries(rows.map((row) => [row.table_name, row.privileges]))).toEqual({
-      contract_cost_entries: 'S,I,U',
+      // UPDATE is column-level since DB step B (the entry fields and the void
+      // stamp, cost-entries-hardening.dbtest.ts), so not a table privilege.
+      contract_cost_entries: 'S,I',
       // INSERT is column-level (every column but seq), so not a table privilege.
       contract_line_measurements: 'S',
       contract_payment_claims: 'S,I,U',

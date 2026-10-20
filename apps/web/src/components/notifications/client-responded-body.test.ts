@@ -150,6 +150,7 @@ describe('contract-link client_responded bodies', () => {
     client_contract_signed: 'C-2026-0007',
     client_variation_approved: 'VO-2026-0007',
     client_variation_rejected: 'VO-2026-0007',
+    client_request_claimed: 'PR-2026-0007',
   };
 
   for (const locale of ['en', 'ar-EG'] as const) {
@@ -166,17 +167,19 @@ describe('contract-link client_responded bodies', () => {
       for (const params of [{}, { number: 7 }, { number: '7', year: 2026 }, { number: 0, year: 2026 }]) {
         const body = render(locale, bodyKey, params, 'contract');
         expect(body.length).toBeGreaterThan(0);
-        expect(body).not.toMatch(/C-|VO-/);
+        expect(body).not.toMatch(/C-|VO-|PR-/);
       }
     });
   }
 
-  it('says signed, approved and rejected apart', () => {
+  it('says signed, approved, rejected and claimed apart', () => {
     expect(render('en', 'client_contract_signed', SIGNED, 'contract')).toContain('signed contract');
     expect(render('en', 'client_variation_approved', SIGNED, 'contract')).toContain('approved change order');
     expect(render('en', 'client_variation_rejected', SIGNED, 'contract')).toContain('rejected change order');
     expect(render('ar-EG', 'client_contract_signed', SIGNED, 'contract')).toContain('وقّع العقد');
     expect(render('ar-EG', 'client_variation_approved', SIGNED, 'contract')).toContain('وافق على أمر التغيير');
     expect(render('ar-EG', 'client_variation_rejected', SIGNED, 'contract')).toContain('رفض أمر التغيير');
+    expect(render('en', 'client_request_claimed', SIGNED, 'contract')).toContain('says they paid payment request');
+    expect(render('ar-EG', 'client_request_claimed', SIGNED, 'contract')).toContain('بيقول إنه دفع مطالبة الدفع');
   });
 });

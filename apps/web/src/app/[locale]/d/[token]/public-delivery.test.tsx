@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { PortalExecution } from '@/lib/engagements/public/execution-types';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { DOCUMENT_ID, publicDeliveryFixture as delivery } from '@/test/public-delivery-fixture';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
@@ -11,6 +12,7 @@ import { PublicDeliveryView } from './public-delivery';
 
 vi.mock('./actions', () => ({}));
 vi.mock('./review-actions', () => ({}));
+vi.mock('./execution-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),
@@ -103,5 +105,28 @@ describe('the page', () => {
     for (const field of container.querySelectorAll('.client-portal input, .client-portal textarea')) {
       expect(field.className).not.toMatch(/(^|\s)text-(caption|small|body|xs|sm|base)(\s|$)/);
     }
+  });
+});
+
+describe('the execution card (Stage 2, D1a)', () => {
+  const EXECUTION: PortalExecution = {
+    contract: { documentNumber: 'C-2026-0007', status: 'signed', titleAr: null, titleEn: 'Villa', originalValue: '124000.0000' },
+    requests: [],
+    requestsTruncated: false,
+    receipts: [],
+    receiptsTruncated: false,
+    paymentDetails: null,
+  };
+
+  it('renders below the payments card when the page read one, and not otherwise', () => {
+    const first = renderWithIntl(
+      <PublicDeliveryView token="tok-1" read={{ status: 'ok', delivery: delivery() }} execution={EXECUTION} />,
+      { locale: 'en' },
+    );
+    const heading = screen.getByRole('heading', { name: messageAt('en', 'delivery.execution.title') });
+    expect(heading.textContent).toBe(messageAt('en', 'delivery.execution.title'));
+    first.unmount();
+    renderPage('en');
+    expect(screen.queryByRole('heading', { name: messageAt('en', 'delivery.execution.title') })).toBeNull();
   });
 });

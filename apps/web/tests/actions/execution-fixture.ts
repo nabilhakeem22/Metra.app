@@ -99,10 +99,18 @@ export async function seedClientProject(orgId: string): Promise<{ clientId: stri
   return { clientId: client.id, projectId: project.id };
 }
 
+/** The delivery a BOQ hangs off (its client and project are the contract's too). */
+export interface DeliveryRef {
+  id: string;
+  clientId: string;
+  projectId: string;
+}
+
 /**
  * An issued BOQ and the execution contract generated from it. `linesPerSection`
  * sets the shape; line n of a section has qty n, unit price 100, unit cost 60,
- * item code `A-<n>`, and is provisional when n is a multiple of 5.
+ * item code `A-<n>`, and is provisional when n is a multiple of 5. With
+ * `delivery`, the BOQ is that delivery's (boqs.engagement_id, plan A26).
  */
 export async function seedExecutionContract(
   orgId: string,
@@ -110,16 +118,17 @@ export async function seedExecutionContract(
     linesPerSection?: number[];
     state?: ContractState;
     schedule?: ScheduleRow[];
+    delivery?: DeliveryRef;
   } = {},
 ): Promise<ExecutionContract> {
   const linesPerSection = opts.linesPerSection ?? [3];
   const state = opts.state ?? 'issued';
-  const { clientId, projectId } = await seedClientProject(orgId);
+  const { clientId, projectId } = opts.delivery ?? (await seedClientProject(orgId));
 
   const [boq] = await ownerQuery<{ id: string }>(
-    `insert into public.boqs (org_id, number, title_en, client_id, project_id, status, total, subtotal)
-     values ($1, $2, 'Execution BOQ', $3, $4, 'draft', 0, 0) returning id`,
-    [orgId, await nextNumber('boqs', orgId), clientId, projectId],
+    `insert into public.boqs (org_id, number, title_en, client_id, project_id, engagement_id, status, total, subtotal)
+     values ($1, $2, 'Execution BOQ', $3, $4, $5, 'draft', 0, 0) returning id`,
+    [orgId, await nextNumber('boqs', orgId), clientId, projectId, opts.delivery?.id ?? null],
   );
   await ownerQuery(`update public.boqs set status = 'issued' where id = $1`, [boq.id]);
 

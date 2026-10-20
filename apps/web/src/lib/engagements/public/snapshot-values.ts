@@ -56,6 +56,11 @@ export function positiveAmount(value: unknown): string | null {
   return /[1-9]/.test(value) ? value : null;
 }
 
+/** A scale-4 amount string, zero included (what is paid or still due), or null. */
+export function nonNegativeAmount(value: unknown): string | null {
+  return typeof value === 'string' && SCALE4_AMOUNT.test(value) ? value : null;
+}
+
 /** Trimmed text of 1 to `max` characters, or null. */
 export function boundedText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;

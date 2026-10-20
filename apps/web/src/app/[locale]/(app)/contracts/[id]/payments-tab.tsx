@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { ContractBillingView } from '@/lib/execution/billing/view';
 import { leftToBillShown } from './billing-balance';
 import { BillingToSend } from './billing-to-send';
+import { ClaimsPanel } from './claims-panel';
 import { PaymentRequestsTable } from './payment-requests-table';
 import { PaymentsActDialog, type PaymentsAct } from './payments-act-dialog';
 import { PaymentsLedger } from './payments-ledger';
@@ -22,8 +23,9 @@ function closedReason(view: ContractBillingView): 'notSigned' | 'terminated' | '
 
 /**
  * The execution contract's money (plan A4.3): what is left to bill, the
- * schedule rows and approved change orders to send requests for, the requests
- * with what is paid and due on each, and the ledger.
+ * client's "I paid" claims to answer (B4.2), the schedule rows and approved
+ * change orders to send requests for, the requests with what is paid and due
+ * on each, and the ledger.
  *
  * READ EVERY TIME IT IS SHOWN (A4 F3): the tab mounts when it is shown, so it
  * holds no view from before (a payment, a termination, a void made since), and
@@ -70,6 +72,13 @@ export function PaymentsTab({ contractId, may, m }: { contractId: string; may: B
               <span dir="ltr" className="font-mono tabular-nums">{m(leftToBillShown(view.billingBalance))}</span>
             </div>
             {closed && <p className="text-body text-muted-foreground">{t(`closed.${closed}`)}</p>}
+            <ClaimsPanel
+              claims={view.claims}
+              canAnswer={may.record}
+              m={m}
+              onConfirm={(claim) => open({ kind: 'confirmClaim', claim })}
+              onDismiss={(claim) => open({ kind: 'dismissClaim', claim })}
+            />
             <BillingToSend view={view} canSend={may.issue && closed === null} m={m} onSend={(target) => open({ kind: 'send', target })} />
             <PaymentRequestsTable view={view} may={may} m={m} onOpen={open} />
             <PaymentsLedger payments={view.payments} loading={billing.loading} m={m} onShowMore={() => void billing.showMorePayments()} />
@@ -80,6 +89,7 @@ export function PaymentsTab({ contractId, may, m }: { contractId: string; may: B
                 billing={billing}
                 m={m}
                 onAlreadyRecorded={() => setNotice(t('record.already'))}
+                onAlreadyConfirmed={() => setNotice(t('claims.confirm.already'))}
                 onClose={() => setAct(null)}
               />
             )}

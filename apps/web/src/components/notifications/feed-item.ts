@@ -61,7 +61,12 @@ function actorOf(value: unknown): ActorIdentity {
 export function notificationHref(item: FeedItem): string | null {
   if (!item.entityType || !item.entityId) return null;
   const build = ENTITY_HREF[item.entityType];
-  return build ? build(item.entityId) : null;
+  if (!build) return null;
+  // A client's "I paid" is answered on the contract's Payments tab (DB step B).
+  if (item.entityType === 'contract' && item.bodyKey === 'client_request_claimed') {
+    return `${build(item.entityId)}?tab=payments`;
+  }
+  return build(item.entityId);
 }
 
 /**

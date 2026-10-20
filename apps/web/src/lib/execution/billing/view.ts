@@ -1,15 +1,17 @@
 import 'server-only';
 // Everything the contract's Payments tab shows, in one org transaction:
 // the schedule rows with whether each is billed, the approved change orders
-// still to bill, the newest requests with what is paid and due on each, the
-// first page of the payment ledger, and what is left to bill. Every part is
-// bounded (12 schedule rows, 50 change orders, 100 requests, 50 payments) and
+// still to bill, the client's claims that wait for an answer, the newest
+// requests with what is paid and due on each, the first page of the payment
+// ledger, and what is left to bill. Every part is bounded (12 schedule rows,
+// 50 change orders, 100 claims, 100 requests, 50 payments) and
 // money is aggregated in SQL, so the tab's cost does not grow with the ledger.
 import { contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { contractIssuedOnInCairo } from '@/lib/contracts/queries/issued-on';
 import { loadScheduleRows, scheduleView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { listPendingClaims, type PendingClaimRow } from '../claims/queries';
 import { billingBalance } from '../money/final-account';
 import { listContractPayments, type ContractPaymentsPage } from '../payments/queries';
 import { loadContractMoneyFacts } from '../queries/money-facts';
@@ -40,6 +42,8 @@ export interface ContractBillingView {
   billingBalance: string;
   schedule: ScheduleBillingRow[];
   variations: BillableVariationRow[];
+  /** The client's "I paid" claims that wait for the studio (B4), oldest first. */
+  claims: PendingClaimRow[];
   requests: PaymentRequestRow[];
   /** More requests than the tab shows (the newest 100). */
   moreRequests: boolean;
@@ -87,6 +91,7 @@ export function getContractBilling(ctx: OrgContext, contractId: string): Promise
         billed: billed.has(row.id),
       })),
       variations: await listBillableVariations(tx, contract),
+      claims: await listPendingClaims(tx, contractId),
       requests: requests.rows,
       moreRequests: requests.hasMore,
       payments: await listContractPayments(tx, contractId, null),

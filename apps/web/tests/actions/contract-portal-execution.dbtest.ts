@@ -24,14 +24,13 @@ import {
 } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
-// Stage 2 DB step A, the client side: the replaced /c and /v SQL
-// (rls/functions/30-contracts-variations.sql). The snapshot stays ADDITIVE and
-// still carries EVERY line (no cap in step A: lead ruling Oct 19), so
-// the app deployed BEFORE this SQL (lib/contracts/public.ts and
-// lib/variations/public.ts, exercised here unchanged) keeps working between
-// `db:apply-rls` and the deploy; the new lines reader pages the rest; the
-// digest binds the acknowledgement to every line; and the two client acts tell
-// the studio in the same transaction.
+// Stage 2, the client side: the replaced /c and /v SQL
+// (rls/functions/30-contracts-variations.sql). DB step A added the keys; DB
+// step B caps the snapshot to the page's opening (the first 50 sections, the
+// first 50 lines of the whole contract between them, lead rulings Oct 19 and
+// Oct 20 D5); the lines and sections readers page the rest; the digest binds
+// the acknowledgement to every line and every section; and the two client acts
+// tell the studio in the same transaction.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -113,13 +112,12 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
     snapshot = await snapshotOf(contract.rawToken!);
   });
 
-  it('still carries EVERY line of each section, by sort order, plus each section line_count (no cap in step A)', () => {
+  it('carries each section line_count and, between them, only the first 50 lines of the contract (DB step B)', () => {
     const sections = snapshot.sections as Section[];
     expect(sections.map((section) => section.line_count)).toEqual([350, 250]);
-    for (const [index, section] of sections.entries()) {
-      expect(section.lines).toHaveLength(section.line_count);
-      expect(section.lines.map((line) => line.id)).toEqual(contract.lineIds[index]);
-    }
+    expect(snapshot.section_count).toBe(2);
+    expect(sections[0].lines.map((line) => line.id)).toEqual(contract.lineIds[0].slice(0, 50));
+    expect(sections[1].lines).toEqual([]);
     expect(sections[0].lines[4]).toMatchObject({ item_code: 'A-5', provisional: true });
     expect(sections[0].lines[3]).toMatchObject({ item_code: 'A-4', provisional: false });
   });
@@ -139,12 +137,11 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
     }
   });
 
-  it('reads through the app deployed BEFORE this SQL (lib/contracts/public.ts unchanged)', async () => {
+  it('reads through the app reader as the page opens it', async () => {
     const read = await getContractByToken(contract.rawToken!);
     expect(read?.id).toBe(contract.contractId);
-    expect(read?.sections).toHaveLength(2);
-    expect(read?.sections[0].lines).toHaveLength(350);
-    expect(read?.sections[1].lines).toHaveLength(250);
+    expect(read?.section_count).toBe(2);
+    expect(read?.sections.map((section) => section.lines.length)).toEqual([50, 0]);
     expect(contractPayloadHash(read!)).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -175,12 +172,75 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
   });
 });
 
-describe('DB step B (Nov 18): the snapshot cap', () => {
-  // Moves here with the step B re-definition of app_contract_by_token, after
-  // A3.6 has the /c page loading lines through the reader below (plan, DB step
-  // B addendum). AC11's snapshot half: a 600-line contract carries at most 50
-  // lines per section, the first 50 by (sort_order, id).
-  it.todo('carries at most 50 lines per section, the first 50 by sort order');
+describe('DB step B (Nov 18): the snapshot cap (AC11, lead ruling D5)', () => {
+  type CappedSection = { id: string; line_count: number; lines: Array<{ id: string }> };
+  let wide: ExecutionContract;
+
+  beforeAll(async () => {
+    wide = await seedExecutionContract(orgId, { linesPerSection: Array.from({ length: 120 }, () => 1), state: 'issued' });
+  });
+
+  async function sectionsPage(rawToken: string | null, offset: number | null) {
+    const [row] = await ownerQuery<{ data: Record<string, unknown> | null }>(
+      `select public.app_contract_sections_by_token($1, $2) as data`,
+      [rawToken === null ? null : hashShareToken(rawToken), offset],
+    );
+    return row.data as null | { offset: number; section_count: number; sections: CappedSection[] };
+  }
+
+  it('carries the first 50 lines of the WHOLE contract in document order, not 50 per section', async () => {
+    const contract = await seedExecutionContract(orgId, { linesPerSection: [10, 30, 30], state: 'issued' });
+    const sections = (await snapshotOf(contract.rawToken!)).sections as CappedSection[];
+    expect(sections.map((section) => [section.lines.length, section.line_count])).toEqual([
+      [10, 10],
+      [30, 30],
+      [10, 30],
+    ]);
+    expect(sections.flatMap((section) => section.lines.map((line) => line.id))).toEqual(
+      [...contract.lineIds[0], ...contract.lineIds[1], ...contract.lineIds[2].slice(0, 10)],
+    );
+  });
+
+  it('carries the first 50 sections and counts every one', async () => {
+    const snapshot = await snapshotOf(wide.rawToken!);
+    const sections = snapshot.sections as CappedSection[];
+    expect(snapshot.section_count).toBe(120);
+    expect(sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(0, 50));
+    expect(sections.reduce((sum, section) => sum + section.lines.length, 0)).toBe(50);
+  });
+
+  it('app_contract_sections_by_token pages the rest 50 at a time, collapsed, with each line_count', async () => {
+    const second = await sectionsPage(wide.rawToken, 50);
+    expect(second).toMatchObject({ offset: 50, section_count: 120 });
+    expect(second!.sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(50, 100));
+    expect(second!.sections.every((section) => section.lines.length === 0 && section.line_count === 1)).toBe(true);
+    expect((await sectionsPage(wide.rawToken, 100))!.sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(100));
+    expect((await sectionsPage(wide.rawToken, -5))!.offset).toBe(0);
+    expect((await sectionsPage(wide.rawToken, null))!.offset).toBe(0);
+    expect((await sectionsPage(wide.rawToken, 5_000_000))!).toMatchObject({ offset: 100000, sections: [] });
+  });
+
+  it('app_contract_sections_by_token answers null for a bad token and a draft, and names no cost key', async () => {
+    const draft = await seedExecutionContract(orgId, { linesPerSection: [1], state: 'draft' });
+    const draftToken = mintShareToken();
+    await ownerQuery(`update public.contracts set token_hash = $2 where id = $1`, [draft.contractId, draftToken.hash]);
+    expect(await sectionsPage(draftToken.raw, 0)).toBeNull();
+    expect(await sectionsPage('not-a-token', 0)).toBeNull();
+    expect(await sectionsPage(null, 0)).toBeNull();
+    const [source] = await ownerQuery<{ prosrc: string }>(
+      `select prosrc from pg_proc where proname = 'app_contract_sections_by_token'`,
+    );
+    expect(source.prosrc).not.toMatch(/unit_cost|line_cost|margin|supervision/);
+    for (const key of COST_KEYS) expect(keysOf(await sectionsPage(wide.rawToken, 0)).has(key), key).toBe(false);
+  });
+
+  it('the digest, and so the acknowledgement hash, covers a section past the first 50', async () => {
+    const before = await getContractByToken(wide.rawToken!);
+    await tamper(`update public.contract_sections set title_en = 'Renamed' where id = $1`, [wide.sectionIds[99]]);
+    const after = await getContractByToken(wide.rawToken!);
+    expect(after!.lines_digest).not.toBe(before!.lines_digest);
+    expect(contractPayloadHash(after!)).not.toBe(contractPayloadHash(before!));
+  });
 });
 
 describe('app_contract_section_lines_by_token: the rest, 100 at a time (AC11)', () => {
@@ -357,6 +417,20 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
       contractActive: true,
     });
     expect(keysOf(read).has('line_cost')).toBe(false);
+  });
+
+  it("DB step B adds the contract's end date and its approved extension days, this order once approved (B5 D1)", async () => {
+    const own = await seedExecutionContract(orgId, { linesPerSection: [1], state: 'signed' });
+    await seedVariation(orgId, own, 'approved', { timeExtensionDays: 15 });
+    await seedVariation(orgId, own, 'rejected', { timeExtensionDays: 90 });
+    const open = mintShareToken();
+    await seedVariation(orgId, own, 'issued', { timeExtensionDays: 7, tokenHash: open.hash });
+    const approved = mintShareToken();
+    await seedVariation(orgId, own, 'approved', { timeExtensionDays: 10, tokenHash: approved.hash });
+    const documentOf = async (hash: string) =>
+      (await ownerQuery<{ data: Record<string, unknown> }>(`select public.app_variation_by_token($1) as data`, [hash]))[0].data;
+    expect(await documentOf(open.hash)).toMatchObject({ contract_end_date: '2026-12-31', time_extension_days_total: 25 });
+    expect(await documentOf(approved.hash)).toMatchObject({ contract_end_date: '2026-12-31', time_extension_days_total: 25 });
   });
 
   for (const [decision, bodyKey] of [

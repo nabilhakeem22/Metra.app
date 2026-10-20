@@ -24,6 +24,8 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   { name: 'app_contract_ack_by_token', args: 'text, text, text, text, text' },
   // Stage 2 (0063): one section's lines of the token's contract, 100 at a time.
   { name: 'app_contract_section_lines_by_token', args: 'text, uuid, integer' },
+  // DB step B: the sections of the token's contract past the snapshot's first 50.
+  { name: 'app_contract_sections_by_token', args: 'text, integer' },
   { name: 'app_variation_by_token', args: 'text' },
   { name: 'app_variation_respond_by_token', args: 'text, text, text, text, text' },
   { name: 'app_delivery_by_token', args: 'text' },
@@ -64,6 +66,11 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // token-resolved and must not be reachable with an API key.
   { name: 'app_delivery_logo_by_token', args: 'text' },
   { name: 'app_delivery_close_target_by_token', args: 'text' },
+  // Stage 2 DB step B: the delivery's execution card, and the client's "I paid"
+  // on a payment request, which takes caller-supplied p_name/p_ip/p_ua and
+  // writes studio notifications.
+  { name: 'app_delivery_execution_by_token', args: 'text' },
+  { name: 'app_delivery_claim_request_by_token', args: 'text, uuid, text, text, text, text' },
 ];
 
 /** The regprocedure text of one listed function. */

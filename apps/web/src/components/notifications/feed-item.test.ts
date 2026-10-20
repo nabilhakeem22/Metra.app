@@ -40,6 +40,10 @@ describe('notificationHref', () => {
     expect(notificationHref(item({ entityType: 'contract', entityId: 'c3' }))).toBe(
       '/contracts/c3',
     );
+    // A client's "I paid" on a payment request opens its Payments tab (DB step B).
+    expect(notificationHref(item({ entityType: 'contract', entityId: 'c3', bodyKey: 'client_request_claimed' }))).toBe(
+      '/contracts/c3?tab=payments',
+    );
   });
 
   it('returns null when there is nothing to link to', () => {

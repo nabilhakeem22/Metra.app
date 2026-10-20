@@ -9,7 +9,7 @@ import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import type { PublicContractOpening } from '@/lib/contracts/public-types';
+import type { PublicContract } from '@/lib/contracts/public-types';
 import { contractDecidedKey } from './contract-outcome';
 import { ContractSectionList } from './contract-section-list';
 import { ContractTotalsCard } from './contract-totals-card';
@@ -21,7 +21,7 @@ export function PublicContractView({
   contract,
 }: {
   token: string;
-  contract: PublicContractOpening | null;
+  contract: PublicContract | null;
 }) {
   const t = useTranslations('contracts.ack');
   const locale = useLocale();

@@ -2,11 +2,13 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
+import type { PortalExecution } from '@/lib/engagements/public/execution-types';
 import { deliveryDisplayNames, deliveryReference } from '@/lib/engagements/public/display-names';
 import { BudgetCard } from './portal/budget-card';
 import { PortalCommandCard } from './portal/command-card';
 import { DeliveryNotice } from './portal/delivery-notice';
 import { DocumentsCard } from './portal/documents-card';
+import { ExecutionCard } from './portal/execution-card';
 import { Greeting } from './portal/greeting';
 import { PaymentsCard } from './portal/payments-card';
 import { StudioBar } from './portal/studio-bar';
@@ -19,6 +21,8 @@ import { TimelineCard } from './portal/timeline-card';
  * now, what's next) → the budget card whenever the studio has issued a range →
  * the payments card (a payment due is something the client acts on, so it sits
  * above the documents; how to pay and what was received live there too) → the
+ * execution contract's card, at `execution` only (Stage 2: its payment
+ * requests, "I made this payment", how to pay and the receipts) → the
  * released documents → what happened, dated → footer. Every derivation
  * (journey position, stage, hero, timeline words) is computed server-side and
  * carries NO raw machine state; every figure is a client-DUE or client-PAID
@@ -29,10 +33,13 @@ import { TimelineCard } from './portal/timeline-card';
 export function PublicDeliveryView({
   token,
   read,
+  execution = null,
   documentUnavailable = false,
 }: {
   token: string;
   read: DeliveryReadResult;
+  /** The execution contract's card, read only for a delivery at `execution`. */
+  execution?: PortalExecution | null;
   /** Set when the download route bounced back — the client asked for a document
    *  that is not (or is no longer) available to them. */
   documentUnavailable?: boolean;
@@ -86,6 +93,7 @@ export function PublicDeliveryView({
           receipts={delivery.receipts}
           receiptsTruncated={delivery.receiptsTruncated}
         />
+        {execution && <ExecutionCard token={token} initial={execution} />}
         <DocumentsCard
           token={token}
           documents={delivery.documents}

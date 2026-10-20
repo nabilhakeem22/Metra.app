@@ -58,8 +58,9 @@
 // does not have it". POLICIES ARE THE EXCEPTION (Stage 2, security review S4):
 // they are permissive and OR together, so an extra one widens access, and it
 // is reported. So are TRUNCATE, REFERENCES and TRIGGER for metra_app on any
-// table (roles.sql grants none), and the column-level INSERT on
-// contract_line_measurements (every column but `seq`).
+// table (roles.sql grants none), and the two column-level grants
+// (./column-grants.ts): INSERT on contract_line_measurements, UPDATE on
+// contract_cost_entries.
 //
 // EVERY PRIVILEGE READ RESOLVES ITS TABLE THROUGH `pg_class` rather than through
 // a `'public.<name>'::text` argument. The text form raises 42P01 on a table the
@@ -76,6 +77,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { createSql } from '../client';
+import { columnGrantProblems, columnGrantsSummary } from './column-grants';
 import { GRANTED_UPDATE_TABLE, grantedUpdateColumns } from './design-engagement-grant';
 import { declaredFunctions, declaredPolicies, declaredTriggers } from './rls-catalogue';
 import {
@@ -267,9 +269,12 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *                                 site reading are never edited or removed; a
  *                                 correction is a new reading.
  *   payment_requests,
- *   contract_payment_claims,
- *   contract_cost_entries         no DELETE (0063) — a request is voided, a
- *                                 claim resolved, a cost voided; none deleted.
+ *   contract_payment_claims       no DELETE (0063) — a request is voided, a
+ *                                 claim resolved; neither deleted.
+ *   contract_cost_entries         no DELETE (0063) and no TABLE-LEVEL UPDATE
+ *                                 (DB step B): a cost is voided, never deleted,
+ *                                 and its UPDATE is column-level, read back by
+ *                                 ./column-grants.ts.
  *
  * `design_engagements` is NOT in this list: its authority is column-level and is
  * read back separately by `grantProblems`, which is a different question.
@@ -300,7 +305,7 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   contract_line_measurements: ['update', 'delete'],
   contract_payment_claims: ['delete'],
   contract_payments: ['update', 'delete'],
-  contract_cost_entries: ['delete'],
+  contract_cost_entries: ['update', 'delete'],
   payment_requests: ['delete'],
 };
 
@@ -460,48 +465,6 @@ async function neverGrantedPrivilegeProblems(sql: Sql): Promise<string[]> {
   );
 }
 
-/** The table whose INSERT is column-level, and the one column it must not cover. */
-const IDENTITY_ONLY_TABLE = 'contract_line_measurements';
-const IDENTITY_ONLY_COLUMN = 'seq';
-
-/**
- * metra_app may insert every column of contract_line_measurements EXCEPT `seq`
- * (security review S1): `seq` orders the final measured quantities, and a
- * writer who could set it (OVERRIDING SYSTEM VALUE) would outrank every later
- * correction. Read column by column, so a table-level INSERT (which covers
- * `seq`) and a missing column (an outage) are both reported.
- */
-async function measurementInsertProblems(sql: Sql): Promise<string[]> {
-  const rows = (await sql`
-    select a.attname as name,
-           has_column_privilege(${APP_ROLE}::name, c.oid, a.attnum, 'insert') as granted
-      from pg_class c
-      join pg_attribute a on a.attrelid = c.oid
-     where c.relname = ${IDENTITY_ONLY_TABLE} and c.relnamespace = 'public'::regnamespace
-       and a.attnum > 0 and not a.attisdropped
-     order by a.attnum
-  `) as unknown as Array<{ name: string; granted: boolean }>;
-  if (rows.length === 0) {
-    return [`  - ${IDENTITY_ONLY_TABLE} is not in this database at all. Run the migrations first.`];
-  }
-  const problems: string[] = [];
-  for (const row of rows) {
-    if (row.name === IDENTITY_ONLY_COLUMN && row.granted) {
-      problems.push(
-        `  - ${APP_ROLE} may INSERT ${IDENTITY_ONLY_TABLE}.${IDENTITY_ONLY_COLUMN}, so it can ` +
-          'choose the recording order. rls/roles.sql grants insert on every other column only',
-      );
-    }
-    if (row.name !== IDENTITY_ONLY_COLUMN && !row.granted) {
-      problems.push(
-        `  - ${APP_ROLE} may NOT insert ${IDENTITY_ONLY_TABLE}.${row.name}: every measurement ` +
-          'write will fail with 42501',
-      );
-    }
-  }
-  return problems;
-}
-
 /** One line per declared object the database does not have. Empty = applied. */
 function missing(declared: Map<string, string>, applied: Set<string>, kind: string): string[] {
   return [...declared]
@@ -539,7 +502,7 @@ export async function verifyRlsApplied(sql: Sql): Promise<string[]> {
   problems.push(...(await grantProblems(sql)));
   problems.push(...(await narrowedTableGrantProblems(sql)));
   problems.push(...(await neverGrantedPrivilegeProblems(sql)));
-  problems.push(...(await measurementInsertProblems(sql)));
+  problems.push(...(await columnGrantProblems(sql)));
 
   return problems;
 }
@@ -555,7 +518,7 @@ export function verifiedGrantsSummary(): string {
     `${String(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')).length)} columns with no ` +
     `table-level update, and ${String(narrowed.length)} narrowed table(s) ` +
     `(${narrowed.join(', ')}) holding exactly what rls/roles.sql leaves them; ` +
-    `${IDENTITY_ONLY_TABLE} insertable on every column but ${IDENTITY_ONLY_COLUMN}; no ` +
+    `${columnGrantsSummary()}; no ` +
     `${NEVER_GRANTED_PRIVILEGES.join(', ')} for ${APP_ROLE} on any table; no policy outside the manifest.`
   );
 }

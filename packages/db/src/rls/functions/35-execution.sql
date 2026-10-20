@@ -1,9 +1,10 @@
 -- rls/functions/35-execution.sql: Stage 2 execution (migration 0063): the
--- payment request's frozen guard and the payment-fits guard.
+-- payment request's frozen guard and the payment-fits guard; from DB step B
+-- also the cost entry's guard and the actor check of the money writers.
 --
 -- One of the functions/* files apply-rls runs, in the order rls/manifest.ts
--- declares. Idempotent (`create or replace`). The trigger that uses it is
--- attached in rls/policies/35-execution.sql, beside the table's policy.
+-- declares. Idempotent (`create or replace`). The triggers that use them are
+-- attached in rls/policies/35-execution.sql, beside the tables' policies.
 -- rls/**.sql is exempt from the 150-line rule (stack-profile.md).
 
 -- A payment request (مطالبة دفع) is a FROZEN document from the moment it is
@@ -167,6 +168,121 @@ begin
   end loop;
   if exists (select 1 from pg_roles where rolname = 'metra_app') then
     grant execute on function public.enforce_contract_payment_fits() to metra_app;
+  end if;
+end
+$$;
+
+-- A cost entry (المصروفات) is edited and voided, never re-homed or un-voided
+-- (DB step B, B3 security S2). roles.sql already narrows metra_app's UPDATE to
+-- the entry fields and the void stamp; this guard says the same to every
+-- role, the connection role included: an UPDATE that changes `id`, `org_id`,
+-- `contract_id`, `recorded_by`, `idempotency_key` or `created_at` raises
+-- MT100, and so does one that clears or rewrites the void stamp of a voided
+-- entry. Anything else passes, the referential `SET NULL (cost_item_id)` of a
+-- deleted price-book item included.
+--
+-- NOT security definer: it reads only OLD and NEW. `set search_path = ''`.
+create or replace function public.enforce_cost_entry_guarded()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if NEW.id is distinct from OLD.id
+     or NEW.org_id is distinct from OLD.org_id
+     or NEW.contract_id is distinct from OLD.contract_id
+     or NEW.recorded_by is distinct from OLD.recorded_by
+     or NEW.idempotency_key is distinct from OLD.idempotency_key
+     or NEW.created_at is distinct from OLD.created_at then
+    raise exception 'a cost entry keeps its contract, its recorder, its key and its creation time (id %)', OLD.id
+      using errcode = 'MT100';
+  end if;
+  if OLD.voided_at is not null
+     and (NEW.voided_at is distinct from OLD.voided_at or NEW.voided_by is distinct from OLD.voided_by) then
+    raise exception 'a voided cost entry stays voided (id %)', OLD.id
+      using errcode = 'MT100';
+  end if;
+  return NEW;
+end
+$$;
+
+-- Same-transaction lockdown, as for enforce_contract_payment_fits above.
+revoke all on function public.enforce_cost_entry_guarded() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.enforce_cost_entry_guarded() from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.enforce_cost_entry_guarded() to metra_app;
+  end if;
+end
+$$;
+
+-- WHO did it is the session's user, and the DATABASE says so (DB step B, A4
+-- security S3). The money writers stamp an actor column from the request's
+-- session (`ctx.userId`); this guard refuses a row that names anyone else, so
+-- no app path, and no SQL that reached metra_app past the ORM, can record a
+-- payment, a request, a void or a cost in another member's name.
+--
+-- TG_ARGV names the actor columns of the table it is attached to. Every one
+-- that the write SETS (on INSERT, any non-null value; on UPDATE, a value that
+-- changed and is not null) must equal the `app.current_user_id` GUC, which
+-- withOrgContext (packages/db/src/org-context.ts) sets on every app
+-- transaction; a missing GUC refuses too. SQLSTATE MT140, message
+-- `actor_not_session_user`.
+--
+-- ONLY FOR metra_app. The connection role (migrations, the owner's CLIs, the
+-- test fixtures) writes as itself with no session, so it is not asked; the app
+-- always writes as metra_app (SET LOCAL ROLE). SECURITY INVOKER, so
+-- `current_user` is the role that wrote. `to_jsonb` reads a column by its
+-- name: the three tables are written a few rows at a time, so its per-row cost
+-- does not matter here. `set search_path = ''`.
+create or replace function public.enforce_actor_is_session_user()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_session text;
+  v_column  text;
+  v_new     text;
+begin
+  if current_user <> 'metra_app' then
+    return NEW;
+  end if;
+  v_session := nullif(current_setting('app.current_user_id', true), '');
+  foreach v_column in array TG_ARGV loop
+    v_new := to_jsonb(NEW) ->> v_column;
+    continue when v_new is null;
+    continue when TG_OP = 'UPDATE' and v_new is not distinct from (to_jsonb(OLD) ->> v_column);
+    if v_session is null or v_new <> v_session then
+      raise exception 'actor_not_session_user' using errcode = 'MT140',
+        detail = format('%s.%s must name the session user', TG_TABLE_NAME, v_column);
+    end if;
+  end loop;
+  return NEW;
+end
+$$;
+
+-- Same-transaction lockdown, as above.
+revoke all on function public.enforce_actor_is_session_user() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.enforce_actor_is_session_user() from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.enforce_actor_is_session_user() to metra_app;
   end if;
 end
 $$;

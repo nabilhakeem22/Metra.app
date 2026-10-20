@@ -87,6 +87,12 @@ export interface PublicContract {
   lines_digest: string;
   time_extension_days_total: number;
   org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
+  /** Every section of the contract, counted (DB step B). */
+  section_count: number;
+  /**
+   * The page's opening (DB step B): the first 50 sections, holding the first 50
+   * lines of the WHOLE contract between them; the rest load on request.
+   */
   sections: PublicContractSection[];
 }
 
@@ -96,15 +102,6 @@ export interface PublicSectionLinesPage {
   offset: number;
   line_count: number;
   lines: PublicContractLine[];
-}
-
-/**
- * The contract as the /c page opens it (A3 reliability R1): its first 50
- * sections, holding the first 50 lines of the whole contract between them, and
- * how many sections it has. The rest come 50 sections at a time.
- */
-export interface PublicContractOpening extends PublicContract {
-  section_count: number;
 }
 
 /** One "show more sections" answer: up to 50 sections from `offset`, collapsed (no lines). */

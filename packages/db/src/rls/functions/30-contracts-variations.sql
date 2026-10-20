@@ -130,26 +130,16 @@ $$;
 -- line_cost, line_margin, total_cost, total_margin) — a client must never see the
 -- firm's cost basis. The document total is the immutable original_value.
 --
--- STAGE 2 (0063), ADDITIVE ONLY, so the app deployed before this file keeps
--- working between `db:apply-rls` and the deploy that reads the new keys:
+-- STAGE 2 (0063) added, and the app reads:
 --   * `source`: 'proposal' or 'boq' (an execution contract);
 --   * `payment_schedule`: the signed schedule rows {label_ar, label_en, basis,
 --     value, sort_order}, by sort order ([] on a proposal contract), `value` as
 --     a scale-4 STRING (a jsonb numeric reaches JavaScript as a float, and the
 --     money law is strings). Amounts are derived by the app from
 --     original_value (milestoneAmounts);
---   * per section `line_count`. `lines` still carries EVERY line of the
---     section, ordered (sort_order, id), exactly as before: NO CAP in DB step
---     A (lead ruling, Oct 19), so no client ever sees a truncated contract.
---     The cap to the first 50 per section lands in DB step B (apply-rls only,
---     a re-definition of this function in this file), after the /c page loads
---     the rest through app_contract_section_lines_by_token below (A3.6);
+--   * per section `line_count` (every line of the section, counted);
 --   * line `item_code` and `provisional` (a BOQ contract's; null / false on a
 --     proposal contract's);
---   * `lines_digest`: sha256 over EVERY line's client-visible fields, its
---     section included (a line moved between sections moves it), in order,
---     plus the schedule. The acknowledgement hash covers the snapshot, so once
---     step B caps the lines the client still acknowledges every line;
 --   * `time_extension_days_total`: the days the APPROVED change orders add to
 --     the finish date;
 --   * `signed` (A3 fix round, F3/F4): null until the contract is signed, then
@@ -157,11 +147,33 @@ $$;
 --     timestamp, which shows the day before for a paper signature recorded at
 --     Cairo midnight) and how: 'online' (the client's acknowledgement here) or
 --     'paper' (recorded by the studio), read from the contract's own events.
+--
+-- THE CAP (DB step B, lead rulings Oct 19 and Oct 20 D5). What the /c page
+-- opens with, so the document a client downloads does not grow with the
+-- contract, by its lines OR its sections:
+--   * `sections`: the FIRST 50 sections by (sort_order, id), each with its
+--     line_count;
+--   * their `lines`: between them, the FIRST 50 LINES OF THE WHOLE CONTRACT in
+--     document order (section sort_order, section id, line sort_order, line
+--     id), NOT 50 per section (that still grew with the sections). A section
+--     past them carries `lines: []` and its line_count, and the page opens it
+--     through app_contract_section_lines_by_token below;
+--   * `section_count`: every section, counted; the page asks for the sections
+--     past the first 50 through app_contract_sections_by_token below.
+-- Only after A3.6 (the page loading lines lazily) is live: the step B runbook
+-- (docs/DEPLOY.md) says so.
+--
+-- `lines_digest`: sha256 over EVERY line's client-visible fields, its section
+-- included (a line moved between sections moves it), in order, plus the
+-- schedule and, since step B, EVERY section's client-visible fields (id,
+-- titles, subtotal, sort order). The acknowledgement hash covers the snapshot
+-- and this digest, so a client acknowledges every line and every section, not
+-- only the ones the capped snapshot carries.
+--
 -- Every sub-read names `org_id = c.org_id`: the indexes lead with org_id, and
--- this definer function gets no RLS predicate to supply it. The per-section
--- line reads also name `l.contract_id = s.contract_id` (security review S3);
--- since 0063 the 3-column FK contract_lines_section_same_contract_fk makes a
--- line of another contract in this section impossible anyway.
+-- this definer function gets no RLS predicate to supply it. The 3-column FK
+-- contract_lines_section_same_contract_fk (0063) makes every line of a section
+-- a line of that section's contract.
 create or replace function public.app_contract_by_token(p_hash text)
 returns jsonb
 language sql
@@ -169,6 +181,32 @@ stable
 security definer
 set search_path = ''
 as $$
+  with target as materialized (
+    select c.id, c.org_id
+      from public.contracts c
+     where c.token_hash = p_hash
+       and c.status in ('issued', 'signed')
+  ),
+  opening_sections as materialized (
+    select s.id, s.org_id, s.contract_id, s.title_ar, s.title_en, s.section_subtotal, s.sort_order
+      from target t
+      join public.contract_sections s on s.org_id = t.org_id and s.contract_id = t.id
+     order by s.sort_order, s.id
+     limit 50
+  ),
+  opening_lines as materialized (
+    select pick.id, pick.section_id, pick.sort_order
+      from opening_sections s
+     cross join lateral (
+       select l.id, l.section_id, l.sort_order
+         from public.contract_lines l
+        where l.org_id = s.org_id and l.section_id = s.id
+        order by l.sort_order, l.id
+        limit 50
+     ) pick
+     order by s.sort_order, s.id, pick.sort_order, pick.id
+     limit 50
+  )
   select jsonb_build_object(
     'id', c.id,
     'number', c.number,
@@ -255,6 +293,14 @@ as $$
         )
         from public.contract_payment_milestones m
         where m.org_id = c.org_id and m.contract_id = c.id
+      ), '[]'::jsonb),
+      'sections', coalesce((
+        select jsonb_agg(
+          jsonb_build_array(s.id, s.title_ar, s.title_en, s.section_subtotal, s.sort_order)
+          order by s.sort_order, s.id
+        )
+        from public.contract_sections s
+        where s.org_id = c.org_id and s.contract_id = c.id
       ), '[]'::jsonb)
     )::text, 'UTF8')), 'hex'),
     'org', jsonb_build_object(
@@ -262,52 +308,51 @@ as $$
       'name_en', o.name_en,
       'logo_file_id', o.logo_file_id
     ),
+    'section_count', (
+      select count(*) from public.contract_sections s
+      where s.org_id = c.org_id and s.contract_id = c.id
+    ),
     'sections', coalesce((
-      select jsonb_agg(sec order by sec_sort, sec_id)
-      from (
-        select s.sort_order as sec_sort, s.id as sec_id,
-          jsonb_build_object(
-            'id', s.id,
-            'title_ar', s.title_ar,
-            'title_en', s.title_en,
-            'section_subtotal', s.section_subtotal,
-            'sort_order', s.sort_order,
-            'line_count', (
-              select count(*) from public.contract_lines l
-              where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
-            ),
-            'lines', coalesce((
-              select jsonb_agg(ln order by ln_sort, ln_id)
-              from (
-                select l.sort_order as ln_sort, l.id as ln_id,
-                  jsonb_build_object(
-                    'id', l.id,
-                    'item_code', l.item_code,
-                    'description_ar', l.description_ar,
-                    'description_en', l.description_en,
-                    'qty', l.qty,
-                    'unit', l.unit,
-                    'unit_price', l.unit_price,
-                    'discount_pct', l.discount_pct,
-                    'line_total', l.line_total,
-                    'provisional', l.provisional,
-                    'sort_order', l.sort_order
-                  ) as ln
-                from public.contract_lines l
-                where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
-                order by l.sort_order, l.id
-              ) lx
-            ), '[]'::jsonb)
-          ) as sec
-        from public.contract_sections s
-        where s.org_id = c.org_id and s.contract_id = c.id
-      ) sx
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', s.id,
+          'title_ar', s.title_ar,
+          'title_en', s.title_en,
+          'section_subtotal', s.section_subtotal,
+          'sort_order', s.sort_order,
+          'line_count', (
+            select count(*) from public.contract_lines l
+            where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+          ),
+          'lines', coalesce((
+            select jsonb_agg((
+              select jsonb_build_object(
+                'id', l.id,
+                'item_code', l.item_code,
+                'description_ar', l.description_ar,
+                'description_en', l.description_en,
+                'qty', l.qty,
+                'unit', l.unit,
+                'unit_price', l.unit_price,
+                'discount_pct', l.discount_pct,
+                'line_total', l.line_total,
+                'provisional', l.provisional,
+                'sort_order', l.sort_order
+              )
+              from public.contract_lines l
+              where l.org_id = s.org_id and l.id = ol.id
+            ) order by ol.sort_order, ol.id)
+            from opening_lines ol
+            where ol.section_id = s.id
+          ), '[]'::jsonb)
+        ) order by s.sort_order, s.id
+      )
+      from opening_sections s
     ), '[]'::jsonb)
   )
-  from public.contracts c
-  join public.organizations o on o.id = c.org_id
-  where c.token_hash = p_hash
-    and c.status in ('issued', 'signed');
+  from target t
+  join public.contracts c on c.id = t.id
+  join public.organizations o on o.id = c.org_id;
 $$;
 
 -- Same-transaction lockdown (new-function-lockdown.test.ts): CREATE OR REPLACE
@@ -332,15 +377,16 @@ $$;
 
 -- Stage 2 (0063): the lines of ONE section of the token's contract, 100 at a
 -- time, for "show lines" on /c (A20). Shipped in DB step A so A3.6 can move the
--- page to it; the snapshot keeps every line until DB step B caps it at 50 per
--- section. Same visibility as app_contract_by_token (issued or signed; the
--- page shows an expired contract read-only, so expiry does not hide lines).
+-- page to it; since DB step B the snapshot carries only the first 50 lines of
+-- the whole contract, and the page opens every other line here. Same
+-- visibility as app_contract_by_token (issued or signed; the page shows an
+-- expired contract read-only, so expiry does not hide lines).
 -- Answers NULL, uniformly, for an unknown token, a contract not issued or
 -- signed, or a section id that is not a section of THAT contract: no oracle
 -- about other contracts' sections. `p_offset` is clamped to 0..100000 (null =
--- 0); lines are ordered (sort_order, id), the snapshot's order, so once the
--- snapshot is capped, offset 50 continues exactly where it stops. Cost-blind: the same line keys
--- as the snapshot, no unit_cost / line_cost / line_margin.
+-- 0); lines are ordered (sort_order, id), the snapshot's order, so a section
+-- the snapshot opened continues exactly where it stops. Cost-blind: the same
+-- line keys as the snapshot, no unit_cost / line_cost / line_margin.
 --
 -- ONE SECTION'S ROWS, NEVER THE CONTRACT'S (A3 reliability R4). The token's
 -- section is resolved FIRST (`target`, one row or none), and every line read
@@ -433,6 +479,87 @@ begin
   end loop;
   if exists (select 1 from pg_roles where rolname = 'metra_app') then
     grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+  end if;
+end
+$$;
+
+-- DB step B (A3 fix round, D5): the sections of the token's contract from
+-- `p_offset`, 50 at a time, COLLAPSED (`lines: []`; the page opens a section's
+-- lines through app_contract_section_lines_by_token above), for the /c page's
+-- "show more sections". Before step B that answer was a slice of the whole
+-- snapshot; now it reads 50 sections and counts their lines, whatever the
+-- contract holds. Same visibility as app_contract_by_token (issued or signed).
+-- NULL, uniformly, for an unknown token or a contract not issued or signed.
+-- `p_offset` is clamped to 0..100000 (null = 0); sections are ordered
+-- (sort_order, id), the snapshot's order, so offset 50 continues exactly where
+-- the snapshot stops. Answers {offset, section_count, sections}, each section
+-- as the snapshot shapes it. Cost-blind: a section has no cost column.
+create or replace function public.app_contract_sections_by_token(p_hash text, p_offset integer)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with target as materialized (
+    select c.id, c.org_id, greatest(0, least(coalesce(p_offset, 0), 100000)) as start_at
+      from public.contracts c
+     where c.token_hash = p_hash
+       and c.status in ('issued', 'signed')
+  ),
+  picked as materialized (
+    select s.id, s.org_id, s.contract_id, s.title_ar, s.title_en, s.section_subtotal, s.sort_order
+      from target t
+     cross join lateral (
+       select x.id, x.org_id, x.contract_id, x.title_ar, x.title_en, x.section_subtotal, x.sort_order
+         from public.contract_sections x
+        where x.org_id = t.org_id and x.contract_id = t.id
+        order by x.sort_order, x.id
+        offset t.start_at
+        limit 50
+     ) s
+  )
+  select jsonb_build_object(
+    'offset', t.start_at,
+    'section_count', (
+      select count(*) from public.contract_sections s
+      where s.org_id = t.org_id and s.contract_id = t.id
+    ),
+    'sections', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', p.id,
+          'title_ar', p.title_ar,
+          'title_en', p.title_en,
+          'section_subtotal', p.section_subtotal,
+          'sort_order', p.sort_order,
+          'line_count', (
+            select count(*) from public.contract_lines l
+            where l.org_id = p.org_id and l.contract_id = p.contract_id and l.section_id = p.id
+          ),
+          'lines', '[]'::jsonb
+        ) order by p.sort_order, p.id
+      )
+      from picked p
+    ), '[]'::jsonb)
+  )
+  from target t;
+$$;
+
+-- Same-transaction lockdown: a NEW signature is executable by PUBLIC (and, on
+-- Supabase, by the API roles) from the moment CREATE commits.
+revoke all on function public.app_contract_sections_by_token(text, integer) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_contract_sections_by_token(text, integer) from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_contract_sections_by_token(text, integer) to metra_app;
   end if;
 end
 $$;
@@ -549,6 +676,12 @@ $$;
 -- VAT + supervision, owner decision D4a), `time_extension_days` (null = none) and
 -- `contract_source` ('proposal' or 'boq'). An app that does not know a key
 -- ignores it, so the deploy is safe in either order.
+--
+-- DB STEP B (B5 D1), ADDITIVE in the same way: `contract_end_date` (the parent
+-- contract's end_date, `YYYY-MM-DD` or null) and `time_extension_days_total`
+-- (the days ALL of the contract's APPROVED change orders add, this one
+-- included once approved; the same sum as app_contract_by_token's), so /v can
+-- show the revised finish date (lib/execution/finish-date.ts).
 create or replace function public.app_variation_by_token(p_hash text)
 returns jsonb
 language sql
@@ -573,6 +706,12 @@ as $$
     'supervision_pct', c.supervision_pct::text,
     'time_extension_days', v.time_extension_days,
     'contract_source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
+    'contract_end_date', to_char(c.end_date, 'YYYY-MM-DD'),
+    'time_extension_days_total', coalesce((
+      select sum(a.time_extension_days)
+      from public.variation_orders a
+      where a.org_id = c.org_id and a.contract_id = c.id and a.status = 'approved'
+    ), 0),
     -- WHO rejected this variation order (0051), or null when the row predates
     -- the column. `contract_active` alone could not tell a client's own refusal
     -- from a termination cascade, so the portal denied decisions clients had

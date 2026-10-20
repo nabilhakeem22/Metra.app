@@ -318,6 +318,10 @@ const SDF_CALLER_ALLOWLIST = [
   // (and org) does it close? (app_delivery_close_target_by_token: two ids, same
   // token, no money column.) The close itself runs through the executor.
   'apps/web/src/lib/engagements/client-acts/handover-close.ts',
+  // Stage 2 DB step B: the delivery's execution card and the client's "I paid"
+  // on a payment request (app_delivery_execution_by_token,
+  // app_delivery_claim_request_by_token): the same delivery token, no session.
+  'apps/web/src/lib/engagements/public/execution.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

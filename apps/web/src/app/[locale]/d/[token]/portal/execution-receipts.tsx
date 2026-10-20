@@ -1,0 +1,54 @@
+'use client';
+
+import { CheckCircle2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { EXECUTION_LIST_CAP, type PortalExecutionReceipt } from '@/lib/engagements/public/execution-types';
+import { bidiIsolate } from '@/lib/format/bidi';
+import { formatDate } from '@/lib/format/date';
+import { formatPortalMoney } from './portal-money';
+
+/**
+ * The money the studio recorded as received on the execution contract, newest
+ * first: on which day, for which payment request, and how much. Only the newest
+ * 60 travel; when there are more, a note says so. Nothing when nothing was
+ * received.
+ */
+export function ExecutionReceipts({
+  receipts,
+  truncated,
+}: {
+  receipts: readonly PortalExecutionReceipt[];
+  truncated: boolean;
+}) {
+  const t = useTranslations('delivery.execution.receipts');
+  const locale = useLocale();
+  if (receipts.length === 0) return null;
+
+  return (
+    <section aria-labelledby="execution-receipts-title" className="space-y-1">
+      <h3 id="execution-receipts-title" className="text-caption font-semibold text-muted-foreground">
+        {t('title')}
+      </h3>
+      <ul>
+        {receipts.map((receipt, index) => (
+          <li
+            key={`${receipt.receivedOn}-${receipt.requestNumber}-${index}`}
+            className="grid grid-cols-[1rem_1fr_auto] items-start gap-2 border-t py-2 first:border-t-0"
+          >
+            <CheckCircle2 className="mt-0.5 size-4 text-[color:var(--success)]" aria-hidden />
+            <p className="min-w-0 text-caption text-muted-foreground">
+              {t('receivedOn', {
+                date: bidiIsolate(formatDate(receipt.receivedOn, locale)),
+                request: bidiIsolate(receipt.requestNumber),
+              })}
+            </p>
+            <span dir="ltr" className="text-end font-mono text-body font-semibold tabular-nums">
+              {formatPortalMoney(receipt.amount, locale)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {truncated && <p className="text-caption text-muted-foreground">{t('truncated', { count: String(EXECUTION_LIST_CAP) })}</p>}
+    </section>
+  );
+}

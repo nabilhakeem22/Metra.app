@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { COST_ENTRY_UPDATE_COLUMNS } from './column-grants';
 import { grantedUpdateColumns } from './design-engagement-grant';
 import {
   TABLE_PRIVILEGES,
@@ -47,6 +48,8 @@ interface Catalogues {
   hiddenPrivileges?: Array<{ name: string; privilege: string }>;
   /** The column-level INSERT read-back on contract_line_measurements. */
   measurementColumns?: Array<{ name: string; granted: boolean }>;
+  /** The column-level UPDATE read-back on contract_cost_entries (DB step B). */
+  costEntryColumns?: Array<{ name: string; granted: boolean }>;
 }
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
@@ -84,15 +87,22 @@ function appliedTableGrant(table: string): TablePrivilege[] {
 function fixtureSql(catalogues: Catalogues) {
   // Order matters: the trigger read JOINS pg_class, so the RLS-flag branch must
   // be the LAST one tested, not the first.
-  const sql = (strings: TemplateStringsArray) => {
+  const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join(' ');
     // Before the other has_*_privilege branches: these two name a privilege
     // function too, and are told apart by what only they read.
     if (text.includes("('truncate')")) {
       return Promise.resolve(catalogues.hiddenPrivileges ?? []);
     }
-    if (text.includes("a.attnum, 'insert'")) {
-      const columns = [...(declaredTables().get('contract_line_measurements') ?? [])];
+    // The column read-back (./column-grants.ts): its table is a bound value.
+    if (text.includes('has_column_privilege') && text.includes(') as granted')) {
+      const table = values.find((value) => value === 'contract_line_measurements' || value === 'contract_cost_entries');
+      const columns = [...(declaredTables().get(String(table)) ?? [])];
+      if (table === 'contract_cost_entries') {
+        return Promise.resolve(
+          catalogues.costEntryColumns ?? columns.map((name) => ({ name, granted: COST_ENTRY_UPDATE_COLUMNS.has(name) })),
+        );
+      }
       return Promise.resolve(
         catalogues.measurementColumns ??
           columns.map((name) => ({ name, granted: name !== 'seq' })),
@@ -222,6 +232,24 @@ describe('verifyRlsApplied', () => {
     ]);
   });
 
+  it('reports a cost entry column metra_app may update and must not, and one it needs (DB step B, S2)', async () => {
+    const columns = [...(declaredTables().get('contract_cost_entries') ?? [])];
+    expect(columns).toEqual(expect.arrayContaining(['contract_id', 'recorded_by', 'amount']));
+    const problems = await verifyRlsApplied(
+      fixtureSql({
+        costEntryColumns: columns.map((name) => ({
+          name,
+          granted: name === 'contract_id' || (COST_ENTRY_UPDATE_COLUMNS.has(name) && name !== 'amount'),
+        })),
+      }),
+    );
+    expect(problems).toEqual([
+      '  - metra_app may UPDATE contract_cost_entries.contract_id, which no edit or void writes. ' +
+        'rls/roles.sql grants update on the entry fields and the void stamp only',
+      '  - metra_app may NOT update contract_cost_entries.amount: every cost edit or void will fail with 42501',
+    ]);
+  });
+
   it('catches a policy file that never ran — the D7 failure shape, at the database', async () => {
     // A whole file missing is a lot of policies; one is enough to prove the
     // comparison, and the message names the file that declares it.
@@ -280,7 +308,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('58 tables, 58 policies, 18 triggers, 47 functions');
+    expect(declaredCounts()).toBe('58 tables, 58 policies, 22 triggers, 54 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -295,7 +323,8 @@ describe('verifyRlsApplied', () => {
         'market_bulletins, market_categories, market_item_details, market_items, ' +
         'market_price_observations, market_seed_book, payment_requests, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every ' +
-        'column but seq; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.',
+        'column but seq; contract_cost_entries updatable on its 15 entry and void columns only; no truncate, ' +
+        'references, trigger for metra_app on any table; no policy outside the manifest.',
     );
   });
 });

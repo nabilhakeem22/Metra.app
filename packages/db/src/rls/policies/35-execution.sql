@@ -11,23 +11,34 @@
 -- factor), both halves wrapped in `(select ...)` so they run ONCE per query as
 -- an InitPlan (see policies/00-core.sql; policy-wrapped.test.ts pins it).
 --
--- LOCKS. Every table here is new in 0063, so the ACCESS EXCLUSIVE each
--- `alter table` and `create trigger` takes is on a relation no request is
--- waiting for. Six tables x the 3 s lock_timeout is the worst case.
+-- LOCKS. Each `alter table`, `drop trigger` and `create trigger` takes a
+-- table lock for an instant. In DB step A every table here was new, so no
+-- request waited for it; from DB step B on they hold live rows, and a run
+-- waits at most the 3 s lock_timeout per table (six tables x 3 s is the worst
+-- case) behind a long studio transaction, then rolls this file back whole.
 --
 -- WHAT GUARDS WHAT (beside the grants in roles.sql):
 --   contract_payment_milestones  full DML while the contract is a draft;
 --                                frozen with the contract by the existing
 --                                enforce_contract_child_draft() (MT100)
 --   payment_requests             trg_payment_requests_frozen: only issued ->
---                                void, never a delete (MT100)
+--                                void, never a delete (MT100); and (step B)
+--                                trg_payment_requests_actor: issued_by and
+--                                voided_by name the session user (MT140)
 --   contract_payments            append-only BY GRANT (SELECT + INSERT), and
 --                                trg_contract_payments_fits: only on an issued
---                                request, never past its amount (MT130/MT131)
+--                                request, never past its amount (MT130/MT131);
+--                                (step B) trg_contract_payments_actor:
+--                                recorded_by is the session user (MT140)
 --   contract_line_measurements   append-only BY GRANT (SELECT, and INSERT on
 --                                every column but `seq`)
---   contract_payment_claims,
---   contract_cost_entries        mutable lifecycle, no DELETE grant
+--   contract_payment_claims      mutable lifecycle, no DELETE grant
+--   contract_cost_entries        no DELETE grant, UPDATE on the entry fields
+--                                and the void stamp only; (step B)
+--                                trg_contract_cost_entries_guarded: never
+--                                re-homed or un-voided (MT100), and
+--                                trg_contract_cost_entries_actor: recorded_by
+--                                is the session user (MT140)
 
 -- contract_payment_milestones
 alter table public.contract_payment_milestones enable row level security;
@@ -135,3 +146,33 @@ create trigger trg_contract_payments_fits
   before insert on public.contract_payments
   for each row
   execute function public.enforce_contract_payment_fits();
+
+-- DB step B (B3 security S2): a cost entry keeps its contract, recorder, key
+-- and creation time, and a voided one stays voided (functions/35-execution.sql).
+drop trigger if exists trg_contract_cost_entries_guarded on public.contract_cost_entries;
+create trigger trg_contract_cost_entries_guarded
+  before update on public.contract_cost_entries
+  for each row
+  execute function public.enforce_cost_entry_guarded();
+
+-- DB step B (A4 security S3): the actor a money write names is the session's
+-- user, for metra_app. Named `..._actor` so each runs before its table's other
+-- BEFORE trigger (they fire in name order), and an impersonating write is
+-- refused before any lock is taken.
+drop trigger if exists trg_payment_requests_actor on public.payment_requests;
+create trigger trg_payment_requests_actor
+  before insert or update on public.payment_requests
+  for each row
+  execute function public.enforce_actor_is_session_user('issued_by', 'voided_by');
+
+drop trigger if exists trg_contract_payments_actor on public.contract_payments;
+create trigger trg_contract_payments_actor
+  before insert on public.contract_payments
+  for each row
+  execute function public.enforce_actor_is_session_user('recorded_by');
+
+drop trigger if exists trg_contract_cost_entries_actor on public.contract_cost_entries;
+create trigger trg_contract_cost_entries_actor
+  before insert or update on public.contract_cost_entries
+  for each row
+  execute function public.enforce_actor_is_session_user('recorded_by');

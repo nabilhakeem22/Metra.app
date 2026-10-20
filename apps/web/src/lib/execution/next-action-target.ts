@@ -49,8 +49,8 @@ export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextAc
   set_schedule: link('contract_schedule'),
   send_contract: link('contract'),
   record_signed_offline: dialog('sign_offline'),
-  // The Payments tab (A4.3): the request a claim is on shows it, and recording
-  // a payment waits for the claim's answer (B4 brings confirm and dismiss).
+  // The Payments tab (A4.3): its claims panel (B4.2) confirms or dismisses the
+  // claim, and recording a payment on that request waits for the answer.
   review_payment_claim: payments('recordPayments'),
   send_milestone_request: payments('sendRequests'),
   send_variation_request: payments('sendRequests'),

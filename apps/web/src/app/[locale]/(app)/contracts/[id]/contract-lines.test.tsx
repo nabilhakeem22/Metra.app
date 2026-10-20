@@ -31,6 +31,7 @@ vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), save
 vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
 vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
 vi.mock('@/lib/execution/payments/actions', () => ({ recordContractPayment: vi.fn() }));
+vi.mock('@/lib/execution/claims/actions', () => ({ confirmContractClaim: vi.fn(), dismissContractClaim: vi.fn() }));
 
 const line = (n: number): ContractLineView => ({
   id: `l-${n}`,

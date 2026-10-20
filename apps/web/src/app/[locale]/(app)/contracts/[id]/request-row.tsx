@@ -29,7 +29,7 @@ function useTargetLabel() {
  * One payment request on the Payments tab: what it bills and the note sent
  * with it, when, how much, what is paid and still due, and the two things the
  * studio may do with it. A payment is offered while something is due and no
- * client claim waits (the claim is answered first, B4); a void only while
+ * client claim waits (the claims panel answers it first, B4.2); a void only while
  * nothing is paid or claimed. The buttons only ask the tab to open the act: its
  * dialog lives on the tab, so a read of the tab never unmounts it.
  */

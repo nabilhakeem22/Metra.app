@@ -91,8 +91,31 @@ grant select, insert, update on public.payment_requests to metra_app;
 revoke all on public.contract_payment_claims from metra_app;
 grant select, insert, update on public.contract_payment_claims to metra_app;
 -- Actual costs: editable and voidable (voided_at / voided_by), never deleted.
+-- UPDATE IS COLUMN-LEVEL (DB step B, B3 security S2): the entry fields the
+-- edit writes, and the void's stamp, nothing else. So no path can move an
+-- entry to another contract or rewrite who recorded it, its key or its
+-- creation time; trg_contract_cost_entries_guarded (policies/35-execution.sql)
+-- refuses the same for the connection role, and refuses an un-void.
+-- verify-rls-applied.ts reads this list back column by column.
 revoke all on public.contract_cost_entries from metra_app;
-grant select, insert, update on public.contract_cost_entries to metra_app;
+grant select, insert on public.contract_cost_entries to metra_app;
+grant update (
+  contract_section_id,
+  contract_line_id,
+  cost_item_id,
+  category,
+  description,
+  qty,
+  unit,
+  unit_cost,
+  amount,
+  incurred_on,
+  supplier,
+  reference,
+  voided_at,
+  voided_by,
+  updated_at
+) on public.contract_cost_entries to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
@@ -350,12 +373,23 @@ revoke execute on function public.app_variation_respond_by_token(text, text, tex
 -- (not a definer), granted for symmetry with the child-draft guards above.
 grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
 revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from public;
+-- DB step B: the /c sections past the snapshot's first 50, 50 at a time.
+-- Same treatment, also locked down in place (functions/30-contracts-variations.sql).
+grant execute on function public.app_contract_sections_by_token(text, integer) to metra_app;
+revoke execute on function public.app_contract_sections_by_token(text, integer) from public;
 grant execute on function public.enforce_payment_request_frozen() to metra_app;
 -- The payment-fits guard (A2 reliability R2) is an INVOKER trigger function
 -- (S5: it reads as the caller, under RLS); locked down anyway, also in place
 -- right after its CREATE (functions/35-execution.sql).
 grant execute on function public.enforce_contract_payment_fits() to metra_app;
 revoke execute on function public.enforce_contract_payment_fits() from public;
+-- DB step B: the cost entry's guard (B3 security S2) and the actor check of
+-- the money writers (A4 security S3), plain trigger functions, locked down the
+-- same way and in place right after their CREATE (functions/35-execution.sql).
+grant execute on function public.enforce_cost_entry_guarded() to metra_app;
+revoke execute on function public.enforce_cost_entry_guarded() from public;
+grant execute on function public.enforce_actor_is_session_user() to metra_app;
+revoke execute on function public.enforce_actor_is_session_user() from public;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -481,6 +515,21 @@ grant execute on function public.app_boq_releasable(uuid) to metra_app;
 revoke execute on function public.app_boq_releasable(uuid) from public;
 grant execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) to metra_app;
 revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from public;
+-- Stage 2 DB step B: the delivery's execution card and the client's "I paid"
+-- on a payment request (functions/70-execution-portal.sql), token-resolved
+-- like the rest; the claim takes caller-supplied p_name/p_ip/p_ua and writes
+-- studio notifications, so an API role must never reach it. The two helpers
+-- they call take bare ids and are INTERNAL: no grant at all, metra_app
+-- included (the app_client_act_anchor treatment). All four are also locked
+-- down in place, right after their CREATE.
+grant execute on function public.app_delivery_execution_by_token(text) to metra_app;
+revoke execute on function public.app_delivery_execution_by_token(text) from public;
+grant execute on function public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text) from public;
+revoke execute on function public.app_delivery_execution_contract(uuid, uuid) from public;
+revoke execute on function public.app_delivery_execution_contract(uuid, uuid) from metra_app;
+revoke execute on function public.app_studio_payment_details(uuid) from public;
+revoke execute on function public.app_studio_payment_details(uuid) from metra_app;
 
 do $$
 declare
@@ -554,7 +603,19 @@ begin
         r
       );
       execute format(
+        'revoke execute on function public.app_contract_sections_by_token(text, integer) from %I',
+        r
+      );
+      execute format(
         'revoke execute on function public.enforce_contract_payment_fits() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.enforce_cost_entry_guarded() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.enforce_actor_is_session_user() from %I',
         r
       );
       -- Client Delivery Portal token SDFs (S1).
@@ -640,6 +701,23 @@ begin
       );
       execute format(
         'revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from %I',
+        r
+      );
+      -- Stage 2 DB step B (functions/70-execution-portal.sql).
+      execute format(
+        'revoke execute on function public.app_delivery_execution_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_execution_contract(uuid, uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_studio_payment_details(uuid) from %I',
         r
       );
     end if;
