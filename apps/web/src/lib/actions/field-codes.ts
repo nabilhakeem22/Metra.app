@@ -31,7 +31,7 @@ export const FIELD_CODE_PARAMS = {
   // (the day a client signed on paper).
   date_in_future: [],
   // A day before the document it records existed (a paper signature dated
-  // before the contract was issued); `date` is that issue day, YYYY-MM-DD.
+  // before the contract was issued); `date` is that issue day, DD/MM/YYYY.
   date_before_issue: ['date'],
   // A figure typed with more decimals than it is kept to (a rate past 4
   // decimals), refused rather than silently cut.

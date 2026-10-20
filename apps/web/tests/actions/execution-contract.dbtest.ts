@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { generateExecutionContractCore, setContractChargesCore } from '@/lib/contracts/core';
+import {
+  generateExecutionContractCore,
+  issueContractCore,
+  saveContractDraftCore,
+  setContractChargesCore,
+} from '@/lib/contracts/core';
 import { saveContractScheduleCore } from '@/lib/contracts/schedule/save';
 import type { OrgContext } from '@/lib/db/context';
 import { seedBoq, seedProposalContract } from './contract-from-boq-fixture';
@@ -141,9 +146,15 @@ describe('AC3: which BOQ may be contracted', () => {
     });
   });
 
-  it('answers malformed, never a throw, to a null or non-object payload, for generate, charges and the schedule', async () => {
+  it('answers malformed, never a throw, to a null or non-object payload, for generate, charges, the schedule, issue and the header save', async () => {
     type Loose = (ctx: OrgContext, input: unknown) => Promise<unknown>;
-    const cores = [generateExecutionContractCore, setContractChargesCore, saveContractScheduleCore] as unknown as Loose[];
+    const cores = [
+      generateExecutionContractCore,
+      setContractChargesCore,
+      saveContractScheduleCore,
+      issueContractCore,
+      saveContractDraftCore,
+    ] as unknown as Loose[];
     for (const core of cores) {
       for (const payload of [null, undefined, 'x', 7, true]) {
         expect(await core(owner, payload), String(payload)).toEqual({ ok: false, error: 'malformed' });

@@ -14,7 +14,7 @@ import type { ShownPortalFailure } from '@/lib/share/portal-failure';
 import { loadContractSectionLines, loadContractSections } from './actions';
 
 /** What a "show more" left on screen: a shared portal failure, or this page's own sentence. */
-type LoadProblem = { failure: ShownPortalFailure } | { own: 'gone' | 'loadFailed' };
+type LoadProblem = { failure: ShownPortalFailure } | { own: 'gone' | 'loadFailed' | 'loadSectionsFailed' };
 
 /** The key of the list's own ask; a section's lines are asked under the section's id. */
 const SECTIONS = 'sections';
@@ -69,7 +69,7 @@ export function ContractSectionList({
         // Anything but `gone` is a shared portal failure (too_many, uncertain, generic).
         else said({ failure: { error: answer.error, reference: answer.reference } as ShownPortalFailure });
       } catch {
-        said({ own: 'loadFailed' });
+        said({ own: key === SECTIONS ? 'loadSectionsFailed' : 'loadFailed' });
       } finally {
         inFlight.current.delete(key);
       }

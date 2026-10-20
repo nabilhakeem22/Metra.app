@@ -14,6 +14,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
+import { formatDate } from '@/lib/format/date';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readOfflineSignature, type TypedOfflineSignature } from '../sign-offline-input';
@@ -46,7 +47,8 @@ async function issuedOnInCairo(tx: MetraDb, contractId: string): Promise<string>
 /**
  * Flip issued -> signed under the row lock; the status in the WHERE is the
  * admission gate. A paper signature dated before the contract was issued is
- * refused under its box (`date_before_issue`, with the issue day): the
+ * refused under its box (`date_before_issue`, with the issue day as the app shows
+ * every date, DD/MM/YYYY): the
  * evidence record never says the client signed a contract that did not exist.
  */
 async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: string): Promise<void> {
@@ -60,7 +62,7 @@ async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: str
   if (locked.sourceBoqId === null) fail('contract_not_execution');
   if (locked.status !== 'issued') fail('contract_not_signable');
   const issuedOn = await issuedOnInCairo(tx, contractId);
-  if (signedOn < issuedOn) failFields({ signedOn: { code: 'date_before_issue', params: { date: issuedOn } } });
+  if (signedOn < issuedOn) failFields({ signedOn: { code: 'date_before_issue', params: { date: formatDate(issuedOn, 'en') } } });
   const flipped = await tx
     .update(contracts)
     .set({ status: 'signed', updatedAt: new Date() })

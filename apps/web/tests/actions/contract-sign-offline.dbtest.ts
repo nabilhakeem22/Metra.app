@@ -134,7 +134,7 @@ describe('recordContractSignedOfflineCore', () => {
       expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: id, signedOn }), signedOn).toEqual({
         ok: false,
         error: 'check_fields',
-        fields: { signedOn: { code: 'date_before_issue', params: { date: '2026-10-05' } } },
+        fields: { signedOn: { code: 'date_before_issue', params: { date: '05/10/2026' } } },
       });
     }
     expect((await trail(id)).status).toBe('issued');

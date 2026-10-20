@@ -12,6 +12,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { validateSchedule } from '@/lib/execution/money/schedule';
+import { isRecord } from '@/lib/guards/is-record';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import { loadScheduleRows } from '../schedule/queries';
@@ -106,6 +107,8 @@ export async function issueContractCore(
   ctx: OrgContext,
   input: { id: string },
 ): Promise<ActionResult & { data?: string }> {
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.id === 'string' ? input.id.trim() : '';
   if (!isUuid(contractId)) return err('malformed');
   return mutateInOrg(

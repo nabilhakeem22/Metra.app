@@ -1649,6 +1649,7 @@
         "provisional": "Provisional",
         "gone": "These lines can no longer be shown. Please refresh the page.",
         "loadFailed": "We could not load these lines. Please check your connection and try again.",
+        "loadSectionsFailed": "We could not load more sections. Please check your connection and try again.",
         "show": "Show the lines ({count})",
         "moreSections": "Show more sections ({count} left)"
       }
@@ -1657,6 +1658,7 @@
       "show": "Show lines ({count})",
       "showMore": "Show more lines ({count} left)",
       "loadFailed": "We couldn't load these lines. Check your connection and try again.",
+      "loadSectionsFailed": "We couldn't load more sections. Check your connection and try again.",
       "gone": "These lines are not in the workspace you are in now, or no longer exist. Reload the page.",
       "reload": "Reload page",
       "moreSections": "Show more sections",

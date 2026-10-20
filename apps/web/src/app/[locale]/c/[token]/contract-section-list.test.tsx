@@ -20,6 +20,17 @@ vi.mock('@/lib/contracts/public', () => ({
   contractPayloadHash: vi.fn(),
   getContractByToken: vi.fn(),
 }));
+// The browser losing the connection mid-call rejects the action itself, before
+// the server can answer; the gate stands in for that.
+const network = vi.hoisted(() => ({ down: false }));
+vi.mock('./actions', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./actions')>();
+  return {
+    ...real,
+    loadContractSections: (...args: Parameters<typeof real.loadContractSections>) =>
+      network.down ? Promise.reject(new Error('network')) : real.loadContractSections(...args),
+  };
+});
 vi.mock('@/lib/share/request-provenance', () => ({ requestProvenance: async () => ({ ip: null, userAgent: null }) }));
 
 const { loadContractSectionLines, loadContractSections } = await import('./actions');
@@ -56,6 +67,7 @@ beforeEach(() => {
   reads.allowed.mockReset().mockResolvedValue(true);
   reads.page.mockReset();
   reads.sections.mockReset();
+  network.down = false;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -127,6 +139,19 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a contract section on /c (%s)', (loc
     await showMore(120);
     expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'contracts.ack.lines.gone'));
     expect(screen.getAllByRole('row')).toHaveLength(50);
+  });
+
+  test('a failed "show more sections" says it could not load sections, keeps the list and the button (N4)', async () => {
+    const opening = Array.from({ length: 50 }, (_, n) => collapsed(n));
+    renderWithIntl(<ContractSectionList token="t" sections={opening} sectionCount={60} />, { locale });
+    network.down = true;
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.ack.lines.moreSections', 10) }));
+    });
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'contracts.ack.lines.loadSectionsFailed'));
+    expect(messageAt(locale, 'contracts.ack.lines.loadSectionsFailed')).not.toBe(messageAt(locale, 'contracts.ack.lines.loadFailed'));
+    expect(screen.getAllByRole('heading')).toHaveLength(50);
+    expect(screen.getByRole('button', { name: at('contracts.ack.lines.moreSections', 10) })).toBeTruthy();
   });
 
   test('"show more sections" asks from the sections shown, adds 50 collapsed, and goes when none remain (R1)', async () => {

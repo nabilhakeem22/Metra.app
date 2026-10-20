@@ -37,8 +37,13 @@ export function clean(value: string | null | undefined): string | null {
 }
 
 /** Characters that take up no visible room: format marks (zero-width space and
- *  joiners, the bidi marks, the word joiner) and every kind of space. */
-const INVISIBLE = /[\p{Cf}\p{Z}\s]/gu;
+ *  joiners, the bidi marks, the word joiner), every kind of space, and the
+ *  invisible fillers that are not format marks (they are Mn, So or Lo): the
+ *  combining grapheme joiner U+034F, the variation selector U+FE0F, the Hangul
+ *  fillers U+115F, U+1160, U+3164 and U+FFA0, and the braille blank U+2800.
+ *  The two combining ones stand outside the class: inside it a combining mark
+ *  reads as part of the character before it, which the linter refuses. */
+const INVISIBLE = /[\p{Cf}\p{Z}\s\u115F\u1160\u2800\u3164\uFFA0]|\u034F|\uFE0F/gu;
 
 /** True when `text` shows at least one character. */
 export function hasVisibleCharacter(text: string): boolean {

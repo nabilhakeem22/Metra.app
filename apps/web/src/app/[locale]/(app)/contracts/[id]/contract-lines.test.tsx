@@ -191,6 +191,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     expect(screen.queryByRole('button', { name: messageAt(locale, 'contracts.lines.moreSections') })).toBeNull();
   });
 
+  test('a failed "show more sections" says it could not load sections, keeps the list and the button (N4)', async () => {
+    lineReads.loadContractSections.mockResolvedValue({ ok: false, error: 'generic' });
+    function ListHarness() {
+      const lines = useKeptSectionLines();
+      const sections = useKeptSections({ sections: [section(0, [], 's-1')], hasMore: true });
+      return <ContractSectionList contractId="k-1" sections={sections} lines={lines} m={(v: string) => v} />;
+    }
+    renderWithIntl(<ListHarness />, { locale });
+    await press(messageAt(locale, 'contracts.lines.moreSections'));
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'contracts.lines.loadSectionsFailed'));
+    expect(messageAt(locale, 'contracts.lines.loadSectionsFailed')).not.toBe(messageAt(locale, 'contracts.lines.loadFailed'));
+    expect(screen.getAllByRole('heading')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: messageAt(locale, 'contracts.lines.moreSections') })).toBeTruthy();
+  });
+
   test('a sections page that lands twice adds each section once (R1)', async () => {
     let kept: ReturnType<typeof useKeptSections> | null = null;
     function Probe() {

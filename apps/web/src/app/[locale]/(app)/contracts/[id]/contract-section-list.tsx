@@ -63,7 +63,7 @@ export function ContractSectionList({
     setFailures(({ [key]: _cleared, ...rest }) => rest);
     const fail = (shown: ShownFailure) => {
       const gone = 'error' in shown && shown.error === 'record_not_found';
-      const message = gone ? t('gone') : describeReadFailure(shown, te, t('loadFailed'));
+      const message = gone ? t('gone') : describeReadFailure(shown, te, t(key === SECTIONS ? 'loadSectionsFailed' : 'loadFailed'));
       setFailures((current) => ({ ...current, [key]: { message, gone } }));
     };
     startTransition(async () => {

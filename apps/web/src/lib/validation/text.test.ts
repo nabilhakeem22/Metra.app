@@ -6,6 +6,8 @@ import {
   clean,
   optionalText,
   countCharacters,
+  hasVisibleCharacter,
+  visibleText,
 } from './text';
 
 // These two shapes replace eleven hand-copied declarations across the domain
@@ -90,5 +92,43 @@ describe('countCharacters', () => {
 
   it('the empty string is zero', () => {
     expect(countCharacters('')).toBe(0);
+  });
+});
+
+describe('visibleText and hasVisibleCharacter', () => {
+  // Invisible fillers that are not Cf/Z: Mn (034F, FE0F), Lo (115F, 1160, 3164,
+  // FFA0) and So (2800).
+  const FILLERS = ['\u034F', '\uFE0F', '\u3164', '\u2800', '\u115F', '\u1160', '\uFFA0'];
+  const FORMAT_MARKS = ['\u200B', '\u200C', '\u200D', '\u200E', '\u200F', '\uFEFF', '\u2060', '\u00AD', '\u00A0'];
+
+  it('treats a value made only of invisible characters as absent', () => {
+    for (const char of [...FILLERS, ...FORMAT_MARKS]) {
+      expect(visibleText(char), JSON.stringify(char)).toBeNull();
+      expect(visibleText(` ${char}${char} `), JSON.stringify(char)).toBeNull();
+      expect(hasVisibleCharacter(char), JSON.stringify(char)).toBe(false);
+    }
+    expect(visibleText(FILLERS.join('') + FORMAT_MARKS.join(''))).toBeNull();
+  });
+
+  it('keeps real text byte for byte, invisible characters inside it included', () => {
+    for (const text of [
+      'Hassan',
+      '\u0645\u0643\u062A\u0628 \u0645\u064A\u062A\u0631\u0627',
+      '\u200F\u0645\u0643\u062A\u0628\u200F',
+      '\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645',
+      'Hassan\u200B',
+      'a\u3164b',
+      '\u2800dots',
+      'e\u034F\u0301',
+      '\u2764\uFE0F',
+      '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+    ]) {
+      expect(visibleText(text), JSON.stringify(text)).toBe(text);
+      expect(hasVisibleCharacter(text), JSON.stringify(text)).toBe(true);
+    }
+  });
+
+  it('keeps the plain collapse of null, undefined and blanks', () => {
+    for (const value of [null, undefined, '', '   ']) expect(visibleText(value)).toBeNull();
   });
 });

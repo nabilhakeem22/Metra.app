@@ -8,6 +8,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { contractHeaderPatch, validateContractHeader, type ValidatedContractHeader } from './update-header';
 import { failFields, fieldsFailed, type FieldErrors } from '@/lib/actions/field-errors';
@@ -89,8 +90,10 @@ export async function saveContractDraftCore(
   ctx: OrgContext,
   input: SaveContractDraftInput,
 ): Promise<ActionResult> {
-  const id = input.id?.trim();
-  if (!id || !isUuid(id)) return err('malformed');
+  // Directly invokable: a null or a non-object payload is malformed, never a throw.
+  if (!isRecord(input)) return err('malformed');
+  const id = typeof input.id === 'string' ? input.id.trim() : '';
+  if (!isUuid(id)) return err('malformed');
   const header = input.header ?? {};
   const read = validateContractHeader(header);
   if (!read.ok) return fieldsFailed(read.errors);
