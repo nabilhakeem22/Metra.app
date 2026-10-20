@@ -2,8 +2,9 @@ import 'server-only';
 // The cost sheet tab's on-demand read (plan A5.3), gated before any SQL runs.
 // Opening it is the `margin_pnl` read grant, studio roles only: owner, admin,
 // project manager and accountant; the site engineer and the viewer cannot
-// (AC31). The margin inside it is `resolveSeeMargin`: a project manager in a
-// studio that hides margin from PMs gets the sheet with `margin = null`. The
+// (AC31). What is inside it is `resolveSeeMargin`: a project manager in a
+// studio that hides margin from PMs gets billing only, `cost = null`, so no
+// value, budget or cost is there to subtract a margin from (F10, S1). The
 // 'use server' wrapper in ./actions.ts adds the session.
 import { err, type ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';

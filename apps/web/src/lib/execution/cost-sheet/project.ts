@@ -2,9 +2,10 @@ import 'server-only';
 // What the project's Financials tab shows of job cost and margin (plan A5.3,
 // replacing its two locked cards): the cost sheet of the project's execution
 // contract, the newest one generated from a BOQ, a live one before a
-// terminated one (the delivery card's rule, A26). Only its totals and its
-// projected margin cross to the page, and the sheet is the same SQL aggregate
-// the contract's Cost sheet tab reads.
+// terminated one (the delivery card's rule, A26). Only its totals, its
+// projected margin and its billing cross to the page, and the sheet is the
+// same SQL aggregate the contract's Cost sheet tab reads. A reader who may not
+// see margin gets the billing only, as on that tab (A5 fix round, F10 and S1).
 import { contracts } from '@metra/db';
 import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
@@ -12,10 +13,9 @@ import { getCostSheet } from './queries';
 
 export interface ProjectCostSummary {
   contractId: string;
-  budgetCost: string;
-  actualCost: string;
-  /** Null unless the reader may see margin. */
-  projectedMargin: { value: string; pct: number | null } | null;
+  billing: { requested: string; paid: string; outstanding: string };
+  /** Null unless the reader may see cost and margin. */
+  cost: null | { budgetCost: string; actualCost: string; projectedMargin: { value: string; pct: number | null } };
 }
 
 async function projectExecutionContractId(ctx: OrgContext, projectId: string): Promise<string | null> {
@@ -41,8 +41,11 @@ export async function getProjectCostSummary(
   if (!contractId || !sheet) return null;
   return {
     contractId,
-    budgetCost: sheet.totals.budgetCost,
-    actualCost: sheet.totals.actualCost,
-    projectedMargin: sheet.margin && { value: sheet.margin.projected, pct: sheet.margin.projectedPct },
+    billing: sheet.billing,
+    cost: sheet.cost && {
+      budgetCost: sheet.cost.totals.budgetCost,
+      actualCost: sheet.cost.totals.actualCost,
+      projectedMargin: { value: sheet.cost.margin.projected, pct: sheet.cost.margin.projectedPct },
+    },
   };
 }

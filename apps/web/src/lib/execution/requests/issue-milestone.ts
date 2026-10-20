@@ -64,6 +64,7 @@ export async function issueMilestoneRequestCore(
     {
       capability: 'invoices_issue',
       action: 'approve',
+      capTransaction: true,
       refusals: [{ constraint: 'payment_requests_one_per_milestone', code: 'request_exists' }],
     },
     async (tx, audit) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
@@ -9,8 +9,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFieldErrors } from '@/hooks/use-field-errors';
 import { todayInCairo } from '@/lib/automation/clock';
 import { recordMeasurement } from '@/lib/execution/measurements/actions';
-import { MEASUREMENT_FIELDS, measurementFieldErrors, readMeasurement, type CleanMeasurement, type MeasurementField } from '@/lib/execution/measurements/input';
+import {
+  isFarBeyondContractQty,
+  MEASUREMENT_FIELDS,
+  measurementFieldErrors,
+  readMeasurement,
+  type CleanMeasurement,
+  type MeasurementField,
+} from '@/lib/execution/measurements/input';
+import { readNonNegativeExactFigure } from '@/lib/validation/amount-field';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
+import { formatMeasuredQty } from './measurement-row';
 
 /** The DOM id of a box of the dialog: its refusal sits under it. */
 export const recordMeasurementControlId = (field: MeasurementField) => `record-measurement-${field}`;
@@ -19,11 +28,27 @@ type TypedMeasurement = Record<MeasurementField, string>;
 
 const sameTyped = (a: TypedMeasurement, b: TypedMeasurement) => MEASUREMENT_FIELDS.every((field) => a[field] === b[field]);
 
+/** The line being measured: its name, and its contract quantity for the far-beyond check. */
+export interface RecordedLine {
+  id: string;
+  label: string;
+  qty: string;
+  unit: string;
+}
+
+/** Whether the typed quantity, read as it would be saved, is far beyond the line's contract quantity. */
+function farBeyond(typedQty: string, line: RecordedLine): boolean {
+  const read = readNonNegativeExactFigure(typedQty);
+  return read.ok && isFarBeyondContractQty(read.value, line.qty);
+}
+
 /**
  * The FINAL measured quantity of one line (owner decision Oct 19): the
  * quantity as typed on site (Arabic digits and "1,250" rewritten on blur to the
  * figure that is saved), the day, an optional note. Every refusal is said under
- * its box. A correction is a new reading, never an edit.
+ * its box. A correction is a new reading, never an edit. A quantity more than
+ * ten times the line's contract quantity is still saved, but the dialog says
+ * so under the box first (S3).
  *
  * A retry after a lost answer carries the SAME key while the boxes are
  * unchanged, so the server answers the reading it already has (`already`); a
@@ -39,7 +64,7 @@ export function RecordMeasurementDialog({
   contractId: string;
   /** The contract's issue day, `YYYY-MM-DD`: no reading is dated before it. */
   contractIssuedOn: string;
-  line: { id: string; label: string };
+  line: RecordedLine;
   /** The reading is saved (or was already), as the server keeps it: the tab shows it on its line. */
   onSaved: (reading: CleanMeasurement, already: boolean) => void;
   onClose: () => void;
@@ -47,6 +72,7 @@ export function RecordMeasurementDialog({
   const t = useTranslations('contracts.execution.measurements.record');
   const tc = useTranslations('common');
   const te = useTranslations('errors');
+  const locale = useLocale();
   const today = todayInCairo(new Date());
   const [typed, setTyped] = useState<TypedMeasurement>({ measuredQty: '', measuredOn: today, note: '' });
   const [pending, startTransition] = useTransition();
@@ -95,6 +121,11 @@ export function RecordMeasurementDialog({
           onBlur={(event) => set('measuredQty', normalizeDecimalInput(event.target.value))}
         />
       </FormField>
+      {farBeyond(typed.measuredQty, line) && (
+        <p className="text-caption text-[color:var(--warn)]" role="status">
+          {t('farBeyond', { qty: `${formatMeasuredQty(line.qty, locale)} ${line.unit}` })}
+        </p>
+      )}
       <FormField id={recordMeasurementControlId('measuredOn')} label={t('measuredOn')} {...errors.bind('measuredOn')}>
         <Input type="date" dir="ltr" max={today} value={typed.measuredOn} onChange={(event) => set('measuredOn', event.target.value)} />
       </FormField>

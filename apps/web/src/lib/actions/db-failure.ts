@@ -13,6 +13,8 @@
  *    usually the abandoned first attempt, which is still free to commit.
  *  - `57014` query_canceled — a statement_timeout or an explicit cancel. The
  *    cancel races the commit, so the answer is genuinely unknown.
+ *  - `25P04` transaction_timeout — a capped transaction ran past its cap
+ *    (org-context.ts); the session is ended with it.
  *  - class `08` connection_exception — the socket died between sending COMMIT and
  *    reading its reply. The canonical ambiguous write.
  *
@@ -30,6 +32,10 @@ const AMBIGUOUS_SQLSTATES: ReadonlySet<string> = new Set([
   // admin_shutdown: what the pooler raises when it recycles a backend under a
   // write in flight. The server is gone; whether COMMIT landed is unknown.
   '57P01',
+  // transaction_timeout: the whole-transaction cap of a contract writer (A5 R1)
+  // ended it and its session. Answered like the lock timeout it replaces as the
+  // writer's bound: the act may be retried, and its key stays held.
+  '25P04',
 ]);
 
 /** SQLSTATE class 08 — connection_exception, every member of it. */

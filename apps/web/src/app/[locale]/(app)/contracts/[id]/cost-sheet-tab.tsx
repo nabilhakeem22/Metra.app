@@ -20,11 +20,13 @@ function Figure({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * The cost sheet (كشف التكلفة, plan A5.3): the contract's value, what was
- * requested and paid, budget against actual cost per section, and the margin
- * (planned, and projected per section) for a role that may see margin; the
- * server leaves it out otherwise. Read on demand when the tab is shown: SQL
- * aggregates, so it costs the same however many costs the contract holds.
+ * The cost sheet (كشف التكلفة, plan A5.3): what was requested and paid, and,
+ * for a role that may see margin, the contract's value (before the measured
+ * differences the final account adds, F11), budget against actual cost per
+ * section and the margin (planned, and projected per section). The server
+ * leaves the cost side out for any other role (F10, S1). Read on demand when
+ * the tab is shown: SQL aggregates, so it costs the same however many costs
+ * the contract holds.
  */
 export function CostSheetTab({ contractId, m }: { contractId: string; m: (value: string) => string }) {
   const t = useTranslations('contracts.execution.costSheet');
@@ -48,6 +50,7 @@ export function CostSheetTab({ contractId, m }: { contractId: string; m: (value:
     };
   }, [contractId, te]);
 
+  const cost = sheet?.cost ?? null;
   const pct = (value: number | null) => (value === null ? '' : ` (${formatPercent(value, locale)})`);
 
   return (
@@ -59,30 +62,34 @@ export function CostSheetTab({ contractId, m }: { contractId: string; m: (value:
           !error && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t('loading')} />
         ) : (
           <>
+            {cost && (
+              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Figure label={t('value.originalValue')} value={m(cost.value.originalValue)} />
+                <Figure label={t('value.approvedVariations')} value={m(cost.value.approvedVariations)} />
+                <Figure label={t('value.revisedValue')} value={m(cost.value.revisedValue)} />
+                <Figure label={t('value.valueExVat')} value={m(cost.value.valueExVat)} />
+              </dl>
+            )}
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Figure label={t('value.originalValue')} value={m(sheet.value.originalValue)} />
-              <Figure label={t('value.approvedVariations')} value={m(sheet.value.approvedVariations)} />
-              <Figure label={t('value.revisedValue')} value={m(sheet.value.revisedValue)} />
-              <Figure label={t('value.valueExVat')} value={m(sheet.value.valueExVat)} />
               <Figure label={t('billing.requested')} value={m(sheet.billing.requested)} />
               <Figure label={t('billing.paid')} value={m(sheet.billing.paid)} />
               <Figure label={t('billing.outstanding')} value={m(sheet.billing.outstanding)} />
             </dl>
-            <CostSheetRows sheet={sheet} m={m} />
-            <section className="space-y-2">
-              <h3 className="text-body font-semibold">{t('margin.title')}</h3>
-              {sheet.margin ? (
-                <>
+            {cost ? (
+              <>
+                <CostSheetRows cost={cost} m={m} />
+                <section className="space-y-2">
+                  <h3 className="text-body font-semibold">{t('margin.title')}</h3>
                   <dl className="grid grid-cols-2 gap-3">
-                    <Figure label={t('margin.planned')} value={`${m(sheet.margin.planned)}${pct(sheet.margin.plannedPct)}`} />
-                    <Figure label={t('margin.projected')} value={`${m(sheet.margin.projected)}${pct(sheet.margin.projectedPct)}`} />
+                    <Figure label={t('margin.planned')} value={`${m(cost.margin.planned)}${pct(cost.margin.plannedPct)}`} />
+                    <Figure label={t('margin.projected')} value={`${m(cost.margin.projected)}${pct(cost.margin.projectedPct)}`} />
                   </dl>
                   <p className="text-caption text-muted-foreground">{t('margin.note')}</p>
-                </>
-              ) : (
-                <p className="text-body text-muted-foreground">{t('margin.hidden')}</p>
-              )}
-            </section>
+                </section>
+              </>
+            ) : (
+              <p className="text-body text-muted-foreground">{t('costHidden')}</p>
+            )}
           </>
         )}
       </CardContent>

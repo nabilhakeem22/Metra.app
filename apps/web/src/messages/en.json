@@ -638,7 +638,8 @@
     "open_variations": "A change order is still waiting for a decision. Settle every open change order before the final account.",
     "cost_entry_not_found": "That cost entry no longer exists. Refresh the page.",
     "cost_entry_voided": "This cost entry was voided, so it cannot be changed.",
-    "line_not_in_contract": "That line is not part of this contract. Pick a line of this contract."
+    "line_not_in_contract": "That line is not part of this contract. Pick a line of this contract.",
+    "final_account_too_large": "The final account is past the largest amount one request can bill. A measured quantity is probably wrong: check the readings on the Measurements tab."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1183,7 +1184,11 @@
         "notShown": "Not shown to your role",
         "openCostSheet": "Open the cost sheet",
         "costBody": "Job cost and margin come from the cost sheet of the project's execution contract.",
-        "budget": "Budget:"
+        "budget": "Budget:",
+        "requested": "Requested",
+        "paid": "Paid",
+        "outstanding": "Due",
+        "costHidden": "Job cost and margin are not shown to your role."
       },
       "team": {
         "title": "Team",
@@ -1728,7 +1733,7 @@
         "tab": "Payments",
         "title": "Payment requests and payments",
         "loading": "Loading the payments",
-        "leftToBill": "Left to bill on the contract:",
+        "leftToBill": "Left to bill on the schedule:",
         "closed": {
           "notSigned": "Payment requests can be sent once the client signs the contract.",
           "terminated": "The contract was terminated, so nothing more can be billed on it.",
@@ -1774,7 +1779,8 @@
             "issued": "Awaiting payment",
             "paid": "Paid",
             "void": "Void"
-          }
+          },
+          "voidClosed": "While the final account is issued, the requests before it cannot be voided. Void the final account first if it has no payments."
         },
         "record": {
           "open": "Record a payment",
@@ -1809,7 +1815,9 @@
           "amount": "Amount",
           "details": "Details",
           "more": "Show more payments"
-        }
+        },
+        "leftToBillHint": "Measured differences are settled in the final account.",
+        "billedInFinalAccount": "The final account bills the instalments and change orders that were not requested before it, so they are no longer listed here."
       },
       "finish": {
         "revised": "Revised finish date: {date}, {count, plural, one {{n} day} other {{n} days}} added by approved change orders",
@@ -1845,7 +1853,8 @@
           "note": "Note",
           "submit": "Save the reading",
           "saved": "The reading was saved.",
-          "already": "That reading was already saved."
+          "already": "That reading was already saved.",
+          "farBeyond": "This is more than 10 times the line's contract quantity ({qty}). Check it before you save; it is saved as typed."
         },
         "page": {
           "title": "Measurements of {number}",
@@ -1863,7 +1872,7 @@
         "adjustmentCharge": "Measured differences, with VAT and supervision",
         "finalValue": "Final value",
         "billedSoFar": "Requested before it",
-        "balance": "Left to bill",
+        "balance": "Final balance (includes measured differences)",
         "differences": {
           "title": "Measured differences",
           "empty": "No line was measured differently from its quantity.",
@@ -1876,13 +1885,15 @@
           "works": "Works",
           "billed": "Billed",
           "flagged": "Needs a change order",
-          "more": "Show more lines"
+          "more": "Show more lines",
+          "discountNote": "The works on each line are before the contract's {pct} document discount, which applies to the total, so the lines do not add up to the measured works above."
         },
         "blocked": {
           "notSigned": "The final account can be issued once the client signs the contract.",
           "terminated": "The contract was terminated, so no final account can be issued on it.",
           "openVariations": "Change orders still waiting for a decision: {count}. Settle them before the final account.",
-          "nothingDue": "Nothing is left to bill, so there is no final account to issue."
+          "nothingDue": "Nothing is left to bill, so there is no final account to issue.",
+          "tooLarge": "The final account is past the largest amount one request can bill. A measured quantity is probably wrong: check the readings on the Measurements tab."
         },
         "issued": {
           "title": "Final account request",
@@ -1910,8 +1921,8 @@
         "value": {
           "originalValue": "Contract value",
           "approvedVariations": "Approved change orders",
-          "revisedValue": "Revised value",
-          "valueExVat": "Value before VAT"
+          "revisedValue": "Revised value, before measured differences",
+          "valueExVat": "Value before VAT and measured differences"
         },
         "billing": {
           "requested": "Requested",
@@ -1928,7 +1939,7 @@
           "untitled": "Untitled section",
           "total": "Total",
           "kinds": {
-            "whole_contract": "Whole contract",
+            "whole_contract": "Unallocated cost (whole contract)",
             "change_orders": "Change orders, new scope",
             "more_sections": "Other sections: {count}"
           }
@@ -1937,9 +1948,9 @@
           "title": "Margin",
           "planned": "Planned margin",
           "projected": "Projected margin",
-          "note": "Projected margin counts each section at its budget or its actual cost, whichever is higher.",
-          "hidden": "Margin is not shown to your role."
-        }
+          "note": "Projected margin counts each section at its budget or its actual cost, whichever is higher."
+        },
+        "costHidden": "Cost and margin are not shown to your role."
       }
     }
   },

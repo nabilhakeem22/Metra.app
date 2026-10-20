@@ -1,6 +1,6 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
@@ -21,7 +21,7 @@ export const issueFinalAccountControlId = (field: RequestTermField) => `issue-fi
  * request: dated today, with an optional due day and note, for the balance
  * the card shows (`expectedAmount`). The server recomputes it under the
  * contract lock; a balance that moved since (a reading, an approval, a request)
- * is refused with the new figure, said as money, and the card is read again so
+ * is refused with the new figure, said as the dialog says its own, and the card is read again so
  * the dialog then offers that figure. Every other refusal also re-reads the
  * card, and once it shows the account issued (by someone else) the dialog
  * closes on it.
@@ -44,11 +44,10 @@ export function IssueFinalAccountDialog({
   const t = useTranslations('contracts.execution.finalAccount.issue');
   const tc = useTranslations('common');
   const te = useTranslations('errors');
-  const locale = useLocale();
   const [dueOn, setDueOn] = useState('');
   const [note, setNote] = useState('');
   const [pending, startTransition] = useTransition();
-  const errors = useFieldErrors({ fields: REQUEST_TERM_FIELDS, translate: withMoneyParams(te, locale) });
+  const errors = useFieldErrors({ fields: REQUEST_TERM_FIELDS, translate: withMoneyParams(te, m) });
   const today = todayInCairo(new Date());
 
   function submit() {

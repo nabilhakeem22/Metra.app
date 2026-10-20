@@ -79,7 +79,7 @@ const sectionOf = (row: Row['sections'][number]): CostSheetSectionInput => ({
 const foldedOf = (folded: Row['folded']): FoldedSectionsInput | null =>
   folded && { count: Number(folded.count), budgetCost: folded.budget, actualCost: folded.actual, projectedCost: folded.projected };
 
-/** The contract's cost sheet, margin left out unless `canSeeMargin`; null when it is not the caller's execution contract. */
+/** The contract's cost sheet, cost and margin left out unless `canSeeMargin`; null when it is not the caller's execution contract. */
 export function getCostSheet(ctx: OrgContext, contractId: string, canSeeMargin: boolean): Promise<CostSheet | null> {
   return withOrgContext(ctx, async (tx) => {
     const contract = await loadExecutionContract(tx, contractId);

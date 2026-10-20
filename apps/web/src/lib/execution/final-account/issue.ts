@@ -4,17 +4,21 @@
 // the provisional lines (D2a), minus every request issued so far.
 //
 // Refused: a change order still awaiting a decision (`open_variations`), a
-// balance of zero or less (`final_account_nothing_due`), a balance that is not
-// the one the studio was shown (`final_account_changed`, with the balance now:
-// a measurement, an approval or a payment request moved it), and a final
-// account already issued (`request_exists`; the partial unique
-// `payment_requests_one_final_account` is the database's backstop). Once
+// balance of zero or less (`final_account_nothing_due`, whatever figure was
+// shown, a negative one included: F9), a balance past the money cap
+// (`final_account_too_large`: a mistyped reading on a provisional line, S3),
+// a balance that is not the one the studio was shown (`final_account_changed`,
+// with the balance now: a measurement, an approval or a payment request moved
+// it), and a final account already issued (`request_exists`; the partial
+// unique `payment_requests_one_final_account` is the database's backstop). Once
 // issued it closes new requests, measurements and change-order approvals,
 // until it is voided (unpaid only, requests/void.ts).
 //
 // LOCKS: the contract FOR UPDATE FIRST, like every request writer (A4 coder's
 // note, requests/billing-lock.ts). Measurements and approvals hold it FOR
-// SHARE first (./gate.ts), so the figures read here cannot move under it.
+// SHARE first (./gate.ts), so the figures read here cannot move under it. The
+// whole transaction is capped (`capTransaction`, A5 R1): a steady stream of
+// those share holders can delay it, never hold it past the cap.
 import type { MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
@@ -24,7 +28,7 @@ import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import { isRecord } from '@/lib/guards/is-record';
-import { readMoneyString } from '@/lib/money/read';
+import { readMoney, withinMagnitude } from '@/lib/money/read';
 import { isUuid } from '@/lib/uuid';
 import { finalAccountFigures } from '../money/final-account';
 import { finalAccountTax } from '../money/final-account-tax';
@@ -38,6 +42,20 @@ export interface IssueFinalAccountInput extends TypedRequestTerms {
   contractId?: unknown;
   /** The balance the studio was shown (scale-4): the request bills only that. */
   expectedAmount?: unknown;
+}
+
+/** A shown balance past the money cap: well formed, but no balance that may be issued equals it. */
+const OVER_CAP = 'over_cap';
+
+/**
+ * The balance the studio was shown, with its sign (a negative one is what the
+ * card shows on a contract billed past its final value), or null when it is
+ * not a figure at all.
+ */
+function readShownBalance(raw: unknown): string | typeof OVER_CAP | null {
+  const read = readMoney(typeof raw === 'string' ? raw : null, { allowNegative: true });
+  if (read.ok) return read.value;
+  return read.reason === 'too_large' ? OVER_CAP : null;
 }
 
 /** Σ VAT of the issued requests. */
@@ -56,8 +74,8 @@ export async function issueFinalAccountCore(
   // Directly invokable: a null or a non-object payload is malformed, never a throw.
   if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.contractId === 'string' ? input.contractId.trim() : '';
-  const expected = readMoneyString(typeof input.expectedAmount === 'string' ? input.expectedAmount : null);
-  if (!isUuid(contractId) || expected === null) return err('malformed');
+  const shown = readShownBalance(input.expectedAmount);
+  if (!isUuid(contractId) || shown === null) return err('malformed');
   const issuedOn = todayInCairo(new Date());
   const read = readRequestTerms(input, issuedOn);
   if (!read.ok) return fieldsFailed(read.errors);
@@ -67,6 +85,7 @@ export async function issueFinalAccountCore(
     {
       capability: 'invoices_issue',
       action: 'approve',
+      capTransaction: true,
       refusals: [{ constraint: 'payment_requests_one_final_account', code: 'request_exists' }],
     },
     async (tx, audit) => {
@@ -76,8 +95,10 @@ export async function issueFinalAccountCore(
       if (money.openVariationCount > 0) fail('open_variations');
       const basis = { ...contract, ...money };
       const figures = finalAccountFigures(basis, await loadMeasuredWorks(tx, contractId));
-      if (parseMoney4(figures.balance) <= 0n) fail('final_account_nothing_due');
-      if (parseMoney4(figures.balance) !== parseMoney4(expected)) fail('final_account_changed', { amount: figures.balance });
+      const balance4 = parseMoney4(figures.balance);
+      if (balance4 <= 0n) fail('final_account_nothing_due');
+      if (!withinMagnitude(figures.balance)) fail('final_account_too_large');
+      if (shown === OVER_CAP || balance4 !== parseMoney4(shown)) fail('final_account_changed', { amount: figures.balance });
       const taxAmount = finalAccountTax({
         contractTaxAmount: contract.taxAmount,
         taxRate: contract.taxRate,

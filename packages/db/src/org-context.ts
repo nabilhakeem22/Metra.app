@@ -17,6 +17,26 @@ export interface OrgContext {
 }
 
 /**
+ * How long a capped transaction may last, in EVERY state: waiting on a lock,
+ * running, or idle between statements. `lock_timeout` bounds each lock WAIT,
+ * and a writer that needs a row FOR UPDATE while a steady stream of FOR SHARE
+ * holders overlap on it re-waits once per holder set, each wait with a fresh
+ * 5 s: measured, a contract writer was held 20 s, until `statement_timeout`
+ * (A5 reliability R1). `transaction_timeout` (PostgreSQL 17+) ends the
+ * transaction AND its session when the cap passes (SQLSTATE 25P04), which the
+ * app answers `uncertain`, the answer a lock timeout already gets. Set
+ * mid-transaction it starts counting from that moment, which is the opening
+ * statement here.
+ *
+ * On a server older than 17 the setting does not exist, so it is set only
+ * when `server_version_num` says it may be, in the same statement (the
+ * version check lock-timeout.ts makes, without a second round trip): the CASE
+ * never calls set_config on an older server. Production runs 17.
+ */
+const WHOLE_TRANSACTION_CAP = sql`case when current_setting('server_version_num')::integer >= 170000
+      then set_config('transaction_timeout', '8s', true) end`;
+
+/**
  * Open the transaction: identity GUCs, the non-bypass role and the server-side
  * bounds, in ONE round trip.
  *
@@ -42,13 +62,31 @@ export interface OrgContext {
 async function openBoundTransaction(
   tx: { execute: (query: SQL) => Promise<unknown> },
   identity: SQL,
+  capTransaction = false,
 ): Promise<void> {
   await tx.execute(sql`select ${identity},
     set_config('lock_timeout', '5s', true),
     set_config('statement_timeout', '20s', true),
     set_config('idle_in_transaction_session_timeout', '30s', true),
+    ${capTransaction ? sql`${WHOLE_TRANSACTION_CAP},` : sql``}
     set_config('role', 'metra_app', true)`);
 }
+
+/**
+ * What a transaction is opened as, beyond the bounds every one gets.
+ *  - `snapshot`: REPEATABLE READ READ ONLY, so every statement reads ONE
+ *    snapshot. For a read that shows several figures of one record together
+ *    (the final account card, A5 R2): under READ COMMITTED each statement
+ *    takes its own, and a write committing between two of them tears the card.
+ *  - `capTransaction`: the whole-transaction cap above, for a writer that
+ *    takes a contended row FOR UPDATE.
+ */
+export interface TransactionOptions {
+  snapshot?: boolean;
+  capTransaction?: boolean;
+}
+
+const SNAPSHOT_READ = { isolationLevel: 'repeatable read', accessMode: 'read only' } as const;
 
 /**
  * The ONLY sanctioned way to touch business tables. Opens a transaction, switches
@@ -62,16 +100,21 @@ export async function withOrgContext<T>(
   db: MetraDb,
   ctx: OrgContext,
   fn: (tx: MetraDb) => Promise<T>,
+  options: TransactionOptions = {},
 ): Promise<T> {
-  return db.transaction(async (tx) => {
-    await openBoundTransaction(
-      tx,
-      sql`set_config('app.current_org_id', ${ctx.orgId}, true),
+  return db.transaction(
+    async (tx) => {
+      await openBoundTransaction(
+        tx,
+        sql`set_config('app.current_org_id', ${ctx.orgId}, true),
     set_config('app.current_user_id', ${ctx.userId}, true),
     set_config('app.current_user_email', ${ctx.email ?? ''}, true)`,
-    );
-    return fn(tx as unknown as MetraDb);
-  });
+        options.capTransaction,
+      );
+      return fn(tx as unknown as MetraDb);
+    },
+    options.snapshot ? SNAPSHOT_READ : undefined,
+  );
 }
 
 /**

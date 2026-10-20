@@ -11,14 +11,14 @@ import 'server-only';
 // `advance_pct` / `retention_pct`) — removing them would be a breaking API change
 // for no gain, and they remain a usable default when a contract is drafted.
 import { contracts } from '@metra/db';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { weightedRates, type ClientEffectiveRates } from './rates';
 
 /** Contract statuses that represent a real commercial commitment. `draft` is a
  *  work-in-progress and must not drag the client's effective rate around;
  *  `terminated` is no longer a commitment. That leaves issued + signed. */
-const COMMITTED_STATUSES = ['issued', 'signed'] as const;
+export const COMMITTED_STATUSES = ['issued', 'signed'] as const;
 
 /**
  * The client's effective advance/retention: each committed contract's percentage
@@ -57,17 +57,33 @@ export function getClientEffectiveRates(
   });
 }
 
+/** A project's effective rates, and how many committed EXECUTION contracts it has beside them. */
+export interface ProjectEffectiveRates extends ClientEffectiveRates {
+  executionContractCount: number;
+}
+
 /**
  * The same effective-rate calculation, scoped to ONE PROJECT's committed contracts.
  * The projects spec asks for Financials to behave "the same as clients", and the
  * arithmetic is identical — only the filter differs — so it shares `weightedRates`
  * rather than growing a second copy that could drift.
+ *
+ * Only PROPOSAL contracts carry the two rates. An execution contract (from a
+ * BOQ) has no advance or retention terms: its schedule's first and last rows
+ * are those, and both columns are stored 0 (plan A5). Weighting its 0 in would
+ * drag a real rate down, and on a project with only execution contracts the
+ * cards would read "0.00%" for terms that do not exist, so the Financials tab
+ * hides them there (A5 fix round F4); `executionContractCount` says so.
  */
 export function getProjectEffectiveRates(
   ctx: OrgContext,
   projectId: string,
-): Promise<ClientEffectiveRates> {
+): Promise<ProjectEffectiveRates> {
   return withOrgContext(ctx, async (tx) => {
+    const committed = and(
+      eq(contracts.projectId, projectId),
+      inArray(contracts.status, [...COMMITTED_STATUSES]),
+    );
     const rows = await tx
       .select({
         advancePct: contracts.advancePct,
@@ -75,12 +91,11 @@ export function getProjectEffectiveRates(
         value: sql<string>`coalesce(${contracts.originalValue}, 0)::text`,
       })
       .from(contracts)
-      .where(
-        and(
-          eq(contracts.projectId, projectId),
-          inArray(contracts.status, [...COMMITTED_STATUSES]),
-        ),
-      );
-    return weightedRates(rows);
+      .where(and(committed, isNull(contracts.sourceBoqId)));
+    const [execution] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(contracts)
+      .where(and(committed, isNotNull(contracts.sourceBoqId)));
+    return { ...weightedRates(rows), executionContractCount: execution?.count ?? 0 };
   });
 }

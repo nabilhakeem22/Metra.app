@@ -77,7 +77,7 @@ export async function recordContractSignedOfflineCore(
   if (!read.ok) return fieldsFailed(read.errors);
   const { signedOn, note } = read.values;
 
-  return mutateInOrg(ctx, { immutableCode: 'contract_not_signable' }, async (tx, audit) => {
+  return mutateInOrg(ctx, { immutableCode: 'contract_not_signable', capTransaction: true }, async (tx, audit) => {
     await signIssuedContract(tx, contractId, signedOn);
     await tx.insert(contractEvents).values({
       orgId: ctx.orgId,

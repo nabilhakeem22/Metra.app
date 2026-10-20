@@ -45,17 +45,27 @@ const FIGURES = {
 
 function account(overrides: Partial<FinalAccountView> = {}): FinalAccountView {
   return {
-    contractId: CONTRACT, status: 'signed', originalValue: '124000.0000', figures: FIGURES, openVariationCount: 0, issued: null,
+    contractId: CONTRACT, status: 'signed', originalValue: '124000.0000', documentDiscountPct: '0.0000', figures: FIGURES, openVariationCount: 0, issued: null,
     counts: { billed: 1, flagged: 0 }, differences: { rows: [], nextCursor: null }, ...overrides,
   };
 }
 
 const SHEET: CostSheet = {
-  value: { originalValue: '124000.0000', approvedVariations: '0.0000', revisedValue: '124000.0000', valueExVat: '110000.0000' },
-  billing: { requested: '0.0000', paid: '0.0000', outstanding: '0.0000' },
-  sections: [{ kind: 'section', sectionId: 's-1', titleAr: null, titleEn: 'Ceilings', count: null, budgetCost: '100.0000', actualCost: '150.0000', variance: '50.0000', overBudget: true }],
-  totals: { budgetCost: '100.0000', actualCost: '150.0000' },
-  margin: null,
+  billing: { requested: '500.0000', paid: '200.0000', outstanding: '300.0000' },
+  cost: {
+    value: { originalValue: '124000.0000', approvedVariations: '0.0000', revisedValue: '124000.0000', valueExVat: '110000.0000' },
+    sections: [
+      { kind: 'section', sectionId: 's-1', titleAr: null, titleEn: 'Ceilings', count: null, budgetCost: '100.0000', actualCost: '150.0000', variance: '50.0000', overBudget: true },
+      { kind: 'whole_contract', sectionId: null, titleAr: null, titleEn: null, count: null, budgetCost: null, actualCost: '70.0000', variance: null, overBudget: false },
+    ],
+    totals: { budgetCost: '100.0000', actualCost: '220.0000' },
+    margin: { planned: '109900.0000', projected: '109780.0000', plannedPct: 99.9, projectedPct: 99.8 },
+  },
+};
+
+const DIFFERENCE = {
+  lineId: 'l-1', sectionTitleAr: null, sectionTitleEn: 'Ceilings', itemCode: 'A-5', descriptionAr: null, descriptionEn: 'Gypsum',
+  unit: 'sqm', qty: '200.0000', provisional: true, measuredQty: '210.0000', variationQty: '0.0000', residualQty: '10.0000', works: '4000.0000',
 };
 
 beforeEach(() => {
@@ -112,12 +122,47 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the A5 tabs (%s)', (locale) => {
     expect(screen.queryByText(at('contracts.execution.finalAccount.someoneElse'))).toBeNull();
   });
 
-  test('cost sheet: the sections against budget, and no margin when the server left it out', async () => {
+  test('final account: under a document discount the differences say the lines are before it (F8)', async () => {
+    const differences = { rows: [DIFFERENCE], nextCursor: null };
+    finalAccount.loadFinalAccount.mockResolvedValue({ ok: true, data: account({ documentDiscountPct: '10.0000', differences }) });
+    await show(<FinalAccountCard contractId={CONTRACT} canIssue m={m} />);
+    const note = at('contracts.execution.finalAccount.differences.discountNote').replace('{pct}', '10.00%');
+    expect(screen.getByText(note)).toBeTruthy();
+  });
+
+  test('final account: no document discount, no note', async () => {
+    finalAccount.loadFinalAccount.mockResolvedValue({ ok: true, data: account({ differences: { rows: [DIFFERENCE], nextCursor: null } }) });
+    await show(<FinalAccountCard contractId={CONTRACT} canIssue m={m} />);
+    expect(screen.getAllByText(m('4000.0000')).length).toBeGreaterThan(0);
+    const note = at('contracts.execution.finalAccount.differences.discountNote').replace('{pct}', '0.00%');
+    expect(screen.queryByText(note)).toBeNull();
+  });
+
+  test('final account: a balance past the money cap is not offered, and says why (S3)', async () => {
+    const figures = { ...FIGURES, balance: '1240000123379.9876' };
+    finalAccount.loadFinalAccount.mockResolvedValue({ ok: true, data: account({ figures }) });
+    await show(<FinalAccountCard contractId={CONTRACT} canIssue m={m} />);
+    expect(screen.getByText(at('contracts.execution.finalAccount.blocked.tooLarge'))).toBeTruthy();
+    expect(screen.queryByRole('button', { name: at('contracts.execution.finalAccount.issue.open') })).toBeNull();
+  });
+
+  test('cost sheet: the sections against budget; cost booked to no section is never over budget (F5)', async () => {
     costSheet.loadCostSheet.mockResolvedValue({ ok: true, data: SHEET });
     await show(<CostSheetTab contractId={CONTRACT} m={m} />);
     expect(screen.getByText('Ceilings')).toBeTruthy();
-    expect(screen.getByText(at('contracts.execution.costSheet.rows.overBudget'))).toBeTruthy();
-    expect(screen.getByText(at('contracts.execution.costSheet.margin.hidden'))).toBeTruthy();
-    expect(screen.queryByText(at('contracts.execution.costSheet.margin.projected'))).toBeNull();
+    expect(screen.getAllByText(at('contracts.execution.costSheet.rows.overBudget'))).toHaveLength(1);
+    expect(screen.getByText(at('contracts.execution.costSheet.rows.kinds.whole_contract'))).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.costSheet.value.revisedValue'))).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.costSheet.margin.projected'))).toBeTruthy();
+  });
+
+  test('cost sheet: billing only when the server left the cost out (F10, S1)', async () => {
+    costSheet.loadCostSheet.mockResolvedValue({ ok: true, data: { billing: SHEET.billing, cost: null } });
+    await show(<CostSheetTab contractId={CONTRACT} m={m} />);
+    expect(screen.getByText(m('300.0000'))).toBeTruthy();
+    expect(screen.getByText(at('contracts.execution.costSheet.costHidden'))).toBeTruthy();
+    for (const hidden of ['value.valueExVat', 'rows.budget', 'rows.actual', 'margin.projected']) {
+      expect(screen.queryByText(at(`contracts.execution.costSheet.${hidden}`))).toBeNull();
+    }
   });
 });

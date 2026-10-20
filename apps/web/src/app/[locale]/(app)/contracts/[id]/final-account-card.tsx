@@ -7,25 +7,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { FinalAccountView } from '@/lib/execution/final-account/load';
+import { withinMagnitude } from '@/lib/money/read';
 import { FinalAccountDifferences } from './final-account-differences';
 import { IssueFinalAccountDialog } from './issue-final-account-dialog';
 import { useFinalAccount } from './use-final-account';
 
-type Blocked = 'notSigned' | 'terminated' | 'openVariations' | 'nothingDue';
+type Blocked = 'notSigned' | 'terminated' | 'openVariations' | 'nothingDue' | 'tooLarge';
 
 /** Why the final account cannot be issued now, or null when it can (the core's refusals, said first). */
 function blockedReason(view: FinalAccountView): Blocked | null {
   if (view.status === 'terminated') return 'terminated';
   if (view.status !== 'signed') return 'notSigned';
   if (view.openVariationCount > 0) return 'openVariations';
-  return parseMoney4(view.figures.balance) > 0n ? null : 'nothingDue';
+  if (parseMoney4(view.figures.balance) <= 0n) return 'nothingDue';
+  return withinMagnitude(view.figures.balance) ? null : 'tooLarge';
 }
 
 function Figure({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b py-1.5 last:border-0">
       <dt className={strong ? 'font-semibold' : 'text-muted-foreground'}>{label}</dt>
-      <dd dir="ltr" className={`font-mono tabular-nums ${strong ? 'font-semibold' : ''}`}>{value}</dd>
+      <dd dir="ltr" className={`whitespace-nowrap font-mono tabular-nums ${strong ? 'font-semibold' : ''}`}>{value}</dd>
     </div>
   );
 }

@@ -8,29 +8,38 @@
 //   planned margin    = value ex VAT - budget
 //   projected margin  = value ex VAT - projected cost, PER SECTION (owner decision Oct 19):
 //     each section counts max(its budget + its change-order budget, its actual);
-//     change-order lines on no contract line (new scope) count max(their budget, 0);
+//     change-order lines on no contract line (new scope) count at their budget, a
+//     de-scope below zero included (lead ruling, A5 fix round F2): no cost entry is
+//     booked to them, so max(budget, 0) could only hide a de-scope, and planned
+//     must equal projected while nothing is spent;
 //     actual cost booked to no section counts as it is.
 // A change-order line on a contract line takes that line's section, so its
 // budget sits in that section's row; the new-scope ones form the "change
-// orders" row, which takes no cost entries.
+// orders" row, which takes no cost entries. Cost booked to no section is the
+// whole-contract row: it has no budget, so it is never over one (F5).
+//
+// Cost and margin are for a reader who may see margin (`canSeeMargin`); any
+// other reader gets billing only (F10, S1).
 import { formatMoney4, marginPct, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import type { CostSheet, CostSheetInput, CostSheetRow, CostSheetRowKind, CostSheetSectionInput } from './cost-sheet-types';
+import type { CostSheet, CostSheetCost, CostSheetInput, CostSheetRow, CostSheetRowKind, CostSheetSectionInput } from './cost-sheet-types';
 import { approvedVariationsCharge, variationCharge } from './variation-charge';
 
 const max4 = (a: bigint, b: bigint) => (a > b ? a : b);
 const sum4 = (values: (string | null)[]) => values.reduce((total, value) => total + parseMoney4(value), 0n);
 const UNTITLED = { sectionId: null, titleAr: null, titleEn: null, count: null };
 
+const money4OrNull = (value: string | null) => (value === null ? null : parseMoney4(value));
+
 function costRow(kind: CostSheetRowKind, row: Omit<CostSheetRow, 'kind' | 'variance' | 'overBudget'>): CostSheetRow {
-  const budget4 = parseMoney4(row.budgetCost);
-  const actual4 = row.actualCost === null ? null : parseMoney4(row.actualCost);
+  const budget4 = money4OrNull(row.budgetCost);
+  const actual4 = money4OrNull(row.actualCost);
   return {
     kind,
     ...row,
-    budgetCost: formatMoney4(budget4),
+    budgetCost: budget4 === null ? null : formatMoney4(budget4),
     actualCost: actual4 === null ? null : formatMoney4(actual4),
-    variance: actual4 === null ? null : formatMoney4(actual4 - budget4),
-    overBudget: actual4 !== null && actual4 > budget4,
+    variance: actual4 === null || budget4 === null ? null : formatMoney4(actual4 - budget4),
+    overBudget: actual4 !== null && budget4 !== null && actual4 > budget4,
   };
 }
 
@@ -52,7 +61,7 @@ function costRows(input: CostSheetInput): CostSheetRow[] {
   const more = input.moreSections;
   if (more) rows.push(costRow('more_sections', { ...UNTITLED, count: more.count, budgetCost: more.budgetCost, actualCost: more.actualCost }));
   if (parseMoney4(input.unallocatedActualCost) !== 0n) {
-    rows.push(costRow('whole_contract', { ...UNTITLED, budgetCost: '0', actualCost: input.unallocatedActualCost }));
+    rows.push(costRow('whole_contract', { ...UNTITLED, budgetCost: null, actualCost: input.unallocatedActualCost }));
   }
   if (parseMoney4(input.newScopeVariationsCost) !== 0n) {
     rows.push(costRow('change_orders', { ...UNTITLED, budgetCost: input.newScopeVariationsCost, actualCost: null }));
@@ -61,7 +70,7 @@ function costRows(input: CostSheetInput): CostSheetRow[] {
 }
 
 /** The contract value, with the approved change orders' charges, each rounded as it is billed. */
-function contractValue(input: CostSheetInput): CostSheet['value'] {
+function contractValue(input: CostSheetInput): CostSheetCost['value'] {
   const original4 = parseMoney4(input.originalValue);
   const variations4 = parseMoney4(approvedVariationsCharge(input.approvedVariationNetDeltas, input.taxRate, input.supervisionPct));
   const variationsExVat4 = sum4(
@@ -85,31 +94,32 @@ function projectedCost4(input: CostSheetInput): bigint {
     0n,
   );
   const folded4 = parseMoney4(input.moreSections?.projectedCost ?? '0');
-  return sections4 + folded4 + max4(parseMoney4(input.newScopeVariationsCost), 0n) + parseMoney4(input.unallocatedActualCost);
+  return sections4 + folded4 + parseMoney4(input.newScopeVariationsCost) + parseMoney4(input.unallocatedActualCost);
 }
 
-function contractMargin(input: CostSheetInput, valueExVat: string, budgetCost: string): NonNullable<CostSheet['margin']> {
+function contractMargin(input: CostSheetInput, valueExVat: string, budgetCost: string): CostSheetCost['margin'] {
   const value4 = parseMoney4(valueExVat);
   const planned = formatMoney4(value4 - parseMoney4(budgetCost));
   const projected = formatMoney4(value4 - projectedCost4(input));
   return { planned, projected, plannedPct: marginPct(planned, valueExVat), projectedPct: marginPct(projected, valueExVat) };
 }
 
-/** The cost sheet; `margin` is null unless the reader may see margin (`canSeeMargin`). */
-export function buildCostSheet(input: CostSheetInput, canSeeMargin: boolean): CostSheet {
+function contractCost(input: CostSheetInput): CostSheetCost {
   const value = contractValue(input);
-  const rows = costRows(input);
+  const sections = costRows(input);
+  const totals = {
+    budgetCost: formatMoney4(sum4(sections.map((row) => row.budgetCost))),
+    actualCost: formatMoney4(sum4(sections.map((row) => row.actualCost))),
+  };
+  return { value, sections, totals, margin: contractMargin(input, value.valueExVat, totals.budgetCost) };
+}
+
+/** The cost sheet; `cost` is null unless the reader may see cost and margin (`canSeeMargin`). */
+export function buildCostSheet(input: CostSheetInput, canSeeMargin: boolean): CostSheet {
   const requested4 = parseMoney4(input.requestedTotal);
   const paid4 = parseMoney4(input.paidTotal);
-  const totals = {
-    budgetCost: formatMoney4(sum4(rows.map((row) => row.budgetCost))),
-    actualCost: formatMoney4(sum4(rows.map((row) => row.actualCost))),
-  };
   return {
-    value,
     billing: { requested: formatMoney4(requested4), paid: formatMoney4(paid4), outstanding: formatMoney4(requested4 - paid4) },
-    sections: rows,
-    totals,
-    margin: canSeeMargin ? contractMargin(input, value.valueExVat, totals.budgetCost) : null,
+    cost: canSeeMargin ? contractCost(input) : null,
   };
 }

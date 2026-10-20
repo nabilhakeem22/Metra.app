@@ -69,6 +69,11 @@ describe('isAmbiguousDbOutcome', () => {
     expect(isAmbiguousDbOutcome(pgError('57P01'))).toBe(true);
   });
 
+  it('is true for transaction_timeout, the cap of a contract writer (A5 R1)', () => {
+    expect(isAmbiguousDbOutcome(pgError('25P04'))).toBe(true);
+    expect(isAmbiguousDbOutcome(wrappedPgError('25P04'))).toBe(true);
+  });
+
   it('is false for errors that definitively committed nothing', () => {
     expect(isAmbiguousDbOutcome(pgError('23505'))).toBe(false); // unique violation
     expect(isAmbiguousDbOutcome(pgError('23514'))).toBe(false); // check violation

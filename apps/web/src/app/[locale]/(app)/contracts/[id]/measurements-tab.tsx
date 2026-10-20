@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { STACKED_BODY, STACKED_HEAD, STACKED_TABLE } from '@/components/ui/stacked-table';
 import type { MeasurementContractView } from '@/lib/execution/measurements/contract-view';
 import type { MeasurableLine } from '@/lib/execution/measurements/queries';
 import { measurableLineLabel, MeasurementRow } from './measurement-row';
-import { RecordMeasurementDialog } from './record-measurement-dialog';
+import { RecordMeasurementDialog, type RecordedLine } from './record-measurement-dialog';
 import { useMeasurableLines, type MeasurementsFilter } from './use-measurable-lines';
 
 /** Why no reading can be recorded now, or null when one can. */
@@ -34,7 +35,7 @@ export function MeasurementsTab({ contractId, canRecord }: { contractId: string;
   const { reload } = data;
   const [filter, setFilter] = useState<MeasurementsFilter>({ provisionalOnly: false, query: '' });
   const [query, setQuery] = useState('');
-  const [recording, setRecording] = useState<{ id: string; label: string } | null>(null);
+  const [recording, setRecording] = useState<RecordedLine | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export function MeasurementsTab({ contractId, canRecord }: { contractId: string;
   const mayRecord = canRecord && data.contract !== null && closed === null;
   const openRecording = (line: MeasurableLine) => {
     setNotice(null);
-    setRecording({ id: line.id, label: measurableLineLabel(line, locale) });
+    setRecording({ id: line.id, label: measurableLineLabel(line, locale), qty: line.qty, unit: line.unit });
   };
 
   return (
@@ -80,28 +81,22 @@ export function MeasurementsTab({ contractId, canRecord }: { contractId: string;
         {data.contract === null && data.loading && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t('loading')} />}
         {data.contract && data.lines.length === 0 && !data.loading && <p className="text-body text-muted-foreground">{t('empty')}</p>}
         {data.lines.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-body">
-              <thead className="text-caption text-muted-foreground">
-                <tr className="border-b">
-                  <th className="py-2 pe-3 text-start font-medium">{t('line')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('contractQty')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('ordered')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('measured')}</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.lines.map((line) => (
-                  <MeasurementRow
-                    key={line.id}
-                    line={line}
-                    onRecord={mayRecord ? () => openRecording(line) : null}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <table className={STACKED_TABLE}>
+            <thead className={STACKED_HEAD}>
+              <tr className="border-b">
+                <th className="py-2 pe-3 text-start font-medium">{t('line')}</th>
+                <th className="py-2 pe-3 text-end font-medium">{t('contractQty')}</th>
+                <th className="py-2 pe-3 text-end font-medium">{t('ordered')}</th>
+                <th className="py-2 pe-3 text-end font-medium">{t('measured')}</th>
+                <th className="py-2" />
+              </tr>
+            </thead>
+            <tbody className={STACKED_BODY}>
+              {data.lines.map((line) => (
+                <MeasurementRow key={line.id} line={line} onRecord={mayRecord ? () => openRecording(line) : null} />
+              ))}
+            </tbody>
+          </table>
         )}
         {data.nextCursor && (
           <Button variant="secondary" size="sm" disabled={data.loading} onClick={() => void data.showMore()}>

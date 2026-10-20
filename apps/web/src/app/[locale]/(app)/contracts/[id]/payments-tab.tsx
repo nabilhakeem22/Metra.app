@@ -64,10 +64,14 @@ export function PaymentsTab({ contractId, may, m }: { contractId: string; may: B
           billing.loading && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t('loading')} />
         ) : (
           <>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <h2 className="text-body font-semibold">{t('title')}</h2>
-              <span className="text-caption text-muted-foreground">{t('leftToBill')}</span>
-              <span dir="ltr" className="font-mono tabular-nums">{m(leftToBillShown(view.billingBalance))}</span>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="text-body font-semibold">{t('title')}</h2>
+                <span className="text-caption text-muted-foreground">{t('leftToBill')}</span>
+                <span dir="ltr" className="font-mono tabular-nums">{m(leftToBillShown(view.billingBalance))}</span>
+              </div>
+              {/* F3: the final account's balance adds the measured differences; this one does not. */}
+              <p className="text-caption text-muted-foreground">{t('leftToBillHint')}</p>
             </div>
             {closed && <p className="text-body text-muted-foreground">{t(`closed.${closed}`)}</p>}
             <BillingToSend view={view} canSend={may.issue && closed === null} m={m} onSend={(target) => open({ kind: 'send', target })} />

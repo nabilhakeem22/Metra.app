@@ -127,6 +127,56 @@ describe('issueFinalAccountCore', () => {
     expect(await issue(moved.contractId, '129455.9999')).toEqual({ ok: false, error: 'final_account_changed', params: { amount: '129456.0000' } });
   });
 
+  it('F9: a negative balance shown answers nothing due; one shown on a contract with a balance answers the balance', async () => {
+    const billedPast = await seedBillableContract(orgId);
+    await seedRequest(orgId, billedPast.contractId, ctx.owner!.userId, { milestoneId: billedPast.milestoneIds[0] }, '125240');
+    expect((await account(billedPast.contractId)).figures.balance).toBe('-1240.0000');
+    expect(await issue(billedPast.contractId, '-1240.0000')).toEqual({ ok: false, error: 'final_account_nothing_due' });
+    const due = await seedBillableContract(orgId);
+    expect(await issue(due.contractId, '-1')).toEqual({ ok: false, error: 'final_account_changed', params: { amount: '124000.0000' } });
+  });
+
+  it('S3: a balance past the money cap answers final_account_too_large, whatever was shown; the reading itself is kept', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed', linesPerSection: [5] });
+    const provisional = contract.lineIds[0][4];
+    const reading = await recordMeasurementCore(ctx.project_manager!, {
+      contractId: contract.contractId,
+      contractLineId: provisional,
+      measuredQty: '99999999999.9999',
+      measuredOn: todayInCairo(new Date()),
+      idempotencyKey: randomUUID(),
+    });
+    expect(reading).toMatchObject({ ok: true });
+    const shown = (await account(contract.contractId)).figures.balance;
+    for (const expectedAmount of [shown, '124000', '999999999999999.9999']) {
+      expect(await issue(contract.contractId, expectedAmount)).toEqual({ ok: false, error: 'final_account_too_large' });
+    }
+    const [count] = await ownerQuery<{ n: number }>(`select count(*)::int as n from public.payment_requests where contract_id = $1`, [contract.contractId]);
+    expect(count.n).toBe(0);
+  });
+
+  it('confirms every A5 writer refuses a terminated contract: no bill, no reading, no approval', async () => {
+    const contract = await seedBillableContract(orgId);
+    const order = await seedOrderWithLines(orgId, contract, [{ contractLineId: null, qty: '10' }]);
+    const draft = await seedVariation(orgId, contract, 'draft');
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [contract.contractId]);
+    expect(await issue(contract.contractId, '125240')).toEqual({ ok: false, error: 'contract_not_active' });
+    expect(await issueMilestoneRequestCore(ctx.owner!, { milestoneId: contract.milestoneIds[0] })).toEqual({ ok: false, error: 'contract_not_active' });
+    expect(await issueVariationRequestCore(ctx.owner!, { variationOrderId: order })).toEqual({ ok: false, error: 'contract_not_active' });
+    expect(
+      await recordMeasurementCore(ctx.owner!, {
+        contractId: contract.contractId,
+        contractLineId: contract.lineIds[0][0],
+        measuredQty: '1',
+        measuredOn: todayInCairo(new Date()),
+        idempotencyKey: randomUUID(),
+      }),
+    ).toEqual({ ok: false, error: 'contract_not_active' });
+    expect((await internalApproveVariationCore(ctx.owner!, { id: draft.id })).ok).toBe(false);
+    const [status] = await ownerQuery<{ status: string }>(`select status from public.variation_orders where id = $1`, [draft.id]);
+    expect(status.status).toBe('draft');
+  });
+
   it('refuses a role without invoices_issue, an unsigned contract, and a malformed payload', async () => {
     const contract = await seedBillableContract(orgId);
     for (const role of ['project_manager', 'viewer'] as const) expect(await issue(contract.contractId, '124000', ctx[role]!)).toEqual({ ok: false, error: 'forbidden' });

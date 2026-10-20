@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { measurementFieldErrors, readMeasurement } from './input';
+import { isFarBeyondContractQty, measurementFieldErrors, readMeasurement } from './input';
 
 // A5.1: the final measured quantity of a line, as the record dialog and the
 // core both read it.
@@ -50,5 +50,14 @@ describe('measurementFieldErrors', () => {
       measuredOn: { code: 'date_before_issue', params: { date: '01/10/2026' } },
     });
     expect(measurementFieldErrors({ measuredQty: '1', measuredOn: ISSUED }, TODAY, ISSUED)).toEqual({});
+  });
+});
+
+describe('isFarBeyondContractQty (S3)', () => {
+  it('asks for a check only past ten times the contract quantity', () => {
+    expect(isFarBeyondContractQty('100.0000', '10.0000')).toBe(false);
+    expect(isFarBeyondContractQty('100.0001', '10.0000')).toBe(true);
+    expect(isFarBeyondContractQty('9999999999.9999', '12.5000')).toBe(true);
+    expect(isFarBeyondContractQty('0.0000', '0.0000')).toBe(false);
   });
 });

@@ -9,6 +9,7 @@
 // that day, the dialog from the tab's view). A correction is a NEW reading: the
 // ledger is append-only and the latest recorded one is the line's quantity.
 import type { FieldErrors } from '@/lib/actions/field-errors';
+import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { readNonNegativeExactFigure } from '@/lib/validation/amount-field';
 import { dayBeforeIssue, readRecordedDay } from '@/lib/validation/day-field';
 import { readFields, readOptionalText } from '@/lib/validation/field-rules';
@@ -48,4 +49,17 @@ export function measurementFieldErrors(
   if (!read.ok) return read.errors;
   const beforeIssue = dayBeforeIssue(read.values.measuredOn, contractIssuedOn);
   return beforeIssue ? { measuredOn: beforeIssue } : {};
+}
+
+/** How many times its contract quantity a reading may be before the dialog asks the studio to check it. */
+export const FAR_BEYOND_CONTRACT_QTY_TIMES = 10n;
+
+/**
+ * Whether a reading the dialog has read (scale 4) is more than ten times the
+ * line's contract quantity (A5 fix round, S3): most likely a slip of the
+ * keyboard, and on a provisional line it moves the final account by the same
+ * factor. It is still saved as typed; the dialog only says so before Save.
+ */
+export function isFarBeyondContractQty(measuredQty: string, contractQty: string): boolean {
+  return parseMoney4(measuredQty) > parseMoney4(contractQty) * FAR_BEYOND_CONTRACT_QTY_TIMES;
 }

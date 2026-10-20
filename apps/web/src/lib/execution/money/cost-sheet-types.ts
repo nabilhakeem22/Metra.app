@@ -52,19 +52,30 @@ export interface CostSheetRow {
   titleEn: string | null;
   /** How many sections a `more_sections` row folds; null on every other row. */
   count: number | null;
-  /** A section's budget includes its change-order budget. */
-  budgetCost: string;
+  /** A section's budget includes its change-order budget. Null on the whole-contract row: no budget is set against cost booked to no section. */
+  budgetCost: string | null;
   /** Null on the change-orders row: cost entries are booked to sections, never to it. */
   actualCost: string | null;
-  /** actual - budget, above zero is over budget; null where actual is. */
+  /** actual - budget, above zero is over budget; null where either is. */
   variance: string | null;
   overBudget: boolean;
 }
 
-export interface CostSheet {
+/** What the sheet says of cost: only to a reader who may see cost and margin. */
+export interface CostSheetCost {
   value: { originalValue: string; approvedVariations: string; revisedValue: string; valueExVat: string };
-  billing: { requested: string; paid: string; outstanding: string };
   sections: CostSheetRow[];
   totals: { budgetCost: string; actualCost: string };
-  margin: null | { planned: string; projected: string; plannedPct: number | null; projectedPct: number | null };
+  margin: { planned: string; projected: string; plannedPct: number | null; projectedPct: number | null };
+}
+
+export interface CostSheet {
+  billing: { requested: string; paid: string; outstanding: string };
+  /**
+   * Null unless the reader may see cost and margin (`canSeeMargin`): a project
+   * manager in a studio that hides margin from PMs gets billing only, with no
+   * value before VAT, budget, actual cost or variance to subtract a margin from
+   * (A5 fix round, F10 and S1), as the contract page hides cost from them.
+   */
+  cost: CostSheetCost | null;
 }

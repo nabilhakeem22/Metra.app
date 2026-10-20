@@ -87,7 +87,8 @@ export async function terminateContractCore(
 ): Promise<ActionResult> {
   return mutateInOrg(
     ctx,
-    { capability: 'contracts_issue', action: 'approve' },
+    // Capped (A5 R1): its UPDATE waits on the contract's FOR SHARE holders.
+    { capability: 'contracts_issue', action: 'approve', capTransaction: true },
     async (tx, audit) => {
       await terminateActiveContract(tx, input.id);
       await recordTerminatedEvent(tx, ctx, input.id);

@@ -6,6 +6,12 @@ import 'server-only';
 // (open change orders), the issued final account request if there is one, and
 // the first page of measured differences with what each bills or that it is
 // flagged. Bounded: one page of 50 lines, every other figure an aggregate.
+//
+// ONE SNAPSHOT (A5 reliability R2): the transaction is REPEATABLE READ READ
+// ONLY, so a reading, an approval or a request committing while the card is
+// read is in every figure or in none. Under READ COMMITTED each statement saw
+// its own moment, and a final account issued between two of them showed
+// "requested before it" short by its own amount.
 import type { ContractStatus, MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
@@ -14,9 +20,8 @@ import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { computeFinalAccount, finalAccountFigures, type FinalAccountFigures } from '../money/final-account';
 import { requestOutstanding } from '../money/outstanding';
 import { loadExecutionContract, type ExecutionContractBasis } from '../queries/execution-contract';
-import { loadMeasuredWorks } from '../queries/measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from '../queries/money-facts';
-import { countDifferences, listDifferences, type DifferenceRow } from './differences';
+import { listDifferencesAfter, loadMeasuredDifferences, type DifferenceRow, type DifferencesPage } from './differences';
 
 export interface FinalAccountDifference extends Omit<DifferenceRow, 'unitPrice' | 'discountPct'> {
   residualQty: string;
@@ -41,6 +46,8 @@ export interface FinalAccountView {
   contractId: string;
   status: ContractStatus;
   originalValue: string;
+  /** The contract's document discount %: it applies to the measured works' total, not to each line's (F8). */
+  documentDiscountPct: string;
   /** The account as issued, or as it would be issued now. */
   figures: FinalAccountFigures;
   /** Change orders awaiting a decision: the account cannot be issued while any is. */
@@ -76,12 +83,7 @@ function figuresBasis(contract: ExecutionContractBasis, money: ContractMoneyFact
 }
 
 /** One page of differences, each priced by computeFinalAccount's own rule. */
-export async function loadDifferencesPage(
-  tx: MetraDb,
-  contract: ExecutionContractBasis,
-  afterLineId: string | null,
-): Promise<FinalAccountDifferencesPage> {
-  const page = await listDifferences(tx, contract.id, afterLineId);
+function pricedPage(contract: ExecutionContractBasis, page: DifferencesPage): FinalAccountDifferencesPage {
   const account = computeFinalAccount({
     ...contract,
     approvedVariationNetDeltas: [],
@@ -101,22 +103,28 @@ export async function loadDifferencesPage(
 }
 
 export function getFinalAccount(ctx: OrgContext, contractId: string): Promise<FinalAccountView | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const contract = await loadExecutionContract(tx, contractId);
-    if (!contract) return null;
-    const money = await loadContractMoneyFacts(tx, contractId);
-    const issued = await loadIssuedFinalAccount(tx, contractId);
-    return {
-      contractId,
-      status: contract.status,
-      originalValue: contract.originalValue,
-      figures: finalAccountFigures(figuresBasis(contract, money, issued), await loadMeasuredWorks(tx, contractId)),
-      openVariationCount: money.openVariationCount,
-      issued,
-      counts: await countDifferences(tx, contractId),
-      differences: await loadDifferencesPage(tx, contract, null),
-    };
-  });
+  return withOrgContext(
+    ctx,
+    async (tx) => {
+      const contract = await loadExecutionContract(tx, contractId);
+      if (!contract) return null;
+      const money = await loadContractMoneyFacts(tx, contractId);
+      const issued = await loadIssuedFinalAccount(tx, contractId);
+      const measured = await loadMeasuredDifferences(tx, contractId);
+      return {
+        contractId,
+        status: contract.status,
+        originalValue: contract.originalValue,
+        documentDiscountPct: contract.discountPct,
+        figures: finalAccountFigures(figuresBasis(contract, money, issued), measured.measuredWorks),
+        openVariationCount: money.openVariationCount,
+        issued,
+        counts: measured.counts,
+        differences: pricedPage(contract, measured.firstPage),
+      };
+    },
+    { snapshot: true },
+  );
 }
 
 /** One more page of differences after `afterLineId`; null when the contract is not the caller's. */
@@ -127,6 +135,6 @@ export function getFinalAccountDifferences(
 ): Promise<FinalAccountDifferencesPage | null> {
   return withOrgContext(ctx, async (tx) => {
     const contract = await loadExecutionContract(tx, contractId);
-    return contract ? loadDifferencesPage(tx, contract, afterLineId) : null;
+    return contract ? pricedPage(contract, await listDifferencesAfter(tx, contractId, afterLineId)) : null;
   });
 }

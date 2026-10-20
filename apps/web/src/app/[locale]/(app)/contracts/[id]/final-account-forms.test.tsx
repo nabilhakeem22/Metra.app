@@ -4,7 +4,6 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { FinalAccountView } from '@/lib/execution/final-account/load';
 import { MEASUREMENT_FIELDS } from '@/lib/execution/measurements/input';
 import { REQUEST_TERM_FIELDS } from '@/lib/execution/requests/input';
-import { formatMoneyExact } from '@/lib/format/money';
 import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { issueFinalAccountControlId, IssueFinalAccountDialog } from './issue-final-account-dialog';
@@ -22,8 +21,8 @@ const finalAccount = vi.hoisted(() => ({ issueFinalAccount: vi.fn(), loadFinalAc
 vi.mock('@/lib/execution/final-account/actions', () => finalAccount);
 
 const CONTRACT = 'c0000000-0000-4000-8000-000000000001';
-const LINE = { id: 'l0000000-0000-4000-8000-000000000002', label: 'A-5 Gypsum ceiling' };
-const m = (value: string) => value;
+const LINE = { id: 'l0000000-0000-4000-8000-000000000002', label: 'A-5 Gypsum ceiling', qty: '20.0000', unit: 'sqm' };
+const m = (value: string) => `EGP ${value}`;
 
 beforeEach(() => {
   for (const action of [...Object.values(measurements), ...Object.values(finalAccount)]) action.mockReset();
@@ -76,6 +75,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the final account dialogs (%s)', (lo
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ measuredQty: '241.0000', note: null }), false);
   });
 
+  test('a quantity more than ten times the contract quantity is flagged before Save, and still saved (S3)', async () => {
+    show(recordDialog());
+    const warning = at('contracts.execution.measurements.record.farBeyond').replace('{qty}', '20 sqm');
+    type(recordMeasurementControlId('measuredQty'), '200');
+    expect(screen.queryByText(warning)).toBeNull();
+    type(recordMeasurementControlId('measuredQty'), '200.5');
+    expect(screen.getByText(warning)).toBeTruthy();
+    measurements.recordMeasurement.mockResolvedValueOnce({ ok: true, data: 'r-1', already: false });
+    await saveReading();
+    expect(measurements.recordMeasurement).toHaveBeenCalledWith(expect.objectContaining({ measuredQty: '200.5' }));
+  });
+
   test('the quantity typed in Arabic digits is rewritten on blur to the figure that is saved', () => {
     show(recordDialog());
     const box = document.getElementById(recordMeasurementControlId('measuredQty'))!;
@@ -95,7 +106,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the final account dialogs (%s)', (lo
     });
   });
 
-  test('a balance that moved is said with the new figure as money, and the card reads itself again', async () => {
+  test('a balance that moved is said with the new figure as the dialog says its own (F7), and the card reads itself again', async () => {
     const onAnswered = vi.fn().mockResolvedValue({ issued: null } as FinalAccountView);
     const onClose = vi.fn();
     show(<IssueFinalAccountDialog contractId={CONTRACT} amount="4960.0000" m={m} onAnswered={onAnswered} onClose={onClose} />);
@@ -104,7 +115,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the final account dialogs (%s)', (lo
     expect(finalAccount.issueFinalAccount).toHaveBeenCalledWith({ contractId: CONTRACT, expectedAmount: '4960.0000', dueOn: '', note: '' });
     expect(onAnswered).toHaveBeenCalledWith();
     expect(onClose).not.toHaveBeenCalled();
-    const said = at('errors.final_account_changed').replace('{amount}', formatMoneyExact('5000.0000', locale));
+    const said = at('errors.final_account_changed').replace('{amount}', m('5000.0000'));
     expect(screen.getByText(said)).toBeTruthy();
   });
 
