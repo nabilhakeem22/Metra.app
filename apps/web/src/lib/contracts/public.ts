@@ -22,8 +22,8 @@ export type {
 /** The furthest a "show more" may start, the SQL's own clamp. */
 const MAX_LINE_OFFSET = 100_000;
 
-/** The lines a section opens with on /c (plan A20); the rest load on demand. */
-const OPENING_LINES_PER_SECTION = 50;
+/** The lines the /c page opens with, across the whole contract; the rest load on demand. */
+const OPENING_LINES = 50;
 
 export async function getContractByToken(
   rawToken: string,
@@ -37,18 +37,21 @@ export async function getContractByToken(
 }
 
 /**
- * The snapshot as the page opens it: at most the first 50 lines per section,
- * whatever the SQL sent (every line until DB step B caps it there), so the page
- * a client downloads does not grow with the contract. "Show more" continues
- * from the 51st, the SDF's own order.
+ * The snapshot as the page opens it: the first 50 lines of the WHOLE contract,
+ * in section order, the way the studio's contract page opens (B1). A section
+ * past them opens collapsed, with its line count and "show lines". So the page
+ * a client downloads does not grow with the contract, however many sections it
+ * has; "show lines" continues each section from where it stands.
  */
 export function withOpeningLines(contract: PublicContract): PublicContract {
+  let budget = OPENING_LINES;
   return {
     ...contract,
-    sections: contract.sections.map((section) => ({
-      ...section,
-      lines: section.lines.slice(0, OPENING_LINES_PER_SECTION),
-    })),
+    sections: contract.sections.map((section) => {
+      const lines = section.lines.slice(0, budget);
+      budget -= lines.length;
+      return { ...section, lines };
+    }),
   };
 }
 

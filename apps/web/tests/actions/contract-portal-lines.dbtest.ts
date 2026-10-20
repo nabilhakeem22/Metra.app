@@ -8,8 +8,8 @@ import {
 import { closeExecutionFixture, seedExecutionContract, tamper, type ExecutionContract } from './execution-fixture';
 import { closeFixture, seedOrg, teardown } from './fixture';
 
-// PR A3.6, AC11 and AC12 through the app's own reader: the /c page opens on at
-// most 50 lines per section, "show more" fetches the rest 100 at a time, a
+// PR A3.6, AC11 and AC12 through the app's own reader: the /c page opens on the
+// first 50 lines of the contract, "show more" fetches the rest 100 at a time, a
 // section of another contract answers nothing, and the acknowledgement hash
 // covers every line whether or not the snapshot carries it.
 
@@ -35,11 +35,11 @@ afterAll(async () => {
 });
 
 describe('the /c page on a 600-line contract (AC11)', () => {
-  it('opens on at most 50 lines per section, with each section line count', async () => {
+  it('opens on the first 50 lines of the whole contract; a section past them opens collapsed', async () => {
     const opened = withOpeningLines((await getContractByToken(contract.rawToken!))!);
     expect(opened.sections.map((section) => [section.lines.length, section.line_count])).toEqual([
       [50, 350],
-      [50, 250],
+      [0, 250],
     ]);
     expect(opened.sections[0].lines.map((line) => line.id)).toEqual(contract.lineIds[0].slice(0, 50));
   });

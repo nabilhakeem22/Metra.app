@@ -91,6 +91,17 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a contract section on /c (%s)', (loc
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  test('a section past the opening window opens collapsed and shows its lines from the first', async () => {
+    renderWithIntl(<SectionLines token="t" section={{ ...SECTION, lines: [], line_count: 30 }} />, { locale });
+    expect(screen.queryAllByRole('row')).toHaveLength(0);
+    reads.page.mockResolvedValueOnce({ section_id: 's-1', offset: 0, line_count: 30, lines: lines(1, 30) });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('contracts.ack.lines.show', 30) }));
+    });
+    expect(reads.page).toHaveBeenLastCalledWith('t', 's-1', 0);
+    expect(screen.getAllByRole('row')).toHaveLength(30);
+  });
+
   test('says too many requests, or that the lines are gone, and keeps the lines it has', async () => {
     renderWithIntl(<SectionLines token="t" section={SECTION} />, { locale });
     reads.allowed.mockResolvedValueOnce(false);

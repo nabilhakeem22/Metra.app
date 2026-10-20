@@ -17,8 +17,9 @@ import { loadContractSectionLines } from './actions';
 type LoadProblem = { failure: ShownPortalFailure } | { own: 'gone' | 'loadFailed' };
 
 /**
- * One section of the contract: its subtotal, its opening lines, and "show more
- * lines" for the rest, 100 at a time through the link's read budget.
+ * One section of the contract: its subtotal, its opening lines (none when the
+ * page's opening window ended before it), and "show lines" for the rest, 100
+ * at a time through the link's read budget.
  */
 export function SectionLines({ token, section }: { token: string; section: PublicContractSection }) {
   const t = useTranslations('contracts.ack.lines');
@@ -50,29 +51,31 @@ export function SectionLines({ token, section }: { token: string; section: Publi
           <h2 className="text-body font-semibold">{text(section.title_ar, section.title_en)}</h2>
           <span className="font-mono tabular-nums text-body" dir="ltr">{formatMoney(section.section_subtotal, locale)}</span>
         </div>
-        <table className="w-full text-body">
-          <tbody>
-            {lines.map((line) => (
-              <tr key={line.id} className="border-b last:border-0">
-                <td className="px-4 py-2">
-                  {line.item_code && <span className="me-2 text-muted-foreground" dir="ltr">{line.item_code}</span>}
-                  {text(line.description_ar, line.description_en)}
-                  {line.provisional && <span className="ms-2 text-caption text-muted-foreground">{t('provisional')}</span>}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                  {formatQuantity(line.qty, locale)} {line.unit}
-                </td>
-                <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.unit_price, locale)}</td>
-                <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.line_total, locale)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {lines.length > 0 && (
+          <table className="w-full text-body">
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.id} className="border-b last:border-0">
+                  <td className="px-4 py-2">
+                    {line.item_code && <span className="me-2 text-muted-foreground" dir="ltr">{line.item_code}</span>}
+                    {text(line.description_ar, line.description_en)}
+                    {line.provisional && <span className="ms-2 text-caption text-muted-foreground">{t('provisional')}</span>}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground" dir="ltr">
+                    {formatQuantity(line.qty, locale)} {line.unit}
+                  </td>
+                  <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.unit_price, locale)}</td>
+                  <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.line_total, locale)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {remaining > 0 && (
           <div className="space-y-2 border-t px-4 py-3 text-center">
             <Button variant="secondary" size="sm" onClick={showMore} disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {t('showMore', { count: remaining })}
+              {lines.length === 0 ? t('show', { count: remaining }) : t('showMore', { count: remaining })}
             </Button>
             {problem && 'failure' in problem && <PortalFailureAlert failure={problem.failure} />}
             {problem && 'own' in problem && (

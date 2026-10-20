@@ -1641,7 +1641,8 @@
         "showMore": "Show more lines ({count} left)",
         "provisional": "Provisional",
         "gone": "These lines can no longer be shown. Please refresh the page.",
-        "loadFailed": "We could not load these lines. Please check your connection and try again."
+        "loadFailed": "We could not load these lines. Please check your connection and try again.",
+        "show": "Show the lines ({count})"
       }
     },
     "lines": {
