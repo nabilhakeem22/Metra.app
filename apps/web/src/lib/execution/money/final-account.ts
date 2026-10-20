@@ -57,9 +57,19 @@ function variationsCharge4(input: Omit<FinalAccountInput, 'measuredLines'>): big
   return parseMoney4(approvedVariationsCharge(input.approvedVariationNetDeltas, input.taxRate, input.supervisionPct));
 }
 
-/** The figures that follow from the measured works (Σ billed line works, before
- *  the document discount): the same rule for the full account and the balance. */
-function finalFigures(input: Omit<FinalAccountInput, 'measuredLines'>, measuredWorks4: bigint) {
+export type FinalAccountFigures = Omit<FinalAccount, 'billedLines' | 'flaggedLines'>;
+
+/**
+ * The figures from the measured works ALREADY SUMMED: Σ over the billed
+ * (provisional) measured lines of each line's works, exactly as computeFinalAccount
+ * rounds them (residual x unit price, then the line discount, each to the 4th
+ * decimal, half away from zero), before the document discount. For a reader
+ * that sums them in SQL so the lines never cross the wire (the delivery card,
+ * A3 reliability R3; the final account card and its issue core, A5); equal to
+ * computeFinalAccount's figures for the same lines.
+ */
+export function finalAccountFigures(input: Omit<FinalAccountInput, 'measuredLines'>, measuredWorks: string): FinalAccountFigures {
+  const measuredWorks4 = parseMoney4(measuredWorks);
   const adjustmentWorks4 = measuredWorks4 - pctOf(measuredWorks4, parseMoney4(input.discountPct));
   // The measured works carry VAT and supervision by the same rule as a change order.
   const adjustment = variationCharge(formatMoney4(adjustmentWorks4), input.taxRate, input.supervisionPct);
@@ -97,19 +107,12 @@ export function computeFinalAccount(input: FinalAccountInput): FinalAccount {
     billedLines.push({ lineId: line.lineId, residualQty, works: lineTotal });
     measuredWorks4 += parseMoney4(lineTotal);
   }
-  return { ...finalFigures(input, measuredWorks4), billedLines, flaggedLines };
+  return { ...finalAccountFigures(input, formatMoney4(measuredWorks4)), billedLines, flaggedLines };
 }
 
-/**
- * The full balance from the measured works ALREADY SUMMED: Σ over the billed
- * (provisional) measured lines of each line's works, exactly as computeFinalAccount
- * rounds them (residual x unit price, then the line discount, each to the 4th
- * decimal, half away from zero). For a reader that sums them in SQL so the lines
- * never cross the wire (the delivery card, A3 reliability R3); equal to
- * `computeFinalAccount(...).balance` for the same lines.
- */
+/** The full balance from the measured works already summed (finalAccountFigures). */
 export function finalAccountBalance(input: Omit<FinalAccountInput, 'measuredLines'>, measuredWorks: string): string {
-  return finalFigures(input, parseMoney4(measuredWorks)).balance;
+  return finalAccountFigures(input, measuredWorks).balance;
 }
 
 /**
