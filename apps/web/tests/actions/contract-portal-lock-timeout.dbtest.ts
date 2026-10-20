@@ -198,6 +198,6 @@ describe('R4: a page of lines reads one section, not the contract', () => {
     for (const rows of scans) expect(rows).toBeLessThanOrEqual(120);
     // The JSON is built for the page only: one primary-key probe per line shown.
     const probes = planLines.find((line) => /contract_lines_pkey on contract_lines/.test(line));
-    expect(probes).toMatch(/rows=1 loops=100\)/);
+    expect(probes).toMatch(/rows=1(?:\.00)? loops=100\)/);
   }, 60_000);
 });

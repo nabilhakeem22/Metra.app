@@ -2801,7 +2801,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/stage2-a2-schema
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat a2f397b4 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (a2f397b4)
+git diff --stat b43919ab HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (b43919ab)
 git diff --stat b415d66b origin/main -- packages/db    # MUST print nothing: main's database code is still the one undo (0) restores
 ```
 
