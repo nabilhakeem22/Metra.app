@@ -1,10 +1,8 @@
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { BoqCostedCopy } from './boq-costed-copy';
-import { BoqIssue } from './boq-issue';
-import { BoqSheet } from './boq-sheet';
 import { BoqStart } from './boq-start';
+import { BoqTabSheet } from './boq-tab-sheet';
 
 /**
  * The project's Bill of Quantities — the priced schedule of works that the
@@ -15,6 +13,10 @@ import { BoqStart } from './boq-start';
  * refused server-side regardless (lib/boqs/edit.ts re-checks the status and the
  * capability on every write) — hiding the inputs on an issued BOQ is a courtesy
  * to the studio, not the rule that protects the document.
+ *
+ * A SERVER component, so it hands `BoqTabSheet` plain data only: the header
+ * controls are a function of the BOQ as shown, and that function has to be made
+ * on the client side of the boundary (src/test/no-function-props-to-client.test.ts).
  */
 export function BoqTab({
   projectId,
@@ -46,21 +48,11 @@ export function BoqTab({
   const canEdit = canBuild && boq.status === 'draft';
 
   return (
-    <BoqSheet
+    <BoqTabSheet
       boq={boq}
       canEdit={canEdit}
-      actions={(shown) => (
-        <>
-          {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
-          {canEdit && (
-            <BoqIssue
-              boqId={boq.id}
-              disabled={shown.lineCount === 0}
-              clientCanOpen={clientCanOpenOnIssue}
-            />
-          )}
-        </>
-      )}
+      canSeeCost={canSeeCost}
+      clientCanOpenOnIssue={clientCanOpenOnIssue}
     />
   );
 }
