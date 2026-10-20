@@ -3263,15 +3263,15 @@ backfilled.
 
 **1. Put the step B code in the production checkout.** This step adds no
 dependency of `db:apply-rls`, so the installed `node_modules` serve as they
-are. First save a copy of this runbook: the checkout undo (0) switches to does
-not contain it.
+are. Right after the switch it saves a copy of this runbook: the checkout
+undo (0) switches to does not contain it.
 
 ```powershell
 cd C:\Users\HP\merta-main
-Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-b.md
 git fetch origin
 git rev-parse --short origin/main    # WRITE THIS DOWN: the code the site runs now, which undo (0) puts back
 git switch --detach origin/validate/stage2-b4-client-paid
+Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-b.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
 git diff --stat <B_SHA> HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (<B_SHA>)
 git merge-base --is-ancestor origin/main HEAD; "contains main: $LASTEXITCODE"    # MUST print "contains main: 0"
@@ -3279,8 +3279,9 @@ git diff --stat origin/main HEAD -- packages/db/migrations    # MUST print nothi
 git show origin/main:apps/web/src/lib/contracts/public.ts | Select-String -SimpleMatch "app_contract_section_lines_by_token"    # MUST print a line: A3 is on main
 ```
 
-The first `Copy-Item` line saves this runbook to your Desktop; read the rest of
-it from that copy (undo (0) needs it). Four STOPs, tell the lead in each case:
+The `Copy-Item` line saves this runbook (the branch's, which has this section)
+to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
+STOPs, tell the lead in each case:
 
 - The `git diff --stat <B_SHA> HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
@@ -3402,10 +3403,17 @@ Only a line that starts `apply-rls failed:` is a failure. Expected:
 
 **If it fails, it prints the SQLSTATE and what to do,** on two lines:
 `apply-rls failed: SQLSTATE 55P03: canceling statement due to lock timeout`
-(or `40P01: deadlock detected`) ends `(this file rolled back; the files before
-it stay applied).`: a long studio transaction held a table for more than 3 s.
-Run `npm run db:apply-rls` again a little later; every file is safe to re-run.
-Any other code: tell the lead before running anything else.
+(or `SQLSTATE 40P01: deadlock detected`) then
+`apply-rls failed: lock wait or deadlock, safe to re-run at a quieter moment (this file rolled back; the files before it stay applied).`
+A long studio transaction held a table for more than 3 s. Run
+`npm run db:apply-rls` again a little later: it prints the EIGHT notices of a
+first run and the two lines above. In between, step 2 (b) may show
+`step_b_functions` 7 and `step_b_triggers` 0 (the functions file ran, the
+policy file rolled back); the current site works on that too. Rehearsed: a
+reader holding `contract_cost_entries` for 12 s gave exactly these two lines
+from `Applying policies/35-execution.sql ...`, and the re-run after it
+finished applied everything. Any other code: tell the lead before running
+anything else.
 
 **Safe to re-run.** Every statement under `rls/` is idempotent: a second
 `db:apply-rls` prints only the first four notices and the same two lines.
@@ -3588,8 +3596,26 @@ Leave the database alone: the older Worker runs on it (see THE ORDER).
 **Rehearsed** on a local database built by the A2 code (`b43919ab`: 0063 and
 its `db:apply-rls`, with Supabase's API roles and default grants), plus a
 signed execution contract of 121 sections (one of 300 lines), a delivery at
-execution, a part-paid payment request, a pending claim, a cost entry and an
-approved change order. Every command and SQL block above was run as written.
+execution, a part-paid payment request, a cost entry and an approved change
+order. Every command and SQL block above was run as written, from a separate
+checkout standing in for `merta-main`, with `origin/main` played by the A4
+code (`478567c0`, the same database code as A2). Steps 1 to 4 printed exactly
+what they say, step 2 (c) included (`most_sections_in_one_contract` 121, so
+step 4 (d) showed `section_count` 121, `opening_sections` 50 and
+`opening_lines` 50). A catalogue comparison before and after step 3 found
+exactly the changes listed under *What it changes* (7 functions and 4 triggers
+added, the contract and change-order link functions replaced, the cost
+entries' UPDATE turned into 15 column grants) and nothing else. Undo (0), both
+parts, left a catalogue identical to the one before step 3 (policies,
+function bodies and grants, triggers, table and column grants, the role: zero
+differences). Going forward again gave a catalogue identical to the first
+step 3's. The A4 code's own action tests on the step B database: 1,295 of
+1,302 passed; of the 7 that did not, 4 test the uncapped contract link of step
+A (the visible difference under THE ORDER), 2 pin step A's list of client
+functions and step A's cost entry grant (both moved on purpose), and 1 fails
+the same way on the database before step 3 (it checks a Supabase default grant
+on functions that this rehearsal's simulated roles add and roles.sql does not
+manage).
 
 ## Monthly market bulletin
 
