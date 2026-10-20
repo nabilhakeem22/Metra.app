@@ -34,7 +34,7 @@ export async function mutateInOrg<T = void>(
     capability?: Capability;
     action?: PermissionAction;
     flow?: Flow;
-    /** Cap the whole transaction (8 s, PostgreSQL 17+): a core that takes a contended row FOR UPDATE (A5 R1). */
+    /** Cap each statement at 7 s and the whole transaction at 8 s (PostgreSQL 17+): a core that takes a contended row FOR UPDATE (A5 R1). */
     capTransaction?: boolean;
   },
   fn: (tx: MetraDb, audit: (e: AuditEntry) => Promise<void>) => Promise<T>,

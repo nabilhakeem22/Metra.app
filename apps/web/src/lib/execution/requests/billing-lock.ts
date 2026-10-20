@@ -18,7 +18,8 @@ import 'server-only';
 // `capTransaction` (mutateInOrg): FOR SHARE holders (measurements, approvals,
 // ../final-account/gate.ts) do not queue behind a waiting FOR UPDATE, so a
 // steady stream of them could otherwise hold the writer until
-// statement_timeout (A5 R1); the cap ends it at 8 s as `uncertain`.
+// statement_timeout (A5 R1); the caps (7 s a statement, 8 s the transaction,
+// packages/db org-context.ts) end it at about 7 s as `uncertain`.
 import { contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';

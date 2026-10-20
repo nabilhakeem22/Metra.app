@@ -13,7 +13,7 @@ import 'server-only';
 // of the final account (an unpaid one) lifts this again. A share lock does not
 // queue behind a waiting FOR UPDATE, so a steady stream of these could starve
 // the writer: every contract FOR UPDATE writer caps its whole transaction
-// (`capTransaction`, A5 R1), so the starvation ends at 8 s, as `uncertain`.
+// (`capTransaction`, A5 R1), so the starvation ends at about 7 s, as `uncertain`.
 //
 // The contract row is frozen once issued (MT100 on UPDATE); a row lock is not
 // an UPDATE. Termination locks the contract and then its change orders, the

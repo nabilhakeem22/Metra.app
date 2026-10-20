@@ -17,8 +17,8 @@
 // LOCKS: the contract FOR UPDATE FIRST, like every request writer (A4 coder's
 // note, requests/billing-lock.ts). Measurements and approvals hold it FOR
 // SHARE first (./gate.ts), so the figures read here cannot move under it. The
-// whole transaction is capped (`capTransaction`, A5 R1): a steady stream of
-// those share holders can delay it, never hold it past the cap.
+// writer is capped (`capTransaction`, A5 R1): a steady stream of those share
+// holders can delay it, never hold it past about 7 s.
 import type { MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';

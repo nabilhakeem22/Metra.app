@@ -22,9 +22,11 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // measurement and approval cores, final-account/gate.ts) re-starts the
 // writer's wait with every new holder set, each with a fresh 5 s
 // lock_timeout: the tester measured a writer held 20 s, until
-// statement_timeout. Every contract FOR UPDATE writer now caps its whole
-// transaction at 8 s (`capTransaction`, transaction_timeout, PostgreSQL 17+),
-// answered `uncertain`, with nothing written.
+// statement_timeout. Every contract FOR UPDATE writer is now capped
+// (`capTransaction`): 7 s a statement, which ends the starved wait with a plain
+// statement error, and 8 s the whole transaction (transaction_timeout,
+// PostgreSQL 17+) behind it. Answered `uncertain`, with nothing written, and the
+// connection stays good for the next statement.
 
 const STREAM_MS = 11_000;
 const HOLD_MS = 300;
@@ -71,7 +73,7 @@ async function timed<T>(run: Promise<T>): Promise<{ result: T; ms: number }> {
 }
 
 describe('a contract writer under a steady FOR SHARE stream', () => {
-  it('R1: the final account issue and the termination end at the 8 s cap, uncertain, and write nothing', async () => {
+  it('R1: the final account issue and the termination end at the cap, uncertain, write nothing, and leave no bad connection', async () => {
     const [server] = await ownerQuery<{ version: number }>(`select current_setting('server_version_num')::integer as version`);
     expect(server.version, 'the cap needs PostgreSQL 17, which CI and production run').toBeGreaterThanOrEqual(170000);
     // One contract per writer, so the two writers never wait on each other (that wait is lock_timeout's).
@@ -88,8 +90,8 @@ describe('a contract writer under a steady FOR SHARE stream', () => {
 
     for (const writer of [issued, terminated]) {
       expect(writer.result).toEqual({ ok: false, error: 'uncertain' });
-      expect(writer.ms).toBeGreaterThan(7_500);
-      expect(writer.ms).toBeLessThan(9_500);
+      expect(writer.ms).toBeGreaterThan(6_500);
+      expect(writer.ms).toBeLessThan(8_500);
     }
     for (const count of holderCounts) expect(count).toBeGreaterThan(50);
     const after = await ownerQuery<{ status: string; requests: number }>(
@@ -99,16 +101,30 @@ describe('a contract writer under a steady FOR SHARE stream', () => {
     );
     expect(after).toEqual([{ status: 'signed', requests: 0 }, { status: 'signed', requests: 0 }]);
 
+    // Every pooled connection still answers: the cap ended a statement, not a session.
+    const reads = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        withOrgContext(owner, (tx) => tx.execute(sql`select pg_sleep(0.05)`)).then(
+          () => 'ok',
+          (error: unknown) => sqlstateOf(error) ?? 'failed',
+        ),
+      ),
+    );
+    expect(reads).toEqual(Array<string>(10).fill('ok'));
+
     // Once the stream ends, the same acts go through.
     expect(await issueFinalAccountCore(owner, { contractId: billed.contractId, expectedAmount: '124000' })).toMatchObject({ ok: true });
     expect(await terminateContractCore(owner, { id: ended.contractId })).toEqual({ ok: true });
   });
 
-  it('a capped writer that finishes in time leaves no cap on its connection', async () => {
+  it('a capped transaction runs under both caps, and the next one on the pool under neither', async () => {
+    const bounds = sql`select current_setting('statement_timeout') as statement, current_setting('transaction_timeout') as whole`;
+    const capped = (await withOrgContext(owner, (tx) => tx.execute(bounds), { capTransaction: true })) as unknown as Array<Record<string, string>>;
+    expect(capped[0]).toEqual({ statement: '7s', whole: '8s' });
+    const plain = (await withOrgContext(owner, (tx) => tx.execute(bounds))) as unknown as Array<Record<string, string>>;
+    expect(plain[0]).toEqual({ statement: '20s', whole: '0' });
     const contract = await seedBillableContract(orgIds[0]);
     expect(await terminateContractCore(owner, { id: contract.contractId })).toEqual({ ok: true });
-    const [session] = await ownerQuery<{ cap: string }>(`select current_setting('transaction_timeout') as cap`);
-    expect(session.cap).toBe('0');
   });
 });
 

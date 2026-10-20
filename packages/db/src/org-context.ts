@@ -17,22 +17,33 @@ export interface OrgContext {
 }
 
 /**
- * How long a capped transaction may last, in EVERY state: waiting on a lock,
- * running, or idle between statements. `lock_timeout` bounds each lock WAIT,
- * and a writer that needs a row FOR UPDATE while a steady stream of FOR SHARE
+ * The bounds of a CAPPED transaction: a writer that takes a contended row FOR
+ * UPDATE (A5 reliability R1). `lock_timeout` bounds each lock WAIT, and a
+ * writer that needs a row FOR UPDATE while a steady stream of FOR SHARE
  * holders overlap on it re-waits once per holder set, each wait with a fresh
- * 5 s: measured, a contract writer was held 20 s, until `statement_timeout`
- * (A5 reliability R1). `transaction_timeout` (PostgreSQL 17+) ends the
- * transaction AND its session when the cap passes (SQLSTATE 25P04), which the
- * app answers `uncertain`, the answer a lock timeout already gets. Set
- * mid-transaction it starts counting from that moment, which is the opening
- * statement here.
+ * 5 s: measured, a contract writer was held 20 s, until the 20 s
+ * statement_timeout. Two caps, so that wait ends at about 8 s:
  *
- * On a server older than 17 the setting does not exist, so it is set only
- * when `server_version_num` says it may be, in the same statement (the
+ *  - `statement_timeout` 7 s instead of 20 s. The starved wait is ONE
+ *    statement, so this is what ends it in practice: SQLSTATE 57014, a plain
+ *    statement error that leaves the session alive, answered `uncertain` as a
+ *    lock timeout is.
+ *  - `transaction_timeout` 8 s (PostgreSQL 17+), the cap of the whole
+ *    transaction in every state (waiting, running, idle between statements),
+ *    for the rarer case of several waits that each stay under the statement
+ *    cap. It ends the transaction AND its session (SQLSTATE 25P04, also
+ *    `uncertain`). It is the backstop, not the first cap, on purpose: after a
+ *    server-ended session postgres.js 3.4.9 keeps the fatal error and fails the
+ *    NEXT statement on that connection with it (measured: 3 stale 25P04 on 10
+ *    later reads), so the common case must not end the session. Set
+ *    mid-transaction, it counts from that moment: the opening statement here.
+ *
+ * On a server older than 17 `transaction_timeout` does not exist, so it is set
+ * only when `server_version_num` says it may be, in the same statement (the
  * version check lock-timeout.ts makes, without a second round trip): the CASE
  * never calls set_config on an older server. Production runs 17.
  */
+const CAPPED_STATEMENT_TIMEOUT = '7s';
 const WHOLE_TRANSACTION_CAP = sql`case when current_setting('server_version_num')::integer >= 170000
       then set_config('transaction_timeout', '8s', true) end`;
 
@@ -66,7 +77,7 @@ async function openBoundTransaction(
 ): Promise<void> {
   await tx.execute(sql`select ${identity},
     set_config('lock_timeout', '5s', true),
-    set_config('statement_timeout', '20s', true),
+    set_config('statement_timeout', ${capTransaction ? CAPPED_STATEMENT_TIMEOUT : '20s'}, true),
     set_config('idle_in_transaction_session_timeout', '30s', true),
     ${capTransaction ? sql`${WHOLE_TRANSACTION_CAP},` : sql``}
     set_config('role', 'metra_app', true)`);
@@ -78,8 +89,8 @@ async function openBoundTransaction(
  *    snapshot. For a read that shows several figures of one record together
  *    (the final account card, A5 R2): under READ COMMITTED each statement
  *    takes its own, and a write committing between two of them tears the card.
- *  - `capTransaction`: the whole-transaction cap above, for a writer that
- *    takes a contended row FOR UPDATE.
+ *  - `capTransaction`: the two caps above, for a writer that takes a
+ *    contended row FOR UPDATE.
  */
 export interface TransactionOptions {
   snapshot?: boolean;
