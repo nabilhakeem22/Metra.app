@@ -325,6 +325,16 @@ $$;
 -- 0); lines are ordered (sort_order, id), the snapshot's order, so once the
 -- snapshot is capped, offset 50 continues exactly where it stops. Cost-blind: the same line keys
 -- as the snapshot, no unit_cost / line_cost / line_margin.
+--
+-- ONE SECTION'S ROWS, NEVER THE CONTRACT'S (A3 reliability R4). The token's
+-- section is resolved FIRST (`target`, one row or none), and every line read
+-- after it filters on that section alone, (org_id, section_id), so the scan is
+-- the section's index and never the contract's: a page of a 100-line section
+-- reads 100 lines whatever the contract holds. No `contract_id` predicate on
+-- the lines: contract_lines_section_same_contract_fk (0063) already makes every
+-- line of a section a line of that section's contract. The page picks its 100
+-- ids (walking past `start_at` on the index) BEFORE building any JSON, so a
+-- skipped line is never turned into a jsonb object.
 create or replace function public.app_contract_section_lines_by_token(
   p_hash text,
   p_section_id uuid,
@@ -336,44 +346,55 @@ stable
 security definer
 set search_path = ''
 as $$
+  with target as materialized (
+    select s.org_id, s.id as section_id,
+           greatest(0, least(coalesce(p_offset, 0), 100000)) as start_at
+    from public.contracts c
+    join public.contract_sections s
+      on s.org_id = c.org_id and s.contract_id = c.id and s.id = p_section_id
+    where c.token_hash = p_hash
+      and c.status in ('issued', 'signed')
+  ),
+  picked as materialized (
+    select pick.id, pick.sort_order
+    from target t
+    cross join lateral (
+      select l.id, l.sort_order
+      from public.contract_lines l
+      where l.org_id = t.org_id and l.section_id = t.section_id
+      order by l.sort_order, l.id
+      offset t.start_at
+      limit 100
+    ) pick
+  )
   select jsonb_build_object(
-    'section_id', s.id,
-    'offset', page.start_at,
+    'section_id', t.section_id,
+    'offset', t.start_at,
     'line_count', (
       select count(*) from public.contract_lines l
-      where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+      where l.org_id = t.org_id and l.section_id = t.section_id
     ),
     'lines', coalesce((
-      select jsonb_agg(ln order by ln_sort, ln_id)
-      from (
-        select l.sort_order as ln_sort, l.id as ln_id,
-          jsonb_build_object(
-            'id', l.id,
-            'item_code', l.item_code,
-            'description_ar', l.description_ar,
-            'description_en', l.description_en,
-            'qty', l.qty,
-            'unit', l.unit,
-            'unit_price', l.unit_price,
-            'discount_pct', l.discount_pct,
-            'line_total', l.line_total,
-            'provisional', l.provisional,
-            'sort_order', l.sort_order
-          ) as ln
-        from public.contract_lines l
-        where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
-        order by l.sort_order, l.id
-        offset page.start_at
-        limit 100
-      ) lx
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', l.id,
+          'item_code', l.item_code,
+          'description_ar', l.description_ar,
+          'description_en', l.description_en,
+          'qty', l.qty,
+          'unit', l.unit,
+          'unit_price', l.unit_price,
+          'discount_pct', l.discount_pct,
+          'line_total', l.line_total,
+          'provisional', l.provisional,
+          'sort_order', l.sort_order
+        ) order by k.sort_order, k.id
+      )
+      from picked k
+      join public.contract_lines l on l.org_id = t.org_id and l.id = k.id
     ), '[]'::jsonb)
   )
-  from public.contracts c
-  join public.contract_sections s
-    on s.org_id = c.org_id and s.contract_id = c.id and s.id = p_section_id
-  cross join (select greatest(0, least(coalesce(p_offset, 0), 100000)) as start_at) page
-  where c.token_hash = p_hash
-    and c.status in ('issued', 'signed');
+  from target t;
 $$;
 
 -- Same-transaction lockdown: a NEW signature is executable by PUBLIC (and, on
@@ -410,6 +431,14 @@ $$;
 -- its creation year in Africa/Cairo, the year C-YYYY-NNNN shows). No other role
 -- and never the `client` role. No email. A flip happens once per contract, so
 -- there is nothing to deduplicate; a repeat answers 'already' before this.
+--
+-- LOCK TIMEOUT (A3 reliability R2), as the delivery token writes
+-- (50-delivery-write.sql): the flip waits at most 4 s on a studio transaction
+-- holding the contract row (an issue, a paper signature, a terminate), then the
+-- call fails with 55P03 and rolls back whole, well before the app's 15 s
+-- database deadline. So the client is answered in about 4 s and nothing of this
+-- call commits after that answer. The setting holds only inside this function;
+-- the caller's own lock_timeout is restored on exit.
 create or replace function public.app_contract_ack_by_token(
   p_hash text,
   p_name text,
@@ -422,6 +451,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   st  text;
