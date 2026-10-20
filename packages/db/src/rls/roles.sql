@@ -68,6 +68,31 @@ grant select, insert, update, delete on public.boq_sections      to metra_app;
 grant select, insert, update, delete on public.boq_lines         to metra_app;
 grant select, insert, update, delete on public.variation_orders      to metra_app;
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
+-- Stage 2 execution (0063). Every grant on the six execution tables is written
+-- `revoke all ... ; grant <exactly this>`, so a re-run converges ANY drift (a
+-- hand-granted TRUNCATE, REFERENCES or TRIGGER included: TRUNCATE ignores RLS
+-- and fires no row trigger), not only the privileges a narrowing names
+-- (security review S4). This file is one transaction, so no request ever sees
+-- the moment between the revoke and the grant.
+--
+-- The payment schedule is the contract's terms: full DML while the contract is
+-- a draft, frozen with it after by trg_contract_payment_milestones_parent_draft
+-- (policies/35-execution.sql).
+revoke all on public.contract_payment_milestones from metra_app;
+grant select, insert, update, delete on public.contract_payment_milestones to metra_app;
+-- A payment request is a frozen document: INSERT, and the one UPDATE
+-- trg_payment_requests_frozen admits (issued -> void). Never DELETE: a void
+-- keeps its number.
+revoke all on public.payment_requests from metra_app;
+grant select, insert, update on public.payment_requests to metra_app;
+-- A client's "I paid" on a request: the studio confirms or dismisses it
+-- (UPDATE of status + resolution columns), like client_payment_claims. No
+-- DELETE: a resolved claim is retained.
+revoke all on public.contract_payment_claims from metra_app;
+grant select, insert, update on public.contract_payment_claims to metra_app;
+-- Actual costs: editable and voidable (voided_at / voided_by), never deleted.
+revoke all on public.contract_cost_entries from metra_app;
+grant select, insert, update on public.contract_cost_entries to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
@@ -220,6 +245,33 @@ grant select, insert on public.payment_events          to metra_app;
 -- so any UPDATE/DELETE raises a permission error at the database.
 grant select, insert on public.engagement_events       to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
+-- Stage 2 execution (0063): the contract's payment ledger and the site
+-- measurement ledger are append-only. A recorded payment is never edited or
+-- removed (a mistaken bill is voided before it is paid, never the payment),
+-- and a measurement is corrected by a NEW reading (the highest `seq` wins).
+-- `revoke all` first, as above.
+revoke all on public.contract_payments from metra_app;
+grant select, insert on public.contract_payments to metra_app;
+-- INSERT on every column EXCEPT `seq` (security review S1): `seq` is the
+-- recording order, an identity, and with a table-level INSERT a writer could
+-- pick it (OVERRIDING SYSTEM VALUE) and outrank every later correction. The
+-- identity default needs no column privilege, so a normal insert works.
+-- verify-rls-applied.ts reads this back column by column.
+revoke all on public.contract_line_measurements from metra_app;
+grant select on public.contract_line_measurements to metra_app;
+grant insert (
+  id,
+  org_id,
+  created_at,
+  updated_at,
+  contract_id,
+  contract_line_id,
+  measured_qty,
+  measured_on,
+  note,
+  recorded_by,
+  idempotency_key
+) on public.contract_line_measurements to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;
@@ -291,6 +343,19 @@ grant execute on function public.app_variation_by_token(text) to metra_app;
 revoke execute on function public.app_variation_by_token(text) from public;
 grant execute on function public.app_variation_respond_by_token(text, text, text, text, text) to metra_app;
 revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from public;
+-- Stage 2 (0063): the /c lines of one section, 100 at a time, by token. Same
+-- treatment; also locked down in place, right after its CREATE
+-- (functions/30-contracts-variations.sql), so there is no window while
+-- apply-rls runs. The payment request frozen guard is a plain trigger function
+-- (not a definer), granted for symmetry with the child-draft guards above.
+grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from public;
+grant execute on function public.enforce_payment_request_frozen() to metra_app;
+-- The payment-fits guard (A2 reliability R2) is an INVOKER trigger function
+-- (S5: it reads as the caller, under RLS); locked down anyway, also in place
+-- right after its CREATE (functions/35-execution.sql).
+grant execute on function public.enforce_contract_payment_fits() to metra_app;
+revoke execute on function public.enforce_contract_payment_fits() from public;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -482,6 +547,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.enforce_contract_payment_fits() from %I',
         r
       );
       -- Client Delivery Portal token SDFs (S1).

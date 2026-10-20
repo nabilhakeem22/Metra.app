@@ -34,6 +34,18 @@
 -- OLD/NEW are read DIRECTLY rather than through `to_jsonb`: both attached tables
 -- carry contract_id, and materialising a whole row as jsonb to read one uuid is
 -- per-row cost on the deep copy that generates a contract from a proposal.
+--
+-- THE PARENT IS READ `FOR SHARE` (Stage 2, A2 reliability R1). A plain read
+-- under READ COMMITTED saw the last COMMITTED status, so a child written while
+-- an issue was in flight read `draft` and committed into an ISSUED contract
+-- (measured: 10 of 10 milestones landed in a schedule no issue gate saw). FOR
+-- SHARE conflicts with the issuer's row lock: the child waits for the issue to
+-- commit, re-reads the row as `issued`, and raises MT100. All children share
+-- the lock, so concurrent child writes do not block one another; only a status
+-- change waits for them (and the issue core locks the contract FOR UPDATE
+-- before it reads the schedule, plan A3.2 addendum). The writer that inserted
+-- the contract in the same transaction already holds it, so the deep copy
+-- pays nothing; on a cascade delete the parent is already gone (no row).
 create or replace function public.enforce_contract_child_draft()
 returns trigger
 language plpgsql
@@ -46,7 +58,7 @@ begin
   -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
   -- OLD is NULL on INSERT, hence the guard.
   if TG_OP <> 'INSERT' then
-    select status into st from public.contracts where id = OLD.contract_id;
+    select status into st from public.contracts where id = OLD.contract_id for share;
     if st is not null and st <> 'draft' then
       raise exception
         'contract children are frozen once the contract leaves draft (status=%)', st
@@ -58,7 +70,7 @@ begin
   end if;
 
   -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
-  select status into st from public.contracts where id = NEW.contract_id;
+  select status into st from public.contracts where id = NEW.contract_id for share;
   if st is not null and st <> 'draft' then
     raise exception
       'contract children are frozen once the contract leaves draft (status=%)', st
@@ -117,6 +129,34 @@ $$;
 -- signed contracts are visible. OMITS every cost/margin column (unit_cost,
 -- line_cost, line_margin, total_cost, total_margin) — a client must never see the
 -- firm's cost basis. The document total is the immutable original_value.
+--
+-- STAGE 2 (0063), ADDITIVE ONLY, so the app deployed before this file keeps
+-- working between `db:apply-rls` and the deploy that reads the new keys:
+--   * `source`: 'proposal' or 'boq' (an execution contract);
+--   * `payment_schedule`: the signed schedule rows {label_ar, label_en, basis,
+--     value, sort_order}, by sort order ([] on a proposal contract), `value` as
+--     a scale-4 STRING (a jsonb numeric reaches JavaScript as a float, and the
+--     money law is strings). Amounts are derived by the app from
+--     original_value (milestoneAmounts);
+--   * per section `line_count`. `lines` still carries EVERY line of the
+--     section, ordered (sort_order, id), exactly as before: NO CAP in DB step
+--     A (lead ruling, Oct 19), so no client ever sees a truncated contract.
+--     The cap to the first 50 per section lands in DB step B (apply-rls only,
+--     a re-definition of this function in this file), after the /c page loads
+--     the rest through app_contract_section_lines_by_token below (A3.6);
+--   * line `item_code` and `provisional` (a BOQ contract's; null / false on a
+--     proposal contract's);
+--   * `lines_digest`: sha256 over EVERY line's client-visible fields, its
+--     section included (a line moved between sections moves it), in order,
+--     plus the schedule. The acknowledgement hash covers the snapshot, so once
+--     step B caps the lines the client still acknowledges every line;
+--   * `time_extension_days_total`: the days the APPROVED change orders add to
+--     the finish date.
+-- Every sub-read names `org_id = c.org_id`: the indexes lead with org_id, and
+-- this definer function gets no RLS predicate to supply it. The per-section
+-- line reads also name `l.contract_id = s.contract_id` (security review S3);
+-- since 0063 the 3-column FK contract_lines_section_same_contract_fk makes a
+-- line of another contract in this section impossible anyway.
 create or replace function public.app_contract_by_token(p_hash text)
 returns jsonb
 language sql
@@ -161,27 +201,72 @@ as $$
     'original_value', c.original_value,
     'total', c.original_value,
     'share_expires_at', c.share_expires_at,
+    'source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
+    'time_extension_days_total', coalesce((
+      select sum(v.time_extension_days)
+      from public.variation_orders v
+      where v.org_id = c.org_id and v.contract_id = c.id and v.status = 'approved'
+    ), 0),
+    'payment_schedule', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'label_ar', m.label_ar,
+          'label_en', m.label_en,
+          'basis', m.basis,
+          'value', m.value::text,
+          'sort_order', m.sort_order
+        ) order by m.sort_order
+      )
+      from public.contract_payment_milestones m
+      where m.org_id = c.org_id and m.contract_id = c.id
+    ), '[]'::jsonb),
+    'lines_digest', encode(sha256(convert_to(jsonb_build_object(
+      'lines', coalesce((
+        select jsonb_agg(
+          jsonb_build_array(
+            l.id, l.section_id, l.item_code, l.description_ar, l.description_en, l.qty,
+            l.unit, l.unit_price, l.discount_pct, l.line_total, l.provisional
+          ) order by s.sort_order, s.id, l.sort_order, l.id
+        )
+        from public.contract_lines l
+        join public.contract_sections s on s.id = l.section_id and s.org_id = l.org_id
+        where l.org_id = c.org_id and l.contract_id = c.id
+      ), '[]'::jsonb),
+      'schedule', coalesce((
+        select jsonb_agg(
+          jsonb_build_array(m.label_ar, m.label_en, m.basis, m.value, m.sort_order)
+          order by m.sort_order
+        )
+        from public.contract_payment_milestones m
+        where m.org_id = c.org_id and m.contract_id = c.id
+      ), '[]'::jsonb)
+    )::text, 'UTF8')), 'hex'),
     'org', jsonb_build_object(
       'name_ar', o.name_ar,
       'name_en', o.name_en,
       'logo_file_id', o.logo_file_id
     ),
     'sections', coalesce((
-      select jsonb_agg(sec order by sec_sort)
+      select jsonb_agg(sec order by sec_sort, sec_id)
       from (
-        select s.sort_order as sec_sort,
+        select s.sort_order as sec_sort, s.id as sec_id,
           jsonb_build_object(
             'id', s.id,
             'title_ar', s.title_ar,
             'title_en', s.title_en,
             'section_subtotal', s.section_subtotal,
             'sort_order', s.sort_order,
+            'line_count', (
+              select count(*) from public.contract_lines l
+              where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+            ),
             'lines', coalesce((
-              select jsonb_agg(ln order by ln_sort)
+              select jsonb_agg(ln order by ln_sort, ln_id)
               from (
-                select l.sort_order as ln_sort,
+                select l.sort_order as ln_sort, l.id as ln_id,
                   jsonb_build_object(
                     'id', l.id,
+                    'item_code', l.item_code,
                     'description_ar', l.description_ar,
                     'description_en', l.description_en,
                     'qty', l.qty,
@@ -189,15 +274,17 @@ as $$
                     'unit_price', l.unit_price,
                     'discount_pct', l.discount_pct,
                     'line_total', l.line_total,
+                    'provisional', l.provisional,
                     'sort_order', l.sort_order
                   ) as ln
                 from public.contract_lines l
-                where l.section_id = s.id
+                where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+                order by l.sort_order, l.id
               ) lx
             ), '[]'::jsonb)
           ) as sec
         from public.contract_sections s
-        where s.contract_id = c.id
+        where s.org_id = c.org_id and s.contract_id = c.id
       ) sx
     ), '[]'::jsonb)
   )
@@ -207,11 +294,122 @@ as $$
     and c.status in ('issued', 'signed');
 $$;
 
+-- Same-transaction lockdown (new-function-lockdown.test.ts): CREATE OR REPLACE
+-- keeps an existing ACL, so for a replaced function this is convergence, not a
+-- window; it is here so every token function this file creates or replaces is
+-- locked down by the file that writes it.
+revoke all on function public.app_contract_by_token(text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_contract_by_token(text) from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_contract_by_token(text) to metra_app;
+  end if;
+end
+$$;
+
+-- Stage 2 (0063): the lines of ONE section of the token's contract, 100 at a
+-- time, for "show lines" on /c (A20). Shipped in DB step A so A3.6 can move the
+-- page to it; the snapshot keeps every line until DB step B caps it at 50 per
+-- section. Same visibility as app_contract_by_token (issued or signed; the
+-- page shows an expired contract read-only, so expiry does not hide lines).
+-- Answers NULL, uniformly, for an unknown token, a contract not issued or
+-- signed, or a section id that is not a section of THAT contract: no oracle
+-- about other contracts' sections. `p_offset` is clamped to 0..100000 (null =
+-- 0); lines are ordered (sort_order, id), the snapshot's order, so once the
+-- snapshot is capped, offset 50 continues exactly where it stops. Cost-blind: the same line keys
+-- as the snapshot, no unit_cost / line_cost / line_margin.
+create or replace function public.app_contract_section_lines_by_token(
+  p_hash text,
+  p_section_id uuid,
+  p_offset integer
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'section_id', s.id,
+    'offset', page.start_at,
+    'line_count', (
+      select count(*) from public.contract_lines l
+      where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+    ),
+    'lines', coalesce((
+      select jsonb_agg(ln order by ln_sort, ln_id)
+      from (
+        select l.sort_order as ln_sort, l.id as ln_id,
+          jsonb_build_object(
+            'id', l.id,
+            'item_code', l.item_code,
+            'description_ar', l.description_ar,
+            'description_en', l.description_en,
+            'qty', l.qty,
+            'unit', l.unit,
+            'unit_price', l.unit_price,
+            'discount_pct', l.discount_pct,
+            'line_total', l.line_total,
+            'provisional', l.provisional,
+            'sort_order', l.sort_order
+          ) as ln
+        from public.contract_lines l
+        where l.org_id = s.org_id and l.contract_id = s.contract_id and l.section_id = s.id
+        order by l.sort_order, l.id
+        offset page.start_at
+        limit 100
+      ) lx
+    ), '[]'::jsonb)
+  )
+  from public.contracts c
+  join public.contract_sections s
+    on s.org_id = c.org_id and s.contract_id = c.id and s.id = p_section_id
+  cross join (select greatest(0, least(coalesce(p_offset, 0), 100000)) as start_at) page
+  where c.token_hash = p_hash
+    and c.status in ('issued', 'signed');
+$$;
+
+-- Same-transaction lockdown: a NEW signature is executable by PUBLIC (and, on
+-- Supabase, by the API roles) from the moment CREATE commits.
+revoke all on function public.app_contract_section_lines_by_token(text, uuid, integer) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_contract_section_lines_by_token(text, uuid, integer) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+  end if;
+end
+$$;
+
 -- Public share: record a client's ELECTRONIC ACKNOWLEDGEMENT of a contract (NOT
 -- a binding signature — A5). Flips issued->signed atomically, stamps the
 -- signature date, and appends an append-only event carrying the actor name, IP,
 -- user agent and the sha256 hash of the acknowledged document. Returns a status
 -- code the route maps to token_invalid / token_expired / already_responded / ok.
+--
+-- STAGE 2 (0063): the studio hears it in the SAME transaction. After the flip,
+-- one in-app notification per owner / admin / project_manager member of the
+-- contract's org (kind `client_responded`, body `client_contract_signed`,
+-- entity `contract` + its id, params {number, year}: the contract's number and
+-- its creation year in Africa/Cairo, the year C-YYYY-NNNN shows). No other role
+-- and never the `client` role. No email. A flip happens once per contract, so
+-- there is nothing to deduplicate; a repeat answers 'already' before this.
 create or replace function public.app_contract_ack_by_token(
   p_hash text,
   p_name text,
@@ -230,10 +428,13 @@ declare
   exp timestamptz;
   cid uuid;
   oid uuid;
+  cnum integer;
+  cyear integer;
   n   int;
 begin
-  select status, share_expires_at, id, org_id
-    into st, exp, cid, oid
+  select status, share_expires_at, id, org_id, number,
+         extract(year from created_at at time zone 'Africa/Cairo')::int
+    into st, exp, cid, oid, cnum, cyear
     from public.contracts
     where token_hash = p_hash;
   if not found then return 'not_found'; end if;
@@ -254,7 +455,35 @@ begin
     (id, org_id, contract_id, kind, actor_name, ip, user_agent, pdf_hash, from_status, to_status)
     values (gen_random_uuid(), oid, cid, 'acknowledged', p_name, p_ip, p_ua, p_pdf_hash, 'issued', 'signed');
 
+  insert into public.notifications
+    (org_id, recipient_user_id, kind, entity_type, entity_id, body_key, params)
+  select oid, m.user_id, 'client_responded', 'contract', cid, 'client_contract_signed',
+         jsonb_build_object('number', cnum, 'year', cyear)
+    from public.memberships m
+   where m.org_id = oid
+     and m.role::text in ('owner', 'admin', 'project_manager');
+
   return 'ok';
+end
+$$;
+
+-- Same-transaction lockdown, as for app_contract_by_token above.
+revoke all on function public.app_contract_ack_by_token(text, text, text, text, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_contract_ack_by_token(text, text, text, text, text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_contract_ack_by_token(text, text, text, text, text) to metra_app;
+  end if;
 end
 $$;
 
@@ -265,6 +494,12 @@ $$;
 -- contract_active tells the reader whether the parent contract still carries
 -- commercial change: termination rejects open VOs, so without it the portal
 -- would read status='rejected' and tell the client THEY rejected the order.
+--
+-- STAGE 2 (0063), ADDITIVE: `tax_rate` and `supervision_pct` (the parent
+-- contract's, as scale-4 STRINGS: an approved change order is charged works +
+-- VAT + supervision, owner decision D4a), `time_extension_days` (null = none) and
+-- `contract_source` ('proposal' or 'boq'). An app that does not know a key
+-- ignores it, so the deploy is safe in either order.
 create or replace function public.app_variation_by_token(p_hash text)
 returns jsonb
 language sql
@@ -285,6 +520,10 @@ as $$
     'contract_number', c.number,
     'share_expires_at', v.share_expires_at,
     'contract_active', (c.status in ('issued', 'signed')),
+    'tax_rate', c.tax_rate::text,
+    'supervision_pct', c.supervision_pct::text,
+    'time_extension_days', v.time_extension_days,
+    'contract_source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
     -- WHO rejected this variation order (0051), or null when the row predates
     -- the column. `contract_active` alone could not tell a client's own refusal
     -- from a termination cascade, so the portal denied decisions clients had
@@ -342,10 +581,35 @@ as $$
     and v.status in ('issued', 'approved', 'rejected');
 $$;
 
+-- Same-transaction lockdown, as for app_contract_by_token above.
+revoke all on function public.app_variation_by_token(text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_variation_by_token(text) from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_variation_by_token(text) to metra_app;
+  end if;
+end
+$$;
+
 -- Public share: record a client's approve/reject decision on a variation order.
 -- Flips issued->approved|rejected atomically + appends an append-only event with
 -- the actor name/IP/user agent. Returns a code the route maps to
 -- token_invalid / token_expired / already_responded / ok.
+--
+-- STAGE 2 (0063): the studio hears it in the SAME transaction: one in-app
+-- notification per owner / admin / project_manager member (kind
+-- `client_responded`, body `client_variation_approved` or
+-- `client_variation_rejected`, entity `contract` + the PARENT contract's id so
+-- the feed opens the contract, params {number, year}: the CHANGE ORDER's number
+-- and its creation year in Africa/Cairo, the year VO-YYYY-NNNN shows). A
+-- decision flips once, so there is nothing to deduplicate.
 create or replace function public.app_variation_respond_by_token(
   p_hash text,
   p_decision text,
@@ -366,6 +630,9 @@ declare
   vid    uuid;
   oid    uuid;
   cst    text;
+  cid    uuid;
+  vnum   integer;
+  vyear  integer;
   n      int;
 begin
   target := case
@@ -375,8 +642,9 @@ begin
   end;
   if target is null then return 'invalid'; end if;
 
-  select v.status, v.share_expires_at, v.id, v.org_id, c.status::text
-    into st, exp, vid, oid, cst
+  select v.status, v.share_expires_at, v.id, v.org_id, c.status::text, c.id, v.number,
+         extract(year from v.created_at at time zone 'Africa/Cairo')::int
+    into st, exp, vid, oid, cst, cid, vnum, vyear
     from public.variation_orders v
     join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
     where v.token_hash = p_hash;
@@ -402,7 +670,36 @@ begin
     (id, org_id, variation_order_id, kind, actor_channel, actor_name, ip, user_agent, from_status, to_status)
     values (gen_random_uuid(), oid, vid, target, 'client', p_name, p_ip, p_ua, 'issued', target);
 
+  insert into public.notifications
+    (org_id, recipient_user_id, kind, entity_type, entity_id, body_key, params)
+  select oid, m.user_id, 'client_responded', 'contract', cid,
+         case target when 'approved' then 'client_variation_approved' else 'client_variation_rejected' end,
+         jsonb_build_object('number', vnum, 'year', vyear)
+    from public.memberships m
+   where m.org_id = oid
+     and m.role::text in ('owner', 'admin', 'project_manager');
+
   return 'ok';
+end
+$$;
+
+-- Same-transaction lockdown, as for app_contract_by_token above.
+revoke all on function public.app_variation_respond_by_token(text, text, text, text, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_variation_respond_by_token(text, text, text, text, text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_variation_respond_by_token(text, text, text, text, text) to metra_app;
+  end if;
 end
 $$;
 

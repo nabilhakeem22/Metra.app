@@ -29,6 +29,10 @@ export async function getContractedProposalIds(
       .select({ sourceProposalId: contracts.sourceProposalId })
       .from(contracts)
       .where(inArray(contracts.sourceProposalId, proposalIds));
-    return new Set(rows.map((r) => r.sourceProposalId));
+    // `inArray` on the column never matches a null, so every row names a
+    // proposal; the filter only narrows the type (BOQ contracts carry null, 0063).
+    return new Set(
+      rows.flatMap((row) => (row.sourceProposalId === null ? [] : [row.sourceProposalId])),
+    );
   });
 }

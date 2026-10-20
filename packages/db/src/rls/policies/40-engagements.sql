@@ -25,12 +25,12 @@ alter table public.engagement_transitions force  row level security;
 drop policy if exists org_isolation on public.engagement_transitions;
 create policy org_isolation on public.engagement_transitions
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- engagement_milestones (Step 3; full DML — the fee schedule is editable while
@@ -40,12 +40,12 @@ alter table public.engagement_milestones force  row level security;
 drop policy if exists org_isolation on public.engagement_milestones;
 create policy org_isolation on public.engagement_milestones
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- payment_events (Step 4; append-only via grants — SELECT + INSERT only, no
@@ -55,12 +55,12 @@ alter table public.payment_events force  row level security;
 drop policy if exists org_isolation on public.payment_events;
 create policy org_isolation on public.payment_events
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- engagement_artifacts (Step 5; full-ish DML — artifacts are re-attestable /
@@ -71,12 +71,12 @@ alter table public.engagement_artifacts force  row level security;
 drop policy if exists org_isolation on public.engagement_artifacts;
 create policy org_isolation on public.engagement_artifacts
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- engagement_events (Step 7; append-only via grants — SELECT + INSERT only, no
@@ -86,12 +86,12 @@ alter table public.engagement_events force  row level security;
 drop policy if exists org_isolation on public.engagement_events;
 create policy org_isolation on public.engagement_events
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- engagement_change_orders (Step 8; SELECT + INSERT + UPDATE grants — UPDATE is
@@ -101,12 +101,12 @@ alter table public.engagement_change_orders force  row level security;
 drop policy if exists org_isolation on public.engagement_change_orders;
 create policy org_isolation on public.engagement_change_orders
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- client_payment_claims (Client Delivery Portal Phase 3; MUTABLE lifecycle —
@@ -119,12 +119,12 @@ alter table public.client_payment_claims force  row level security;
 drop policy if exists org_isolation on public.client_payment_claims;
 create policy org_isolation on public.client_payment_claims
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- document_categories (clients + projects spec): the firm's own filing vocabulary.
@@ -135,12 +135,12 @@ alter table public.document_categories force  row level security;
 drop policy if exists org_isolation on public.document_categories;
 create policy org_isolation on public.document_categories
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- engagement_document_comments (Client Deliverables Step 2; APPEND-ONLY — SELECT +
@@ -153,12 +153,12 @@ alter table public.engagement_document_comments force  row level security;
 drop policy if exists org_isolation on public.engagement_document_comments;
 create policy org_isolation on public.engagement_document_comments
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- design_engagements
@@ -167,12 +167,12 @@ alter table public.design_engagements force  row level security;
 drop policy if exists org_isolation on public.design_engagements;
 create policy org_isolation on public.design_engagements
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- Round B (0056): a share link's nonce never outlives its hash. Any UPDATE that

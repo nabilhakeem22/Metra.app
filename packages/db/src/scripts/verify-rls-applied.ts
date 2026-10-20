@@ -26,9 +26,10 @@
 //   * every `create trigger` exists in `pg_trigger` (non-internal);
 //   * every function the manifest defines exists in `pg_proc`;
 //   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS;
-//   * eleven NARROWED tables — boqs, document_categories,
+//   * sixteen NARROWED tables — boqs, document_categories,
 //     engagement_document_comments, engagement_milestones,
-//     workspace_entitlements and the six SELECT-only market tables — hold exactly the table-level privileges roles.sql
+//     workspace_entitlements, the six SELECT-only market tables and the five
+//     Stage 2 execution tables that may not be deleted from (0063) — hold exactly the table-level privileges roles.sql
 //     leaves them with after its revokes, AND do not hold the one privilege each
 //     narrowing exists to remove (no DELETE on boqs, no UPDATE/DELETE on the
 //     append-only three, no DELETE on the filing vocabulary). Until wave 8 item 6
@@ -52,9 +53,13 @@
 // CI one. That is `assert-schema-applied`'s report-only territory and stays
 // there.
 //
-// ONE-DIRECTIONAL, like `schema-catalogue.ts`: an EXTRA policy, trigger or
-// function in the database is never reported. Only "the code declares it and the
-// database does not have it".
+// ONE-DIRECTIONAL, like `schema-catalogue.ts`: an EXTRA trigger or function in
+// the database is never reported. Only "the code declares it and the database
+// does not have it". POLICIES ARE THE EXCEPTION (Stage 2, security review S4):
+// they are permissive and OR together, so an extra one widens access, and it
+// is reported. So are TRUNCATE, REFERENCES and TRIGGER for metra_app on any
+// table (roles.sql grants none), and the column-level INSERT on
+// contract_line_measurements (every column but `seq`).
 //
 // EVERY PRIVILEGE READ RESOLVES ITS TABLE THROUGH `pg_class` rather than through
 // a `'public.<name>'::text` argument. The text form raises 42P01 on a table the
@@ -257,6 +262,14 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *                                 `market:publish` CLI writes them, as the
  *                                 connection role. A metra_app write would let
  *                                 one studio change what every studio sees.
+ *   contract_payments,
+ *   contract_line_measurements    append-only (0063) — a recorded payment and a
+ *                                 site reading are never edited or removed; a
+ *                                 correction is a new reading.
+ *   payment_requests,
+ *   contract_payment_claims,
+ *   contract_cost_entries         no DELETE (0063) — a request is voided, a
+ *                                 claim resolved, a cost voided; none deleted.
  *
  * `design_engagements` is NOT in this list: its authority is column-level and is
  * read back separately by `grantProblems`, which is a different question.
@@ -284,6 +297,11 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   market_price_observations: ['insert', 'update', 'delete'],
   market_seed_book: ['insert', 'update', 'delete'],
   workspace_entitlements: ['update', 'delete'],
+  contract_line_measurements: ['update', 'delete'],
+  contract_payment_claims: ['delete'],
+  contract_payments: ['update', 'delete'],
+  contract_cost_entries: ['delete'],
+  payment_requests: ['delete'],
 };
 
 /** One cell of the table-privilege read-back. */
@@ -396,6 +414,94 @@ async function narrowedTableGrantProblems(sql: Sql): Promise<string[]> {
   return problems;
 }
 
+/**
+ * Policies the database has and NO manifest file declares (security review S4).
+ * The one exception to "one-directional": policies are PERMISSIVE and OR
+ * together, so a surplus `using (true)` on any table opens it to every caller,
+ * and a re-run of apply-rls (which drops and re-creates only the policies it
+ * declares) leaves it in place. Every table in `public` is ours, so a surplus
+ * here is never legitimate.
+ */
+function surplusPolicies(declared: Map<string, string>, applied: Set<string>): string[] {
+  return [...applied]
+    .filter((key) => !declared.has(key))
+    .sort()
+    .map(
+      (key) =>
+        `  - policy ${key} is in the database and declared by NO rls/ file: policies OR ` +
+        'together, so it widens what the declared one allows. Drop it, then re-run apply-rls',
+    );
+}
+
+/** Table privileges roles.sql grants metra_app on NO table. */
+const NEVER_GRANTED_PRIVILEGES = ['truncate', 'references', 'trigger'] as const;
+
+/**
+ * Does metra_app hold TRUNCATE, REFERENCES or TRIGGER on any table (security
+ * review S4)? roles.sql grants none of them anywhere, and TRUNCATE is the
+ * dangerous one: it ignores RLS and fires no row trigger, so it would empty a
+ * ledger across every studio and pass the payment request's frozen guard. The
+ * six Stage 2 tables converge by `revoke all` on every run; on an older table
+ * a surplus survives apply-rls and only a human can explain it.
+ */
+async function neverGrantedPrivilegeProblems(sql: Sql): Promise<string[]> {
+  const rows = (await sql`
+    select c.relname as name, p.name as privilege
+      from pg_class c
+      cross join (values ('truncate'), ('references'), ('trigger')) as p(name)
+     where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+       and has_table_privilege(${APP_ROLE}::name, c.oid, p.name)
+     order by 1, 2
+  `) as unknown as Array<{ name: string; privilege: (typeof NEVER_GRANTED_PRIVILEGES)[number] }>;
+  return rows.map(
+    (row) =>
+      `  - ${APP_ROLE} has ${row.privilege} on ${row.name}, which rls/roles.sql grants on no ` +
+      'table. Re-run apply-rls; if it survives that, someone granted it by hand',
+  );
+}
+
+/** The table whose INSERT is column-level, and the one column it must not cover. */
+const IDENTITY_ONLY_TABLE = 'contract_line_measurements';
+const IDENTITY_ONLY_COLUMN = 'seq';
+
+/**
+ * metra_app may insert every column of contract_line_measurements EXCEPT `seq`
+ * (security review S1): `seq` orders the final measured quantities, and a
+ * writer who could set it (OVERRIDING SYSTEM VALUE) would outrank every later
+ * correction. Read column by column, so a table-level INSERT (which covers
+ * `seq`) and a missing column (an outage) are both reported.
+ */
+async function measurementInsertProblems(sql: Sql): Promise<string[]> {
+  const rows = (await sql`
+    select a.attname as name,
+           has_column_privilege(${APP_ROLE}::name, c.oid, a.attnum, 'insert') as granted
+      from pg_class c
+      join pg_attribute a on a.attrelid = c.oid
+     where c.relname = ${IDENTITY_ONLY_TABLE} and c.relnamespace = 'public'::regnamespace
+       and a.attnum > 0 and not a.attisdropped
+     order by a.attnum
+  `) as unknown as Array<{ name: string; granted: boolean }>;
+  if (rows.length === 0) {
+    return [`  - ${IDENTITY_ONLY_TABLE} is not in this database at all. Run the migrations first.`];
+  }
+  const problems: string[] = [];
+  for (const row of rows) {
+    if (row.name === IDENTITY_ONLY_COLUMN && row.granted) {
+      problems.push(
+        `  - ${APP_ROLE} may INSERT ${IDENTITY_ONLY_TABLE}.${IDENTITY_ONLY_COLUMN}, so it can ` +
+          'choose the recording order. rls/roles.sql grants insert on every other column only',
+      );
+    }
+    if (row.name !== IDENTITY_ONLY_COLUMN && !row.granted) {
+      problems.push(
+        `  - ${APP_ROLE} may NOT insert ${IDENTITY_ONLY_TABLE}.${row.name}: every measurement ` +
+          'write will fail with 42501',
+      );
+    }
+  }
+  return problems;
+}
+
 /** One line per declared object the database does not have. Empty = applied. */
 function missing(declared: Map<string, string>, applied: Set<string>, kind: string): string[] {
   return [...declared]
@@ -424,12 +530,16 @@ export async function verifyRlsApplied(sql: Sql): Promise<string[]> {
     }
   }
 
-  problems.push(...missing(declaredPolicies(), await appliedPolicies(sql), 'policy'));
+  const policies = await appliedPolicies(sql);
+  problems.push(...missing(declaredPolicies(), policies, 'policy'));
+  problems.push(...surplusPolicies(declaredPolicies(), policies));
   problems.push(...missing(declaredTriggers(), await appliedTriggers(sql), 'trigger'));
   problems.push(...missing(declaredFunctions(), await appliedFunctions(sql), 'function'));
   problems.push(...(await appRoleProblems(sql)));
   problems.push(...(await grantProblems(sql)));
   problems.push(...(await narrowedTableGrantProblems(sql)));
+  problems.push(...(await neverGrantedPrivilegeProblems(sql)));
+  problems.push(...(await measurementInsertProblems(sql)));
 
   return problems;
 }
@@ -444,7 +554,9 @@ export function verifiedGrantsSummary(): string {
     `grants verified — ${GRANTED_UPDATE_TABLE} update narrowed to ` +
     `${String(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')).length)} columns with no ` +
     `table-level update, and ${String(narrowed.length)} narrowed table(s) ` +
-    `(${narrowed.join(', ')}) holding exactly what rls/roles.sql leaves them.`
+    `(${narrowed.join(', ')}) holding exactly what rls/roles.sql leaves them; ` +
+    `${IDENTITY_ONLY_TABLE} insertable on every column but ${IDENTITY_ONLY_COLUMN}; no ` +
+    `${NEVER_GRANTED_PRIVILEGES.join(', ')} for ${APP_ROLE} on any table; no policy outside the manifest.`
   );
 }
 

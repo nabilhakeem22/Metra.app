@@ -17,12 +17,12 @@ alter table public.proposals force  row level security;
 drop policy if exists org_isolation on public.proposals;
 create policy org_isolation on public.proposals
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- proposal_sections
@@ -31,12 +31,12 @@ alter table public.proposal_sections force  row level security;
 drop policy if exists org_isolation on public.proposal_sections;
 create policy org_isolation on public.proposal_sections
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- proposal_lines
@@ -45,12 +45,12 @@ alter table public.proposal_lines force  row level security;
 drop policy if exists org_isolation on public.proposal_lines;
 create policy org_isolation on public.proposal_lines
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- proposal_events (append-only via grants; org-isolated + membership-gated)
@@ -59,12 +59,12 @@ alter table public.proposal_events force  row level security;
 drop policy if exists org_isolation on public.proposal_events;
 create policy org_isolation on public.proposal_events
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 

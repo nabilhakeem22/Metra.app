@@ -1,5 +1,6 @@
 // The sentence for a `client_responded` notification: what the client did, on
-// which delivery. PURE and CLIENT-SAFE, like feed-item.ts, which calls it.
+// which delivery, contract or change order. PURE and CLIENT-SAFE, like
+// feed-item.ts, which calls it.
 //
 // `{delivery}` is the delivery's label (./delivery-label.ts). Numbers reach the
 // catalogue as STRINGS (Latin digits); the one number
@@ -11,15 +12,22 @@
 import { conceptLetter } from '@/lib/engagements/concept-letter';
 import { bidiIsolate } from '@/lib/format/bidi';
 import {
+  CLIENT_CONTRACT_BODY_KEYS,
   CLIENT_RESPONDED_BODY_KEYS,
+  type ClientContractBodyKey,
   type ClientRespondedBodyKey,
 } from '@/lib/notifications/kinds';
+import { contractDocumentLabelOf } from './contract-label';
 import { deliveryLabelOf } from './delivery-label';
 
 export type BodyTranslate = (key: string, values?: Record<string, string | number>) => string;
 
 export function isClientRespondedBodyKey(bodyKey: string): bodyKey is ClientRespondedBodyKey {
   return (CLIENT_RESPONDED_BODY_KEYS as readonly string[]).includes(bodyKey);
+}
+
+function isClientContractBodyKey(bodyKey: string): bodyKey is ClientContractBodyKey {
+  return (CLIENT_CONTRACT_BODY_KEYS as readonly string[]).includes(bodyKey);
 }
 
 const text = (value: unknown): string | null =>
@@ -35,6 +43,11 @@ export function clientRespondedBody(
   locale: string,
   milestoneLabel: (kind: string) => string | null,
 ): string {
+  // A contract (/c) or change-order (/v) act names its document, not a delivery.
+  if (isClientContractBodyKey(bodyKey)) {
+    const document = contractDocumentLabelOf(bodyKey, params);
+    return translate(bodyKey, { hasDocument: document ? 'yes' : 'no', document: document ?? '' });
+  }
   const delivery = deliveryLabelOf(params, locale);
   // One unread row per MILESTONE since 0057, so a count above 1 is the same
   // milestone claimed again: the sentence always names that milestone.

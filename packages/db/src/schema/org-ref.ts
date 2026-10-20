@@ -78,3 +78,37 @@ export function sameOrgFk(
       : [index(`${table}_${name}_idx`).on(t.orgId, child)]),
   ];
 }
+
+export interface SameContractTarget {
+  orgId: AnyPgColumn;
+  contractId: AnyPgColumn;
+  id: AnyPgColumn;
+}
+
+/**
+ * The 3-column FK `(org_id, contract_id, <name>_id) -> target(org_id, contract_id, id)`
+ * (Stage 2, 0063): a child that names a row of a contract (a line, a section, a
+ * payment request) can only name a row of ITS OWN contract, as a database fact.
+ * Precondition: `target` has unique(org_id, contract_id, id).
+ *
+ * RESTRICT by default; `cascade` only where the child is part of its parent
+ * (a contract line of its section). NO index is emitted: every caller declares
+ * the index its reads need. A nullable `<name>_id` is unchecked while null
+ * (MATCH SIMPLE), which is what an optional target means. Never `set null`: it
+ * would null contract_id too (the 0052 defect, one column wider).
+ */
+export function sameContractFk(
+  t: Record<string, AnyPgColumn>,
+  name: string,
+  target: SameContractTarget,
+  opts?: { onDelete?: 'restrict' | 'cascade' },
+) {
+  const table = getTableName(
+    (t.orgId as unknown as { table: Parameters<typeof getTableName>[0] }).table,
+  );
+  return foreignKey({
+    columns: [t.orgId, t.contractId, t[`${name}Id`]],
+    foreignColumns: [target.orgId, target.contractId, target.id],
+    name: `${table}_${name}_same_contract_fk`,
+  }).onDelete(opts?.onDelete ?? 'restrict');
+}
