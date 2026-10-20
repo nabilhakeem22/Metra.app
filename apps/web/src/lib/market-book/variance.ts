@@ -19,6 +19,15 @@ export function marketVariance(
   market: { unit: MarketUnit; price: string | null },
 ): MarketVariance {
   if (!unitsCompatible(studio.unit, market.unit)) return { variancePct: null, reason: 'unit_mismatch' };
-  const variancePct = percentChange(market.price, studio.unitCost);
+  return priceVariance(studio.unitCost, market.price);
+}
+
+/**
+ * The same figure for a pair already known to compare: a read that matched the
+ * studio unit against the seed book's (market_seed_book.unit IS the market
+ * unit's studio twin, ./units.ts), so no market unit travels with it.
+ */
+export function priceVariance(studioUnitCost: string, marketPrice: string | null): MarketVariance {
+  const variancePct = percentChange(marketPrice, studioUnitCost);
   return variancePct === null ? { variancePct: null, reason: 'no_price' } : { variancePct, reason: 'ok' };
 }

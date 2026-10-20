@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { marketVariance } from './variance';
+import { marketVariance, priceVariance } from './variance';
 
 describe('marketVariance', () => {
   it('says how far the studio cost sits from the official price, rounded to 1 dp', () => {
@@ -19,5 +19,16 @@ describe('marketVariance', () => {
 
   it('has no figure without an official price', () => {
     expect(marketVariance({ unit: 'sqm', unitCost: '420' }, { unit: 'sqm', price: null })).toEqual({ variancePct: null, reason: 'no_price' });
+  });
+});
+
+describe('priceVariance (units already matched)', () => {
+  it('is the same figure as marketVariance on a compatible pair', () => {
+    expect(priceVariance('420.0000', '400.0000')).toEqual(marketVariance({ unit: 'sqm', unitCost: '420.0000' }, { unit: 'sqm', price: '400.0000' }));
+  });
+
+  it('has no figure without a price, or against a zero price', () => {
+    expect(priceVariance('420', null)).toEqual({ variancePct: null, reason: 'no_price' });
+    expect(priceVariance('420', '0')).toEqual({ variancePct: null, reason: 'no_price' });
   });
 });

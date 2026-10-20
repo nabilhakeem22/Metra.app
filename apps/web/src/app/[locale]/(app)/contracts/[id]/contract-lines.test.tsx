@@ -35,6 +35,7 @@ const line = (n: number): ContractLineView => ({
 });
 const option = (n: number): ContractLineOption => ({
   id: `l-${n}`,
+  sectionId: 's-1',
   descriptionAr: `بند ${n}`,
   descriptionEn: `Line ${n}`,
   sectionTitleAr: 'مدني',
