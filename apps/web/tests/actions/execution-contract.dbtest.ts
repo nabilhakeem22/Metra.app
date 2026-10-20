@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { generateExecutionContractCore, setContractChargesCore } from '@/lib/contracts/core';
+import { saveContractScheduleCore } from '@/lib/contracts/schedule/save';
 import type { OrgContext } from '@/lib/db/context';
 import { seedBoq, seedProposalContract } from './contract-from-boq-fixture';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract } from './execution-fixture';
@@ -138,6 +139,27 @@ describe('AC3: which BOQ may be contracted', () => {
       ok: false,
       error: 'malformed',
     });
+  });
+
+  it('answers malformed, never a throw, to a null or non-object payload, for generate, charges and the schedule', async () => {
+    type Loose = (ctx: OrgContext, input: unknown) => Promise<unknown>;
+    const cores = [generateExecutionContractCore, setContractChargesCore, saveContractScheduleCore] as unknown as Loose[];
+    for (const core of cores) {
+      for (const payload of [null, undefined, 'x', 7, true]) {
+        expect(await core(owner, payload), String(payload)).toEqual({ ok: false, error: 'malformed' });
+      }
+    }
+  });
+
+  it('refuses a rate typed past 4 decimals, never cutting it (F8)', async () => {
+    const boq = await seedBoq(orgId);
+    expect(await generateExecutionContractCore(owner, { boqId: boq.boqId, taxRate: '100.00001', supervisionPct: '0' })).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { taxRate: { code: 'too_many_decimals', params: { max: 4 } } },
+    });
+    const [row] = await ownerQuery<{ n: number }>(`select count(*)::int as n from public.contracts where source_boq_id = $1`, [boq.boqId]);
+    expect(row.n).toBe(0);
   });
 
   it('is owner and admin work: a project manager and a viewer are forbidden', async () => {
