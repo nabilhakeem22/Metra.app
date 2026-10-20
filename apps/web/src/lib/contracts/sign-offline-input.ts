@@ -3,9 +3,8 @@
 // day before the issue, which only it knows) and an optional note.
 // PURE and CLIENT-SAFE: the dialog checks it on Save, the core again on arrival.
 import type { FieldErrors } from '@/lib/actions/field-errors';
-import { readFields, readOptionalText, type FieldRead } from '@/lib/validation/field-rules';
-import { validIsoDate } from '@/lib/validation/iso-date';
-import { requiredText } from '@/lib/validation/text-field-rules';
+import { readDayUpToToday } from '@/lib/validation/day-field';
+import { readFields, readOptionalText } from '@/lib/validation/field-rules';
 
 export const SIGN_OFFLINE_FIELDS = ['signedOn', 'note'] as const;
 export type SignOfflineField = (typeof SIGN_OFFLINE_FIELDS)[number];
@@ -18,22 +17,10 @@ export interface TypedOfflineSignature {
   note?: unknown;
 }
 
-/** Year 0 is a day JavaScript knows and Postgres refuses (22008): not a day. */
-const FIRST_STORABLE_DAY = '0001-01-01';
-
-function readSignedOn(raw: unknown, todayInCairo: string): FieldRead<string> {
-  const value = typeof raw === 'string' ? raw.trim() : '';
-  const missing = requiredText(value);
-  if (missing) return { ok: false, error: missing };
-  if (!validIsoDate(value) || value < FIRST_STORABLE_DAY) return { ok: false, error: { code: 'invalid_date' } };
-  if (value > todayInCairo) return { ok: false, error: { code: 'date_in_future' } };
-  return { ok: true, value };
-}
-
 /** `todayInCairo` is `YYYY-MM-DD`: the Cairo day decides "today", never UTC. */
 export function readOfflineSignature(input: TypedOfflineSignature, todayInCairo: string) {
   return readFields({
-    signedOn: readSignedOn(input.signedOn, todayInCairo),
+    signedOn: readDayUpToToday(input.signedOn, todayInCairo),
     note: readOptionalText(typeof input.note === 'string' ? input.note : null, MAX_SIGN_OFFLINE_NOTE_CHARS),
   });
 }

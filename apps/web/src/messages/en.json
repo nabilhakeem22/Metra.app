@@ -480,6 +480,7 @@
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
       "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
       "date_in_future": "That day has not come yet. Pick today or an earlier day.",
+      "date_in_past": "That day has already passed. Pick today or a later day.",
       "too_many_decimals": "Use at most {max} decimal places.",
       "date_before_issue": "The contract was issued on {date}. Pick that day or a later one."
     },
@@ -2809,6 +2810,7 @@
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
         "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
         "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
+        "date_in_past": "That day has already passed. Please choose today or a later day.",
         "too_many_decimals": "Please use at most {max} decimal places.",
         "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one."
       },

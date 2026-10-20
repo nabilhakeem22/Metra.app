@@ -30,6 +30,9 @@ export const FIELD_CODE_PARAMS = {
   // A day that has not come yet, where only today or an earlier day is true
   // (the day a client signed on paper).
   date_in_future: [],
+  // A day already gone, where only today or a later day makes sense (the day a
+  // payment request is due).
+  date_in_past: [],
   // A day before the document it records existed (a paper signature dated
   // before the contract was issued); `date` is that issue day, DD/MM/YYYY.
   date_before_issue: ['date'],
