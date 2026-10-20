@@ -54,7 +54,14 @@ describe('readCostItemInput', () => {
   });
 
   test('a name that is only too long or unprintable is said under its own half, not as missing', () => {
-    expect(costItemFieldErrors({ ...VALID, nameEn: 'B'.repeat(201) })).toEqual({ nameEn: { code: 'too_long', params: { max: 200 } } });
+    expect(costItemFieldErrors({ ...VALID, nameEn: 'B'.repeat(1001) })).toEqual({ nameEn: { code: 'too_long', params: { max: 1000 } } });
     expect(costItemFieldErrors({ ...VALID, nameEn: null, nameAr: `لوح${String.fromCharCode(7)}` })).toEqual({ nameAr: { code: 'unprintable' } });
+  });
+
+  test('an edit keeps an unchanged long code and name, and refuses a changed one (N1)', () => {
+    const stored = { code: 'C'.repeat(214), nameEn: 'B'.repeat(1290), nameAr: null };
+    expect(costItemFieldErrors({ ...VALID, ...stored, defaultUnitPrice: '150' }, stored)).toEqual({});
+    expect(costItemFieldErrors({ ...VALID, ...stored, nameEn: `${stored.nameEn}x` }, stored)).toEqual({ nameEn: { code: 'too_long', params: { max: 1000 } } });
+    expect(costItemFieldErrors({ ...VALID, ...stored })).toMatchObject({ code: { code: 'too_long' }, nameEn: { code: 'too_long' } });
   });
 });

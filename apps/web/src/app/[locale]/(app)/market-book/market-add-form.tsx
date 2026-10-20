@@ -32,6 +32,9 @@ export const MARKET_ADD_CONTROL_ID: Record<AddMarketItemField, string> = {
   defaultUnitPrice: 'ma-price',
 };
 
+/** The price box's hint, said inline under it: a "?" tooltip there would sit over the old-price warning above. */
+const PRICE_HINT_ID = 'ma-price-hint';
+
 interface AddFormState {
   code: string;
   nameAr: string;
@@ -133,9 +136,18 @@ export function MarketAddForm({ item, sections, onClose, attribution }: MarketAd
             />
           </FormField>
           {item.latestPriced && <MarketAddCost priced={item.latestPriced} isOld={item.latestPricedIsOld} unitLabel={unit ? tp(`units.${unit}`) : ''} />}
-          <FormField id={MARKET_ADD_CONTROL_ID.defaultUnitPrice} label={tp('form.price')} hint={t('addForm.priceHint')} {...errors.bind('defaultUnitPrice')}>
-            <Input dir="ltr" inputMode="decimal" value={form.defaultUnitPrice} onChange={(event) => set('defaultUnitPrice')(event.target.value)} />
-          </FormField>
+          <div className="space-y-1">
+            <FormField id={MARKET_ADD_CONTROL_ID.defaultUnitPrice} label={tp('form.price')} {...errors.bind('defaultUnitPrice')}>
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                aria-describedby={PRICE_HINT_ID}
+                value={form.defaultUnitPrice}
+                onChange={(event) => set('defaultUnitPrice')(event.target.value)}
+              />
+            </FormField>
+            <p id={PRICE_HINT_ID} className="text-caption text-muted-foreground">{t('addForm.priceHint')}</p>
+          </div>
           {attribution}
         </>
       )}

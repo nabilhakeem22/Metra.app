@@ -8,7 +8,19 @@
 // would throw past the core (answered `generic`, logged as a defect). The
 // shape check refuses that input as `malformed` before any rule reads it.
 import { readOptionalText, type FieldRead } from '@/lib/validation/field-rules';
-import { MAX_LABEL_CHARS } from '@/lib/validation/text';
+import { clean } from '@/lib/validation/text';
+
+/** The longest code a cost item may be given, in characters (code points). */
+export const COST_ITEM_CODE_MAX = 120;
+/** The longest name, in each language: BOQ descriptions run long, Arabic ones especially. */
+export const COST_ITEM_NAME_MAX = 1_000;
+
+/** The text fields a cost item already holds; an update leaves an unchanged one as it is, whatever it holds. */
+export interface StoredCostItemText {
+  code: string;
+  nameEn: string | null;
+  nameAr: string | null;
+}
 
 /** The text every cost-item create takes: its code, its two names, its section and its selling price. */
 const COST_ITEM_TEXT_FIELDS = ['code', 'nameEn', 'nameAr', 'sectionId', 'defaultUnitPrice'] as const;
@@ -29,14 +41,25 @@ export function hasCostItemInputShape(input: unknown, extraFields: readonly stri
   return [...COST_ITEM_TEXT_FIELDS, ...extraFields].every((field) => isOptionalText(input[field]));
 }
 
-/** The code: required, printable, at most MAX_LABEL_CHARS characters. */
-export function readCostItemCode(value: string | null | undefined): FieldRead<string> {
-  const read = readOptionalText(value, MAX_LABEL_CHARS);
+/**
+ * A text box read under `max`, unless it still holds the value the item
+ * already has (`stored`): an item imported before the caps, or with a long
+ * description, keeps its text through an edit that changes something else.
+ */
+function readBoundedText(value: string | null | undefined, max: number, stored: string | null | undefined): FieldRead<string | null> {
+  const typed = clean(value);
+  if (stored !== undefined && typed !== null && typed === stored) return { ok: true, value: typed };
+  return readOptionalText(value, max);
+}
+
+/** The code: required, printable, at most COST_ITEM_CODE_MAX characters (an unchanged stored code passes). */
+export function readCostItemCode(value: string | null | undefined, stored?: string): FieldRead<string> {
+  const read = readBoundedText(value, COST_ITEM_CODE_MAX, stored);
   if (!read.ok) return read;
   return read.value === null ? { ok: false, error: { code: 'code_required' } } : { ok: true, value: read.value };
 }
 
-/** One of the two names: blank is null; printable, at most MAX_LABEL_CHARS characters. */
-export function readCostItemName(value: string | null | undefined): FieldRead<string | null> {
-  return readOptionalText(value, MAX_LABEL_CHARS);
+/** One of the two names: blank is null; printable, at most COST_ITEM_NAME_MAX characters (an unchanged stored name passes). */
+export function readCostItemName(value: string | null | undefined, stored?: string | null): FieldRead<string | null> {
+  return readBoundedText(value, COST_ITEM_NAME_MAX, stored);
 }

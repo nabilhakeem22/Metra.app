@@ -7,10 +7,10 @@ import { costItems, sections, type CostItemUnit, type MetraDb } from '@metra/db'
 import { and, eq, ne } from 'drizzle-orm';
 import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
 import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { err, fail, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
 import { clean } from '@/lib/validation/text';
-import { hasCostItemInputShape } from './cost-item-input';
+import { hasCostItemInputShape, type StoredCostItemText } from './cost-item-input';
 import { readCostItemInput, type CostItemValues } from './field-rules';
 import type { CostItemInput } from './fields';
 import { UNIT_TOKENS } from './import';
@@ -52,14 +52,21 @@ export interface CostItemColumns extends CostItemValues {
 /** The price book's own fields beyond the ones every cost-item create takes. */
 const PRICE_BOOK_INPUT_FIELDS = ['unit', 'defaultUnitCost', 'taxCode', 'etaItemCode', 'etaCodeType'] as const;
 
+/** Whether `input` has the price book's shape (hasCostItemInputShape); anything else is `malformed`. */
+export function hasPriceBookInputShape(input: unknown): boolean {
+  return hasCostItemInputShape(input, PRICE_BOOK_INPUT_FIELDS);
+}
+
 /** The row's columns, or the refusal: an input no form can send (not an object,
  *  a field that is not text), then every typed-value error at once, then the
- *  values no form can send (a section id that is not a uuid, an unknown unit). */
+ *  values no form can send (a section id that is not a uuid, an unknown unit).
+ *  An edit passes the item's `stored` text: an unchanged code or name passes. */
 export function costItemColumns(
   input: CostItemInput,
+  stored?: StoredCostItemText,
 ): { refusal: ActionResult } | { columns: CostItemColumns } {
-  if (!hasCostItemInputShape(input, PRICE_BOOK_INPUT_FIELDS)) return { refusal: err('malformed') };
-  const read = readCostItemInput(input);
+  if (!hasPriceBookInputShape(input)) return { refusal: err('malformed') };
+  const read = readCostItemInput(input, stored);
   if (!read.ok) return { refusal: fieldsFailed(read.errors) };
   if (!isUuid(input.sectionId) || !isUnit(input.unit)) return { refusal: err('malformed') };
   return {
@@ -72,6 +79,14 @@ export function costItemColumns(
       etaCodeType: clean(input.etaCodeType),
     },
   };
+}
+
+/** costItemColumns inside an edit's transaction, against the row as stored: a refusal is thrown (mutateInOrg answers it). */
+export function editedCostItemColumns(input: CostItemInput, stored: StoredCostItemText): CostItemColumns {
+  const read = costItemColumns(input, stored);
+  if ('columns' in read) return read.columns;
+  if (read.refusal.fields) failFields(read.refusal.fields);
+  return fail('malformed');
 }
 
 /**

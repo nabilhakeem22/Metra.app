@@ -4,9 +4,10 @@
 import { costItems } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { COST_ITEM_REFUSALS, costItemColumns, requireWritable } from './cost-item-write';
+import { isUuid } from '@/lib/uuid';
+import { COST_ITEM_REFUSALS, costItemColumns, editedCostItemColumns, hasPriceBookInputShape, requireWritable } from './cost-item-write';
 import type { CostItemInput } from './fields';
 
 export type { CostItemInput } from './fields';
@@ -47,13 +48,16 @@ export async function createCostItemCore(
   );
 }
 
+/**
+ * Edit one price-book item. Its typed values are read against the row as
+ * stored, so a code or name left unchanged is kept whatever its length (an
+ * item imported with a long description can still have its price edited).
+ */
 export async function updateCostItemCore(
   ctx: OrgContext,
   input: { id: string } & CostItemInput,
 ): Promise<ActionResult> {
-  const read = costItemColumns(input);
-  if ('refusal' in read) return read.refusal;
-  const { columns } = read;
+  if (!hasPriceBookInputShape(input) || !isUuid(input.id)) return err('malformed');
 
   return mutateInOrg(
     ctx,
@@ -65,6 +69,7 @@ export async function updateCostItemCore(
         .where(eq(costItems.id, input.id))
         .limit(1);
       if (!before) fail('record_not_found');
+      const columns = editedCostItemColumns(input, before);
       await requireWritable(tx, { ...columns, exceptId: input.id });
 
       await tx

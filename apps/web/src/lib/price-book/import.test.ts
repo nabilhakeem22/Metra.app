@@ -103,6 +103,21 @@ describe('validateImportRows', () => {
     ]);
   });
 
+  it('refuses a code or name an edit could not keep: too long, or with a control character (N1)', () => {
+    const rows = [
+      ['C'.repeat(121), 'x', 'civil', 'sqm', '1', '2'],
+      ['C'.repeat(120), 'x', 'civil', 'sqm', '1', '2'],
+      [`A${String.fromCharCode(1)}`, 'x', 'civil', 'sqm', '1', '2'],
+      ['LONG-EN', 'n'.repeat(1001), 'civil', 'sqm', '1', '2'],
+      ['FINE-EN', 'n'.repeat(1000), 'civil', 'sqm', '1', '2'],
+      ['CTRL-EN', `x${String.fromCharCode(1)}y`, 'civil', 'sqm', '1', '2'],
+      ['LONG-AR', 'ok', 'civil', 'sqm', '1', '2', 'ن'.repeat(1001)],
+    ];
+    expect(validateImportRows(rows, { ...MAP, nameAr: 6 }, new Set(), SECTIONS).map((r) => (r.ok ? 'ok' : r.error))).toEqual([
+      'code_too_long', 'ok', 'code_unprintable', 'name_too_long', 'ok', 'name_unprintable', 'name_too_long',
+    ]);
+  });
+
   // F4 — code matching is case-SENSITIVE (matches the DB unique(org_id, code)).
   it('treats codes as case-sensitive (ABC vs abc are distinct)', () => {
     const existRow = [['abc', 'x', 'civil', 'sqm', '1', '2']];

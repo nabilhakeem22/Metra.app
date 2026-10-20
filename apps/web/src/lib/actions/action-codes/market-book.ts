@@ -13,4 +13,7 @@ export type MarketBookActionCode =
   | 'market_item_already_added'
   // No published month ever priced this item (every month suspended), so it
   // has no cost to start from: the seed skips it too.
-  | 'market_item_unpriced';
+  | 'market_item_unpriced'
+  // Said under a name field: the studio's own item {code} already has this
+  // name (the seed's name-clash rule), so the add asks for another one.
+  | 'name_taken';

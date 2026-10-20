@@ -3,7 +3,7 @@ import { marketRowView } from '@/app/[locale]/(app)/market-book/market-row-view'
 import { addMarketItemToPriceBookCore, linkCostItemToMarketCore } from '@/lib/market-book/core';
 import { readMarketBookPage } from '@/lib/market-book/queries';
 import type { OrgContext } from '@/lib/db/context';
-import { MAX_LABEL_CHARS } from '@/lib/validation/text';
+import { COST_ITEM_CODE_MAX } from '@/lib/price-book/cost-item-input';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import { closeMarketFixture, marketRaw, seedBulletin, seedMarketItem, type MarketLeaf } from './market-fixture';
 import { rebuildSeedBook } from './market-seed-fixture';
@@ -177,6 +177,31 @@ describe('an added item is named exactly as the seed names it (F2)', () => {
   });
 });
 
+describe('a name an own item of the studio already has (N2, the name-clash rule of the seed)', () => {
+  it('is refused under that name with the code of that item, and a different typed name is added', async () => {
+    const mirror = await seedMarketItem('sqm', { nameAr: 'مرايا فضية', nameEn: 'Silver mirror', specAr: '5 مم', specEn: '5 mm' });
+    await seedBulletin('2096-12', [[mirror.id, '2096-12', '300']]);
+    await rebuildSeedBook();
+    await marketRaw()`insert into public.cost_items (org_id, code, name_en, section_id, unit)
+                      values (${owner.orgId}, 'MY-MIRROR', 'silver  MIRROR 5 mm', ${sectionId}, 'sqm')`;
+    const before = await raw.count('cost_items', owner.orgId);
+    expect(await add('MKT-MIRROR', mirror.id)).toEqual({
+      ok: false, error: 'check_fields', fields: { nameEn: { code: 'name_taken', params: { code: 'MY-MIRROR' } } },
+    });
+    expect(await raw.count('cost_items', owner.orgId)).toBe(before);
+    expect(await add('MKT-MIRROR', mirror.id, { nameAr: 'مرايا فضية 5 مم', nameEn: 'Silver mirror 5 mm (market)' })).toMatchObject({ ok: true });
+  });
+
+  it('never counts an item linked to the market, or carrying a seed code, as an own item', async () => {
+    const twin = await seedMarketItem('sqm', { nameAr: 'زجاج توأم', nameEn: 'Twin glass' });
+    await seedBulletin('2096-11', [[twin.id, '2096-11', '50']]);
+    await rebuildSeedBook();
+    await marketRaw()`insert into public.cost_items (org_id, code, name_en, section_id, unit)
+                      values (${owner.orgId}, 'MKT-SOMETHING-ELSE', 'Twin glass', ${sectionId}, 'sqm')`;
+    expect(await add('MKT-TWIN', twin.id)).toMatchObject({ ok: true });
+  });
+});
+
 describe('what no form can send is refused, never thrown (S2, S3)', () => {
   it('refuses a non-object input and a field that is not text as malformed', async () => {
     const base = { marketItemId: glass.id, sectionId };
@@ -190,7 +215,7 @@ describe('what no form can send is refused, never thrown (S2, S3)', () => {
     const before = await raw.count('cost_items', owner.orgId);
     expect(await add('C'.repeat(200000), rebar.id, { nameAr: `حديد${String.fromCharCode(0)}` })).toEqual({
       ok: false, error: 'check_fields',
-      fields: { code: { code: 'too_long', params: { max: MAX_LABEL_CHARS } }, nameAr: { code: 'unprintable' } },
+      fields: { code: { code: 'too_long', params: { max: COST_ITEM_CODE_MAX } }, nameAr: { code: 'unprintable' } },
     });
     expect(await raw.count('cost_items', owner.orgId)).toBe(before);
   });

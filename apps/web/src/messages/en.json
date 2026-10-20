@@ -675,7 +675,8 @@
     "market_item_not_found": "This market item isn't available any more. Refresh the page and pick another one.",
     "market_unit_incompatible": "The units don't match, so this market item can't be added or linked here.",
     "market_item_already_added": "This market item is already in your price book. Refresh the page and open it from there instead of adding it again.",
-    "market_item_unpriced": "This market item has never had an official price, so it can't be added to your price book."
+    "market_item_unpriced": "This market item has never had an official price, so it can't be added to your price book.",
+    "name_taken": "Your own item {code} already has this name. Type a different name."
   },
   "common": {
     "untranslated": "untranslated",
@@ -881,9 +882,13 @@
       "errors": {
         "row_empty": "Empty row",
         "code_missing": "Missing code",
+        "code_too_long": "Code longer than {codeMax} characters",
+        "code_unprintable": "Hidden or control characters in the code",
         "code_duplicate_in_file": "Duplicate code in file",
         "code_exists": "Code already exists",
         "name_missing": "Missing name",
+        "name_too_long": "Name longer than {nameMax} characters",
+        "name_unprintable": "Hidden or control characters in the name",
         "category_invalid": "Unknown category",
         "unit_invalid": "Unknown unit",
         "cost_invalid": "Invalid cost",

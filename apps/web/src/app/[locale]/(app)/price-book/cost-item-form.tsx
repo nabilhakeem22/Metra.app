@@ -51,7 +51,8 @@ export function CostItemForm({ open, onOpenChange, item, sections }: CostItemFor
 
   function submit() {
     const payload = costItemPayload(form);
-    if (errors.applyLocal(costItemFieldErrors(payload))) return;
+    // An edit checks against the item as stored: an unchanged code or name is never refused.
+    if (errors.applyLocal(costItemFieldErrors(payload, item ?? undefined))) return;
     startTransition(async () => {
       try {
         const result = item

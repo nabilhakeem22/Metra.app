@@ -73,6 +73,15 @@ describe.each<TestLocale>(['en', 'ar-EG'])('MarketAddForm (%s)', (locale) => {
     expect(text).toContain('attribution block');
   });
 
+  test('says the price hint inline under the box, never in a tooltip over the old-price warning (N3)', () => {
+    renderForm(locale, marketRowView(glassRow({ latestPriced: { month: '2024-06', price: '777.0000' } }), '2026-09'));
+    const hint = document.getElementById('ma-price-hint');
+    expect(hint?.textContent).toBe(at('marketBook.addForm.priceHint'));
+    expect(control('defaultUnitPrice').getAttribute('aria-describedby')).toContain('ma-price-hint');
+    expect(hint?.tagName).toBe('P');
+    expect(hint?.closest('label')).toBeNull();
+  });
+
   test('a cost from before the row window is shown with its month and a warning', () => {
     renderForm(locale, marketRowView(glassRow({ latestPriced: { month: '2024-06', price: '777.0000' } }), '2026-09'));
     const text = document.body.textContent ?? '';

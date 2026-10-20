@@ -5,7 +5,7 @@ import type { FieldErrors } from '@/lib/actions/field-errors';
 import { readTypedMoney } from '@/lib/validation/amount-field';
 import { readFields } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
-import { readCostItemCode, readCostItemName } from './cost-item-input';
+import { readCostItemCode, readCostItemName, type StoredCostItemText } from './cost-item-input';
 import type { CostItemField, CostItemInput } from './fields';
 
 /** A cleared cost/price box is a zero rather than a refusal (the column is NOT
@@ -25,12 +25,16 @@ export type CostItemRead =
   | { ok: true; values: CostItemValues }
   | { ok: false; errors: FieldErrors<CostItemField> };
 
-/** Read every typed value at once, or say what is wrong with each of them; one of the two names is enough (`name`). */
-export function readCostItemInput(input: CostItemInput): CostItemRead {
+/**
+ * Read every typed value at once, or say what is wrong with each of them; one
+ * of the two names is enough (`name`). An edit passes `stored`, the item's
+ * text as it is: a code or name left unchanged is never refused.
+ */
+export function readCostItemInput(input: CostItemInput, stored?: StoredCostItemText): CostItemRead {
   const read = readFields({
-    code: readCostItemCode(input.code),
-    nameEn: readCostItemName(input.nameEn),
-    nameAr: readCostItemName(input.nameAr),
+    code: readCostItemCode(input.code, stored?.code),
+    nameEn: readCostItemName(input.nameEn, stored?.nameEn),
+    nameAr: readCostItemName(input.nameAr, stored?.nameAr),
     defaultUnitCost: readTypedMoney(input.defaultUnitCost, BLANK_IS_ZERO),
     defaultUnitPrice: readTypedMoney(input.defaultUnitPrice, BLANK_IS_ZERO),
   });
@@ -39,8 +43,8 @@ export function readCostItemInput(input: CostItemInput): CostItemRead {
   return { ok: false, errors: { ...(read.ok ? {} : read.errors), ...(named ? {} : { name: { code: 'name_required' } }) } };
 }
 
-/** The form's pre-check: the same rules, as the refusals under each field. */
-export function costItemFieldErrors(input: CostItemInput): FieldErrors<CostItemField> {
-  const read = readCostItemInput(input);
+/** The form's pre-check: the same rules, as the refusals under each field (`stored` when editing). */
+export function costItemFieldErrors(input: CostItemInput, stored?: StoredCostItemText): FieldErrors<CostItemField> {
+  const read = readCostItemInput(input, stored);
   return read.ok ? {} : read.errors;
 }

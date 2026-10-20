@@ -201,4 +201,5 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   market_unit_incompatible: 'bad-request',
   market_item_already_added: 'conflict',
   market_item_unpriced: 'conflict',
+  name_taken: 'conflict',
 };

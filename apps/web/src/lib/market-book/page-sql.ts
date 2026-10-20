@@ -17,6 +17,26 @@ import { MARKET_PAGE_SIZE, type MarketBookView } from './page-params';
 // series reads only months from "latest minus 12", bound as a date (R5)
 // through an InitPlan, so the index keeps the bound.
 
+/**
+ * How many items each leaf holds (category_id, n). Counted in the seed book
+ * (market_seed_book: one row per published item, rebuilt in the transaction
+ * of every publish and withdrawal), so the count costs one pass over the book
+ * however long the history grows. Counting market_items runs their RLS policy,
+ * an EXISTS over each item's whole observation history: 205 of the page's
+ * 249 ms at 3,000 items and 121 bulletins. Until the book is first built (the
+ * 0062 runbook builds it before this code ships) the count falls back to that.
+ */
+export const CATEGORY_COUNTS = sql`
+  select c.id as category_id, count(*)::int as n
+    from market_seed_book b
+    join market_categories c on c.key = b.leaf_key
+   group by c.id
+  union all
+  select category_id, count(*)::int as n
+    from market_items
+   where not exists (select 1 from market_seed_book)
+   group by category_id`;
+
 /** What a search looks in: names, specs, and the item's own sub-category names. */
 const SEARCHED_TEXT = sql`concat_ws(' ', i.name_ar, i.name_en, i.spec_ar, i.spec_en, c.name_ar, c.name_en)`;
 
@@ -38,7 +58,7 @@ export function marketBookPageSql(view: MarketBookView, locale: string): SQL {
       select period_month, published_at, collection_from_day, collection_to_day, region_key
         from market_bulletins order by period_month desc limit 1
     ), counts as (
-      select category_id, count(*)::int as n from market_items group by category_id
+      ${CATEGORY_COUNTS}
     ), categories as (
       select c.key, c.name_ar, c.name_en, p.key as parent_key, c.parent_id, c.sort_order,
              coalesce(p.sort_order, c.sort_order) as top_order,

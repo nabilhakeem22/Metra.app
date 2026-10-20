@@ -8,7 +8,8 @@
 // the seed's names (read from the stored seed book), its studio unit, the
 // newest priced month of its whole history as the cost, and cost x 1.05 as the
 // selling price unless one is typed. It refuses what the seed skips: an item
-// already linked, one with no studio unit, one never priced.
+// already linked, one with no studio unit, one never priced, and a name the
+// studio's own item already has (answered under the name, so another can be typed).
 import { costItems } from '@metra/db';
 import { atPriceBookScale, withFivePercentMargin } from '@metra/db/market-seed';
 import { eq } from 'drizzle-orm';
@@ -20,7 +21,7 @@ import { hasCostItemInputShape } from '@/lib/price-book/cost-item-input';
 import { COST_ITEM_REFUSALS, requireWritable } from '@/lib/price-book/cost-item-write';
 import { isUuid } from '@/lib/uuid';
 import { ADD_MARKET_ITEM_OWN_FIELDS, readAddMarketItemInput, type AddMarketItemInput } from './add-input';
-import { activeMarketItem, latestPricedMonth, refuseWhenAlreadyAdded, seededNames, studioUnitOf } from './market-item-reads';
+import { activeMarketItem, latestPricedMonth, refuseNameClash, refuseWhenAlreadyAdded, seededNames, studioUnitOf } from './market-item-reads';
 import { holdStudioBookOrBusy } from './studio-hold';
 import { unitsCompatible } from './units';
 
@@ -62,6 +63,7 @@ export async function addMarketItemToPriceBookCore(
         marketItemId: item.id,
       };
       await requireWritable(tx, columns);
+      await refuseNameClash(tx, names);
       const [row] = await tx.insert(costItems).values({ orgId: ctx.orgId, ...columns }).returning({ id: costItems.id });
       await audit({
         entity: 'cost_item',

@@ -3,7 +3,7 @@
 import { Loader2 } from 'lucide-react';
 import type { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { ValidatedRow } from '@/lib/price-book/import';
+import { IMPORT_ERROR_PARAMS, type ValidatedRow } from '@/lib/price-book/import';
 
 // The wizard's third step: preview validated rows and run the import. All state
 // and the import mutation live in the parent (ImportWizard); this child renders
@@ -59,7 +59,7 @@ export function ImportWizardPreviewStep({
                     </span>
                   ) : (
                     <span className="text-destructive">
-                      {t(`import.errors.${r.error}`)}
+                      {t(`import.errors.${r.error}`, IMPORT_ERROR_PARAMS)}
                     </span>
                   )}
                 </td>

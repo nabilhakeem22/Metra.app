@@ -19,7 +19,7 @@ interface StudioIndex {
  * seed's own: it never counts as a name clash, so a re-run after a partial
  * undo re-seeds. Names clash only with the studio's OWN items.
  */
-function isOwnItem(existing: StudioBook['items'][number]): boolean {
+export function isOwnItem(existing: StudioBook['items'][number]): boolean {
   return existing.marketItemId === null && !existing.code.startsWith(ITEM_CODE_PREFIX);
 }
 

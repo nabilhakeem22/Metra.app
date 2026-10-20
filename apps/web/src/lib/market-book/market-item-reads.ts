@@ -1,10 +1,14 @@
 // What the market-book write cores (./core.ts) read of a market item, inside
 // the caller's RLS transaction, each a coded refusal when the answer forbids
 // the write: the item itself, whether the studio already has it, its studio
-// unit, its newest priced month, and the names the seed gives it.
+// unit, its newest priced month, the names the seed gives it, and whether the
+// studio's own items already carry the names it would be saved under.
 import { costItems, marketItems, marketSeedBook, type MarketUnit, type MetraDb } from '@metra/db';
+import { comparisonForm, isOwnItem } from '@metra/db/market-seed';
 import { and, eq, sql } from 'drizzle-orm';
+import { failFields, type FieldError } from '@/lib/actions/field-errors';
 import { fail } from '@/lib/actions/mutate';
+import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { latestPricedSql } from './effective-sql';
 import type { MarketPricedMonth, MarketSeededNames } from './types';
 import { studioUnitFor } from './units';
@@ -54,4 +58,25 @@ export async function seededNames(tx: MetraDb, marketItemId: string): Promise<Ma
     .limit(1);
   if (!names) fail('market_book_busy');
   return names;
+}
+
+/**
+ * The seed's name-clash rule (@metra/db/market-seed plan.ts) for an add: a
+ * name one of the studio's OWN items already carries (isOwnItem: not linked to
+ * a market item, not a seed code), compared in comparisonForm in either
+ * language, is refused under that name with the item's code, so the studio can
+ * type another one. Where the seed skips the item, the add asks for a name.
+ */
+export async function refuseNameClash(tx: MetraDb, names: { nameAr: string | null; nameEn: string | null }): Promise<void> {
+  const own = (
+    await tx.select({ code: costItems.code, nameAr: costItems.nameAr, nameEn: costItems.nameEn, marketItemId: costItems.marketItemId }).from(costItems)
+  ).filter(isOwnItem);
+  const holderOf = (name: string | null) =>
+    name === null ? undefined : own.find((item) => [item.nameAr, item.nameEn].some((held) => held !== null && comparisonForm(held) === comparisonForm(name)));
+  const taken = (name: string | null): FieldError | null => {
+    const holder = holderOf(name);
+    return holder ? { code: 'name_taken', params: { code: holder.code } } : null;
+  };
+  const errors = collectFieldErrors({ nameAr: taken(names.nameAr), nameEn: taken(names.nameEn) });
+  if (Object.keys(errors).length > 0) failFields(errors);
 }

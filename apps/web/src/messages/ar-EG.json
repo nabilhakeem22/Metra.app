@@ -675,7 +675,8 @@
     "market_item_not_found": "بند السوق ده مبقاش متاح. حدّث الصفحة واختار بند تاني.",
     "market_unit_incompatible": "الوحدات مش متطابقة، فمينفعش تضيف بند السوق ده أو تربطه هنا.",
     "market_item_already_added": "بند السوق ده متضاف لدليل أسعارك قبل كده. حدّث الصفحة وافتحه من هناك بدل ما تضيفه تاني.",
-    "market_item_unpriced": "بند السوق ده عمره ما كان ليه سعر رسمي، فمينفعش يتضاف لدليل أسعارك."
+    "market_item_unpriced": "بند السوق ده عمره ما كان ليه سعر رسمي، فمينفعش يتضاف لدليل أسعارك.",
+    "name_taken": "البند بتاعك {code} واخد الاسم ده خلاص. اكتب اسم مختلف."
   },
   "common": {
     "untranslated": "غير مترجم",
@@ -881,9 +882,13 @@
       "errors": {
         "row_empty": "صف فاضي",
         "code_missing": "الكود ناقص",
+        "code_too_long": "الكود أطول من {codeMax} حرف",
+        "code_unprintable": "الكود فيه حروف مخفية أو رموز تحكم",
         "code_duplicate_in_file": "كود مكرر في الملف",
         "code_exists": "الكود موجود بالفعل",
         "name_missing": "الاسم ناقص",
+        "name_too_long": "الاسم أطول من {nameMax} حرف",
+        "name_unprintable": "الاسم فيه حروف مخفية أو رموز تحكم",
         "category_invalid": "فئة غير معروفة",
         "unit_invalid": "وحدة غير معروفة",
         "cost_invalid": "تكلفة غير صالحة",
