@@ -3,7 +3,11 @@ import { boqs, designEngagements, proposals, type MetraDb } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import type { ActionCode } from '@/lib/actions/result';
 import { MAX_BOQ_LINES } from '@/lib/boqs/core';
-import { loadDocumentNames, type DocumentNames } from '@/lib/boqs/issue';
+import {
+  loadDocumentNames,
+  projectHasLiveContractOnIssuedBoq,
+  type DocumentNames,
+} from '@/lib/boqs/issue';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { isTerminal } from '@/lib/engagements/states';
 import { proposalRevision } from '@/lib/proposals/revision';
@@ -108,6 +112,9 @@ function readSnapshotRows(
     if (sent) return { alreadySent: sent, engagementId: header.engagementId };
     const engagement = await readActiveEngagement(tx, header.engagementId);
     if (typeof engagement === 'string') return engagement;
+    // Before the render: the commit's supersede would refuse this after Chromium
+    // ran and the file was stored (freeze.ts stays the race backstop).
+    if (await projectHasLiveContractOnIssuedBoq(tx, engagement.projectId)) return 'boq_has_contract';
     const { engagementId: _linked, ...proposal } = header;
     return {
       proposal,
@@ -123,6 +130,7 @@ function readSnapshotRows(
  * `record_not_found`: missing, another org's, or not a BOQ proposal; `malformed`:
  * an id that is no id.
  * `engagement_not_active`: the engagement is terminal.
+ * `boq_has_contract`: a live contract stands on the project's issued BOQ.
  * `line_required` / `too_many_lines`: nothing, or too much, to send.
  * `invalid_qty`: a negative quantity, which a BOQ line cannot hold.
  * `alreadySent`: this exact revision is already out (a replayed send), so the
