@@ -1647,6 +1647,7 @@
     "costs": {
       "tab": "Costs",
       "intro": "What the job actually cost: materials, labour, subcontractors and more. Book each cost to a line, a section, or the whole contract.",
+      "draftNote": "You can record costs once the contract has been issued.",
       "total": "Total recorded",
       "entries": "Entries",
       "record": "Record a cost",

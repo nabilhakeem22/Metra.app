@@ -1,5 +1,6 @@
 'use client';
 
+import type { ContractStatus } from '@metra/db';
 import { Loader2, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
@@ -28,6 +29,7 @@ const ALL = '__all__';
  */
 export function CostsTab({
   contractId,
+  contractStatus,
   sections,
   initial,
   canCreate,
@@ -35,6 +37,7 @@ export function CostsTab({
   m,
 }: {
   contractId: string;
+  contractStatus: ContractStatus;
   sections: ContractSectionSummary[];
   initial: CostEntriesPage;
   canCreate: boolean;
@@ -49,6 +52,8 @@ export function CostsTab({
   const { confirm, dialog } = useConfirm();
   const [voiding, startVoid] = useTransition();
   const filtered = list.filter.category !== null || list.filter.sectionId !== null;
+  // A draft contract takes no cost yet (the cores answer contract_not_issued).
+  const canRecord = canCreate && contractStatus !== 'draft';
 
   async function askVoid(target: CostEntry) {
     const sure = await confirm({ title: t('voidConfirm.title'), description: t('voidConfirm.description'), confirmLabel: t('voidConfirm.confirm'), cancelLabel: t('voidConfirm.cancel'), variant: 'destructive' });
@@ -68,6 +73,7 @@ export function CostsTab({
       {dialog}
       {(canCreate || canUpdate) && <CostEntryForm contractId={contractId} sections={sections} entry={entry} />}
       <p className="text-body text-muted-foreground">{t('intro')}</p>
+      {canCreate && !canRecord && <p className="text-body text-muted-foreground">{t('draftNote')}</p>}
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1 text-caption">
           <span>{t('filterCategory')}</span>
@@ -95,7 +101,7 @@ export function CostsTab({
             <div><dt className="text-caption text-muted-foreground">{t('entries')}</dt><dd className="tabular-nums" dir="ltr">{formatNumber(list.totals.count, locale)}</dd></div>
           </dl>
         )}
-        {canCreate && (
+        {canRecord && (
           <Button size="sm" variant="default" onClick={entry.openNew}>
             <Plus className="size-4" aria-hidden />
             {t('record')}

@@ -129,6 +129,7 @@ export function ContractDetailClient({
       {tab === 'costs' && costs && (
         <CostsTab
           contractId={detail.id}
+          contractStatus={detail.status}
           sections={detail.sections}
           initial={costs}
           canCreate={canCreateCosts}

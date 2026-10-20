@@ -40,9 +40,9 @@ const FIRST: CostEntriesPage = {
   totals: { count: 1, amount: '100.0000' },
 };
 
-function renderTab(locale: TestLocale) {
+function renderTab(locale: TestLocale, contractStatus: 'draft' | 'signed' = 'signed') {
   renderWithIntl(
-    <CostsTab contractId="k-1" sections={[]} initial={FIRST} canCreate canUpdate m={(value) => value} />,
+    <CostsTab contractId="k-1" contractStatus={contractStatus} sections={[]} initial={FIRST} canCreate canUpdate m={(value) => value} />,
     { locale },
   );
 }
@@ -94,5 +94,11 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
     });
     expect(actions.voidCostEntry).toHaveBeenCalledWith(row(1).id);
     expect(toast).toHaveBeenCalledWith({ title: at('errors.cost_entry_voided'), variant: 'destructive' });
+  });
+
+  test('offers no Record on a draft contract, and says why', () => {
+    renderTab(locale, 'draft');
+    expect(screen.queryByRole('button', { name: at('contracts.costs.record') })).toBeNull();
+    expect(screen.getByText(at('contracts.costs.draftNote'))).toBeTruthy();
   });
 });
