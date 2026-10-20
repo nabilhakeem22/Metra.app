@@ -60,6 +60,7 @@ function detail(): ContractDetail {
     supervisionAmount: '100',
     originalValue: '1240',
     revisedValue: '1240',
+    approvedExtensionDays: 0,
     sections: [
       {
         id: 's1',

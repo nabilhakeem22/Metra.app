@@ -8,7 +8,7 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { ContractHeaderForm } from './contract-header-form';
 import { CONTRACT_HEADER_FIELDS } from './contract-header-input';
 import { VO_LINE_COLUMNS, type VoLineColumn } from './use-variation-create';
-import { VO_REASON_ID, VO_TITLE_ID } from './variation-create-form';
+import { VO_DAYS_ID, VO_REASON_ID, VO_TITLE_ID } from './variation-create-form';
 import { variationLineControlId } from './variation-line-row';
 import { VariationRegister } from './variation-register';
 
@@ -72,11 +72,13 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
       fireEvent.click(screen.getByRole('button', { name }));
     });
   };
-  const openRegister = async () => {
+  /** `chargeRates`: an execution contract's register, whose orders may add days. */
+  const openRegister = async (chargeRates: { taxRate: string; supervisionPct: string } | null = null) => {
     show(
       <VariationRegister
         contractId="k-1"
         contractStatus="issued"
+        chargeRates={chargeRates}
         variations={[]}
         canDraftVariation
         canPriceVariation={false}
@@ -108,6 +110,20 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
     await expectFieldErrorsRenderUnderFields({
       fields: ['title', 'reason'],
       controlIdOf: (field) => (field === 'title' ? VO_TITLE_ID : VO_REASON_ID),
+      answerWith: (result: ActionResult) => variations.createVariationDraft.mockResolvedValue(result),
+      submit: press(at('variations.saveDraft')),
+      locale,
+      typed: { [VO_TITLE_ID]: 'Extra door' },
+    });
+  });
+
+  test('a new variation order on an execution contract: title, reason and the days it adds', async () => {
+    await openRegister({ taxRate: '14', supervisionPct: '10' });
+    typeTitle();
+    const controls: Record<string, string> = { title: VO_TITLE_ID, reason: VO_REASON_ID, timeExtensionDays: VO_DAYS_ID };
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['title', 'reason', 'timeExtensionDays'],
+      controlIdOf: (field) => controls[field],
       answerWith: (result: ActionResult) => variations.createVariationDraft.mockResolvedValue(result),
       submit: press(at('variations.saveDraft')),
       locale,

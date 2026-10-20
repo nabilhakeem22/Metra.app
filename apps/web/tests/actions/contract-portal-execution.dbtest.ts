@@ -22,6 +22,7 @@ import {
   tamper,
   type ExecutionContract,
 } from './execution-fixture';
+import { seedProposalContract } from './contract-from-boq-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // Stage 2 DB step A, the client side: the replaced /c and /v SQL
@@ -348,15 +349,42 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
   it('adds tax_rate, supervision_pct, time_extension_days and contract_source', async () => {
     const token = mintShareToken();
     await seedVariation(orgId, contract, 'issued', { timeExtensionDays: 12, tokenHash: token.hash });
-    const read = (await getVariationByToken(token.raw)) as unknown as Record<string, unknown>;
-    expect(read).toMatchObject({
+    const [{ data: document }] = await ownerQuery<{ data: Record<string, unknown> }>(
+      `select public.app_variation_by_token($1) as data`,
+      [token.hash],
+    );
+    expect(document).toMatchObject({
       tax_rate: '14.0000',
       supervision_pct: '10.0000',
       time_extension_days: 12,
       contract_source: 'boq',
+      contract_active: true,
+    });
+    expect(keysOf(document).has('line_cost')).toBe(false);
+    // The reader (PR B5) maps the four keys onto typed fields for the page.
+    const read = await getVariationByToken(token.raw);
+    expect(read).toMatchObject({
+      charges: { taxRate: '14.0000', supervisionPct: '10.0000' },
+      timeExtensionDays: 12,
       contractActive: true,
     });
     expect(keysOf(read).has('line_cost')).toBe(false);
+  });
+
+  it("a proposal contract's order gets no breakdown from the reader: its page stays as it was", async () => {
+    const proposalContractId = await seedProposalContract(orgId);
+    await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [proposalContractId]);
+    const [project] = await ownerQuery<{ project_id: string }>(
+      `select project_id from public.contracts where id = $1`,
+      [proposalContractId],
+    );
+    const token = mintShareToken();
+    // Days written past the cores (legacy or bypass data) stay off /v too (F6).
+    await seedVariation(orgId, { contractId: proposalContractId, projectId: project.project_id }, 'issued', {
+      tokenHash: token.hash,
+      timeExtensionDays: 9,
+    });
+    expect(await getVariationByToken(token.raw)).toMatchObject({ charges: null, timeExtensionDays: null });
   });
 
   for (const [decision, bodyKey] of [

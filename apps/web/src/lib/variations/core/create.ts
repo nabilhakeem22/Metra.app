@@ -1,14 +1,17 @@
 // Variation-order creation: createVariationDraftCore. Opens a DRAFT VO against an
 // ISSUED or SIGNED contract and allocates the per-org VO number (VO-YYYY-NNNN).
 import { contracts, variationOrders, type MetraDb } from '@metra/db';
-import { fieldsFailed } from '@/lib/actions/field-errors';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
+import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
+import { readTimeExtensionDays } from '../time-extension';
+import { refuseExtensionOffExecution } from './time-extension-gate';
 
 export interface CreateVariationDraftInput {
   contractId: string;
@@ -16,6 +19,14 @@ export interface CreateVariationDraftInput {
   titleEn?: string | null;
   reasonAr?: string | null;
   reasonEn?: string | null;
+  /** Days the order adds to the finish date; blank, null or absent = none. */
+  timeExtensionDays?: unknown;
+}
+
+/** What the draft row is opened with, once every field has been read. */
+interface VariationDraftValues {
+  input: CreateVariationDraftInput;
+  timeExtensionDays: number | null;
 }
 
 /**
@@ -27,18 +38,18 @@ export interface CreateVariationDraftInput {
 async function loadLiveContract(
   tx: MetraDb,
   contractId: string,
-): Promise<{ projectId: string }> {
+): Promise<{ projectId: string; sourceBoqId: string | null }> {
   const contract = await requireInOrg(
     tx,
     contracts,
     contractId,
-    { status: contracts.status, projectId: contracts.projectId },
+    { status: contracts.status, projectId: contracts.projectId, sourceBoqId: contracts.sourceBoqId },
     'record_not_found',
   );
   if (contract.status !== 'issued' && contract.status !== 'signed') {
     fail('contract_not_issued');
   }
-  return { projectId: contract.projectId };
+  return { projectId: contract.projectId, sourceBoqId: contract.sourceBoqId };
 }
 
 /** Per-org numbering, serialized by a transaction-scoped advisory lock. */
@@ -53,7 +64,7 @@ async function persistVariationDraft(
   number: number,
   contractId: string,
   projectId: string,
-  input: CreateVariationDraftInput,
+  { input, timeExtensionDays }: VariationDraftValues,
 ): Promise<string> {
   const [row] = await tx
     .insert(variationOrders)
@@ -66,6 +77,7 @@ async function persistVariationDraft(
       titleEn: clean(input.titleEn),
       reasonAr: clean(input.reasonAr),
       reasonEn: clean(input.reasonEn),
+      timeExtensionDays,
     })
     .returning({ id: variationOrders.id });
   return row.id;
@@ -77,13 +89,14 @@ function auditVariationCreated(
   variationOrderId: string,
   number: number,
   contractId: string,
+  timeExtensionDays: number | null,
 ): Promise<void> {
   return audit({
     entity: 'variation_order',
     entityId: variationOrderId,
     action: 'create',
     before: null,
-    after: { number, contract_id: contractId },
+    after: { number, contract_id: contractId, time_extension_days: timeExtensionDays },
   });
 }
 
@@ -97,16 +110,21 @@ export async function createVariationDraftCore(
 ): Promise<ActionResult> {
   const contractId = input.contractId?.trim();
   if (!contractId || !isUuid(contractId)) return err('malformed');
-  // Bilingual check: a VO needs a title in at least ONE language, said under it.
-  if (!clean(input.titleAr) && !clean(input.titleEn)) {
-    return fieldsFailed({ title: { code: 'name_required' } });
-  }
+  // Bilingual check: a VO needs a title in at least ONE language, said under
+  // it; the days under theirs, both at once.
+  const days = readTimeExtensionDays(input.timeExtensionDays);
+  const refusals = collectFieldErrors({
+    title: !clean(input.titleAr) && !clean(input.titleEn) ? { code: 'name_required' } : null,
+    timeExtensionDays: days.ok ? null : days.error,
+  });
+  if (!days.ok || hasFieldErrors(refusals)) return fieldsFailed(refusals);
 
   return mutateInOrg(
     ctx,
     { capability: 'variations_draft', action: 'create' },
     async (tx, audit) => {
       const contract = await loadLiveContract(tx, contractId);
+      refuseExtensionOffExecution(days.value, contract.sourceBoqId);
       const number = await allocateVariationNumber(tx, ctx.orgId);
       const variationOrderId = await persistVariationDraft(
         tx,
@@ -114,9 +132,9 @@ export async function createVariationDraftCore(
         number,
         contractId,
         contract.projectId,
-        input,
+        { input, timeExtensionDays: days.value },
       );
-      await auditVariationCreated(audit, variationOrderId, number, contractId);
+      await auditVariationCreated(audit, variationOrderId, number, contractId, days.value);
       return variationOrderId;
     },
   );

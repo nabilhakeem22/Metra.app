@@ -7,6 +7,7 @@ import { useRouter } from '@/i18n/routing';
 import type { ActionResult } from '@/lib/actions/result';
 import { createVariationDraft, saveVariationDraft } from '@/lib/variations/actions';
 import { keyedLineErrors, variationLinePath, type VariationLineColumn } from '@/lib/variations/line-fields';
+import { TIME_EXTENSION_FIELD, timeExtensionFieldErrors } from '@/lib/variations/time-extension';
 import type { DraftVoLine } from './contract-vo-types';
 
 // The "new variation order" flow: its typed state, and the two writes it makes
@@ -35,8 +36,9 @@ const NEW_LINE: Omit<DraftVoLine, 'key'> = {
   discountPct: '0',
 };
 
-function renderedFields(lines: readonly DraftVoLine[]): string[] {
-  return ['title', 'reason', ...lines.flatMap((line) => VO_LINE_COLUMNS.map((column) => variationLinePath(line.key, column)))];
+function renderedFields(lines: readonly DraftVoLine[], withDays: boolean): string[] {
+  const header = withDays ? ['title', 'reason', TIME_EXTENSION_FIELD] : ['title', 'reason'];
+  return [...header, ...lines.flatMap((line) => VO_LINE_COLUMNS.map((column) => variationLinePath(line.key, column)))];
 }
 
 /** The answer with its line refusals on the keys of the rows that were sent. */
@@ -45,23 +47,29 @@ function onSentRows(result: ActionResult, sent: readonly DraftVoLine[]): ActionR
   return { ...result, fields: keyedLineErrors(result.fields, sent.map((line) => line.key)) };
 }
 
-export function useVariationCreate(contractId: string) {
+/**
+ * `withDays`: an execution contract's order may add days to the finish date;
+ * a proposal contract's form has no such box and never sends one.
+ */
+export function useVariationCreate(contractId: string, withDays: boolean) {
   const te = useTranslations('errors');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [reason, setReason] = useState('');
+  const [days, setDays] = useState('');
   const [lines, setLines] = useState<DraftVoLine[]>([]);
   const [pending, startTransition] = useTransition();
   // The draft this form already opened. When its lines are refused, the retry
   // saves THAT draft again rather than opening a second variation order.
   const createdId = useRef<string | null>(null);
   const nextKey = useRef(0);
-  const errors = useFieldErrors({ fields: renderedFields(lines), translate: te });
+  const errors = useFieldErrors({ fields: renderedFields(lines, withDays), translate: te });
 
   function reset() {
     setTitle('');
     setReason('');
+    setDays('');
     setLines([]);
     createdId.current = null;
     errors.clear();
@@ -84,16 +92,17 @@ export function useVariationCreate(contractId: string) {
   }
 
   async function send(): Promise<ActionResult> {
+    const header = { titleEn: title, reasonEn: reason || null, timeExtensionDays: withDays ? days : undefined };
     let id = createdId.current;
     if (!id) {
-      const created = await createVariationDraft({ contractId, titleEn: title, reasonEn: reason || null });
+      const created = await createVariationDraft({ contractId, ...header });
       if (!created.ok || !created.data) return created;
       id = createdId.current = created.data;
       if (lines.length === 0) return created;
     }
     return saveVariationDraft({
       id,
-      header: { titleEn: title, reasonEn: reason || null },
+      header,
       lines: lines.map((line, index) => ({
         contractLineId: line.contractLineId || null,
         descriptionEn: line.descriptionEn,
@@ -107,7 +116,11 @@ export function useVariationCreate(contractId: string) {
   }
 
   function save() {
-    if (errors.applyLocal(title.trim() ? {} : { title: { code: 'name_required' } })) return;
+    const refusals = {
+      ...(title.trim() ? {} : { title: { code: 'name_required' as const } }),
+      ...(withDays ? timeExtensionFieldErrors(days) : {}),
+    };
+    if (errors.applyLocal(refusals)) return;
     startTransition(async () => {
       try {
         const sent = lines;
@@ -123,12 +136,15 @@ export function useVariationCreate(contractId: string) {
   }
 
   return {
+    withDays,
     open,
     toggle,
     title,
     setTitle,
     reason,
     setReason,
+    days,
+    setDays,
     lines,
     addLine: () => setLines((current) => [...current, { ...NEW_LINE, key: `vo-${(nextKey.current += 1)}` }]),
     updateLine,

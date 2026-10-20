@@ -28,7 +28,8 @@ export async function persistVariationLines(
 }
 
 /**
- * Stamp the header and the recomputed netDelta, RE-ASSERTING the draft gate.
+ * Stamp the header, the recomputed netDelta and the validated days (undefined =
+ * not part of this edit), RE-ASSERTING the draft gate.
  *
  * If the VO left draft between the row lock and here (it cannot, since the caller
  * holds that lock — but stay defensive) the update affects 0 rows and fails
@@ -42,7 +43,7 @@ export async function persistVariationHeader(
   tx: MetraDb,
   variationOrderId: string,
   header: SaveVariationDraftInput['header'],
-  netDelta: string,
+  computed: { netDelta: string; timeExtensionDays: number | null | undefined },
 ): Promise<void> {
   const patch = header ?? {};
   const saved = await tx
@@ -52,7 +53,8 @@ export async function persistVariationHeader(
       ...(patch.titleEn !== undefined ? { titleEn: clean(patch.titleEn) } : {}),
       ...(patch.reasonAr !== undefined ? { reasonAr: clean(patch.reasonAr) } : {}),
       ...(patch.reasonEn !== undefined ? { reasonEn: clean(patch.reasonEn) } : {}),
-      netDelta,
+      ...(computed.timeExtensionDays !== undefined ? { timeExtensionDays: computed.timeExtensionDays } : {}),
+      netDelta: computed.netDelta,
       updatedAt: new Date(),
     })
     .where(

@@ -4,11 +4,12 @@ import 'server-only';
 // ./section-summaries.ts, their lines through ./section-lines.ts) and the PDF
 // (every line, because the printed document is the whole contract).
 // Both share one header assembly: load the header (./detail-header.ts), compute
-// the revised value, gate the margin.
+// the revised value and the days approved change orders add, gate the margin.
 import { variationOrders, type MetraDb } from '@metra/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { computeRevisedContractValue } from '@/lib/aggregates/contract-value';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { approvedVariationsCharge } from '@/lib/execution/money/variation-charge';
 import { loadContractHeader } from './detail-header';
 import { loadContractSections } from './detail-sections';
 import type { ContractDetail, ContractHeaderDetail, ContractPageDetail } from './detail-types';
@@ -29,14 +30,43 @@ export type {
   ContractSigning,
 } from './detail-types';
 
-/** Revised value = original + Σ netDelta of APPROVED VOs (A3, computed). */
-async function computeRevisedValue(
+/** What a contract's value is made of, as far as its change orders are concerned. */
+interface ContractValueBasis {
+  originalValue: string;
+  sourceBoqId: string | null;
+  taxRate: string;
+  supervisionPct: string;
+}
+
+/**
+ * Revised value (computed, A3) = original + what the approved orders add. A
+ * proposal contract adds their net change, as it always has. An execution
+ * contract's original value already carries VAT and supervision, so it adds
+ * each order's full charge (D4a, F1), rounded per order as it is billed.
+ */
+function revisedValueOf(contract: ContractValueBasis, approvedNetDeltas: string[]): string {
+  if (contract.sourceBoqId === null) {
+    return computeRevisedContractValue(contract.originalValue, approvedNetDeltas);
+  }
+  const charge = approvedVariationsCharge(approvedNetDeltas, contract.taxRate, contract.supervisionPct);
+  return computeRevisedContractValue(contract.originalValue, [charge]);
+}
+
+/**
+ * What the APPROVED VOs change, in ONE SQL row: their net changes (the money
+ * rule rounds per order, so each crosses the wire as one short figure) and
+ * the days they add to the finish date (A24), summed in SQL.
+ */
+async function computeApprovedChanges(
   tx: MetraDb,
   contractId: string,
-  originalValue: string,
-): Promise<string> {
-  const approved = await tx
-    .select({ netDelta: variationOrders.netDelta })
+  contract: ContractValueBasis,
+): Promise<{ revisedValue: string; approvedExtensionDays: number }> {
+  const [approved] = await tx
+    .select({
+      netDeltas: sql<string[]>`coalesce(jsonb_agg(${variationOrders.netDelta}::text), '[]'::jsonb)`,
+      extensionDays: sql<number>`coalesce(sum(${variationOrders.timeExtensionDays}), 0)::int`,
+    })
     .from(variationOrders)
     .where(
       and(
@@ -44,10 +74,10 @@ async function computeRevisedValue(
         eq(variationOrders.status, 'approved'),
       ),
     );
-  return computeRevisedContractValue(
-    originalValue,
-    approved.map((variation) => variation.netDelta),
-  );
+  return {
+    revisedValue: revisedValueOf(contract, approved.netDeltas),
+    approvedExtensionDays: approved.extensionDays,
+  };
 }
 
 /** The header, the revised value, and cost totals only when the caller may see margin. */
@@ -63,7 +93,7 @@ async function loadHeaderDetail(
   return {
     ...rest,
     createdAt: createdAt.toISOString(),
-    revisedValue: await computeRevisedValue(tx, id, header.originalValue),
+    ...(await computeApprovedChanges(tx, id, header)),
     // Absent, not null, when the caller may not see margin.
     ...(canSeeMargin ? { totalCost, totalMargin } : {}),
   };
