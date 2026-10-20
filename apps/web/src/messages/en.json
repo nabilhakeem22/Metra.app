@@ -1271,6 +1271,7 @@
         "issuedStepDone": "BOQ issued and published to the client. The BOQ step is done.",
         "issuedStepWaits": "BOQ issued and published to the client. An owner, admin or accountant completes the BOQ step.",
         "issueNoEngagement": "This project has no single active engagement to deliver through",
+        "issueBlockedByContract": "The issued BOQ has a contract. Changes now go through change orders.",
         "statusIssued": "Issued",
         "statusDraft": "Draft",
         "find": "Find a line",

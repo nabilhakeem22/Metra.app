@@ -43,14 +43,17 @@ export function BoqTabSheet({
   canEdit,
   canSeeCost,
   clientCanOpenOnIssue,
+  issueBlockedByContract,
   execution,
 }: {
   boq: BoqDetail;
   canEdit: boolean;
   canSeeCost: boolean;
   clientCanOpenOnIssue: boolean;
+  issueBlockedByContract: boolean;
   execution: BoqExecution;
 }) {
+  const t = useTranslations('projects.profile.boq');
   return (
     <BoqSheet
       boq={boq}
@@ -59,10 +62,13 @@ export function BoqTabSheet({
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
           {boq.status === 'issued' && <BoqExecutionAction execution={execution} boqId={boq.id} />}
+          {canEdit && issueBlockedByContract && (
+            <p className="text-body text-[color:var(--text-muted)]">{t('issueBlockedByContract')}</p>
+          )}
           {canEdit && (
             <BoqIssue
               boqId={boq.id}
-              disabled={shown.lineCount === 0}
+              disabled={shown.lineCount === 0 || issueBlockedByContract}
               clientCanOpen={clientCanOpenOnIssue}
             />
           )}

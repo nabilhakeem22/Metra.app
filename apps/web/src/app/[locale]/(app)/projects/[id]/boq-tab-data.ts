@@ -2,10 +2,11 @@ import 'server-only';
 // What the project's BOQ tab renders from, read on the server. Split out of
 // page.tsx so the tab's one extra read (the release rule its Issue confirm
 // states) does not grow the page's composition.
-import { getBoqIssueReleasable } from '@/lib/boqs/issue';
+import { getBoqIssueReleasable, projectHasLiveContractOnIssuedBoq } from '@/lib/boqs/issue';
 import { getProjectBoq } from '@/lib/boqs/queries';
 import { getContractIdForBoq } from '@/lib/contracts/queries';
 import type { OrgContext } from '@/lib/db/context';
+import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import type { BoqExecution } from './boq-tab-sheet';
 
@@ -18,7 +19,18 @@ export async function loadBoqTab(ctx: OrgContext, projectId: string) {
     boq && canBuild && boq.status === 'draft'
       ? await getBoqIssueReleasable(ctx, boq.id)
       : false;
-  return { boq, canBuild, canSeeCost, clientCanOpenOnIssue, execution: await loadBoqExecution(ctx, boq) };
+  const issueBlockedByContract =
+    boq && canBuild && boq.status === 'draft'
+      ? await withOrgContext(ctx, (tx) => projectHasLiveContractOnIssuedBoq(tx, projectId))
+      : false;
+  return {
+    boq,
+    canBuild,
+    canSeeCost,
+    clientCanOpenOnIssue,
+    issueBlockedByContract,
+    execution: await loadBoqExecution(ctx, boq),
+  };
 }
 
 /** An issued BOQ becomes an execution contract: open the one it has, or offer to create it. */

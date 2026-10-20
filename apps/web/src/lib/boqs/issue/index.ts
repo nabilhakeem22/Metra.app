@@ -11,6 +11,7 @@ import { can } from '@/lib/permissions/can';
 import { getBoqDetail, type BoqDetail } from '../queries';
 import { loadDocumentNames, type DocumentNames } from './document-names';
 import { freezeAndRecordIssue } from './freeze';
+import { projectHasLiveContractOnIssuedBoq } from './live-contract';
 import { renderAndStoreClientBoqPdf } from './render';
 import { boqRevision, fenceIssueRevision } from './revision';
 import { issueEngagementOf } from './sole-engagement';
@@ -19,6 +20,7 @@ export { freezeAndRecordIssue, type FreezeIssueInput } from './freeze';
 export { loadDocumentNames, type DocumentNames } from './document-names';
 export { renderAndStoreClientBoqPdf } from './render';
 export { getBoqIssueReleasable } from './releasable';
+export { projectHasLiveContractOnIssuedBoq } from './live-contract';
 
 /**
  * Issue a BOQ from the sheet — the action that joins the structured document to
@@ -85,8 +87,8 @@ async function loadIssueSource(
   ctx: OrgContext,
   boqId: string,
 ): Promise<IssueSource | ActionCode> {
-  const [row] = await withOrgContext(ctx, (tx) =>
-    tx
+  const { row, contracted } = await withOrgContext(ctx, async (tx) => {
+    const [found] = await tx
       .select({
         status: boqs.status,
         projectId: boqs.projectId,
@@ -97,10 +99,17 @@ async function loadIssueSource(
       })
       .from(boqs)
       .where(eq(boqs.id, boqId))
-      .limit(1),
-  );
+      .limit(1);
+    return {
+      row: found,
+      contracted: found ? await projectHasLiveContractOnIssuedBoq(tx, found.projectId) : false,
+    };
+  });
   if (!row) return 'boq_not_found';
   if (row.status !== 'draft') return 'boq_not_draft';
+  // Before the render: the freeze would refuse this after Chromium ran and the
+  // file was stored, leaving an orphan per click (freeze.ts stays the backstop).
+  if (contracted) return 'boq_has_contract';
 
   // The client copy never prints cost, so cost is not fetched for it.
   const detail = await getBoqDetail(ctx, boqId, { showCost: false });

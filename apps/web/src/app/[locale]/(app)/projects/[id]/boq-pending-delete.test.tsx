@@ -80,6 +80,7 @@ function renderTab(detail: BoqDetail = boq, locale: 'ar-EG' | 'en' = 'ar-EG') {
         canBuild
         canSeeCost={false}
         clientCanOpenOnIssue={false}
+        issueBlockedByContract={false}
         execution={{ contractId: null, canGenerate: false }}
       />
       <ToastApi />
