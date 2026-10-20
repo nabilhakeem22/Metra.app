@@ -1626,6 +1626,9 @@
       "nameRequired": "Write your full name to acknowledge the contract.",
       "button": "Acknowledge electronically",
       "done": "Your acknowledgement has been recorded. Thank you.",
+      "signedPaper": "This contract was signed on paper on {date}.",
+      "signedOnline": "This contract was acknowledged online on {date}.",
+      "signed": "This contract is signed.",
       "already": "This contract has already been acknowledged.",
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
@@ -1646,7 +1649,8 @@
         "provisional": "Provisional",
         "gone": "These lines can no longer be shown. Please refresh the page.",
         "loadFailed": "We could not load these lines. Please check your connection and try again.",
-        "show": "Show the lines ({count})"
+        "show": "Show the lines ({count})",
+        "moreSections": "Show more sections ({count} left)"
       }
     },
     "lines": {

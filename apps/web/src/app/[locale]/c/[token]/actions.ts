@@ -5,8 +5,10 @@ import {
   contractPayloadHash,
   getContractByToken,
   getContractSectionLinesByToken,
+  getContractSectionsByToken,
   type AckError,
   type PublicSectionLinesPage,
+  type PublicSectionsPage,
 } from '@/lib/contracts/public';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
 import { portalReadAllowed } from '@/lib/share/portal-rate-limit';
@@ -14,6 +16,13 @@ import { requestProvenance } from '@/lib/share/request-provenance';
 
 /** The client's acknowledgement: its outcome, or an act that never landed. */
 export type ContractAnswer = { ok: boolean; error?: AckError } | ({ ok: false } & PortalFailure);
+
+/** One "show more sections" answer; `gone` as for the lines below. */
+export type SectionsAnswer =
+  | { ok: true; page: PublicSectionsPage }
+  | { ok: false; error: 'gone' }
+  | { ok: false; error: 'too_many' }
+  | ({ ok: false } & PortalFailure);
 
 /** One "show more lines" answer. `gone` is uniform: a forged section id, an
  *  unknown token and a withdrawn contract cannot be told apart. */
@@ -56,6 +65,19 @@ export async function loadContractSectionLines(
   return answered('loadContractSectionLines', (failure) => ({ ok: false as const, ...failure }), async () => {
     if (!(await portalReadAllowed(token))) return { ok: false as const, error: 'too_many' as const };
     const page = await getContractSectionLinesByToken(token, sectionId, offset);
+    return page ? { ok: true as const, page } : { ok: false as const, error: 'gone' as const };
+  });
+}
+
+/**
+ * Public (no-session) read of the next 50 sections, collapsed, when the client
+ * asks for them (A3 reliability R1). It spends the link's READ budget and,
+ * past it, answers `too_many`.
+ */
+export async function loadContractSections(token: string, offset: number): Promise<SectionsAnswer> {
+  return answered('loadContractSections', (failure) => ({ ok: false as const, ...failure }), async () => {
+    if (!(await portalReadAllowed(token))) return { ok: false as const, error: 'too_many' as const };
+    const page = await getContractSectionsByToken(token, offset);
     return page ? { ok: true as const, page } : { ok: false as const, error: 'gone' as const };
   });
 }

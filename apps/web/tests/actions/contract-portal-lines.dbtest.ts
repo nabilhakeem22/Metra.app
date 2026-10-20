@@ -3,19 +3,23 @@ import {
   contractPayloadHash,
   getContractByToken,
   getContractSectionLinesByToken,
-  withOpeningLines,
+  getContractSectionsByToken,
+  openingContract,
+  type PublicContract,
 } from '@/lib/contracts/public';
 import { closeExecutionFixture, seedExecutionContract, tamper, type ExecutionContract } from './execution-fixture';
 import { closeFixture, seedOrg, teardown } from './fixture';
 
 // PR A3.6, AC11 and AC12 through the app's own reader: the /c page opens on the
-// first 50 lines of the contract, "show more" fetches the rest 100 at a time, a
-// section of another contract answers nothing, and the acknowledgement hash
-// covers every line whether or not the snapshot carries it.
+// first 50 lines of the contract and its first 50 sections (A3 R1), "show
+// more" fetches the rest 100 lines or 50 sections at a time, a section of
+// another contract answers nothing, and the acknowledgement hash covers every
+// line whether or not the snapshot carries it.
 
 const orgIds: string[] = [];
 let contract: ExecutionContract;
 let other: ExecutionContract;
+let wide: ExecutionContract;
 
 beforeAll(async () => {
   const seeded = await seedOrg({ owners: 1 });
@@ -26,6 +30,13 @@ beforeAll(async () => {
     schedule: [{ labelEn: 'All', basis: 'percent', value: '100' }],
   });
   other = await seedExecutionContract(seeded.orgId, { linesPerSection: [3], state: 'issued' });
+  wide = await seedExecutionContract(seeded.orgId, { linesPerSection: Array.from({ length: 120 }, () => 1), state: 'issued' });
+});
+
+/** The snapshot as DB step B will cap it: every section, the first 50 lines of each. */
+const capped = (full: PublicContract): PublicContract => ({
+  ...full,
+  sections: full.sections.map((section) => ({ ...section, lines: section.lines.slice(0, 50) })),
 });
 
 afterAll(async () => {
@@ -36,7 +47,8 @@ afterAll(async () => {
 
 describe('the /c page on a 600-line contract (AC11)', () => {
   it('opens on the first 50 lines of the whole contract; a section past them opens collapsed', async () => {
-    const opened = withOpeningLines((await getContractByToken(contract.rawToken!))!);
+    const opened = openingContract((await getContractByToken(contract.rawToken!))!);
+    expect(opened.section_count).toBe(2);
     expect(opened.sections.map((section) => [section.lines.length, section.line_count])).toEqual([
       [50, 350],
       [0, 250],
@@ -63,16 +75,41 @@ describe('the /c page on a 600-line contract (AC11)', () => {
   });
 });
 
+describe('the /c page on a 120-section contract (A3 reliability R1)', () => {
+  it('opens on its first 50 sections and says how many there are', async () => {
+    const opened = openingContract((await getContractByToken(wide.rawToken!))!);
+    expect(opened.section_count).toBe(120);
+    expect(opened.sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(0, 50));
+    expect(opened.sections.reduce((sum, section) => sum + section.lines.length, 0)).toBe(50);
+  });
+
+  it('"show more sections" gives the next 50, collapsed, then the last 20, in order', async () => {
+    const second = await getContractSectionsByToken(wide.rawToken!, 50);
+    expect(second?.section_count).toBe(120);
+    expect(second?.sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(50, 100));
+    expect(second?.sections.every((section) => section.lines.length === 0 && section.line_count === 1)).toBe(true);
+    const last = await getContractSectionsByToken(wide.rawToken!, 100);
+    expect(last?.sections.map((section) => section.id)).toEqual(wide.sectionIds.slice(100));
+  });
+
+  it('answers null for a bad offset and a bad token', async () => {
+    for (const offset of [-1, 1.5, 100_001, '50', null]) {
+      expect(await getContractSectionsByToken(wide.rawToken!, offset)).toBeNull();
+    }
+    expect(await getContractSectionsByToken('nope', 0)).toBeNull();
+  });
+});
+
 describe('the acknowledgement hash (AC12)', () => {
-  it('is the same over the full snapshot and the opened one, so step B does not move it', async () => {
+  it('is the same over the full snapshot and the one DB step B caps, so step B does not move it', async () => {
     const full = (await getContractByToken(contract.rawToken!))!;
-    expect(contractPayloadHash(withOpeningLines(full))).toBe(contractPayloadHash(full));
+    expect(contractPayloadHash(capped(full))).toBe(contractPayloadHash(full));
   });
 
   it('moves when a line the page never opened differs', async () => {
-    const before = contractPayloadHash(withOpeningLines((await getContractByToken(contract.rawToken!))!));
+    const before = contractPayloadHash(capped((await getContractByToken(contract.rawToken!))!));
     await tamper(`update public.contract_lines set qty = qty + 1 where id = $1`, [contract.lineIds[1][200]]);
-    const after = contractPayloadHash(withOpeningLines((await getContractByToken(contract.rawToken!))!));
+    const after = contractPayloadHash(capped((await getContractByToken(contract.rawToken!))!));
     expect(after).not.toBe(before);
   });
 });

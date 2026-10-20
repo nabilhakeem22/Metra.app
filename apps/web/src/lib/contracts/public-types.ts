@@ -78,6 +78,8 @@ export interface PublicContract {
   original_value: string;
   total: string;
   share_expires_at: string | null;
+  /** How a signed contract was signed: the Cairo day (YYYY-MM-DD) and the way; null until signed. */
+  signed: { on: string; via: 'online' | 'paper' } | null;
   /** 'boq' for an execution contract, generated from a BOQ. */
   source: 'proposal' | 'boq';
   payment_schedule: PublicScheduleRow[];
@@ -94,4 +96,20 @@ export interface PublicSectionLinesPage {
   offset: number;
   line_count: number;
   lines: PublicContractLine[];
+}
+
+/**
+ * The contract as the /c page opens it (A3 reliability R1): its first 50
+ * sections, holding the first 50 lines of the whole contract between them, and
+ * how many sections it has. The rest come 50 sections at a time.
+ */
+export interface PublicContractOpening extends PublicContract {
+  section_count: number;
+}
+
+/** One "show more sections" answer: up to 50 sections from `offset`, collapsed (no lines). */
+export interface PublicSectionsPage {
+  offset: number;
+  section_count: number;
+  sections: PublicContractSection[];
 }

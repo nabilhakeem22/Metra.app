@@ -9,14 +9,16 @@ import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-cal
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
-import type { PublicContract, PublicSectionLinesPage } from './public-types';
+import type { PublicContract, PublicContractOpening, PublicSectionLinesPage, PublicSectionsPage } from './public-types';
 
 export type {
   PublicContract,
   PublicContractLine,
+  PublicContractOpening,
   PublicContractSection,
   PublicScheduleRow,
   PublicSectionLinesPage,
+  PublicSectionsPage,
 } from './public-types';
 
 /** The furthest a "show more" may start, the SQL's own clamp. */
@@ -24,6 +26,12 @@ const MAX_LINE_OFFSET = 100_000;
 
 /** The lines the /c page opens with, across the whole contract; the rest load on demand. */
 const OPENING_LINES = 50;
+
+/** The sections the /c page holds per page: the first 50 open with it, the rest come 50 at a time. */
+export const SECTIONS_PAGE_SIZE = 50;
+
+/** The furthest a "show more sections" may start: past the BOQ caps, never a real contract. */
+const MAX_SECTION_OFFSET = 100_000;
 
 export async function getContractByToken(
   rawToken: string,
@@ -37,21 +45,41 @@ export async function getContractByToken(
 }
 
 /**
- * The snapshot as the page opens it: the first 50 lines of the WHOLE contract,
- * in section order, the way the studio's contract page opens (B1). A section
- * past them opens collapsed, with its line count and "show lines". So the page
- * a client downloads does not grow with the contract, however many sections it
- * has; "show lines" continues each section from where it stands.
+ * The snapshot as the page opens it: its first 50 sections, holding the first
+ * 50 lines of the WHOLE contract in section order between them, the way the
+ * studio's contract page opens (B1, A3 R1). A section past those lines opens
+ * collapsed, with its line count and "show lines"; the sections past the first
+ * 50 come with "show more sections". So the page a client downloads does not
+ * grow with the contract's lines OR its sections.
  */
-export function withOpeningLines(contract: PublicContract): PublicContract {
+export function openingContract(contract: PublicContract): PublicContractOpening {
   let budget = OPENING_LINES;
   return {
     ...contract,
-    sections: contract.sections.map((section) => {
+    section_count: contract.sections.length,
+    sections: contract.sections.slice(0, SECTIONS_PAGE_SIZE).map((section) => {
       const lines = section.lines.slice(0, budget);
       budget -= lines.length;
       return { ...section, lines };
     }),
+  };
+}
+
+/**
+ * Up to 50 sections of the token's contract from `offset`, collapsed (their
+ * lines load through "show lines"). Null, uniformly, for an unknown token, a
+ * contract not issued or signed, or an offset that is not a whole number in
+ * range. Read off the snapshot until DB step B gives the sections their own
+ * SQL page: the act costs what the snapshot costs, the page it feeds does not.
+ */
+export async function getContractSectionsByToken(rawToken: string, offset: unknown): Promise<PublicSectionsPage | null> {
+  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_SECTION_OFFSET) return null;
+  const contract = await getContractByToken(rawToken);
+  if (!contract) return null;
+  return {
+    offset,
+    section_count: contract.sections.length,
+    sections: contract.sections.slice(offset, offset + SECTIONS_PAGE_SIZE).map((section) => ({ ...section, lines: [] })),
   };
 }
 

@@ -7,12 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Centered } from '@/components/share/link-page-parts';
 import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
+import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import type { PublicContract } from '@/lib/contracts/public-types';
+import type { PublicContractOpening } from '@/lib/contracts/public-types';
 import { contractDecidedKey } from './contract-outcome';
+import { ContractSectionList } from './contract-section-list';
 import { ContractTotalsCard } from './contract-totals-card';
 import { ScheduleCard } from './schedule-card';
-import { SectionLines } from './section-lines';
 import { useContractAck } from './use-contract-ack';
 
 export function PublicContractView({
@@ -20,7 +21,7 @@ export function PublicContractView({
   contract,
 }: {
   token: string;
-  contract: PublicContract | null;
+  contract: PublicContractOpening | null;
 }) {
   const t = useTranslations('contracts.ack');
   const locale = useLocale();
@@ -36,7 +37,10 @@ export function PublicContractView({
   const num = formatDocNumber('C', contract.number, docYear(null, new Date()));
 
   const decided = contract.status !== 'issued' || ack.outcome !== null;
-  const decidedMessage = t(contractDecidedKey(contract.status, ack.outcome));
+  // The signing day is the Cairo day the snapshot carries (YYYY-MM-DD), never a UTC timestamp.
+  const decidedMessage = t(contractDecidedKey(contract, ack.outcome), {
+    date: contract.signed ? formatDate(contract.signed.on, locale) : '',
+  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -50,9 +54,7 @@ export function PublicContractView({
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
       </header>
 
-      {contract.sections.map((section) => (
-        <SectionLines key={section.id} token={token} section={section} />
-      ))}
+      <ContractSectionList token={token} sections={contract.sections} sectionCount={contract.section_count} />
 
       <ContractTotalsCard contract={contract} />
       <ScheduleCard contract={contract} />
