@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordContractSignedOfflineCore } from '@/lib/contracts/core';
+import { getContractPage } from '@/lib/contracts/queries';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import type { MemberRole } from '@metra/db';
@@ -139,6 +140,8 @@ describe('recordContractSignedOfflineCore', () => {
     expect((await trail(id)).status).toBe('issued');
     expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: id, signedOn: '2026-10-05' })).toMatchObject({ ok: true });
     expect(await trail(id)).toMatchObject({ status: 'signed', day: '2026-10-05' });
+    // The contract page says the same Cairo day, and how (F4).
+    expect((await getContractPage(ctx.owner!, id, true))!.signed).toEqual({ on: '2026-10-05', via: 'paper' });
   });
 
   it('says year 0 is not a day (never a 22008), and a null or non-object payload is malformed', async () => {

@@ -46,7 +46,7 @@ const DETAIL = {
   termsAr: null,
   originalValue: '1000.0000',
   revisedValue: '1000.0000',
-  sections: [],
+  signed: null,
 } as unknown as ContractPageDetail;
 
 async function press(name: string) {
@@ -76,6 +76,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     renderWithIntl(
       <ContractDetailClient
         detail={DETAIL}
+        openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
         tabs={['overview', 'variations']}

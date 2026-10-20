@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
-import { getContractPage } from '@/lib/contracts/queries';
+import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
 import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
@@ -31,6 +31,11 @@ export default async function ContractDetailPage({
   // Only an execution contract has a schedule: at most 12 rows.
   const schedule = detail.sourceBoqId === null ? null : await getContractSchedule(ctx, detail);
   const tabs = contractTabsFor(detail);
+  const openingTab = openingContractTab((await searchParams).tab, tabs);
+  // Only the overview shows the sections: the schedule and the change orders
+  // never read them (A3 reliability R1). Opened elsewhere, the overview asks
+  // for its first page when it is shown.
+  const openingSections = openingTab === 'overview' ? await getContractSectionsPage(ctx, id, null) : null;
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
@@ -45,10 +50,11 @@ export default async function ContractDetailPage({
       />
       <ContractDetailClient
         detail={detail}
+        openingSections={openingSections}
         variations={variations}
         schedule={schedule}
         tabs={tabs}
-        openingTab={openingContractTab((await searchParams).tab, tabs)}
+        openingTab={openingTab}
         canSignOffline={mayRecordSignedOffline(ctx.role)}
         canManage={canManage}
         canIssue={canIssue}

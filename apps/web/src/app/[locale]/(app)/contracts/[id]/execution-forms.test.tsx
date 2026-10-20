@@ -144,10 +144,28 @@ describe.each<TestLocale>(['en', 'ar-EG'])('execution contract forms (%s)', (loc
     });
   });
 
-  test('an execution contract header has no advance or retention box', () => {
+  test('an execution contract header has no advance, retention or signature date box (F4)', async () => {
     show(<ContractHeaderForm detail={DETAIL} />);
     expect(document.getElementById('ch-advancePct')).toBeNull();
     expect(document.getElementById('ch-retentionPct')).toBeNull();
+    expect(document.getElementById('ch-signatureDate')).toBeNull();
     expect(document.getElementById('ch-startDate')).not.toBeNull();
+    contracts.saveContractDraft.mockResolvedValue({ ok: true });
+    await press(at('contracts.saveDraft'))();
+    expect(contracts.saveContractDraft.mock.calls[0][0].header.signatureDate).toBeUndefined();
+  });
+
+  test('an amount schedule asks for the exact contract value, to the 4th decimal (F5)', () => {
+    const odd = { ...DETAIL, originalValue: '1600.7453', taxAmount: '196.5828' } as unknown as ContractHeaderDetail;
+    const amounts: ContractScheduleView = {
+      valid: false,
+      rows: [
+        { id: 'm-1', labelAr: null, labelEn: 'Half', basis: 'amount', value: '800.3700', sortOrder: 0, amount: null, taxAmount: null },
+        { id: 'm-2', labelAr: null, labelEn: 'Rest', basis: 'amount', value: '800.3800', sortOrder: 1, amount: null, taxAmount: null },
+      ],
+    };
+    show(<ScheduleTab contractId="k-1" status="draft" canManage schedule={amounts} contract={odd} m={(value) => value} />);
+    const exact = locale === 'en' ? '1,600.7453 EGP' : '1,600.7453 ج.م';
+    expect(document.querySelector(`label[for="${SCHEDULE_TOTAL_ID}"]`)?.textContent).toContain(exact);
   });
 });

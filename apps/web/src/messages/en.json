@@ -1590,6 +1590,7 @@
     "project": "Project",
     "originalValue": "Original value",
     "revisedValue": "Revised value",
+    "signedOn": "Signed on {date} ({via, select, paper {on paper} other {online}})",
     "value": "Value",
     "saveDraft": "Save draft",
     "saved": "Saved",
@@ -1653,7 +1654,9 @@
       "showMore": "Show more lines ({count} left)",
       "loadFailed": "We couldn't load these lines. Check your connection and try again.",
       "gone": "These lines are not in the workspace you are in now, or no longer exist. Reload the page.",
-      "reload": "Reload page"
+      "reload": "Reload page",
+      "moreSections": "Show more sections",
+      "loadingSections": "Loading the sections"
     },
     "execution": {
       "generate": {

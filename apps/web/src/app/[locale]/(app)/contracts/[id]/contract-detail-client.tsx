@@ -8,7 +8,7 @@ import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
-import type { ContractPageDetail } from '@/lib/contracts/queries';
+import type { ContractPageDetail, ContractSectionsPage } from '@/lib/contracts/queries';
 import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
@@ -17,10 +17,12 @@ import type { ContractAction } from './contract-vo-types';
 import { ScheduleTab } from './schedule-tab';
 import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
+import { useKeptSections } from './use-kept-sections';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
   detail,
+  openingSections,
   variations,
   schedule,
   tabs,
@@ -32,6 +34,8 @@ export function ContractDetailClient({
   canPriceVariation,
 }: {
   detail: ContractPageDetail;
+  /** The first page of sections when the page opened on the overview; null on another tab. */
+  openingSections: ContractSectionsPage | null;
   variations: VariationListRow[];
   /** The payment schedule of an execution contract; null on a proposal contract. */
   schedule: ContractScheduleView | null;
@@ -49,6 +53,7 @@ export function ContractDetailClient({
   const locale = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<ContractTab>(openingTab);
+  const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
@@ -103,6 +108,7 @@ export function ContractDetailClient({
       {tab === 'overview' && (
         <ContractOverview
           detail={detail}
+          keptSections={keptSections}
           keptLines={keptLines}
           canManage={canManage}
           canIssue={canIssue}
