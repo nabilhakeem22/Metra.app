@@ -13,6 +13,9 @@ import { asc } from 'drizzle-orm';
 /** The most lines one read returns. */
 export const LINES_PAGE_SIZE = 50;
 
+/** The most sections one read returns (A3 reliability R1). */
+export const SECTIONS_PAGE_SIZE = 50;
+
 export const LINE_VIEW_COLUMNS = {
   id: contractLines.id,
   descriptionAr: contractLines.descriptionAr,

@@ -4,7 +4,6 @@ import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractsClient } from '../contracts-client';
 import { ContractDetailClient } from './contract-detail-client';
-import { contractTabsFor } from './tabs';
 import { ContractHeaderForm } from './contract-header-form';
 import { VariationRegister } from './variation-register';
 
@@ -50,7 +49,7 @@ const DETAIL = {
   termsAr: null,
   originalValue: '1000.0000',
   revisedValue: '1000.0000',
-  sections: [],
+  signed: null,
 } as unknown as ContractPageDetail;
 
 async function press(name: string) {
@@ -80,8 +79,12 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     renderWithIntl(
       <ContractDetailClient
         detail={DETAIL}
+        openingSections={{ sections: [], hasMore: false }}
         variations={[]}
-        tabs={contractTabsFor(false)}
+        schedule={null}
+        tabs={['overview', 'variations']}
+        openingTab="overview"
+        canSignOffline={false}
         canCreateCosts={false}
         canUpdateCosts={false}
         canManage={false}

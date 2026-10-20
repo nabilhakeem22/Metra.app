@@ -516,7 +516,10 @@
       "no_longer_exists": "That choice no longer exists; it may have been deleted. Pick another one.",
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting.",
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
-      "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
+      "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
+      "date_in_future": "That day has not come yet. Pick today or an earlier day.",
+      "too_many_decimals": "Use at most {max} decimal places.",
+      "date_before_issue": "The contract was issued on {date}. Pick that day or a later one."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -558,11 +561,11 @@
     "date_in_future": "That date is in the future. Pick today or an earlier day.",
     "amount_too_large": "That amount is larger than Metra can hold. Check the number of digits and enter it again.",
     "last_primary_contact": "This is the primary contact of the client. Make another contact primary first, then remove this one.",
-    "contract_exists": "A contract was already generated from this proposal. Open it from the contracts list.",
+    "contract_exists": "A contract was already generated from this document. Open it from the contracts list.",
     "proposal_not_accepted": "The proposal has not been accepted yet. Record the acceptance first, then generate the contract.",
     "contract_not_draft": "This contract was already issued, so it cannot be edited. Refresh the page to see its current state.",
     "contract_not_issued": "The contract has not been issued yet. Issue it first, then try again.",
-    "contract_not_signable": "This contract cannot be terminated in its current state. Refresh the page to see where it stands.",
+    "contract_not_signable": "This contract can no longer take this step in its current state. Refresh the page to see where it stands.",
     "variation_not_draft": "This variation order is no longer a draft, so it cannot be edited. Refresh the page to see its current state.",
     "variation_not_internal_approved": "The variation order is not approved internally yet. Approve it first, then issue it.",
     "engagement_title_required": "The delivery has no title. Write one in Arabic or English; one of them is enough.",
@@ -1715,6 +1718,7 @@
         "save": "Save"
       }
     },
+    "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
     "empty": "No contracts yet. Generate one from an accepted proposal.",
     "generate": "Generate contract",
     "generateFromProposal": "Generate contract from this proposal",
@@ -1725,6 +1729,7 @@
     "project": "Project",
     "originalValue": "Original value",
     "revisedValue": "Revised value",
+    "signedOn": "Signed on {date} ({via, select, paper {on paper} other {online}})",
     "value": "Value",
     "saveDraft": "Save draft",
     "saved": "Saved",
@@ -1760,6 +1765,9 @@
       "nameRequired": "Write your full name to acknowledge the contract.",
       "button": "Acknowledge electronically",
       "done": "Your acknowledgement has been recorded. Thank you.",
+      "signedPaper": "This contract was signed on paper on {date}.",
+      "signedOnline": "This contract was acknowledged online on {date}.",
+      "signed": "This contract is signed.",
       "already": "This contract has already been acknowledged.",
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
@@ -1767,14 +1775,85 @@
       "heading": "Contract",
       "originalValue": "Original value",
       "advancePct": "Advance %",
-      "retentionPct": "Retention %"
+      "retentionPct": "Retention %",
+      "worksValue": "Works value",
+      "vat": "VAT ({rate})",
+      "supervision": "Supervision fee ({rate})",
+      "schedule": {
+        "title": "Payment schedule",
+        "note": "Each amount is a share of the contract value, VAT included."
+      },
+      "lines": {
+        "showMore": "Show more lines ({count} left)",
+        "provisional": "Provisional",
+        "gone": "These lines can no longer be shown. Please refresh the page.",
+        "loadFailed": "We could not load these lines. Please check your connection and try again.",
+        "show": "Show the lines ({count})",
+        "moreSections": "Show more sections ({count} left)"
+      }
     },
     "lines": {
       "show": "Show lines ({count})",
       "showMore": "Show more lines ({count} left)",
       "loadFailed": "We couldn't load these lines. Check your connection and try again.",
       "gone": "These lines are not in the workspace you are in now, or no longer exist. Reload the page.",
-      "reload": "Reload page"
+      "reload": "Reload page",
+      "moreSections": "Show more sections",
+      "loadingSections": "Loading the sections"
+    },
+    "execution": {
+      "generate": {
+        "open": "Create the execution contract",
+        "title": "Execution contract from the BOQ",
+        "description": "The works value is the BOQ total. Set VAT and the supervision fee; you can change them while the contract is a draft.",
+        "taxRate": "VAT %",
+        "supervisionPct": "Supervision fee %",
+        "submit": "Create the contract",
+        "openContract": "Open the execution contract"
+      },
+      "charges": {
+        "title": "VAT and supervision",
+        "taxRate": "VAT %",
+        "supervisionPct": "Supervision fee %",
+        "worksValue": "Works value (BOQ total)",
+        "taxAmount": "VAT",
+        "supervisionAmount": "Supervision fee",
+        "originalValue": "Contract value",
+        "save": "Save the charges"
+      },
+      "schedule": {
+        "tab": "Payment schedule",
+        "title": "Payment schedule",
+        "intro": "What the client pays, and when. The client signs it with the contract, and it is fixed once the contract is sent.",
+        "basis": "Split by",
+        "bases": {
+          "percent": "Percentages",
+          "amount": "Amounts"
+        },
+        "labelAr": "Name (Arabic)",
+        "labelEn": "Name (English)",
+        "share": "Share %",
+        "amount": "Amount",
+        "total": "Total (must be {target})",
+        "add": "Add a payment",
+        "remove": "Remove",
+        "save": "Save the schedule",
+        "empty": "No payment schedule yet.",
+        "stale": "The schedule no longer adds up to the contract value. Save it again before you send the contract.",
+        "defaults": {
+          "advance": "Advance payment",
+          "works": "During the works",
+          "handover": "On handover"
+        }
+      },
+      "signOffline": {
+        "open": "Record signed on paper",
+        "title": "The client signed on paper",
+        "description": "Record the day the client signed this contract outside Metra. The contract becomes signed, and payment requests can be sent.",
+        "signedOn": "Signed on",
+        "note": "Note",
+        "submit": "Record the signature"
+      }
     }
   },
   "variations": {
@@ -2038,9 +2117,7 @@
       "closed": {
         "execution": {
           "headline": "Closed: the client is building with you",
-          "hint": "The design is done. Price the build from the BOQ when you're ready.",
-          "viewBoq": "View BOQ",
-          "startQuotation": "Start a quotation"
+          "hint": "The design is done. The build runs on the execution contract below."
         },
         "closed_design_only": {
           "headline": "Closed: design-only handover complete",
@@ -2866,7 +2943,10 @@
         "no_longer_exists": "This choice is no longer available. Please choose another one.",
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting.",
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
-        "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
+        "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares.",
+        "date_in_future": "That day has not come yet. Please choose today or an earlier day.",
+        "too_many_decimals": "Please use at most {max} decimal places.",
+        "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
@@ -2976,5 +3056,39 @@
     },
     "unitNotSupported": "Your price book has no unit for this item, so it can't be added.",
     "neverPriced": "This item has never had an official price, so it can't be added."
+  },
+  "execution": {
+    "card": {
+      "title": "Execution",
+      "waitingOnClient": "Waiting for the client to sign the contract on its link.",
+      "someoneElse": "An owner or an admin does this.",
+      "stage": {
+        "no_boq": "No BOQ in Metra yet",
+        "no_contract": "The BOQ is issued, with no execution contract yet",
+        "draft": "The contract is a draft",
+        "awaiting_signature": "The contract is sent, not signed yet",
+        "in_progress": "Works in progress",
+        "final_account": "The final account is issued",
+        "settled": "Settled",
+        "terminated": "The contract was terminated"
+      },
+      "next": {
+        "open_boq": "Open the BOQ",
+        "create_contract": "Create the execution contract",
+        "set_schedule": "Set the payment schedule",
+        "send_contract": "Send the contract",
+        "record_signed_offline": "Record signed on paper",
+        "await_variation_answer": "Follow up on the change order"
+      },
+      "upcoming": {
+        "send_milestone_request": "Next: a payment request for {instalment}.",
+        "send_variation_request": "Next: a payment request for the approved change order.",
+        "record_payment": "Next: the client's payment on the open payment request.",
+        "review_payment_claim": "Next: checking the payment the client reported.",
+        "prepare_final_account": "Next: the final account.",
+        "review_final_account": "Next: reviewing the final account.",
+        "anInstalment": "the next instalment"
+      }
+    }
   }
 }

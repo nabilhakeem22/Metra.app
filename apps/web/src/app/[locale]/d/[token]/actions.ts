@@ -15,7 +15,7 @@ import { THREAD_READ_REFUSED, type PortalThreadRead } from '@/lib/engagements/po
 import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
 import { isUuid } from '@/lib/uuid';
-import { requestProvenance } from './request-provenance';
+import { requestProvenance } from '@/lib/share/request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
 // (concept, design, budget, handover) are in ./review-actions.ts.
@@ -52,7 +52,7 @@ export type DeliveryCommentActResult = (DeliveryCommentResult | UnansweredAct | 
 /**
  * Public (no-session) client delivery-portal action (Phase 3): the client "mark as
  * paid" on ONE milestone. Captures the client IP + user agent
- * (./request-provenance.ts) for the claim's provenance; the raw token is NEVER
+ * (lib/share/request-provenance.ts) for the claim's provenance; the raw token is NEVER
  * logged. The claim is PENDING: no state move, no money ledger (the studio confirms
  * it later), and the amount is locked server-side, so no amount input exists. A
  * first `ok` notifies the finance roles, naming the milestone the SDF accepted.

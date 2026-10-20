@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billingBalance, computeFinalAccount, type FinalAccountInput, type MeasuredLine } from './final-account';
+import { billingBalance, computeFinalAccount, finalAccountBalance, type FinalAccountInput, type MeasuredLine } from './final-account';
 
 function line(overrides: Partial<MeasuredLine> & Pick<MeasuredLine, 'lineId'>): MeasuredLine {
   return {
@@ -122,3 +122,18 @@ describe('billingBalance', () => {
   });
 });
 
+describe('finalAccountBalance (the card reads the measured works summed in SQL, R3)', () => {
+  it('equals computeFinalAccount for the same lines, from their works summed', () => {
+    const lines = [
+      provisional,
+      firmCovered,
+      firmUncovered,
+      line({ lineId: 'p2', qty: '12.3500', unitPrice: '87.5000', discountPct: '12.5', provisional: true, measuredQty: '9.1111' }),
+    ];
+    const input: FinalAccountInput = { ...base, discountPct: '2.5', approvedVariationNetDeltas: ['10000', '-333.3333'], measuredLines: lines };
+    const account = computeFinalAccount(input);
+    const works = account.billedLines.reduce((total, billed) => total + Number(billed.works) * 10000, 0) / 10000;
+    expect(finalAccountBalance(input, works.toFixed(4))).toBe(account.balance);
+    expect(billingBalance(input)).toBe(finalAccountBalance(input, '0'));
+  });
+});

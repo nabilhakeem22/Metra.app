@@ -13,13 +13,14 @@ import { useRouter } from '@/i18n/routing';
 import { saveContractDraft } from '@/lib/contracts/actions';
 import type { ContractHeaderDetail } from '@/lib/contracts/queries';
 import {
-  CONTRACT_HEADER_FIELDS,
+  contractHeaderFieldsFor,
   contractHeaderInput,
   headerFormOf,
+  type HeaderField,
   type HeaderForm,
 } from './contract-header-input';
 
-type HeaderKey = keyof HeaderForm;
+type HeaderKey = HeaderField;
 
 const KIND: Partial<Record<HeaderKey, 'date' | 'number'>> = {
   advancePct: 'number',
@@ -33,7 +34,8 @@ const KIND: Partial<Record<HeaderKey, 'date' | 'number'>> = {
 
 /**
  * Draft-only header editor — wires the tested saveContractDraftCore so staff set
- * retention/advance/terms/dates/payment terms before issuing. Each refused field
+ * retention/advance/terms/dates/payment terms before issuing. An execution
+ * contract has no retention or advance box (its schedule says how it is paid). Each refused field
  * is said under it (a percentage outside 0 to 100, a day that is not one, an end
  * before the start); a refusal of the contract itself (`contract_not_draft`:
  * it was issued meanwhile) is said above the fields.
@@ -46,7 +48,8 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<HeaderForm>(() => headerFormOf(detail));
-  const errors = useFieldErrors({ fields: CONTRACT_HEADER_FIELDS, translate: te });
+  const shown = contractHeaderFieldsFor(detail);
+  const errors = useFieldErrors({ fields: shown, translate: te });
   const formRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalid(formRef, errors.invalidAttempt);
 
@@ -54,7 +57,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
     errors.clear();
     startTransition(async () => {
       try {
-        const res = await saveContractDraft({ id: detail.id, header: contractHeaderInput(form) });
+        const res = await saveContractDraft({ id: detail.id, header: contractHeaderInput(form, shown) });
         if (errors.applyResult(res)) return;
         setSaved(true);
         router.refresh();
@@ -91,9 +94,9 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
           </p>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('advancePct', th('advancePct'))}
-          {field('retentionPct', th('retentionPct'))}
-          {field('signatureDate', th('signatureDate'))}
+          {shown.includes('advancePct') && field('advancePct', th('advancePct'))}
+          {shown.includes('retentionPct') && field('retentionPct', th('retentionPct'))}
+          {shown.includes('signatureDate') && field('signatureDate', th('signatureDate'))}
           {field('startDate', th('startDate'))}
           {field('endDate', th('endDate'))}
           {field('paymentTermsDays', th('paymentTermsDays'))}

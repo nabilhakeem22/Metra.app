@@ -71,9 +71,10 @@ export interface ContractLineOptionsPage {
 }
 
 /**
- * A section as the contract page opens it: its line count from SQL, and only
+ * A section as the contract page shows it: its line count from SQL, and only
  * the lines that fall inside the page's opening window (the first 50 lines of
- * the whole contract). The rest load on demand, a page at a time.
+ * the whole contract, on the first page of sections). The rest load on demand,
+ * a page at a time.
  */
 export interface ContractSectionSummary {
   id: string;
@@ -83,6 +84,19 @@ export interface ContractSectionSummary {
   sectionSubtotal: string;
   lineCount: number;
   openingLines: ContractLineView[];
+}
+
+/** At most SECTIONS_PAGE_SIZE sections, in document order, and whether more follow. */
+export interface ContractSectionsPage {
+  sections: ContractSectionSummary[];
+  hasMore: boolean;
+}
+
+/** When and how a signed contract was signed: the Cairo day of its signing event. */
+export interface ContractSigning {
+  /** YYYY-MM-DD, the day in Cairo. */
+  on: string;
+  via: 'online' | 'paper';
 }
 
 /** Everything about a contract but its sections. */
@@ -142,7 +156,11 @@ export interface ContractDetail extends ContractHeaderDetail {
   sections: ContractDetailSection[];
 }
 
-/** The contract as its page opens: bounded whatever the contract's size. */
+/**
+ * The contract as its page opens: the header and how it was signed. Its
+ * sections load a page at a time (./section-summaries.ts), and only on the tab
+ * that shows them, so no page grows with the number of sections.
+ */
 export interface ContractPageDetail extends ContractHeaderDetail {
-  sections: ContractSectionSummary[];
+  signed: ContractSigning | null;
 }

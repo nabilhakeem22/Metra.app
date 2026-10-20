@@ -1,5 +1,5 @@
 import 'server-only';
-import { boqs, type MetraDb } from '@metra/db';
+import { boqs, contracts, type MetraDb } from '@metra/db';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import type { OrgContext } from '@/lib/db/context';
@@ -47,7 +47,8 @@ export async function freezeAndRecordIssue(
  * Lock and supersede every other draft or issued BOQ on the project. Returns the
  * one that was issued (at most one can be), which the new version supersedes.
  * Issued -> superseded is the trigger's whitelisted transition; drafts are not
- * locked at all.
+ * locked at all. An issued BOQ a live contract stands on is never superseded
+ * (`boq_has_contract`, plan A3): changes after the contract are change orders.
  */
 async function supersedeOthers(
   tx: MetraDb,
@@ -64,6 +65,7 @@ async function supersedeOthers(
       ),
     )
     .for('update');
+  await refuseIfContracted(tx, others.filter((other) => other.status === 'issued').map((other) => other.id));
   if (others.length > 0) {
     await tx
       .update(boqs)
@@ -71,6 +73,22 @@ async function supersedeOthers(
       .where(inArray(boqs.id, others.map((other) => other.id)));
   }
   return others.find((other) => other.status === 'issued')?.id ?? null;
+}
+
+/**
+ * A non-terminated contract on one of these BOQs refuses the issue. Read AFTER
+ * the BOQ rows are locked FOR UPDATE: a contract generated meanwhile held its
+ * BOQ FOR SHARE (lib/contracts/core/create-from-boq.ts), so it has committed by
+ * now and this read sees it.
+ */
+async function refuseIfContracted(tx: MetraDb, issuedBoqIds: string[]): Promise<void> {
+  if (issuedBoqIds.length === 0) return;
+  const [standing] = await tx
+    .select({ id: contracts.id })
+    .from(contracts)
+    .where(and(inArray(contracts.sourceBoqId, issuedBoqIds), ne(contracts.status, 'terminated')))
+    .limit(1);
+  if (standing) fail('boq_has_contract');
 }
 
 /** Freeze as the next version. `status = 'draft'` is the admission gate: a

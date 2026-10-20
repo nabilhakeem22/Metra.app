@@ -53,11 +53,30 @@ function residualQty4(line: MeasuredLine): bigint {
 }
 
 /** Every approved change order's full charge, de-scopes included (they lower it). */
-function variationsCharge4(input: FinalAccountInput): bigint {
+function variationsCharge4(input: Omit<FinalAccountInput, 'measuredLines'>): bigint {
   return input.approvedVariationNetDeltas.reduce(
     (total, netDelta) => total + parseMoney4(variationCharge(netDelta, input.taxRate, input.supervisionPct).total),
     0n,
   );
+}
+
+/** The figures that follow from the measured works (Σ billed line works, before
+ *  the document discount): the same rule for the full account and the balance. */
+function finalFigures(input: Omit<FinalAccountInput, 'measuredLines'>, measuredWorks4: bigint) {
+  const adjustmentWorks4 = measuredWorks4 - pctOf(measuredWorks4, parseMoney4(input.discountPct));
+  // The measured works carry VAT and supervision by the same rule as a change order.
+  const adjustment = variationCharge(formatMoney4(adjustmentWorks4), input.taxRate, input.supervisionPct);
+  const variations4 = variationsCharge4(input);
+  const finalValue4 = parseMoney4(input.originalValue) + variations4 + parseMoney4(adjustment.total);
+  const billed4 = parseMoney4(input.issuedRequestsTotal);
+  return {
+    variationsCharge: formatMoney4(variations4),
+    adjustmentWorks: adjustment.works,
+    adjustmentCharge: adjustment.total,
+    finalValue: formatMoney4(finalValue4),
+    billedSoFar: formatMoney4(billed4),
+    balance: formatMoney4(finalValue4 - billed4),
+  };
 }
 
 export function computeFinalAccount(input: FinalAccountInput): FinalAccount {
@@ -81,23 +100,19 @@ export function computeFinalAccount(input: FinalAccountInput): FinalAccount {
     billedLines.push({ lineId: line.lineId, residualQty, works: lineTotal });
     measuredWorks4 += parseMoney4(lineTotal);
   }
+  return { ...finalFigures(input, measuredWorks4), billedLines, flaggedLines };
+}
 
-  const adjustmentWorks4 = measuredWorks4 - pctOf(measuredWorks4, parseMoney4(input.discountPct));
-  // The measured works carry VAT and supervision by the same rule as a change order.
-  const adjustment = variationCharge(formatMoney4(adjustmentWorks4), input.taxRate, input.supervisionPct);
-  const variations4 = variationsCharge4(input);
-  const finalValue4 = parseMoney4(input.originalValue) + variations4 + parseMoney4(adjustment.total);
-  const billed4 = parseMoney4(input.issuedRequestsTotal);
-  return {
-    variationsCharge: formatMoney4(variations4),
-    adjustmentWorks: adjustment.works,
-    adjustmentCharge: adjustment.total,
-    finalValue: formatMoney4(finalValue4),
-    billedSoFar: formatMoney4(billed4),
-    balance: formatMoney4(finalValue4 - billed4),
-    billedLines,
-    flaggedLines,
-  };
+/**
+ * The full balance from the measured works ALREADY SUMMED: Σ over the billed
+ * (provisional) measured lines of each line's works, exactly as computeFinalAccount
+ * rounds them (residual x unit price, then the line discount, each to the 4th
+ * decimal, half away from zero). For a reader that sums them in SQL so the lines
+ * never cross the wire (the delivery card, A3 reliability R3); equal to
+ * `computeFinalAccount(...).balance` for the same lines.
+ */
+export function finalAccountBalance(input: Omit<FinalAccountInput, 'measuredLines'>, measuredWorks: string): string {
+  return finalFigures(input, parseMoney4(measuredWorks)).balance;
 }
 
 /**
@@ -108,5 +123,5 @@ export function computeFinalAccount(input: FinalAccountInput): FinalAccount {
  * so a mid-job progress reading never reads as a refund or a shortfall.
  */
 export function billingBalance(input: Omit<FinalAccountInput, 'measuredLines'>): string {
-  return computeFinalAccount({ ...input, measuredLines: [] }).balance;
+  return finalAccountBalance(input, '0');
 }

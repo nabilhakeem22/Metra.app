@@ -8,19 +8,27 @@ import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
-import type { ContractPageDetail } from '@/lib/contracts/queries';
+import type { ContractPageDetail, ContractSectionsPage } from '@/lib/contracts/queries';
+import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
+import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction } from './contract-vo-types';
 import { CostsTab } from './costs-tab';
+import { ScheduleTab } from './schedule-tab';
 import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
+import { useKeptSections } from './use-kept-sections';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
   detail,
+  openingSections,
   variations,
+  schedule,
   tabs,
+  openingTab,
+  canSignOffline,
   canCreateCosts,
   canUpdateCosts,
   canManage,
@@ -29,9 +37,16 @@ export function ContractDetailClient({
   canPriceVariation,
 }: {
   detail: ContractPageDetail;
+  /** The first page of sections when the page opened on the overview; null on another tab. */
+  openingSections: ContractSectionsPage | null;
   variations: VariationListRow[];
-  /** Costs is among them only on an execution contract, for a role that reads its costs. */
+  /** The payment schedule of an execution contract; null on a proposal contract. */
+  schedule: ContractScheduleView | null;
+  /** Schedule and Costs are among them only on an execution contract; Costs only for a role that reads its costs. */
   tabs: readonly ContractTab[];
+  openingTab: ContractTab;
+  /** Owner, admin or project manager: may record a paper signature (D5). */
+  canSignOffline: boolean;
   canCreateCosts: boolean;
   canUpdateCosts: boolean;
   canManage: boolean;
@@ -40,11 +55,11 @@ export function ContractDetailClient({
   canPriceVariation: boolean;
 }) {
   const t = useTranslations('contracts');
-  const tv = useTranslations('variations');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
-  const [tab, setTab] = useState<ContractTab>('overview');
+  const [tab, setTab] = useState<ContractTab>(openingTab);
+  const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
@@ -94,40 +109,37 @@ export function ContractDetailClient({
         </Card>
       )}
 
-      <div className="flex gap-2 border-b">
-        {tabs.map((tb) => (
-          <button
-            key={tb}
-            type="button"
-            onClick={() => setTab(tb)}
-            className={`border-b-2 px-3 py-2 text-body ${
-              tab === tb
-                ? 'border-primary font-medium'
-                : 'border-transparent text-muted-foreground'
-            }`}
-          >
-            {tb === 'overview' ? t('contract') : tb === 'costs' ? t('costs.tab') : tv('register')}
-          </button>
-        ))}
-      </div>
+      <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />
 
       {tab === 'overview' && (
         <ContractOverview
           detail={detail}
+          keptSections={keptSections}
           keptLines={keptLines}
           canManage={canManage}
           canIssue={canIssue}
+          canSignOffline={canSignOffline}
           pending={pending}
           m={m}
           onIssue={() => act(() => issueContract(detail.id))}
           onTerminate={() => act(() => terminateContract(detail.id))}
         />
       )}
+      {tab === 'schedule' && schedule && (
+        <ScheduleTab
+          contractId={detail.id}
+          status={detail.status}
+          canManage={canManage}
+          schedule={schedule}
+          contract={detail}
+          m={m}
+        />
+      )}
       {tab === 'costs' && (
         <CostsTab
           contractId={detail.id}
           contractStatus={detail.status}
-          sections={detail.sections}
+          sections={keptSections.page?.sections ?? []}
           canCreate={canCreateCosts}
           canUpdate={canUpdateCosts}
           m={m}

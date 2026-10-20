@@ -8,7 +8,7 @@ import type { MilestoneBasis } from '@metra/db';
 import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { readMoneyField } from '@/lib/validation/field-rules';
-import { clean } from '@/lib/validation/text';
+import { visibleText } from '@/lib/validation/text';
 import { boundedText, requiredText } from '@/lib/validation/text-field-rules';
 import { milestoneAmounts } from './milestone-amounts';
 
@@ -45,13 +45,12 @@ function plainDecimal(value4: bigint): string {
   return formatMoney4(value4).replace(/\.?0+$/, '');
 }
 
-/** Either label is enough; each one is capped. */
+/** Either label is enough, once it shows something; each one is capped. */
 function labelError(row: ScheduleRowInput): FieldError | null {
-  if (requiredText(row.labelAr) && requiredText(row.labelEn)) return { code: 'required' };
-  return (
-    boundedText(row.labelAr, MAX_SCHEDULE_LABEL_CHARS) ??
-    boundedText(row.labelEn, MAX_SCHEDULE_LABEL_CHARS)
-  );
+  const labelAr = visibleText(row.labelAr);
+  const labelEn = visibleText(row.labelEn);
+  if (labelAr === null && labelEn === null) return { code: 'required' };
+  return boundedText(labelAr, MAX_SCHEDULE_LABEL_CHARS) ?? boundedText(labelEn, MAX_SCHEDULE_LABEL_CHARS);
 }
 
 /** The row's value at scale 4, or the refusal under its box. */
@@ -115,8 +114,8 @@ export function validateSchedule(
     return { ok: false, errors: { milestones: { code: 'schedule_sum_mismatch', params } } };
   }
   const cleanRows = rows.map((row, index) => ({
-    labelAr: clean(row.labelAr),
-    labelEn: clean(row.labelEn),
+    labelAr: visibleText(row.labelAr),
+    labelEn: visibleText(row.labelEn),
     basis: row.basis,
     value: formatMoney4(clean4[index]),
     sortOrder: index,

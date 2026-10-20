@@ -30,6 +30,7 @@ import {
   type EngagementHeader,
 } from '@/lib/engagements/queries';
 import { mayRecordHandoverConfirmation } from '@/lib/engagements/handover-recorders';
+import { getExecutionFacts } from '@/lib/execution/queries/facts';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
@@ -66,6 +67,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     awaitingReplyCount,
     boqStep,
     feeSplitPrefill,
+    execution,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -86,6 +88,8 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     header.state === 'created'
       ? getLastUsedFeeSchedule(ctx).then(deriveFeeSplitPrefill)
       : Promise.resolve(null),
+    // The execution card exists only once the delivery chose execution.
+    header.state === 'execution' ? getExecutionFacts(ctx, id) : Promise.resolve(null),
   ]);
 
   return {
@@ -103,6 +107,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     awaitingReplyCount,
     boqStep,
     feeSplitPrefill,
+    execution,
   };
 }
 

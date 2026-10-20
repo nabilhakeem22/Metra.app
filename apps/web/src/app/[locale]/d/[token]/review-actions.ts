@@ -16,13 +16,13 @@ import {
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
 import { portalActAllowed } from '@/lib/share/portal-rate-limit';
-import { requestProvenance } from './request-provenance';
+import { requestProvenance } from '@/lib/share/request-provenance';
 
 // The client's REVIEW acts on the portal: the concept, the final design, the
 // budget range and the handover. Public (no session): the share token IS the
 // authorization, flows straight to the act modules, which hash it, and is
 // NEVER logged here. Each act captures the client's IP and user agent
-// (./request-provenance.ts) for the append-only engagement_events trail, and an
+// (lib/share/request-provenance.ts) for the append-only engagement_events trail, and an
 // invisible note is no note (clientNote). Every answer names only a decision
 // that is SAVED (../../../../lib/engagements/review-outcome.ts): a repeat reports
 // the decision on file, never the verb just tapped. A verb outside an act's

@@ -1,7 +1,8 @@
 import 'server-only';
-// The contract, margin-gated, in its two shapes: the PAGE (sections counted in
-// SQL, at most 50 lines; the rest load per section through ./section-lines.ts)
-// and the PDF (every line, because the printed document is the whole contract).
+// The contract, margin-gated, in its two shapes: the PAGE (the header and how
+// it was signed; its sections load a page at a time through
+// ./section-summaries.ts, their lines through ./section-lines.ts) and the PDF
+// (every line, because the printed document is the whole contract).
 // Both share one header assembly: load the header (./detail-header.ts), compute
 // the revised value, gate the margin.
 import { variationOrders, type MetraDb } from '@metra/db';
@@ -11,7 +12,7 @@ import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { loadContractHeader } from './detail-header';
 import { loadContractSections } from './detail-sections';
 import type { ContractDetail, ContractHeaderDetail, ContractPageDetail } from './detail-types';
-import { loadSectionSummaries } from './section-summaries';
+import { loadContractSigning } from './signing';
 
 export type {
   ContractDetail,
@@ -23,7 +24,9 @@ export type {
   ContractLinesPage,
   ContractLineView,
   ContractPageDetail,
+  ContractSectionsPage,
   ContractSectionSummary,
+  ContractSigning,
 } from './detail-types';
 
 /** Revised value = original + Σ netDelta of APPROVED VOs (A3, computed). */
@@ -66,7 +69,7 @@ async function loadHeaderDetail(
   };
 }
 
-/** The contract page's read: bounded however many lines the contract holds. */
+/** The contract page's read: the header and how it was signed, whatever the contract's size. */
 export function getContractPage(
   ctx: OrgContext,
   id: string,
@@ -75,7 +78,7 @@ export function getContractPage(
   return withOrgContext(ctx, async (tx) => {
     const header = await loadHeaderDetail(tx, id, canSeeMargin);
     if (!header) return null;
-    return { ...header, sections: await loadSectionSummaries(tx, id) };
+    return { ...header, signed: await loadContractSigning(tx, id) };
   });
 }
 

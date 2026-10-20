@@ -51,3 +51,22 @@ export async function isKnownContractPosition(
   if (!contract) return false;
   return position.afterLineId === null || lineIn(tx, position.afterLineId, { contractId: position.contractId });
 }
+
+/** The contract is visible, and the cursor section (if any) one of its sections. */
+export async function isKnownSectionCursor(
+  tx: MetraDb,
+  position: { contractId: string; afterSectionId: string | null },
+): Promise<boolean> {
+  const [contract] = await tx
+    .select({ id: contracts.id })
+    .from(contracts)
+    .where(eq(contracts.id, position.contractId))
+    .limit(1);
+  if (!contract || position.afterSectionId === null) return Boolean(contract);
+  const [section] = await tx
+    .select({ id: contractSections.id })
+    .from(contractSections)
+    .where(and(eq(contractSections.id, position.afterSectionId), eq(contractSections.contractId, position.contractId)))
+    .limit(1);
+  return Boolean(section);
+}

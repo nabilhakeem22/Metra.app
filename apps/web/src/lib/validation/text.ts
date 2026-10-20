@@ -36,6 +36,22 @@ export function clean(value: string | null | undefined): string | null {
   return value?.trim() || null;
 }
 
+/** Characters that take up no visible room: format marks (zero-width space and
+ *  joiners, the bidi marks, the word joiner) and every kind of space. */
+const INVISIBLE = /[\p{Cf}\p{Z}\s]/gu;
+
+/** True when `text` shows at least one character. */
+export function hasVisibleCharacter(text: string): boolean {
+  return text.replace(INVISIBLE, '') !== '';
+}
+
+/** `clean`, and null too when nothing in the value shows (a zero-width space
+ *  alone is a blank label, not a name). */
+export function visibleText(value: string | null | undefined): string | null {
+  const trimmed = clean(value);
+  return trimmed !== null && hasVisibleCharacter(trimmed) ? trimmed : null;
+}
+
 /** Control characters no box should hold (NUL fails a text column outright,
  *  22021). Tab, line feed and carriage return are not among them: a note may
  *  carry them. */

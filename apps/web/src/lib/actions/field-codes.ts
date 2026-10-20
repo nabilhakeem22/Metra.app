@@ -27,6 +27,15 @@ export const FIELD_CODE_PARAMS = {
   // A contract value too small for its split: some row would bill nothing,
   // or carry VAT below zero or above its amount.
   schedule_value_too_small: ['value'],
+  // A day that has not come yet, where only today or an earlier day is true
+  // (the day a client signed on paper).
+  date_in_future: [],
+  // A day before the document it records existed (a paper signature dated
+  // before the contract was issued); `date` is that issue day, YYYY-MM-DD.
+  date_before_issue: ['date'],
+  // A figure typed with more decimals than it is kept to (a rate past 4
+  // decimals), refused rather than silently cut.
+  too_many_decimals: ['max'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type FieldCode = keyof typeof FIELD_CODE_PARAMS;

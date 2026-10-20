@@ -30,7 +30,9 @@ function sourcePaths(directory: string): string[] {
   });
 }
 
-function resolveImport(from: string, specifier: string): string | null {
+/** The src module a local specifier (`@/…` or relative) names, or null for a
+ *  package or a path that does not exist. */
+export function resolveImport(from: string, specifier: string): string | null {
   const local = specifier.startsWith('@/') || specifier.startsWith('.');
   if (!local) return null;
   const base = specifier.startsWith('@/') ? join(SRC_ROOT, specifier.slice(2)) : resolve(dirname(from), specifier);

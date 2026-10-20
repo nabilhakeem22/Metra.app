@@ -1,0 +1,93 @@
+'use client';
+
+import { useLocale, useTranslations } from 'next-intl';
+import { GenerateExecutionContract } from '@/components/contracts/generate-execution-contract';
+import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
+import { Button } from '@/components/ui/button';
+import { Link } from '@/i18n/routing';
+import type { ExecutionCardView } from '@/lib/execution/card-view';
+import { pickLocale } from '@/lib/i18n/pick-locale';
+import {
+  NEXT_ACTION_TARGET,
+  STAGES_WAITING_ON_CLIENT,
+  executionCardHref,
+  isStatusLineAction,
+  type NextActionTarget,
+} from '@/lib/execution/next-action-target';
+import type { ExecutionNextActionKind } from '@/lib/execution/stage';
+
+/**
+ * The one control for the next action, or null when this role cannot take it
+ * here. A plain function, not a component: the card needs to know it is null to
+ * say who can take the action instead.
+ */
+function nextActionControl(view: ExecutionCardView, target: NextActionTarget, label: string) {
+  if (target.kind === 'status') return null;
+  if (target.kind === 'dialog') {
+    if (target.dialog === 'generate_contract') {
+      return view.may.generateContract && view.boqId ? <GenerateExecutionContract boqId={view.boqId} /> : null;
+    }
+    return view.may.signOffline && view.contract ? <SignOfflineDialog contractId={view.contract.id} /> : null;
+  }
+  const href = executionCardHref(target.page, { projectId: view.projectId, contractId: view.contract?.id ?? null });
+  const opens = target.page === 'project_boq' || view.may.openContract;
+  if (!href || !opens) return null;
+  return (
+    <Button asChild variant="default">
+      <Link href={href}>{label}</Link>
+    </Button>
+  );
+}
+
+/**
+ * The delivery's EXECUTION card, under the closed headline at `execution`:
+ * the stage derived from the BOQ contract (lib/execution/stage.ts) and its ONE
+ * next action (lib/execution/next-action-target.ts). A role that cannot take
+ * that action is told who can, so the card never shows a dead button.
+ */
+export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
+  const t = useTranslations('execution.card');
+  const next = view.next;
+
+  return (
+    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4" data-execution-stage={view.stage}>
+      <div className="space-y-1">
+        <p className="text-caption font-medium text-muted-foreground">
+          {t('title')}
+          {view.contract && (
+            <>
+              {' · '}
+              <span dir="ltr">{view.contract.documentNumber}</span>
+            </>
+          )}
+        </p>
+        <p className="text-body font-semibold">{t(`stage.${view.stage}`)}</p>
+        {STAGES_WAITING_ON_CLIENT.has(view.stage) && <p className="text-body text-muted-foreground">{t('waitingOnClient')}</p>}
+      </div>
+      {next && (
+        <div className="flex flex-wrap items-center gap-2" data-next-action={next.kind}>
+          <NextAction view={view} kind={next.kind} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The next action: a status line for a money step not built yet (F2), else its control, or who takes it. */
+function NextAction({ view, kind }: { view: ExecutionCardView; kind: ExecutionNextActionKind }) {
+  const t = useTranslations('execution.card');
+  const locale = useLocale();
+  if (isStatusLineAction(kind)) {
+    const named = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
+    return <p className="text-body">{t(`upcoming.${kind}`, { instalment: named || t('upcoming.anInstalment') })}</p>;
+  }
+  const label = t(`next.${kind}`);
+  const control = nextActionControl(view, NEXT_ACTION_TARGET[kind], label);
+  return (
+    control ?? (
+      <p className="text-body">
+        {label} <span className="text-muted-foreground">{t('someoneElse')}</span>
+      </p>
+    )
+  );
+}

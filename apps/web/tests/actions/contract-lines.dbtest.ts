@@ -1,11 +1,17 @@
-// The contract page is bounded whatever the contract's size (PR B1, A27): the
-// page opens with sections counted in SQL and at most 50 lines, each section
-// pages 50 at a time, a position that is not the caller's is refused, and the
-// PDF reads every line in exactly the page's order.
+// The contract page is bounded whatever the contract's size (PR B1, A27; A3
+// reliability R1): its sections come 50 at a time, counted in SQL, the first
+// page with at most 50 lines; each section pages 50 lines at a time; a position
+// that is not the caller's is refused; and the PDF reads every line in exactly
+// the page's order.
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { loadSectionLinesCore } from '@/lib/contracts/lines-core';
-import { getContractForPdf, getContractPage, type ContractLinesPage } from '@/lib/contracts/queries';
+import { loadContractSectionsCore, loadSectionLinesCore } from '@/lib/contracts/lines-core';
+import {
+  getContractForPdf,
+  getContractSectionsPage,
+  type ContractLinesPage,
+  type ContractSectionsPage,
+} from '@/lib/contracts/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { seedContractShell, seedGridContract, seedSections } from './contract-lines-fixture';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -53,7 +59,7 @@ const pageOf = (result: { ok: boolean; data?: ContractLinesPage }) => {
 
 describe('the contract page opens bounded', () => {
   it('a 2,000-line contract: counts from SQL, the first 50 lines only, no cost', async () => {
-    const page = (await getContractPage(owner, big.contractId, true))!;
+    const page = (await getContractSectionsPage(owner, big.contractId, null))!;
     expect(page.sections).toHaveLength(20);
     expect(page.sections.reduce((sum, section) => sum + section.lineCount, 0)).toBe(2000);
     expect(page.sections.map((section) => section.openingLines.length)).toEqual([50, ...Array(19).fill(0)]);
@@ -63,7 +69,7 @@ describe('the contract page opens bounded', () => {
   });
 
   it('a small contract opens whole', async () => {
-    const page = (await getContractPage(owner, small.contractId, true))!;
+    const page = (await getContractSectionsPage(owner, small.contractId, null))!;
     expect(page.sections.map((section) => [section.lineCount, section.openingLines.length])).toEqual([[3, 3], [3, 3]]);
   });
 
@@ -71,7 +77,7 @@ describe('the contract page opens bounded', () => {
     const pdf = (await getContractForPdf(owner, big.contractId, true))!;
     expect(pdf.sections.reduce((sum, section) => sum + section.lines.length, 0)).toBe(2000);
     const pdfTied = (await getContractForPdf(owner, tied, true))!;
-    const pageTied = (await getContractPage(owner, tied, true))!;
+    const pageTied = (await getContractSectionsPage(owner, tied, null))!;
     expect(pdfTied.sections.map((section) => section.id)).toEqual(pageTied.sections.map((section) => section.id));
     const expected = await raw.query<{ id: string }>(
       `select l.id from public.contract_lines l join public.contract_sections s on s.id = l.section_id
@@ -81,6 +87,65 @@ describe('the contract page opens bounded', () => {
     expect(pageTied.sections.flatMap((section) => section.openingLines.map((line) => line.id))).toEqual(
       expected.map((row) => row.id),
     );
+  });
+});
+
+describe('the sections, 50 a request (A3 reliability R1)', () => {
+  const sectionsOf = (result: { ok: boolean; data?: ContractSectionsPage }) => {
+    expect(result.ok).toBe(true);
+    return result.data!;
+  };
+
+  it('walks 120 sections of tied sort orders: every section once, in order, the opening lines on the first page only', async () => {
+    const wide = await seedContractShell(owner.orgId, 4);
+    await seedSections(
+      owner.orgId,
+      wide,
+      Array.from({ length: 120 }, (_, n) => ({
+        titleAr: null,
+        titleEn: `S${n}`,
+        sortOrder: n % 7,
+        lines: n % 3 === 0 ? [] : [{ descriptionAr: null, descriptionEn: `L${n}`, sortOrder: 0 }],
+      })),
+    );
+    const seen: string[] = [];
+    const counts: number[] = [];
+    let afterSectionId: string | null = null;
+    const pages: ContractSectionsPage[] = [];
+    for (let request = 0; request < 4; request += 1) {
+      const page = sectionsOf(await loadContractSectionsCore(owner, { contractId: wide, afterSectionId }));
+      pages.push(page);
+      seen.push(...page.sections.map((section) => section.id));
+      counts.push(...page.sections.map((section) => section.lineCount));
+      if (!page.hasMore) break;
+      afterSectionId = seen[seen.length - 1];
+    }
+    expect(pages.map((page) => [page.sections.length, page.hasMore])).toEqual([[50, true], [50, true], [20, false]]);
+    const expected = await raw.query<{ id: string; n: number }>(
+      `select s.id, (select count(*)::int from public.contract_lines l where l.section_id = s.id) as n
+         from public.contract_sections s where s.contract_id = '${wide}' order by s.sort_order, s.id`,
+    );
+    expect(seen).toEqual(expected.map((row) => row.id));
+    expect(counts).toEqual(expected.map((row) => row.n));
+    const opening = (page: ContractSectionsPage) => page.sections.reduce((sum, section) => sum + section.openingLines.length, 0);
+    expect(pages.map(opening)).toEqual([expected.slice(0, 50).reduce((sum, row) => sum + row.n, 0), 0, 0]);
+  });
+
+  it('refuses a cursor of another contract, another studio and a malformed id; nobody but a reader asks', async () => {
+    expect(await loadContractSectionsCore(owner, { contractId: big.contractId, afterSectionId: small.sectionIds[0] })).toEqual(NOT_FOUND);
+    expect(await loadContractSectionsCore(stranger, { contractId: big.contractId, afterSectionId: null })).toEqual(NOT_FOUND);
+    expect(await loadContractSectionsCore(owner, { contractId: randomUUID(), afterSectionId: null })).toEqual(NOT_FOUND);
+    expect(await loadContractSectionsCore(owner, { contractId: big.contractId, afterSectionId: 'x' })).toEqual({ ok: false, error: 'malformed' });
+    expect(await loadContractSectionsCore(owner, null)).toEqual({ ok: false, error: 'malformed' });
+    expect(await loadContractSectionsCore(projectManager, { contractId: big.contractId, afterSectionId: null })).toEqual({
+      ok: false,
+      error: 'forbidden',
+    });
+    // The last section is a real cursor with nothing after it: an empty page, not "not found".
+    expect(await loadContractSectionsCore(owner, { contractId: big.contractId, afterSectionId: big.sectionIds[19] })).toEqual({
+      ok: true,
+      data: { sections: [], hasMore: false },
+    });
   });
 });
 
