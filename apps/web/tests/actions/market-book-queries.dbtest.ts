@@ -93,16 +93,16 @@ describe('readMarketBookPage', () => {
       return (rows as unknown as Array<{ 'QUERY PLAN': string }>).map((row) => row['QUERY PLAN']).join('\n');
     });
     expect(plan).toMatch(/Index Cond: \(\(item_id = .*\) AND \(period_month >= /);
-    // The market policies run their membership check once (market-book-plans.dbtest.ts);
-    // the one per-row call left is cost_items' own org policy, on at most one linked row per item.
+    // The market policies run their membership check once (market-book-plans.dbtest.ts),
+    // and since 0063's apply-rls so does cost_items' own org policy (the wrapped form,
+    // an InitPlan; rls-wrapped-policies.dbtest.ts): no scan calls it per row any more.
     let scanned = '';
     const perRowOn: string[] = [];
     for (const line of plan.split('\n')) {
       if (/Scan.* on /.test(line)) scanned = line;
       else if (line.includes('Filter:') && line.includes('app_is_current_org_member')) perRowOn.push(scanned);
     }
-    expect(perRowOn.length).toBeGreaterThan(0);
-    for (const scan of perRowOn) expect(scan).toMatch(/ on cost_items /);
+    expect(perRowOn).toEqual([]);
   });
 });
 
