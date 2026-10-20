@@ -99,6 +99,24 @@ describe('cross-tenant isolation', () => {
     expect(orgIdTables.length).toBeGreaterThan(0);
   });
 
+  it('discovers the six Stage 2 execution tables (0063)', () => {
+    // Discovery is by `org_id`, so a new table is checked the day it exists;
+    // naming them here makes a discovery query that silently narrows (a renamed
+    // column, a view) fail instead of quietly checking fewer tables. Their
+    // cross-org reads and writes with REAL rows are proven in
+    // apps/web/tests/actions/execution-schema.dbtest.ts (this seed has none).
+    for (const table of [
+      'contract_payment_milestones',
+      'payment_requests',
+      'contract_payments',
+      'contract_payment_claims',
+      'contract_cost_entries',
+      'contract_line_measurements',
+    ]) {
+      expect(orgIdTables, `${table} was not discovered`).toContain(table);
+    }
+  });
+
   it('every org_id table has FORCE row-level security enabled', async () => {
     const rows = await pg<{ relname: string; rls: boolean; forced: boolean }[]>`
       select c.relname,

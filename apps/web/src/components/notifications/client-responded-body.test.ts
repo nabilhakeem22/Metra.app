@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import en from '@/messages/en.json';
 import ar from '@/messages/ar-EG.json';
 import {
+  CLIENT_CONTRACT_BODY_KEYS,
+  CLIENT_DELIVERY_BODY_KEYS,
   CLIENT_RESPONDED_BODY_KEYS,
   NOTIFICATION_KINDS,
 } from '@/lib/notifications/kinds';
@@ -17,7 +19,12 @@ const CATALOGUES = { en, 'ar-EG': ar } as const;
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const DASH = /[–—]/;
 
-function render(locale: keyof typeof CATALOGUES, bodyKey: string, params: Record<string, unknown>) {
+function render(
+  locale: keyof typeof CATALOGUES,
+  bodyKey: string,
+  params: Record<string, unknown>,
+  entityType = 'engagement',
+) {
   const translate = createTranslator({
     locale,
     messages: CATALOGUES[locale],
@@ -33,7 +40,7 @@ function render(locale: keyof typeof CATALOGUES, bodyKey: string, params: Record
     kind: 'client_responded',
     bodyKey,
     params,
-    entityType: 'engagement',
+    entityType,
     entityId: 'e-1',
     createdAt: '2026-10-07T10:00:00Z',
     read: false,
@@ -47,7 +54,7 @@ const DELIVERY = { number: 12, year: 2026, titleAr: 'مطبخ الفيلا', tit
 
 describe('client_responded bodies', () => {
   for (const locale of ['en', 'ar-EG'] as const) {
-    it.each(CLIENT_RESPONDED_BODY_KEYS)(`${locale}: %s names the delivery`, (bodyKey) => {
+    it.each(CLIENT_DELIVERY_BODY_KEYS)(`${locale}: %s names the delivery`, (bodyKey) => {
       const body = render(locale, bodyKey, DELIVERY);
       expect(body.length).toBeGreaterThan(0);
       expect(body).toContain('DE-2026-0012');
@@ -119,11 +126,57 @@ describe('client_responded bodies', () => {
     expect(render('en', 'client_commented', DELIVERY)).toContain('a comment');
   });
 
+  it('the respondable keys are the delivery keys and the contract-link keys, nothing else', () => {
+    expect([...CLIENT_RESPONDED_BODY_KEYS].sort()).toEqual(
+      [...CLIENT_DELIVERY_BODY_KEYS, ...CLIENT_CONTRACT_BODY_KEYS].sort(),
+    );
+  });
+
   it('every notification kind has its label in both catalogues', () => {
     for (const catalogue of [en, ar]) {
       for (const kind of NOTIFICATION_KINDS) {
         expect(typeof catalogue.notifications.kinds[kind], kind).toBe('string');
       }
     }
+  });
+});
+
+// Stage 2 (0063): a client's act on a contract link (/c) or a change-order link
+// (/v). Written by the token SDFs for EVERY contract, proposal-sourced ones
+// included, with params { number, year } only: the bell names the document.
+describe('contract-link client_responded bodies', () => {
+  const SIGNED = { number: 7, year: 2026 };
+  const expected: Record<(typeof CLIENT_CONTRACT_BODY_KEYS)[number], string> = {
+    client_contract_signed: 'C-2026-0007',
+    client_variation_approved: 'VO-2026-0007',
+    client_variation_rejected: 'VO-2026-0007',
+  };
+
+  for (const locale of ['en', 'ar-EG'] as const) {
+    it.each(CLIENT_CONTRACT_BODY_KEYS)(`${locale}: %s names its document, never a delivery`, (bodyKey) => {
+      const body = render(locale, bodyKey, SIGNED, 'contract');
+      expect(body.length).toBeGreaterThan(0);
+      expect(body).toContain(expected[bodyKey]);
+      expect(body).not.toContain('DE-');
+      expect(ARABIC_INDIC.test(body)).toBe(false);
+      expect(DASH.test(body)).toBe(false);
+    });
+
+    it.each(CLIENT_CONTRACT_BODY_KEYS)(`${locale}: %s still reads without its number`, (bodyKey) => {
+      for (const params of [{}, { number: 7 }, { number: '7', year: 2026 }, { number: 0, year: 2026 }]) {
+        const body = render(locale, bodyKey, params, 'contract');
+        expect(body.length).toBeGreaterThan(0);
+        expect(body).not.toMatch(/C-|VO-/);
+      }
+    });
+  }
+
+  it('says signed, approved and rejected apart', () => {
+    expect(render('en', 'client_contract_signed', SIGNED, 'contract')).toContain('signed contract');
+    expect(render('en', 'client_variation_approved', SIGNED, 'contract')).toContain('approved change order');
+    expect(render('en', 'client_variation_rejected', SIGNED, 'contract')).toContain('rejected change order');
+    expect(render('ar-EG', 'client_contract_signed', SIGNED, 'contract')).toContain('وقّع العقد');
+    expect(render('ar-EG', 'client_variation_approved', SIGNED, 'contract')).toContain('وافق على أمر التغيير');
+    expect(render('ar-EG', 'client_variation_rejected', SIGNED, 'contract')).toContain('رفض أمر التغيير');
   });
 });

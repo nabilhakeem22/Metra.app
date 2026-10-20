@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 116 declared, 116 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 281 declared, 281 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 44 declared, 44 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 133 declared, 133 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 340 declared, 340 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 47 declared, 47 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 44 declared, 44 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 47 declared, 47 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 44 RLS functions', () => {
+  it('declares 47 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -223,8 +223,11 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // app_notify_lost_client_acts; 43 with the trigger fn
     // enforce_client_page_details_writer (the owner/admin-only rule). 44 with
     // Round D's trigger fn clear_rom_issue_on_band_change (the seven-argument
-    // respond overload shares its function's name, so it adds none).
-    expect(declaredFunctions().size).toBe(44);
+    // respond overload shares its function's name, so it adds none). 46 since
+    // Stage 2 (0063) added app_contract_section_lines_by_token and the trigger
+    // fn enforce_payment_request_frozen; 47 with the A2 fix round's
+    // enforce_contract_payment_fits.
+    expect(declaredFunctions().size).toBe(47);
   });
 });
 
@@ -239,7 +242,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
-      'composite set-null FKs — 13 found (13 declared in src/schema/), every one narrowed',
+      'composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed',
     );
   });
 
@@ -432,15 +435,17 @@ describe('the floor under the composite set-null gate (L3)', () => {
     );
   });
 
-  it('derives the floor from the schema, and the schema declares THIRTEEN', () => {
+  it('derives the floor from the schema, and the schema declares FIFTEEN', () => {
     // Twelve since wave 8 item 1. It was eleven for one wave, and the twelfth —
     // `files_category_same_org_fk`, created by 0040 and declared by no schema
     // file — is the reason this gate existed with a floor BELOW what every
     // database actually held: a silent un-narrowing of that one would have been
     // invisible to the production-side check. Derived from `src/schema/`, so
     // deleting the declaration in `files.ts` reds this line and not a comment.
+    // Fifteen since Stage 2 (0063): contract_payment_claims.confirmed_payment_id
+    // and contract_cost_entries.cost_item_id, both born narrowed.
     const declared = declaredCompositeSetNullFks();
-    expect(declared.size).toBe(13);
+    expect(declared.size).toBe(15);
     expect(declared.get('boqs_engagement_same_org_fk')).toEqual({
       table: 'boqs',
       columns: ['engagement_id'],
@@ -461,12 +466,12 @@ describe('the floor under the composite set-null gate (L3)', () => {
     expect(declaredIndexes().has('files_org_category_idx')).toBe(true);
   });
 
-  it('passes on the thirteen a narrowed database holds', async () => {
+  it('passes on the fifteen a narrowed database holds', async () => {
     captureConsole();
     const code = await runSchemaCheck(
       fixtureSql({ ...completeCatalogues(), compositeFks: narrowedCatalogue() }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('13 found (13 declared in src/schema/)');
+    expect(logged.join('\n')).toContain('15 found (15 declared in src/schema/)');
   });
 });

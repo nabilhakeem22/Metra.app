@@ -1585,6 +1585,9 @@
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
       "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}",
+      "client_contract_signed": "{hasDocument, select, yes {العميل وقّع العقد {document} من اللينك.} other {العميل وقّع عقد من اللينك.}}",
+      "client_variation_approved": "{hasDocument, select, yes {العميل وافق على أمر التغيير {document}.} other {العميل وافق على أمر تغيير.}}",
+      "client_variation_rejected": "{hasDocument, select, yes {العميل رفض أمر التغيير {document}.} other {العميل رفض أمر تغيير.}}",
       "client_page_details_changed": "{hasActor, select, yes {{actor} غيّر بيانات التواصل والدفع اللي العملاء بيشوفوها. راجعها من الإعدادات.} other {بيانات التواصل والدفع اللي العملاء بيشوفوها اتغيّرت. راجعها من الإعدادات.}}"
     },
     "viewAll": "عرض الكل"

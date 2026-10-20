@@ -42,6 +42,8 @@ export const ENTITY_HREF: Record<string, (id: string) => string> = {
   proposal: (id) => `/proposals/${id}`,
   project: (id) => `/projects/${id}`,
   engagement: (id) => `/engagements/${id}`,
+  // A client's act on a contract link (/c) or a change-order link (/v), 0063.
+  contract: (id) => `/contracts/${id}`,
   // The studio itself: today only the payment-details alert, which opens its card.
   organization: () => '/settings#client-page',
 };

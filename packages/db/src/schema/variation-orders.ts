@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   pgTable,
@@ -39,14 +41,24 @@ export const variationOrders = pgTable(
     reasonEn: text('reason_en'),
     // Server-computed sum of the VO line totals; may be negative.
     netDelta: money('net_delta').notNull().default('0'),
+    // Stage 2 (0063): days this change order adds to the contract's finish date,
+    // set while draft (frozen with the rest of the row after). Null = none.
+    timeExtensionDays: integer('time_extension_days'),
     tokenHash: text('token_hash'),
     shareExpiresAt: timestamp('share_expires_at', { withTimezone: true }),
   },
   (t) => [
     unique('variation_orders_org_id_id_unique').on(t.orgId, t.id),
+    // The target of payment_requests' 3-column change-order FK (0063): a request
+    // can only bill a change order of ITS OWN contract.
+    unique('variation_orders_org_contract_id_unique').on(t.orgId, t.contractId, t.id),
     unique('variation_orders_org_id_number_unique').on(t.orgId, t.number),
     unique('variation_orders_token_hash_unique').on(t.tokenHash),
     bilingualCheck('variation_orders', 'title'),
+    check(
+      'variation_orders_time_extension_days_range',
+      sql`time_extension_days between 0 and 3650`,
+    ),
     ...sameOrgFk(t, 'contract', contracts, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     index('variation_orders_org_status_idx').on(t.orgId, t.status),

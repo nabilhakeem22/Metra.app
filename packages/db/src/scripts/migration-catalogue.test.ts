@@ -207,8 +207,12 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
 
   it('narrows exactly the edges the schema declares — 0052 plus the ones born narrowed', () => {
     expect(narrowedBy0052()).toHaveLength(12);
-    expect(narrowedAtCreation()).toEqual(['boqs.source_proposal_id']);
-    expect(declaredCompositeSetNullFks().size).toBe(13);
+    expect(narrowedAtCreation()).toEqual([
+      'boqs.source_proposal_id',
+      'contract_payment_claims.confirmed_payment_id',
+      'contract_cost_entries.cost_item_id',
+    ]);
+    expect(declaredCompositeSetNullFks().size).toBe(15);
     expect([...narrowedBy0052(), ...narrowedAtCreation()].sort()).toEqual(declaredEdges());
   });
 
