@@ -4,15 +4,20 @@ import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { VariationListRow } from '@/lib/variations/queries';
-import type { ContractAction } from './contract-vo-types';
+import type { ContractAction, VariationChargeRates } from './contract-vo-types';
 import { useVariationCreate } from './use-variation-create';
 import { VariationCreateForm } from './variation-create-form';
 import { VariationTable } from './variation-table';
 
-/** The contract's variation register: the new-VO form (when one may be drafted) over the list. */
+/**
+ * The contract's variation register: the new-VO form (when one may be drafted)
+ * over the list. `chargeRates` is set on an execution contract only: its orders
+ * may add days, and each shows its charge (D4a).
+ */
 export function VariationRegister({
   contractId,
   contractStatus,
+  chargeRates,
   variations,
   canDraftVariation,
   canPriceVariation,
@@ -22,6 +27,7 @@ export function VariationRegister({
 }: {
   contractId: string;
   contractStatus: string;
+  chargeRates: VariationChargeRates | null;
   variations: VariationListRow[];
   canDraftVariation: boolean;
   canPriceVariation: boolean;
@@ -30,7 +36,7 @@ export function VariationRegister({
   act: ContractAction;
 }) {
   const tv = useTranslations('variations');
-  const create = useVariationCreate(contractId);
+  const create = useVariationCreate(contractId, chargeRates !== null);
   const canOpenNew =
     canDraftVariation && (contractStatus === 'issued' || contractStatus === 'signed');
 
@@ -47,6 +53,7 @@ export function VariationRegister({
       {create.open && <VariationCreateForm create={create} contractId={contractId} />}
       <VariationTable
         variations={variations}
+        chargeRates={chargeRates}
         canPriceVariation={canPriceVariation}
         pending={pending}
         m={m}

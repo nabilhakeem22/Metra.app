@@ -28,6 +28,11 @@ export interface SaveVariationDraftInput {
     titleEn?: string | null;
     reasonAr?: string | null;
     reasonEn?: string | null;
+    /**
+     * Days the order adds to the finish date: blank or null = none. Absent =
+     * not part of this edit. Only an execution contract's order carries one.
+     */
+    timeExtensionDays?: unknown;
   };
   lines: VariationLineInput[];
 }

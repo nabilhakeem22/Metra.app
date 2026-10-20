@@ -144,6 +144,8 @@ export interface ContractHeaderDetail {
   originalValue: string;
   // Computed aggregate (A3): originalValue + Σ approved-VO netDeltas.
   revisedValue: string;
+  // Computed aggregate (A24): Σ approved-VO time extensions, in days (0 = none).
+  approvedExtensionDays: number;
   // margin-gated
   totalCost?: string;
   totalMargin?: string;

@@ -41,6 +41,14 @@ export interface PublicVariation {
    * no staff "reject VO" action. null is every row written before 0051.
    */
   rejectionChannel: 'client' | 'staff' | null;
+  /**
+   * The parent execution contract's VAT and supervision rates, which the order
+   * is charged on top of its works (D4a). Null on a proposal contract, whose
+   * page shows the net change alone, exactly as before Stage 2.
+   */
+  charges: { taxRate: string; supervisionPct: string } | null;
+  /** Days the order adds to the contract's finish date; null = none recorded. */
+  timeExtensionDays: number | null;
   org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
   lines: PublicVariationLine[];
 }
@@ -48,11 +56,18 @@ export interface PublicVariation {
 /** The SDF's snake_case document, before it is mapped onto PublicVariation. */
 type VariationTokenDocument = Omit<
   PublicVariation,
-  'contractActive' | 'rejectionChannel'
+  'contractActive' | 'rejectionChannel' | 'charges' | 'timeExtensionDays'
 > & {
   contract_active: boolean | null;
   rejection_channel: unknown;
+  tax_rate: unknown;
+  supervision_pct: unknown;
+  time_extension_days: unknown;
+  contract_source: unknown;
 };
+
+/** A rate as the SDF sends it: a plain non-negative decimal string. */
+const RATE_TEXT = /^\d+(\.\d+)?$/;
 
 /**
  * The recorded rejection channel, or null — mapped DEFENSIVELY, exactly as
@@ -63,6 +78,21 @@ type VariationTokenDocument = Omit<
  */
 function toRejectionChannel(value: unknown): 'client' | 'staff' | null {
   return value === 'client' || value === 'staff' ? value : null;
+}
+
+/**
+ * The rates the breakdown is computed with, or null, mapped DEFENSIVELY like
+ * the channel: only a BOQ contract's order with two well-formed rates gets a
+ * breakdown, so a document from an un-applied function keeps today's page.
+ */
+function toCharges(source: unknown, taxRate: unknown, supervisionPct: unknown): PublicVariation['charges'] {
+  if (source !== 'boq' || typeof taxRate !== 'string' || typeof supervisionPct !== 'string') return null;
+  return RATE_TEXT.test(taxRate) && RATE_TEXT.test(supervisionPct) ? { taxRate, supervisionPct } : null;
+}
+
+/** A whole, non-negative day count, or null for anything else. */
+function toExtensionDays(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 export async function getVariationByToken(
@@ -78,6 +108,10 @@ export async function getVariationByToken(
   const {
     contract_active: contractActive,
     rejection_channel: rejectionChannel,
+    tax_rate: taxRate,
+    supervision_pct: supervisionPct,
+    time_extension_days: timeExtensionDays,
+    contract_source: contractSource,
     ...rest
   } = document;
   // Only an explicit false marks the contract dead. The respond SDF is the real
@@ -86,6 +120,8 @@ export async function getVariationByToken(
     ...rest,
     contractActive: contractActive !== false,
     rejectionChannel: toRejectionChannel(rejectionChannel),
+    charges: toCharges(contractSource, taxRate, supervisionPct),
+    timeExtensionDays: toExtensionDays(timeExtensionDays),
   };
 }
 

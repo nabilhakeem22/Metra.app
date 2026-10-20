@@ -133,6 +133,11 @@ export function ContractDetailClient({
         <VariationRegister
           contractId={detail.id}
           contractStatus={detail.status}
+          chargeRates={
+            detail.sourceBoqId === null
+              ? null
+              : { taxRate: detail.taxRate, supervisionPct: detail.supervisionPct }
+          }
           variations={variations}
           canDraftVariation={canDraftVariation}
           canPriceVariation={canPriceVariation}

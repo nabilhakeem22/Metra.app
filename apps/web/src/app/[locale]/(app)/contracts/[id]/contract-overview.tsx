@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { formatDate } from '@/lib/format/date';
 import { ChargesForm } from './charges-form';
+import { ContractFinishDate } from './contract-finish-date';
 import { ContractHeaderForm } from './contract-header-form';
 import { ContractSectionList } from './contract-section-list';
 import type { KeptSectionLines } from './use-kept-section-lines';
@@ -60,6 +61,9 @@ export function ContractOverview({
             <span className="text-muted-foreground">
               {t('signedOn', { date: formatDate(detail.signed.on, locale), via: detail.signed.via })}
             </span>
+          )}
+          {execution && (
+            <ContractFinishDate endDate={detail.endDate} approvedExtensionDays={detail.approvedExtensionDays} />
           )}
           <div className="ms-auto flex gap-2">
             {execution && canSignOffline && detail.status === 'issued' && (

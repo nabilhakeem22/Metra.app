@@ -1717,6 +1717,10 @@
         "signedOn": "Signed on",
         "note": "Note",
         "submit": "Record the signature"
+      },
+      "finish": {
+        "revised": "Revised finish date: {date}, {count, plural, one {{n} day} other {{n} days}} added by approved change orders",
+        "added": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the works"
       }
     }
   },
@@ -1774,7 +1778,25 @@
       "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
       "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it.",
       "heading": "Variation order",
-      "netDelta": "Net change"
+      "netDelta": "Net change",
+      "charge": {
+        "works": "Works value",
+        "tax": "VAT",
+        "supervision": "Supervision fee",
+        "total": "Total charge",
+        "addsDays": "This change order extends the works by {count, plural, one {{n} day} other {{n} days}}."
+      }
+    },
+    "timeExtension": {
+      "label": "Days added to the finish date",
+      "hint": "Leave it empty if this change order does not move the finish date. From 0 to 3650 days."
+    },
+    "charge": {
+      "works": "Works",
+      "tax": "VAT",
+      "supervision": "Supervision",
+      "total": "Total",
+      "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the finish date"
     }
   },
   "engagements": {

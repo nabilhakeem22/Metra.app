@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Centered, Row } from '@/components/share/link-page-parts';
+import { Centered } from '@/components/share/link-page-parts';
 import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
@@ -19,6 +19,7 @@ import {
 } from '@/lib/variations/decided-message';
 import type { PublicVariation } from '@/lib/variations/public';
 import { respondToVariation } from './actions';
+import { VariationChargeCard } from './variation-charge-card';
 
 export function PublicVariationView({
   token,
@@ -106,11 +107,7 @@ export function PublicVariationView({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="ms-auto max-w-xs py-4 text-body">
-          <Row label={t('netDelta')} value={m(variation.net_delta)} bold />
-        </CardContent>
-      </Card>
+      <VariationChargeCard variation={variation} m={m} />
 
       {decided ? (
         <Card>

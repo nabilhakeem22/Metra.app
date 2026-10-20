@@ -12,17 +12,24 @@ import { VARIATION_STATUS_TONE } from '@/lib/ui/record-status-tones';
 import { internalApproveVariation, issueVariation } from '@/lib/variations/actions';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { variationStatusKey } from '@/lib/variations/status-label';
-import type { ContractAction } from './contract-vo-types';
+import type { ContractAction, VariationChargeRates } from './contract-vo-types';
+import { VariationChargeSummary } from './variation-charge-summary';
 
-/** The contract's variation orders, each with the next step its status allows. */
+/**
+ * The contract's variation orders, each with the next step its status allows.
+ * On an execution contract (`chargeRates`) each also says what it charges the
+ * client and the days it adds.
+ */
 export function VariationTable({
   variations,
+  chargeRates,
   canPriceVariation,
   pending,
   m,
   act,
 }: {
   variations: VariationListRow[];
+  chargeRates: VariationChargeRates | null;
   canPriceVariation: boolean;
   pending: boolean;
   m: (v: string) => string;
@@ -55,6 +62,14 @@ export function VariationTable({
                   </td>
                   <td className="px-4 py-2">
                     {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
+                    {chargeRates && (
+                      <VariationChargeSummary
+                        netDelta={v.netDelta}
+                        timeExtensionDays={v.timeExtensionDays}
+                        rates={chargeRates}
+                        m={m}
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <StatusChip tone={VARIATION_STATUS_TONE[statusKey]} label={tv(`status.${statusKey}`)} />
