@@ -798,6 +798,17 @@ $$;
 -- the feed opens the contract, params {number, year}: the CHANGE ORDER's number
 -- and its creation year in Africa/Cairo, the year VO-YYYY-NNNN shows). A
 -- decision flips once, so there is nothing to deduplicate.
+--
+-- DB STEP B (A5 reliability, /v versus termination): the PARENT CONTRACT is
+-- locked FOR SHARE before the order is touched, and its status is read again
+-- under that lock. Termination (lib/contracts/lifecycle/terminate.ts) holds the
+-- contract FOR UPDATE and then rejects every open order in the same
+-- transaction, so the two are serialised in that one order (contract, then
+-- order): an approval that waits for a termination reads `terminated` and
+-- answers `contract_inactive`, and never approves an order of a contract that
+-- is gone; one that commits first is approved before the termination, which
+-- then finds the order decided. Two client decisions share the lock and meet
+-- on the order row, as before.
 create or replace function public.app_variation_respond_by_token(
   p_hash text,
   p_decision text,
@@ -837,6 +848,10 @@ begin
     join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
     where v.token_hash = p_hash;
   if not found then return 'not_found'; end if;
+  select c.status::text into cst
+    from public.contracts c
+   where c.org_id = oid and c.id = cid
+   for share;
   -- A terminated contract carries no commercial change. Checked BEFORE the VO
   -- status: termination rejects open VOs, so the VO status alone would report
   -- 'already' and hide the real reason from the client.

@@ -115,6 +115,7 @@ describe('the execution card (Stage 2, D1a)', () => {
     requestsTruncated: false,
     receipts: [],
     receiptsTruncated: false,
+    earlierClaims: [],
     paymentDetails: null,
   };
 

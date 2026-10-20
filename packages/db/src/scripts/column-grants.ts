@@ -1,4 +1,4 @@
-// The two Stage 2 tables whose metra_app privilege is narrower than the table,
+// The three Stage 2 tables whose metra_app privilege is narrower than the table,
 // read back COLUMN BY COLUMN after apply-rls (verify-rls-applied.ts). A
 // table-level grant covers every column, so it is reported as the surplus
 // column it lets through; a column the app writes and may not is an outage,
@@ -11,6 +11,9 @@
 //     void's stamp, nothing else (DB step B, B3 security S2): an entry never
 //     moves to another contract, and who recorded it, its key and its creation
 //     time never change.
+//   contract_payment_claims UPDATE  the answer's columns only (DB step B, B4
+//     security S1): the studio confirms or dismisses a claim, and never
+//     rewrites what the client claimed, its note, name, IP or user agent.
 //
 // THE LISTS ARE WRITTEN HERE, not read from roles.sql: they are the invariant,
 // roles.sql is its implementation, so an edit that widened the grant would
@@ -36,6 +39,15 @@ export const COST_ENTRY_UPDATE_COLUMNS: ReadonlySet<string> = new Set([
   'reference',
   'voided_at',
   'voided_by',
+  'updated_at',
+]);
+
+/** The claim columns a confirm and a dismiss write (lib/execution/claims). */
+export const CLAIM_UPDATE_COLUMNS: ReadonlySet<string> = new Set([
+  'status',
+  'confirmed_payment_id',
+  'resolved_by',
+  'resolved_at',
   'updated_at',
 ]);
 
@@ -71,6 +83,16 @@ const COLUMN_GRANT_RULES: readonly ColumnGrantRule[] = [
     missing: (column) =>
       `  - ${APP_ROLE} may NOT update contract_cost_entries.${column}: every cost edit or void will fail with 42501`,
   },
+  {
+    table: 'contract_payment_claims',
+    privilege: 'update',
+    granted: (column) => CLAIM_UPDATE_COLUMNS.has(column),
+    surplus: (column) =>
+      `  - ${APP_ROLE} may UPDATE contract_payment_claims.${column}, which no confirm or dismiss writes. ` +
+      "rls/roles.sql grants update on the answer's columns only",
+    missing: (column) =>
+      `  - ${APP_ROLE} may NOT update contract_payment_claims.${column}: every claim confirm or dismiss will fail with 42501`,
+  },
 ];
 
 async function ruleProblems(sql: Sql, rule: ColumnGrantRule): Promise<string[]> {
@@ -102,6 +124,7 @@ export async function columnGrantProblems(sql: Sql): Promise<string[]> {
 export function columnGrantsSummary(): string {
   return (
     'contract_line_measurements insertable on every column but seq; contract_cost_entries ' +
-    `updatable on its ${String(COST_ENTRY_UPDATE_COLUMNS.size)} entry and void columns only`
+    `updatable on its ${String(COST_ENTRY_UPDATE_COLUMNS.size)} entry and void columns only; ` +
+    `contract_payment_claims updatable on its ${String(CLAIM_UPDATE_COLUMNS.size)} answer columns only`
   );
 }

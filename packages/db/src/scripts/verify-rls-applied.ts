@@ -58,9 +58,9 @@
 // does not have it". POLICIES ARE THE EXCEPTION (Stage 2, security review S4):
 // they are permissive and OR together, so an extra one widens access, and it
 // is reported. So are TRUNCATE, REFERENCES and TRIGGER for metra_app on any
-// table (roles.sql grants none), and the two column-level grants
+// table (roles.sql grants none), and the three column-level grants
 // (./column-grants.ts): INSERT on contract_line_measurements, UPDATE on
-// contract_cost_entries.
+// contract_cost_entries and on contract_payment_claims.
 //
 // EVERY PRIVILEGE READ RESOLVES ITS TABLE THROUGH `pg_class` rather than through
 // a `'public.<name>'::text` argument. The text form raises 42P01 on a table the
@@ -268,9 +268,13 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *   contract_line_measurements    append-only (0063) — a recorded payment and a
  *                                 site reading are never edited or removed; a
  *                                 correction is a new reading.
- *   payment_requests,
- *   contract_payment_claims       no DELETE (0063) — a request is voided, a
- *                                 claim resolved; neither deleted.
+ *   payment_requests              no DELETE (0063) — a request is voided,
+ *                                 never deleted.
+ *   contract_payment_claims       SELECT only at table level (DB step B): only
+ *                                 the client's link function writes a claim,
+ *                                 and the studio's answer is a column-level
+ *                                 UPDATE, read back by ./column-grants.ts;
+ *                                 never deleted.
  *   contract_cost_entries         no DELETE (0063) and no TABLE-LEVEL UPDATE
  *                                 (DB step B): a cost is voided, never deleted,
  *                                 and its UPDATE is column-level, read back by
@@ -303,7 +307,7 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   market_seed_book: ['insert', 'update', 'delete'],
   workspace_entitlements: ['update', 'delete'],
   contract_line_measurements: ['update', 'delete'],
-  contract_payment_claims: ['delete'],
+  contract_payment_claims: ['insert', 'update', 'delete'],
   contract_payments: ['update', 'delete'],
   contract_cost_entries: ['update', 'delete'],
   payment_requests: ['delete'],

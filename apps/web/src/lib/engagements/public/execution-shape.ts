@@ -7,11 +7,12 @@
 import { formatDocNumber } from '@/lib/format/doc-number';
 import type {
   PortalContractStatus,
+  PortalEarlierClaim,
   PortalExecution,
   PortalExecutionReceipt,
   PortalExecutionRequest,
 } from './execution-types';
-import { EXECUTION_LIST_CAP } from './execution-types';
+import { EARLIER_CLAIMS_CAP, EXECUTION_LIST_CAP } from './execution-types';
 import { boundedText, calendarDay, isoInstant, nonNegativeAmount, positiveAmount } from './snapshot-values';
 import { parsePaymentDetails } from './studio-rows';
 
@@ -77,10 +78,19 @@ function receiptOf(raw: unknown): PortalExecutionReceipt | null {
   return amount && receivedOn && requestNumber ? { amount, receivedOn, requestNumber } : null;
 }
 
+function earlierClaimOf(raw: unknown): PortalEarlierClaim | null {
+  const row = asRow(raw);
+  if (!row) return null;
+  const requestNumber = documentNumber('PR', row.request_number, row.request_year);
+  const amount = positiveAmount(row.amount);
+  const claimedAt = isoInstant(row.claimed_at);
+  return requestNumber && amount && claimedAt ? { requestNumber, amount, claimedAt } : null;
+}
+
 /** The rows of a list, newest first as the SQL ordered them, cut at its cap, every malformed one dropped. */
-function listOf<T>(raw: unknown, read: (row: unknown) => T | null): T[] {
+function listOf<T>(raw: unknown, read: (row: unknown) => T | null, cap = EXECUTION_LIST_CAP): T[] {
   if (!Array.isArray(raw)) return [];
-  return raw.slice(0, EXECUTION_LIST_CAP).map(read).filter((row): row is T => row !== null);
+  return raw.slice(0, cap).map(read).filter((row): row is T => row !== null);
 }
 
 /** The card, or null when the snapshot carries no contract this build can show. */
@@ -103,6 +113,8 @@ export function shapeExecution(raw: unknown): PortalExecution | null {
     requestsTruncated: snapshot.requests_truncated === true,
     receipts: listOf(snapshot.receipts, receiptOf),
     receiptsTruncated: snapshot.receipts_truncated === true,
+    // Absent from a database before the B4 fix round: none.
+    earlierClaims: listOf(snapshot.earlier_claims, earlierClaimOf, EARLIER_CLAIMS_CAP),
     // The SQL sends them only while some request is still due (AC35); the
     // usable-method rule is applied again here, as for the design fee.
     paymentDetails: parsePaymentDetails(snapshot.payment_details, true),

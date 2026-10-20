@@ -7,6 +7,7 @@ import type { PortalExecutionRequest } from '@/lib/engagements/public/execution-
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { DocumentNumber } from './document-number';
 import { describeExecutionFailure } from './execution-failure';
 import { formatPortalMoney } from './portal-money';
 import type { ExecutionClaim } from './use-execution-claim';
@@ -36,7 +37,7 @@ export function isClaimable(request: PortalExecutionRequest): boolean {
 /**
  * One payment request on the client's execution card: its number and what it
  * bills, when it was issued and is due, what is paid and still due, and either
- * "I made this payment", the note that the client's claim is being checked, or
+ * "I've made this payment", the note that the client's claim is being checked, or
  * that it is paid or withdrawn. Money per the Money law: Latin digits, left to
  * right, at the row's end.
  */
@@ -56,7 +57,7 @@ export function ExecutionRequestRow({ request, claim }: { request: PortalExecuti
         <div className="min-w-0">
           <p className="text-body font-medium">{label(request)}</p>
           <p className="text-caption text-muted-foreground">
-            <span dir="ltr">{request.documentNumber}</span>
+            <DocumentNumber>{request.documentNumber}</DocumentNumber>
             {' · '}
             {t('requests.issuedOn', { date: day(request.issuedOn) })}
             {request.dueOn && !request.void && due ? ` · ${t('requests.dueOn', { date: day(request.dueOn) })}` : null}

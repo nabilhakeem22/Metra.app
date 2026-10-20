@@ -6,8 +6,13 @@ import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-err
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { claimExecutionRequest, loadDeliveryExecution } from '../execution-actions';
 
-/** A refused claim as the card says it: a shared portal failure, `wrong_state`, or the flood ceiling. */
-export type ShownClaimFailure = ShownActFailure | { error: 'busy' };
+/**
+ * A refused claim as the card says it: a shared portal failure, `wrong_state`,
+ * the flood ceiling, or `not_received`: the answer was lost and the card, read
+ * again, does not show the claim, so the client may send it again (a repeat is
+ * never counted twice: the database answers it `already`).
+ */
+export type ShownClaimFailure = ShownActFailure | { error: 'busy' } | { error: 'not_received' };
 
 export interface ExecutionClaim {
   /** The card as it is now: the page's read, then the answer of each claim. */
@@ -31,15 +36,19 @@ export interface ExecutionClaim {
 }
 
 /**
- * The behaviour behind the execution card's "I made this payment". A tap ASKS
+ * The behaviour behind the execution card's "I've made this payment". A tap ASKS
  * (the dialog names the request and the amount still due); only Confirm sends
  * `claimExecutionRequest`, one at a time, its await wrapped so a rejected action
  * can never strand the spinner. The amount is the server's, so none is sent.
  * A claim that landed answers with the card as it is now. An answer that could
  * not say what happened (a lost one, `uncertain`), or a refusal because the
- * request moved on (`wrong_state`), is followed by one read of the card, so a
- * claim that landed after all shows as sent; the failure stays said until the
- * next ask.
+ * request moved on (`wrong_state`), is followed by one read of the card.
+ *
+ * AFTER A LOST ANSWER THE READ DECIDES (B4 F1): the card never says "sent" and
+ * "we could not confirm it" on the same row. If the read shows the claim, it
+ * landed (and told the studio in the same write): the failure is cleared. If
+ * the read works and shows no claim, the row says it was not received and keeps
+ * its button. Only when the read fails too does "refresh to check" stay.
  */
 export function useExecutionClaim(token: string, initial: PortalExecution): ExecutionClaim {
   const [execution, setExecution] = useState(initial);
@@ -49,14 +58,31 @@ export function useExecutionClaim(token: string, initial: PortalExecution): Exec
   const [notifiedIds, setNotifiedIds] = useState<ReadonlySet<string>>(new Set());
   const [failure, setFailure] = useState<ExecutionClaim['failure']>(null);
 
-  /** One read of the card; a read that fails leaves what is shown. */
-  async function readAgain(): Promise<void> {
+  /** One read of the card, or null when it failed: the card then keeps what it shows. */
+  async function readAgain(): Promise<PortalExecution | null> {
     try {
       const answer = await loadDeliveryExecution(token);
-      if (answer.ok) setExecution(answer.execution);
+      if (!answer.ok) return null;
+      setExecution(answer.execution);
+      return answer.execution;
     } catch {
-      // The card keeps what it shows; the failure already said tells the client to refresh.
+      return null;
     }
+  }
+
+  /** A lost answer, settled by a read of the card: what the row says afterwards. */
+  async function settleLostAnswer(requestId: string, unconfirmed: ShownClaimFailure): Promise<void> {
+    const card = await readAgain();
+    if (card === null) {
+      setFailure({ requestId, shown: unconfirmed });
+      return;
+    }
+    const row = card.requests.find((request) => request.id === requestId);
+    if (row?.claimedAt) {
+      setNotifiedIds((previous) => new Set(previous).add(requestId));
+      return;
+    }
+    setFailure({ requestId, shown: { error: 'not_received' } });
   }
 
   function confirm() {
@@ -73,11 +99,14 @@ export function useExecutionClaim(token: string, initial: PortalExecution): Exec
           else await readAgain();
           return;
         }
+        if (answer.error === 'uncertain') {
+          await settleLostAnswer(requestId, actFailureOf(answer));
+          return;
+        }
         setFailure({ requestId, shown: answer.error === 'busy' ? { error: 'busy' } : actFailureOf(answer) });
-        if (answer.error === 'uncertain' || answer.error === 'wrong_state') await readAgain();
+        if (answer.error === 'wrong_state') await readAgain();
       } catch {
-        setFailure({ requestId, shown: UNCONFIRMED_WRITE });
-        await readAgain();
+        await settleLostAnswer(requestId, UNCONFIRMED_WRITE);
       } finally {
         setSubmittingId(null);
         setAskingId(null);

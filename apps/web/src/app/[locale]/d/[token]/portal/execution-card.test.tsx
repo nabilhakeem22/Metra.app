@@ -4,11 +4,12 @@ import type { PortalExecution, PortalExecutionRequest } from '@/lib/engagements/
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ExecutionCard } from './execution-card';
 
-// PR B4.3: the client's execution card on /d. "I made this payment" asks
+// PR B4.3: the client's execution card on /d. "I've made this payment" asks
 // first, naming the request and what is still due; Confirm claims once; a
 // claim that landed shows the card the answer carried; a lost answer, or one
-// the request moved past, re-reads the card; and every figure is Latin digits,
-// left to right, in both locales.
+// the request moved past, re-reads the card, and after a lost answer the read
+// decides what the row says (B4 F1); and every figure is Latin digits, left to
+// right, in both locales.
 
 const actions = vi.hoisted(() => ({ claimExecutionRequest: vi.fn(), loadDeliveryExecution: vi.fn() }));
 vi.mock('../execution-actions', () => actions);
@@ -40,6 +41,7 @@ const CARD: PortalExecution = {
   requestsTruncated: false,
   receipts: [{ amount: '12400.0000', receivedOn: '2026-11-03', requestNumber: 'PR-2026-0002' }],
   receiptsTruncated: false,
+  earlierClaims: [],
   paymentDetails: { instapay: 'studio@instapay', bankName: null, bankAccountHolder: null, bankAccountNumber: null, bankIban: null },
 };
 
@@ -62,6 +64,14 @@ async function claimAndConfirm(locale: TestLocale) {
 beforeEach(() => {
   actions.claimExecutionRequest.mockReset();
   actions.loadDeliveryExecution.mockReset();
+});
+
+describe.each<TestLocale>(['en', 'ar-EG'])('"how to pay" quotes the buttons it names (%s, B4 F4)', (locale) => {
+  it("names the label of the execution card's button and the design fee's, which are the same", () => {
+    const label = messageAt(locale, 'delivery.execution.claim');
+    expect(messageAt(locale, 'delivery.payments.claim')).toBe(label);
+    expect(messageAt(locale, 'delivery.payments.instructions.body')).toContain(label);
+  });
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) => {
@@ -122,6 +132,52 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     await claimAndConfirm(locale);
     expect(within(screen.getByRole('alert')).getByText(messageAt(locale, 'portal.errors.uncertain'))).toBeTruthy();
     expect(actions.loadDeliveryExecution).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lost answer whose claim landed: the re-read shows it sent, with no warning beside it (B4 F1)', async () => {
+    actions.claimExecutionRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: CLAIMED });
+    show(locale);
+    await claimAndConfirm(locale);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(claimButtons(locale)).toHaveLength(0);
+    expect(screen.getByRole('status').textContent).toContain(messageAt(locale, 'delivery.execution.claimNotified'));
+
+    actions.claimExecutionRequest.mockResolvedValueOnce({ ok: false, error: 'uncertain' });
+    show(locale);
+    await claimAndConfirm(locale);
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
+  });
+
+  it('a lost answer whose claim did not land: the row says so and keeps its button (B4 F1)', async () => {
+    actions.claimExecutionRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: CARD });
+    show(locale);
+    await claimAndConfirm(locale);
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.execution.error.not_received'));
+    expect(screen.queryByText(messageAt(locale, 'portal.errors.uncertain'))).toBeNull();
+    expect(claimButtons(locale)).toHaveLength(1);
+  });
+
+  it("keeps a receipt's request number on one line, left to right (B4 F5)", () => {
+    show(locale);
+    const receipts = screen.getByRole('region', { name: messageAt(locale, 'delivery.execution.receipts.title') });
+    const number = [...receipts.querySelectorAll('bdi')].find((node) => node.textContent === 'PR-2026-0002');
+    expect(number?.getAttribute('dir')).toBe('ltr');
+    expect(number?.className).toContain('whitespace-nowrap');
+  });
+
+  it("shows a claim still waiting on an earlier contract, in the client's words (B4 F6)", () => {
+    const { container } = show(locale, {
+      ...CARD,
+      earlierClaims: [{ requestNumber: 'PR-2026-0009', amount: '60000.0000', claimedAt: '2026-11-04T10:00:00.000Z' }],
+    });
+    const section = screen.getByRole('region', { name: messageAt(locale, 'delivery.execution.earlierClaims.title') });
+    expect(section.textContent).toContain('PR-2026-0009');
+    expect(section.textContent).toContain('60,000');
+    expect(section.textContent).toContain('04/11/2026');
+    expect(ARABIC_INDIC.test(container.textContent ?? '')).toBe(false);
+    expect(DASH.test(container.textContent ?? '')).toBe(false);
   });
 
   it('a pending claim shows when it was sent and offers no second claim', () => {

@@ -5,13 +5,15 @@ import { useLocale, useTranslations } from 'next-intl';
 import { EXECUTION_LIST_CAP, type PortalExecutionReceipt } from '@/lib/engagements/public/execution-types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import { DocumentNumber } from './document-number';
 import { formatPortalMoney } from './portal-money';
 
 /**
  * The money the studio recorded as received on the execution contract, newest
- * first: on which day, for which payment request, and how much. Only the newest
- * 60 travel; when there are more, a note says so. Nothing when nothing was
- * received.
+ * first (same-day payments by when the studio recorded them): on which day,
+ * for which payment request, and how much. The request's number never breaks
+ * across lines, in either direction (B4 F5). Only the newest 60 travel; when
+ * there are more, a note says so. Nothing when nothing was received.
  */
 export function ExecutionReceipts({
   receipts,
@@ -37,9 +39,10 @@ export function ExecutionReceipts({
           >
             <CheckCircle2 className="mt-0.5 size-4 text-[color:var(--success)]" aria-hidden />
             <p className="min-w-0 text-caption text-muted-foreground">
-              {t('receivedOn', {
+              {t.rich('receivedOn', {
                 date: bidiIsolate(formatDate(receipt.receivedOn, locale)),
-                request: bidiIsolate(receipt.requestNumber),
+                request: receipt.requestNumber,
+                num: (chunks) => <DocumentNumber>{chunks}</DocumentNumber>,
               })}
             </p>
             <span dir="ltr" className="text-end font-mono text-body font-semibold tabular-nums">

@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
+import { validIsoDate } from '@/lib/validation/iso-date';
 
 export interface PublicVariationLine {
   id: string;
@@ -49,6 +50,12 @@ export interface PublicVariation {
   charges: { taxRate: string; supervisionPct: string } | null;
   /** Days the order adds to the contract's finish date; null = none recorded. */
   timeExtensionDays: number | null;
+  /**
+   * The contract's finish as its approved change orders moved it (DB step B,
+   * B5 D1): its end date and the days ALL its approved orders add. Null on a
+   * proposal contract, and from a database before step B.
+   */
+  finish: { endDate: string | null; approvedExtensionDays: number } | null;
   org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
   lines: PublicVariationLine[];
 }
@@ -56,7 +63,7 @@ export interface PublicVariation {
 /** The SDF's snake_case document, before it is mapped onto PublicVariation. */
 type VariationTokenDocument = Omit<
   PublicVariation,
-  'contractActive' | 'rejectionChannel' | 'charges' | 'timeExtensionDays'
+  'contractActive' | 'rejectionChannel' | 'charges' | 'timeExtensionDays' | 'finish'
 > & {
   contract_active: boolean | null;
   rejection_channel: unknown;
@@ -64,6 +71,8 @@ type VariationTokenDocument = Omit<
   supervision_pct: unknown;
   time_extension_days: unknown;
   contract_source: unknown;
+  contract_end_date: unknown;
+  time_extension_days_total: unknown;
 };
 
 /** A rate as the SDF sends it: a plain non-negative decimal string. */
@@ -99,6 +108,18 @@ function toExtensionDays(source: unknown, value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+/**
+ * A BOQ contract's end date and approved days, or null: a proposal contract's
+ * order says no finish, and a document without the total (an un-applied
+ * function) keeps today's page.
+ */
+function toFinish(source: unknown, endDate: unknown, total: unknown): PublicVariation['finish'] {
+  if (source !== 'boq') return null;
+  if (typeof total !== 'number' || !Number.isInteger(total) || total < 0) return null;
+  const day = typeof endDate === 'string' && validIsoDate(endDate) ? endDate : null;
+  return { endDate: day, approvedExtensionDays: total };
+}
+
 export async function getVariationByToken(
   rawToken: string,
 ): Promise<PublicVariation | null> {
@@ -116,6 +137,8 @@ export async function getVariationByToken(
     supervision_pct: supervisionPct,
     time_extension_days: timeExtensionDays,
     contract_source: contractSource,
+    contract_end_date: contractEndDate,
+    time_extension_days_total: approvedExtensionDays,
     ...rest
   } = document;
   // Only an explicit false marks the contract dead. The respond SDF is the real
@@ -126,6 +149,7 @@ export async function getVariationByToken(
     rejectionChannel: toRejectionChannel(rejectionChannel),
     charges: toCharges(contractSource, taxRate, supervisionPct),
     timeExtensionDays: toExtensionDays(contractSource, timeExtensionDays),
+    finish: toFinish(contractSource, contractEndDate, approvedExtensionDays),
   };
 }
 

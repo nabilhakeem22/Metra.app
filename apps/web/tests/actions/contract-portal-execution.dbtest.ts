@@ -443,6 +443,8 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
       (await ownerQuery<{ data: Record<string, unknown> }>(`select public.app_variation_by_token($1) as data`, [hash]))[0].data;
     expect(await documentOf(open.hash)).toMatchObject({ contract_end_date: '2026-12-31', time_extension_days_total: 25 });
     expect(await documentOf(approved.hash)).toMatchObject({ contract_end_date: '2026-12-31', time_extension_days_total: 25 });
+    // The page reads both keys (B4 F2): /v says the revised finish date.
+    expect(await getVariationByToken(open.raw)).toMatchObject({ finish: { endDate: '2026-12-31', approvedExtensionDays: 25 } });
   });
 
   it("a proposal contract's order gets no breakdown from the reader: its page stays as it was", async () => {
@@ -458,7 +460,7 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
       tokenHash: token.hash,
       timeExtensionDays: 9,
     });
-    expect(await getVariationByToken(token.raw)).toMatchObject({ charges: null, timeExtensionDays: null });
+    expect(await getVariationByToken(token.raw)).toMatchObject({ charges: null, timeExtensionDays: null, finish: null });
   });
 
   for (const [decision, bodyKey] of [

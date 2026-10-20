@@ -37,6 +37,20 @@ export interface PortalExecutionReceipt {
   requestNumber: string;
 }
 
+/**
+ * A claim of the client's still waiting on ANOTHER contract of the delivery
+ * (B4 F6): the card shows one contract, so a newer one must not hide what the
+ * client said they paid on the one before it. Newest first.
+ */
+export interface PortalEarlierClaim {
+  /** The request it is on, PR-YYYY-NNNN. */
+  requestNumber: string;
+  /** What the client said they paid (what was due then). */
+  amount: string;
+  /** When it was sent (an ISO instant). */
+  claimedAt: string;
+}
+
 export type PortalContractStatus = 'issued' | 'signed' | 'terminated';
 
 export interface PortalExecution {
@@ -54,9 +68,14 @@ export interface PortalExecution {
   /** At most the newest 60. */
   receipts: PortalExecutionReceipt[];
   receiptsTruncated: boolean;
+  /** At most EARLIER_CLAIMS_CAP. */
+  earlierClaims: PortalEarlierClaim[];
   /** How to pay, only while something is due and the studio set a usable method. */
   paymentDetails: PortalPaymentDetails | null;
 }
 
 /** The newest requests and receipts the card carries (the SQL's own cap). */
 export const EXECUTION_LIST_CAP = 60;
+
+/** The waiting claims on the delivery's other contracts the card carries (the SQL's own cap). */
+export const EARLIER_CLAIMS_CAP = 10;

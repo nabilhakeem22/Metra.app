@@ -85,11 +85,24 @@ grant select, insert, update, delete on public.contract_payment_milestones to me
 -- keeps its number.
 revoke all on public.payment_requests from metra_app;
 grant select, insert, update on public.payment_requests to metra_app;
--- A client's "I paid" on a request: the studio confirms or dismisses it
--- (UPDATE of status + resolution columns), like client_payment_claims. No
--- DELETE: a resolved claim is retained.
+-- A client's "I paid" on a request. ONLY the client's delivery-link function
+-- (app_delivery_claim_request_by_token, as its owner) writes one, so metra_app
+-- gets NO INSERT (DB step B, B4 security S1): no app path can make up a claim
+-- the client never sent. The studio confirms or dismisses it: UPDATE IS
+-- COLUMN-LEVEL, the answer's columns only, so the client's evidence (what was
+-- claimed, the note, the name, IP and user agent) is never rewritten;
+-- trg_contract_payment_claims_guarded refuses the same to the connection role.
+-- No DELETE: a resolved claim is retained. verify-rls-applied.ts reads this
+-- list back column by column.
 revoke all on public.contract_payment_claims from metra_app;
-grant select, insert, update on public.contract_payment_claims to metra_app;
+grant select on public.contract_payment_claims to metra_app;
+grant update (
+  status,
+  confirmed_payment_id,
+  resolved_by,
+  resolved_at,
+  updated_at
+) on public.contract_payment_claims to metra_app;
 -- Actual costs: editable and voidable (voided_at / voided_by), never deleted.
 -- UPDATE IS COLUMN-LEVEL (DB step B, B3 security S2): the entry fields the
 -- edit writes, and the void's stamp, nothing else. So no path can move an

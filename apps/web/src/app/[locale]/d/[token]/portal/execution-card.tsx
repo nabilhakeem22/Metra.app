@@ -5,6 +5,7 @@ import { EXECUTION_LIST_CAP, type PortalExecution } from '@/lib/engagements/publ
 import { bidiIsolate } from '@/lib/format/bidi';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { ConfirmActDialog } from './confirm-act-dialog';
+import { ExecutionEarlierClaims } from './execution-earlier-claims';
 import { ExecutionReceipts } from './execution-receipts';
 import { ExecutionRequestRow, isClaimable, useRequestLabel } from './execution-request-row';
 import { PaymentInstructions } from './payment-instructions';
@@ -14,8 +15,9 @@ import { useExecutionClaim } from './use-execution-claim';
 /**
  * The client's execution contract on the delivery page (Stage 2, D1a): the
  * contract's number, status and value, every payment request the studio sent
- * (newest first, at most 60) with "I made this payment" on each one still due,
- * how to pay while something is due, and the payments received. Shown only for
+ * (newest first, at most 60) with "I've made this payment" on each one still
+ * due, the client's notices still waiting on an earlier contract of the
+ * delivery, how to pay while something is due, and the payments received. Shown only for
  * a delivery at `execution` with a contract the client can see. Figures are
  * what the client is asked to pay or has paid, never the studio's own price
  * basis. فصحى copy, Latin digits, money left to right.
@@ -63,6 +65,7 @@ export function ExecutionCard({ token, initial }: { token: string; initial: Port
           <p className="text-caption text-muted-foreground">{t('requests.truncated', { count: String(EXECUTION_LIST_CAP) })}</p>
         )}
       </section>
+      <ExecutionEarlierClaims claims={claim.execution.earlierClaims} />
       {claim.execution.paymentDetails && <PaymentInstructions details={claim.execution.paymentDetails} />}
       <ExecutionReceipts receipts={claim.execution.receipts} truncated={claim.execution.receiptsTruncated} />
       <ConfirmActDialog

@@ -13,6 +13,7 @@ import {
   seedRequest,
   seedVariation,
   sqlstate,
+  tamper,
   type ExecutionContract,
 } from './execution-fixture';
 import { closeFixture, seedOrg, teardown } from './fixture';
@@ -435,6 +436,8 @@ describe('contract_payments and contract_payment_claims (AC17, AC18 DB parts)', 
   });
 
   it('holds ONE pending claim per request, and ties status to its resolution columns', async () => {
+    // Claims are written by the client's delivery-link function as its owner;
+    // metra_app holds no INSERT since DB step B (B4 security S1).
     const claim = (fields: Record<string, unknown> = {}) => {
       const row = {
         org_id: orgId,
@@ -444,12 +447,20 @@ describe('contract_payments and contract_payment_claims (AC17, AC18 DB parts)', 
         ...fields,
       };
       const columns = Object.keys(row);
-      return app(
+      return ownerQuery(
         `insert into public.contract_payment_claims (${columns.join(', ')})
          values (${columns.map((_, i) => `$${String(i + 1)}`).join(', ')}) returning id`,
         Object.values(row),
       );
     };
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_payment_claims (org_id, contract_id, request_id, claimed_amount) values ($1, $2, $3, 400)`,
+          [orgId, contract.contractId, requestId],
+        ),
+      ),
+    ).toBe('42501');
     const [first] = (await claim()) as Array<{ id: string }>;
     expect(
       await claim().catch((caught: { constraint_name?: string }) => caught.constraint_name),
@@ -596,6 +607,9 @@ describe('contract_line_measurements (AC24 DB part)', () => {
 
   beforeAll(async () => {
     contract = await seedExecutionContract(orgId, { state: 'signed', linesPerSection: [2] });
+    // Issued long before the fixed reading days below: since DB step B a
+    // metra_app reading is refused before the contract's issue day (A5 S2).
+    await tamper(`update public.contracts set created_at = '2026-01-01T00:00:00Z' where id = $1`, [contract.contractId]);
   });
 
   const measure = (lineId: string, qty: string, measuredOn: string, contractId = contract.contractId) =>
@@ -699,7 +713,9 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
       contract_cost_entries: 'S,I',
       // INSERT is column-level (every column but seq), so not a table privilege.
       contract_line_measurements: 'S',
-      contract_payment_claims: 'S,I,U',
+      // No INSERT, and UPDATE is column-level (the answer's columns) since DB
+      // step B (B4 security S1, execution-step-b-guards.dbtest.ts).
+      contract_payment_claims: 'S',
       contract_payment_milestones: 'S,I,U,D',
       contract_payments: 'S,I',
       payment_requests: 'S,I,U',

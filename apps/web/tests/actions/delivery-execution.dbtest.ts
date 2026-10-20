@@ -1,7 +1,8 @@
+import { createSql } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { claimExecutionRequestByToken, getDeliveryExecutionByToken } from '@/lib/engagements/public/execution';
 import { hashShareToken } from '@/lib/share/token';
-import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest, seedVariation } from './execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest, seedVariation, tamper } from './execution-fixture';
 import { seedPayment } from './execution-billing-fixture';
 import {
   claimBySql,
@@ -40,7 +41,11 @@ beforeAll(async () => {
   members = { owner: seeded.ownerIds[0], admin, pm, siteEngineer, accountant, viewer, client };
 });
 
+/** A second connection, to hold a row while the claim runs (R2). */
+const holder = createSql(process.env.DATABASE_URL as string, { max: 1, prepare: false });
+
 afterAll(async () => {
+  await holder.end();
   await teardown(orgIds);
   await closeExecutionFixture();
   await closeFixture();
@@ -75,6 +80,24 @@ describe('app_delivery_execution_by_token: null unless execution, live and contr
     const live = await seedExecutionContract(orgId, { state: 'signed', delivery });
     const card = await getDeliveryExecutionByToken(delivery.rawToken);
     expect(card?.contract).toMatchObject({ status: 'signed', documentNumber: expect.stringContaining(String(live.contractNumber).padStart(4, '0')) });
+  });
+
+  it("keeps a pending claim on the card when a newer live contract appears on the delivery (B4 F6)", async () => {
+    const { delivery, contract: ended } = await seedExecutionDelivery(orgId);
+    const requestId = await seedRequest(orgId, ended.contractId, members.owner, { milestoneId: ended.milestoneIds[0] }, '60000');
+    expect(await claimBySql(delivery.tokenHash, requestId)).toBe('ok');
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [ended.contractId]);
+    const live = await seedExecutionContract(orgId, { state: 'signed', delivery });
+    const card = await getDeliveryExecutionByToken(delivery.rawToken);
+    expect(card?.contract.documentNumber).toContain(String(live.contractNumber).padStart(4, '0'));
+    expect(card?.requests).toEqual([]);
+    expect(card?.earlierClaims).toEqual([
+      { requestNumber: expect.stringMatching(/^PR-\d{4}-\d{4}$/), amount: '60000.0000', claimedAt: expect.any(String) },
+    ]);
+    // Answered by the studio: it leaves the card.
+    const [claim] = await claimsOf(ended.contractId);
+    await dismissBySql(claim.id, members.owner);
+    expect((await getDeliveryExecutionByToken(delivery.rawToken))?.earlierClaims).toEqual([]);
   });
 
   it('neither its output nor any body of the four functions names a price-basis word', async () => {
@@ -119,6 +142,14 @@ describe('the card: requests with what is paid and due, receipts, both capped at
       }),
     ]);
     expect(card?.receipts).toEqual([expect.objectContaining({ amount: '2000.5000', requestNumber: card!.requests[0].documentNumber })]);
+  });
+
+  it('lists same-day receipts newest recorded first (B4 F8)', async () => {
+    const { delivery, contract } = await seedExecutionDelivery(orgId);
+    const requestId = await seedRequest(orgId, contract.contractId, members.owner, { milestoneId: contract.milestoneIds[0] }, '62000');
+    for (const amount of ['240.5', '744', '500']) await seedPayment(orgId, contract.contractId, requestId, members.owner, amount);
+    const card = await getDeliveryExecutionByToken(delivery.rawToken);
+    expect(card?.receipts.map((receipt) => receipt.amount)).toEqual(['500.0000', '744.0000', '240.5000']);
   });
 
   it('carries the newest 60 requests and 60 receipts, and says there are more', async () => {
@@ -211,7 +242,8 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
     }
     expect(await claimBySql(delivery.tokenHash, requestId)).toBe('busy');
     expect(await claimExecutionRequestByToken(delivery.rawToken, { requestId, ip: null, userAgent: null })).toEqual({ ok: false, error: 'busy' });
-    await ownerQuery(`update public.contract_payment_claims set created_at = now() - interval '61 minutes' where contract_id = $1`, [contract.contractId]);
+    // An hour passing, written past the claim guard (a claim's created_at never changes).
+    await tamper(`update public.contract_payment_claims set created_at = now() - interval '61 minutes' where contract_id = $1`, [contract.contractId]);
     expect(await claimBySql(delivery.tokenHash, requestId)).toBe('ok');
   });
 
@@ -226,6 +258,38 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
     expect(codes.filter((code) => code === 'ok')).toHaveLength(10);
     expect(codes.filter((code) => code === 'busy')).toHaveLength(2);
     expect(await claimsOf(contract.contractId)).toHaveLength(10);
+  });
+
+  it('lands at once while the delivery row is held, and skips only its timestamp (B4 R2)', async () => {
+    const { delivery, contract } = await seedExecutionDelivery(orgId);
+    const requestId = await seedRequest(orgId, contract.contractId, members.owner, { milestoneId: contract.milestoneIds[0] });
+    const stamp = async () =>
+      (await ownerQuery<{ at: string }>(`select updated_at::text as at from public.design_engagements where id = $1`, [delivery.id]))[0].at;
+    const before = await stamp();
+    let release!: () => void;
+    const released = new Promise<void>((done) => (release = done));
+    let held!: () => void;
+    const holding = new Promise<void>((done) => (held = done));
+    const studioSave = holder.begin(async (tx) => {
+      await tx`select id from public.design_engagements where id = ${delivery.id} for no key update`;
+      held();
+      await released;
+    });
+    await holding;
+    const started = Date.now();
+    try {
+      expect(await claimBySql(delivery.tokenHash, requestId)).toBe('ok');
+      expect(Date.now() - started).toBeLessThan(1_000);
+    } finally {
+      release();
+      await studioSave;
+    }
+    expect(await stamp()).toBe(before);
+    expect(await claimsOf(contract.contractId)).toHaveLength(1);
+    // Nobody holding it: the claim refreshes the timestamp, as every client act does.
+    const second = await seedRequest(orgId, contract.contractId, members.owner, { milestoneId: contract.milestoneIds[1] });
+    expect(await claimBySql(delivery.tokenHash, second)).toBe('ok');
+    expect(await stamp()).not.toBe(before);
   });
 
   it('waits at most 4 s on a held request row (lock_timeout on the function)', async () => {

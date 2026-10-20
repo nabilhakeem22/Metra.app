@@ -2034,7 +2034,9 @@
         "supervision": "Supervision fee",
         "total": "Total charge",
         "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the duration of the works.",
-        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved."
+        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved.",
+        "revisedFinish": "Revised completion date: {date}, after {count, plural, one {{n} day} other {{n} days}} added by approved change orders.",
+        "finishAdded": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the duration of the works."
       }
     },
     "timeExtension": {
@@ -3008,18 +3010,23 @@
         "variationUnnumbered": "A change order",
         "instalment": "Instalment"
       },
-      "claim": "I made this payment",
+      "claim": "I've made this payment",
       "confirmTitle": "Did you make this payment?",
       "confirmBody": "{request}: {amount}. Your designer confirms it once it arrives.",
       "claimedOn": "Thank you, we are checking your payment. Sent on {date}.",
       "claimNotified": "Your designer has been told.",
       "error": {
         "wrong_state": "This request cannot take a payment notice now. The page now shows where it stands.",
-        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact your designer."
+        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact your designer.",
+        "not_received": "Your notice does not show as received. You can send it again; it is never counted twice."
+      },
+      "earlierClaims": {
+        "title": "Payment notices on an earlier contract",
+        "row": "{amount} on <num>{request}</num>, sent on {date}. Your designer is checking it."
       },
       "receipts": {
         "title": "Payments received",
-        "receivedOn": "Received on {date} for {request}",
+        "receivedOn": "Received on {date} for <num>{request}</num>",
         "truncated": "Showing the latest {count} payments."
       }
     },

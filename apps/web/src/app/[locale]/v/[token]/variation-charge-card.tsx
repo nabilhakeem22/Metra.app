@@ -3,7 +3,9 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { Row } from '@/components/share/link-page-parts';
 import { Card, CardContent } from '@/components/ui/card';
+import { revisedFinishDate } from '@/lib/execution/finish-date';
 import { variationCharge } from '@/lib/execution/money/variation-charge';
+import { formatDate } from '@/lib/format/date';
 import { formatMoneyExact } from '@/lib/format/money';
 import { formatNumber } from '@/lib/format/number';
 import type { PublicVariation } from '@/lib/variations/public';
@@ -15,14 +17,17 @@ import { extensionDaysWording } from '@/lib/variations/time-extension';
  * the exact piastre fraction so the rows add up to the total as shown (F4); a
  * proposal contract's shows the net change alone, as before Stage 2. The days
  * are worded by where the order stands (F2): `standing` is its status while
- * open, 'approved' once approved, and null when it closed any other way.
+ * open, 'approved' once approved, and null when it closed any other way. Then
+ * the contract's revised finish date, as the studio's contract page says it
+ * (B4 F2): its end date plus the days its APPROVED orders add, or only the days
+ * when it has no end date; nothing while no approved order adds a day.
  */
 export function VariationChargeCard({
   variation,
   standing,
   m,
 }: {
-  variation: Pick<PublicVariation, 'net_delta' | 'charges' | 'timeExtensionDays'>;
+  variation: Pick<PublicVariation, 'net_delta' | 'charges' | 'timeExtensionDays' | 'finish'>;
   standing: string | null;
   m: (value: string) => string;
 }) {
@@ -34,6 +39,11 @@ export function VariationChargeCard({
     ? variationCharge(variation.net_delta, variation.charges.taxRate, variation.charges.supervisionPct)
     : null;
   const exact = (value: string) => formatMoneyExact(value, locale);
+  const finish = variation.finish && variation.finish.approvedExtensionDays > 0 ? variation.finish : null;
+  const revised = finish ? revisedFinishDate(finish.endDate, finish.approvedExtensionDays) : null;
+  const finishDays = finish
+    ? { count: finish.approvedExtensionDays, n: formatNumber(finish.approvedExtensionDays, locale) }
+    : null;
 
   return (
     <Card>
@@ -54,6 +64,13 @@ export function VariationChargeCard({
               count: days,
               n: formatNumber(days, locale),
             })}
+          </p>
+        )}
+        {finishDays && (
+          <p className="text-muted-foreground">
+            {revised
+              ? t('charge.revisedFinish', { ...finishDays, date: formatDate(revised, locale) })
+              : t('charge.finishAdded', finishDays)}
           </p>
         )}
       </CardContent>

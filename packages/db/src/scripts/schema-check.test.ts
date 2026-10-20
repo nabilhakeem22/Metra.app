@@ -190,7 +190,7 @@ describe('runSchemaCheck', () => {
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 133 declared, 133 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: constraints — 340 declared, 340 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 54 declared, 54 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 56 declared, 56 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 54 declared, 54 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 56 declared, 56 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 54 RLS functions', () => {
+  it('declares 56 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -231,7 +231,9 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // and app_delivery_claim_request_by_token, their internal helpers
     // app_delivery_execution_contract and app_studio_payment_details, and the
     // trigger fns enforce_cost_entry_guarded and enforce_actor_is_session_user.
-    expect(declaredFunctions().size).toBe(54);
+    // 56 with the B4 fix round's trigger fns enforce_contract_payment_claim_guarded
+    // and enforce_contract_line_measurement_guarded.
+    expect(declaredFunctions().size).toBe(56);
   });
 });
 

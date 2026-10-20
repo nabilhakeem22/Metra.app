@@ -126,13 +126,22 @@ $$;
 --   requests_truncated  the contract has more than 60 requests
 --   receipts   the newest 60 payments, {amount, received_on, request_number,
 --              request_year}: never a method, a reference, a note or who
---              recorded it
+--              recorded it. Newest by the day received, then by when the
+--              studio recorded it (B4 F8: same-day payments newest first)
 --   receipts_truncated  more than 60 payments
+--   earlier_claims  the client's claims still waiting on the delivery's OTHER
+--              contracts (B4 F6: a claim on a contract the card no longer
+--              shows stays visible), at most 10, newest first, each
+--              {request_number, request_year, amount (what was claimed),
+--              claimed_at}
 --   payment_details  app_studio_payment_details, ONLY while some issued
 --              request of the contract (any of them, not only the 60 shown)
 --              still has something due (AC35); else null
 -- Money and days are strings (scale 4; YYYY-MM-DD). Every read names
 -- `org_id`: the indexes lead with it, and a definer gets no RLS predicate.
+-- What is paid is summed ONCE per contract, grouped by request (B4 R4), not
+-- once per request, so a contract with many requests costs one scan of its
+-- payments.
 create or replace function public.app_delivery_execution_by_token(p_hash text)
 returns jsonb
 language sql
@@ -148,33 +157,50 @@ as $$
        and (de.share_expires_at is null or de.share_expires_at > now())
   ),
   contract as materialized (
-    select c.id, c.org_id, c.number, c.status, c.title_ar, c.title_en, c.original_value, c.created_at
+    select c.id, c.org_id, c.number, c.status, c.title_ar, c.title_en, c.original_value, c.created_at,
+           d.id as engagement_id
       from delivery d
       join public.contracts c
         on c.org_id = d.org_id
        and c.id = public.app_delivery_execution_contract(d.id, d.org_id)
   ),
+  paid_by_request as materialized (
+    select p.request_id, sum(p.amount) as paid
+      from contract k
+      join public.contract_payments p on p.org_id = k.org_id and p.contract_id = k.id
+     group by p.request_id
+  ),
   billed as materialized (
     select r.id, r.number, r.kind, r.status, r.amount, r.issued_on, r.due_on,
            r.milestone_id, r.variation_order_id,
-           coalesce((
-             select sum(p.amount) from public.contract_payments p
-              where p.org_id = r.org_id and p.request_id = r.id
-           ), 0) as paid
+           coalesce(pp.paid, 0) as paid
       from contract k
       join public.payment_requests r on r.org_id = k.org_id and r.contract_id = k.id
+      left join paid_by_request pp on pp.request_id = r.id
   ),
   shown as materialized (
     select b.* from billed b order by b.number desc limit 61
   ),
   received as materialized (
-    select p.id, p.amount, p.received_on, r.number as request_number,
+    select p.id, p.amount, p.received_on, p.created_at, r.number as request_number,
            extract(year from r.issued_on)::int as request_year
       from contract k
       join public.contract_payments p on p.org_id = k.org_id and p.contract_id = k.id
       join public.payment_requests r on r.org_id = p.org_id and r.id = p.request_id
-     order by p.received_on desc, p.id desc
+     order by p.received_on desc, p.created_at desc, p.id desc
      limit 61
+  ),
+  earlier as materialized (
+    select pc.id, pc.claimed_amount, pc.created_at, r.number as request_number,
+           extract(year from r.issued_on)::int as request_year
+      from contract k
+      join public.boqs b on b.org_id = k.org_id and b.engagement_id = k.engagement_id
+      join public.contracts c on c.org_id = b.org_id and c.source_boq_id = b.id and c.id <> k.id
+      join public.contract_payment_claims pc
+        on pc.org_id = c.org_id and pc.contract_id = c.id and pc.status = 'pending'
+      join public.payment_requests r on r.org_id = pc.org_id and r.id = pc.request_id
+     order by pc.created_at desc, pc.id desc
+     limit 10
   )
   select jsonb_build_object(
     'contract', jsonb_build_object(
@@ -220,11 +246,22 @@ as $$
           'received_on', to_char(x.received_on, 'YYYY-MM-DD'),
           'request_number', x.request_number,
           'request_year', x.request_year
-        ) order by x.received_on desc, x.id desc
+        ) order by x.received_on desc, x.created_at desc, x.id desc
       )
-      from (select * from received order by received_on desc, id desc limit 60) x
+      from (select * from received order by received_on desc, created_at desc, id desc limit 60) x
     ), '[]'::jsonb),
     'receipts_truncated', (select count(*) from received) > 60,
+    'earlier_claims', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'request_number', e.request_number,
+          'request_year', e.request_year,
+          'amount', e.claimed_amount::text,
+          'claimed_at', e.created_at
+        ) order by e.created_at desc, e.id desc
+      )
+      from earlier e
+    ), '[]'::jsonb),
     'payment_details', case
       when exists (select 1 from billed b where b.status = 'issued' and b.amount > b.paid)
         then public.app_studio_payment_details(k.org_id)
@@ -296,7 +333,11 @@ $$;
 -- THE CALLER'S name / ip / ua are capped 120 / 45 / 512 and the note 2,000,
 -- as the other delivery writes: this function is the trust boundary for what
 -- reaches the claim row. A successful claim refreshes the delivery's
--- updated_at, as every client act does (newest-first lists).
+-- updated_at, as every client act does (newest-first lists), BEST EFFORT (B4
+-- R2): only when nobody holds the delivery row (`skip locked`). A studio save
+-- of the delivery in flight skips the timestamp; it never fails the claim, nor
+-- holds the request lock (and so the studio's money writers on it) while it
+-- waits.
 create or replace function public.app_delivery_claim_request_by_token(
   p_hash text,
   p_request_id uuid,
@@ -391,7 +432,13 @@ begin
    where m.org_id = v_org_id
      and m.role::text in ('owner', 'admin', 'accountant');
 
-  update public.design_engagements set updated_at = now() where id = v_engagement_id;
+  update public.design_engagements de
+     set updated_at = now()
+   where de.id = (
+     select x.id from public.design_engagements x
+      where x.id = v_engagement_id
+        for no key update skip locked
+   );
   return 'ok';
 end
 $$;

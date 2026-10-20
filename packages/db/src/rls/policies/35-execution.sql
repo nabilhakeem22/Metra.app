@@ -15,7 +15,8 @@
 -- table lock for an instant. In DB step A every table here was new, so no
 -- request waited for it; from DB step B on they hold live rows, and a run
 -- waits at most the 3 s lock_timeout per table (six tables x 3 s is the worst
--- case) behind a long studio transaction, then rolls this file back whole.
+-- case) behind a long studio transaction, then rolls this file back whole
+-- (apply-rls retries it, ../scripts/apply-rls-retry.ts).
 --
 -- WHAT GUARDS WHAT (beside the grants in roles.sql):
 --   contract_payment_milestones  full DML while the contract is a draft;
@@ -31,14 +32,28 @@
 --                                (step B) trg_contract_payments_actor:
 --                                recorded_by is the session user (MT140)
 --   contract_line_measurements   append-only BY GRANT (SELECT, and INSERT on
---                                every column but `seq`)
---   contract_payment_claims      mutable lifecycle, no DELETE grant
+--                                every column but `seq`); (step B)
+--                                trg_contract_line_measurements_actor:
+--                                recorded_by is the session user (MT140), and
+--                                trg_contract_line_measurements_guarded: a
+--                                signed execution contract with no issued
+--                                final account, a day from its issue to
+--                                tomorrow, created_at = now() (MT100)
+--   contract_payment_claims      written only by the client's delivery-link
+--                                function; (step B) metra_app SELECT and
+--                                UPDATE of the answer's columns only, and
+--                                trg_contract_payment_claims_guarded: the
+--                                client's evidence never changes, only
+--                                pending -> confirmed | dismissed (MT100);
+--                                trg_contract_payment_claims_actor:
+--                                resolved_by is the session user (MT140)
 --   contract_cost_entries        no DELETE grant, UPDATE on the entry fields
 --                                and the void stamp only; (step B)
 --                                trg_contract_cost_entries_guarded: never
---                                re-homed or un-voided (MT100), and
---                                trg_contract_cost_entries_actor: recorded_by
---                                is the session user (MT140)
+--                                re-homed, un-voided or edited once voided
+--                                (MT100), and trg_contract_cost_entries_actor:
+--                                recorded_by and voided_by are the session
+--                                user (MT140)
 
 -- contract_payment_milestones
 alter table public.contract_payment_milestones enable row level security;
@@ -175,4 +190,33 @@ drop trigger if exists trg_contract_cost_entries_actor on public.contract_cost_e
 create trigger trg_contract_cost_entries_actor
   before insert or update on public.contract_cost_entries
   for each row
+  execute function public.enforce_actor_is_session_user('recorded_by', 'voided_by');
+
+-- DB step B (B4 security S1): a client's claim keeps what the client sent, and
+-- is answered once; the member who answers it is the session's user.
+drop trigger if exists trg_contract_payment_claims_actor on public.contract_payment_claims;
+create trigger trg_contract_payment_claims_actor
+  before update on public.contract_payment_claims
+  for each row
+  execute function public.enforce_actor_is_session_user('resolved_by');
+
+drop trigger if exists trg_contract_payment_claims_guarded on public.contract_payment_claims;
+create trigger trg_contract_payment_claims_guarded
+  before update on public.contract_payment_claims
+  for each row
+  execute function public.enforce_contract_payment_claim_guarded();
+
+-- DB step B (A5 security S2): a site reading names the session's user, and goes
+-- only on a signed execution contract that is still open, on a day it can have
+-- been measured (functions/35-execution.sql).
+drop trigger if exists trg_contract_line_measurements_actor on public.contract_line_measurements;
+create trigger trg_contract_line_measurements_actor
+  before insert on public.contract_line_measurements
+  for each row
   execute function public.enforce_actor_is_session_user('recorded_by');
+
+drop trigger if exists trg_contract_line_measurements_guarded on public.contract_line_measurements;
+create trigger trg_contract_line_measurements_guarded
+  before insert on public.contract_line_measurements
+  for each row
+  execute function public.enforce_contract_line_measurement_guarded();

@@ -37,8 +37,19 @@ describe('shapeExecution', () => {
       requestsTruncated: false,
       receipts: [{ amount: '100.0000', receivedOn: '2026-11-02', requestNumber: 'PR-2026-0004' }],
       receiptsTruncated: false,
+      earlierClaims: [],
       paymentDetails: { instapay: 'studio@instapay', bankName: null, bankAccountHolder: null, bankAccountNumber: null, bankIban: null },
     });
+  });
+
+  it("carries the claims still waiting on the delivery's other contracts, malformed ones dropped, at most 10 (B4 F6)", () => {
+    const claim = { request_number: 3, request_year: 2026, amount: '60000.0000', claimed_at: '2026-11-03T09:15:00.123456+00:00' };
+    const card = shapeExecution(snapshot({
+      earlier_claims: [claim, { ...claim, amount: '0' }, { ...claim, claimed_at: 'yesterday' }, null, ...Array.from({ length: 12 }, () => claim)],
+    }));
+    expect(card?.earlierClaims[0]).toEqual({ requestNumber: 'PR-2026-0003', amount: '60000.0000', claimedAt: '2026-11-03T09:15:00.123Z' });
+    expect(card?.earlierClaims).toHaveLength(7);
+    expect(shapeExecution(snapshot({ earlier_claims: 'nope' }))?.earlierClaims).toEqual([]);
   });
 
   it('names a change order by its number and the final account by its kind', () => {

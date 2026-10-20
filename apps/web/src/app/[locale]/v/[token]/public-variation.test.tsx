@@ -34,6 +34,7 @@ function variationWith(
     rejectionChannel: null,
     charges: null,
     timeExtensionDays: null,
+    finish: null,
     org: { name_ar: 'ستوديو', name_en: 'Studio', logo_file_id: null },
     lines: [
       {
@@ -285,6 +286,45 @@ describe('PublicVariationView — the charge breakdown', () => {
       expect(daysLine()).toBeNull();
       view.unmount();
     }
+  });
+
+  // B4 F2: the contract's revised finish, as the studio's contract page says it.
+  const finishLine = () =>
+    screen.queryByText((text) => text.startsWith('تاريخ الانتهاء المعدَّل') || text.startsWith('تضيف أوامر التغيير المعتمدة'));
+
+  test("shows the contract's revised finish date: its end date plus every approved order's days", () => {
+    renderWithIntl(
+      <PublicVariationView
+        token={TOKEN}
+        variation={variationWith({ timeExtensionDays: 7, finish: { endDate: '2026-12-31', approvedExtensionDays: 25 } })}
+      />,
+    );
+    const line = finishLine()!;
+    expect(line.textContent!.startsWith('تاريخ الانتهاء المعدَّل')).toBe(true);
+    expect(line.textContent).toContain('25/01/2027');
+    expect(line.textContent).toContain('25');
+    expect(line.textContent).not.toMatch(/[٠-٩–—]/);
+  });
+
+  test('says only the days when the contract has no end date, and nothing while no approved order adds one', () => {
+    const { unmount } = renderWithIntl(
+      <PublicVariationView token={TOKEN} variation={variationWith({ finish: { endDate: null, approvedExtensionDays: 10 } })} />,
+    );
+    expect(finishLine()!.textContent!.startsWith('تضيف أوامر التغيير المعتمدة')).toBe(true);
+    unmount();
+    for (const finish of [null, { endDate: '2026-12-31', approvedExtensionDays: 0 }]) {
+      const view = renderWithIntl(<PublicVariationView token={TOKEN} variation={variationWith({ finish })} />);
+      expect(finishLine()).toBeNull();
+      view.unmount();
+    }
+  });
+
+  test('says the revised finish in English too', () => {
+    renderWithIntl(
+      <PublicVariationView token={TOKEN} variation={variationWith({ finish: { endDate: '2026-12-31', approvedExtensionDays: 1 } })} />,
+      { locale: 'en' },
+    );
+    expect(screen.getByText((text) => text.startsWith('Revised completion date:')).textContent).toContain('1 day');
   });
 
   test('a 4-decimal net change shows exact rows that add up to the total as shown (F4)', () => {
