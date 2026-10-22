@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar-EG" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="canonical" href="/ar-EG">
+<link rel="alternate" hreflang="ar-EG" href="/ar-EG">
+<link rel="alternate" hreflang="en" href="/en">
+<!--
+  The bare "/" is a static asset, served before the Worker runs (Workers
+  Free plan CPU relief). It picks the locale in the browser the way the
+  middleware did on the server: the NEXT_LOCALE cookie, then the browser's
+  languages, then the default locale. src/test/root-redirector.test.ts keeps
+  these three constants equal to src/i18n/routing.ts.
+-->
+<script>
+var LOCALES = ['ar-EG', 'en'];
+var DEFAULT_LOCALE = 'ar-EG';
+var LOCALE_COOKIE_NAME = 'NEXT_LOCALE';
+(function () {
+  function primaryTag(tag) {
+    return String(tag).toLowerCase().split('-')[0];
+  }
+  function cookieLocale() {
+    var pairs = document.cookie ? document.cookie.split(';') : [];
+    for (var i = 0; i < pairs.length; i++) {
+      var pair = pairs[i].trim();
+      var separator = pair.indexOf('=');
+      if (separator > 0 && pair.slice(0, separator) === LOCALE_COOKIE_NAME) {
+        var value = pair.slice(separator + 1);
+        return LOCALES.indexOf(value) >= 0 ? value : null;
+      }
+    }
+    return null;
+  }
+  function browserLocale() {
+    var languages = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    for (var i = 0; i < languages.length; i++) {
+      if (!languages[i]) continue;
+      for (var j = 0; j < LOCALES.length; j++) {
+        if (primaryTag(languages[i]) === primaryTag(LOCALES[j])) return LOCALES[j];
+      }
+    }
+    return null;
+  }
+  var locale = cookieLocale() || browserLocale() || DEFAULT_LOCALE;
+  location.replace('/' + locale + location.search + location.hash);
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=/ar-EG"></noscript>
+</head>
+<body></body>
+</html>
