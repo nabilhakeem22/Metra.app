@@ -6,19 +6,14 @@ import { useCountdown } from '@/hooks/use-countdown';
 import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
 import type { ActionResult } from '@/lib/actions/result';
-import {
-  resolvePostLoginPath,
-  sendEmailOtp,
-  sendPhoneOtp,
-  verifyEmailOtp,
-  verifyPhoneOtp,
-} from '@/lib/auth/actions';
+import { sendEmailOtp, sendPhoneOtp, verifyEmailOtp, verifyPhoneOtp } from '@/lib/auth/otp-client';
 import {
   otpCodeErrors,
   otpIdentifierErrors,
   type OtpChannel,
   type OtpField,
 } from '@/lib/auth/otp-field-rules';
+import { signInErrorTranslator } from './sign-in-errors';
 
 type Status = 'idle' | 'sending' | 'code-sent' | 'verifying' | 'error' | 'success';
 
@@ -33,6 +28,7 @@ const RESEND_SECONDS = 60;
  */
 export function useOtpFlow() {
   const te = useTranslations('errors');
+  const tl = useTranslations('login');
   const router = useRouter();
   const [, startTransition] = useTransition();
   const countdown = useCountdown(RESEND_SECONDS);
@@ -44,17 +40,18 @@ export function useOtpFlow() {
   // Only the box on screen can show a refusal; one about the other step's box
   // (a resend that finds the address refused) is said in the status line.
   const rendered: readonly OtpField[] = phase === 'request' ? [channel] : ['token'];
-  const errors = useFieldErrors({ fields: rendered, translate: te });
+  const errors = useFieldErrors({ fields: rendered, translate: signInErrorTranslator(te, tl('pageRefused')) });
 
-  /** Run one call; true when it succeeded. A refusal or a rejection is shown. */
-  async function attempt(call: () => Promise<ActionResult>): Promise<boolean> {
+  /** Run one call; its answer when it succeeded, else null. A refusal or a rejection is shown. */
+  async function attempt<Result extends ActionResult>(call: () => Promise<Result>): Promise<Result | null> {
     try {
-      if (!errors.applyResult(await call())) return true;
+      const result = await call();
+      if (!errors.applyResult(result)) return result;
     } catch (rejection) {
       errors.applyRejection(rejection);
     }
     setStatus('error');
-    return false;
+    return null;
   }
 
   function send(): void {
@@ -82,11 +79,9 @@ export function useOtpFlow() {
       );
       if (!verified) return;
       setStatus('success');
-      // Route by membership: dashboard if they already have an org, else onboarding.
-      await attempt(async () => {
-        router.push(await resolvePostLoginPath());
-        return { ok: true };
-      });
+      // The verify answer names the destination by membership: the dashboard
+      // when they already have an org, else onboarding.
+      router.push(verified.next ?? '/dashboard');
     });
   }
 

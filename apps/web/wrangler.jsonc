@@ -9,6 +9,9 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
+  // Assets-first is LOAD-BEARING: the landing and login pages are pre-rendered
+  // HTML served before the Worker runs. Never set run_worker_first or
+  // not_found_handling here (src/test/wrangler-assets.test.ts, docs/DEPLOY.md).
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

@@ -176,7 +176,8 @@
     "sending": "Sending…",
     "codeSentTitle": "Enter the 6-digit code",
     "back": "Back",
-    "channelLabel": "How should we send your code?"
+    "channelLabel": "How should we send your code?",
+    "pageRefused": "We could not complete sign-in from this page. Refresh the page and try again."
   },
   "onboarding": {
     "formTitle": "Company profile",
