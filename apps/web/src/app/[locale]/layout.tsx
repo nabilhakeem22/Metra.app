@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Manrope, Tajawal } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -60,6 +60,9 @@ export default async function LocaleLayout({
   if (!LOCALES.includes(locale as Locale)) {
     notFound();
   }
+  // The locale from the path, so a page can be pre-rendered without reading the
+  // request headers (the static landing and login pages).
+  setRequestLocale(locale);
 
   return (
     <html
