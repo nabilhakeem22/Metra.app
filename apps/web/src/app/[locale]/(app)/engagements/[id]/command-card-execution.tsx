@@ -39,8 +39,10 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
   }
   const href = executionCardHref(target.page, { projectId: view.projectId, contractId: view.contract?.id ?? null });
   if (!href || !mayFollow(view, target)) return null;
+  // A long label ("Send the payment request for Instalment 1") wraps inside
+  // the card at 390 px instead of running past it: full width, several lines.
   return (
-    <Button asChild variant="default">
+    <Button asChild variant="default" className="w-full whitespace-normal text-center">
       <Link href={href}>{label}</Link>
     </Button>
   );
