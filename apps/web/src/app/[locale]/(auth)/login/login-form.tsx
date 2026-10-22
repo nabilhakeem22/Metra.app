@@ -4,18 +4,19 @@ import { useTranslations } from 'next-intl';
 import { useRef } from 'react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
-import { Link } from '@/i18n/routing';
 import { OTP_LENGTH } from '@/lib/auth/otp-field-rules';
 import { ByLoginMode } from './login-mode';
 import { LoginRequestStep } from './login-request-step';
 import { LoginVerifyStep } from './login-verify-step';
+import { ModeSwitchLink } from './mode-switch-link';
 import { useOtpFlow } from './use-otp-flow';
 
 /**
  * Passwordless auth form. A `?mode=signup` / `?mode=signin` (default) search
  * param drives the sign-in vs create-account FRAMING only: heading, subcopy,
  * and the switch link (each a `ByLoginMode`, so the static page carries the
- * whole sign-in form). The OTP send/verify flow and the post-login routing are
+ * whole sign-in form). The switch link rewrites `?mode` in place, so what was
+ * typed survives it. The OTP send/verify flow and the post-login routing are
  * identical in both modes: a new email still auto-creates the account and lands
  * on onboarding, an existing one on the dashboard.
  */
@@ -90,23 +91,17 @@ export function LoginForm() {
             signin={
               <>
                 {t('switchToSignUpPrompt')}{' '}
-                <Link
-                  href={{ pathname: '/login', query: { mode: 'signup' } }}
-                  className="font-medium text-primary hover:underline"
-                >
+                <ModeSwitchLink mode="signup" className="font-medium text-primary hover:underline">
                   {t('switchToSignUpLink')}
-                </Link>
+                </ModeSwitchLink>
               </>
             }
             signup={
               <>
                 {t('switchToSignInPrompt')}{' '}
-                <Link
-                  href={{ pathname: '/login', query: { mode: 'signin' } }}
-                  className="font-medium text-primary hover:underline"
-                >
+                <ModeSwitchLink mode="signin" className="font-medium text-primary hover:underline">
                   {t('switchToSignInLink')}
-                </Link>
+                </ModeSwitchLink>
               </>
             }
           />
