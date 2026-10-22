@@ -68,6 +68,7 @@ describe('POST /api/auth/otp/send', () => {
     ['a missing identifier', JSON.stringify({ channel: 'email' })],
     ['an array', JSON.stringify(['email', 'mona@firm.example'])],
     ['an identifier over 320 characters', JSON.stringify({ channel: 'email', identifier: `${'a'.repeat(310)}@firm.example` })],
+    ['a well-formed body over 4 KiB', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', padding: 'x'.repeat(5000) })],
   ])('answers %s 400 malformed', async (_case, body) => {
     expect(await send(body)).toEqual({ status: 400, body: { ok: false, error: 'malformed' } });
     expect(doubles.createServerClient).not.toHaveBeenCalled();

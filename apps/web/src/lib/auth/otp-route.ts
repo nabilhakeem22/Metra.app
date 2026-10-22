@@ -7,7 +7,7 @@ import { readSameOriginJson } from '@/lib/http/same-origin-json';
 // The one shape of both sign-in code endpoints (app/api/auth/otp/{send,verify}):
 // a same-origin JSON POST, parsed to its request, answered by its core.
 //   403 forbidden  missing or foreign Origin, or a body not declared JSON
-//   400 malformed  a body that is not JSON, or not the request's shape
+//   400 malformed  a body that is not JSON, is over 4 KiB, or is not the request's shape
 //   200            the core's ActionResult, a refusal included
 //   500 generic    the core threw (one log line, its reference in the body)
 // Never cached: the answers carry session cookies and per-person refusals.

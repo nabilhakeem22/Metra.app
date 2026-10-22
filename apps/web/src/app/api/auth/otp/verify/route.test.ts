@@ -100,6 +100,7 @@ describe('POST /api/auth/otp/verify', () => {
     ['a missing token', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example' })],
     ['a token that is not a string', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: 123456 })],
     ['a token over 16 characters', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '1'.repeat(17) })],
+    ['a well-formed body over 4 KiB', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '123456', padding: 'x'.repeat(5000) })],
   ])('answers %s 400 malformed', async (_case, body) => {
     expect(await verify(body)).toEqual({ status: 400, body: { ok: false, error: 'malformed' } });
     expect(doubles.createServerClient).not.toHaveBeenCalled();
