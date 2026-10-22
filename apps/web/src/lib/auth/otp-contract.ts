@@ -6,7 +6,7 @@
 // to an asset path is a 405 by platform design, so the form cannot use server
 // actions (they post to the page URL). It calls these same-origin JSON routes.
 import type { ActionResult } from '@/lib/actions/result';
-import type { OtpChannel } from './otp-field-rules';
+import { MAX_IDENTIFIER_LENGTH, type OtpChannel } from './otp-field-rules';
 
 export const OTP_SEND_PATH = '/api/auth/otp/send';
 export const OTP_VERIFY_PATH = '/api/auth/otp/verify';
@@ -28,8 +28,6 @@ export interface OtpVerifyRequest {
 /** A verify answer: `next` is present exactly when `ok` is true. */
 export type OtpVerifyResult = ActionResult & { next?: PostLoginPath };
 
-/** The longest address RFC 5321 allows; a phone number is far shorter. */
-const MAX_IDENTIFIER_LENGTH = 320;
 /** A code is 6 digits; anything this long is not a code. */
 const MAX_TOKEN_LENGTH = 16;
 
