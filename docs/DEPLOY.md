@@ -28,9 +28,13 @@ CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
 
 Manual deploy (fallback, from a machine with `wrangler login` done):
 
+The build carries `--dangerouslyUseUnsupportedNextVersion` until the Next 16
+upgrade: OpenNext refuses Next 15 after its support window ended on Oct 21
+2026, and the flag skips only that date check (owner decision, Oct 22).
+
 ```bash
 cd apps/web
-NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build
+NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
 npx wrangler deploy
 ```
 
