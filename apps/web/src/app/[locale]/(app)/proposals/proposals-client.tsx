@@ -2,7 +2,7 @@
 
 import { FileText, Plus, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { ProposalListRow } from '@/lib/proposals/queries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,32 +10,32 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { useRouter } from '@/i18n/routing';
 import { ProposalRow } from './proposal-row';
+import { useProposalSearch } from './use-proposal-search';
 
 export interface ProposalsClientProps {
+  /** One page of the proposals the search matches, searched on the server. */
   items: ProposalListRow[];
+  /** Whether the studio has any proposal at all, whatever the search. */
+  hasAnyProposal: boolean;
+  /** The search the page was loaded with (?q=). */
+  query: string;
   canManage: boolean;
   hasClients: boolean;
+  /** The register's pager, rendered by the server page under the table. */
+  pager: ReactNode;
 }
 
 export function ProposalsClient({
   items,
+  hasAnyProposal,
+  query,
   canManage,
   hasClients,
+  pager,
 }: ProposalsClientProps) {
   const t = useTranslations('proposals');
   const router = useRouter();
-  const [q, setQ] = useState('');
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return items;
-    // A BOQ working copy's Q- number is never shown, so it is not searchable.
-    return items.filter((p) =>
-      `${p.kind === 'quote' ? p.number : ''} ${p.titleEn ?? ''} ${p.titleAr ?? ''}`
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [items, q]);
+  const search = useProposalSearch(query);
 
   const newButton = canManage && hasClients && (
     <Button variant="default" onClick={() => router.push('/proposals/new')}>
@@ -44,7 +44,7 @@ export function ProposalsClient({
     </Button>
   );
 
-  if (items.length === 0) {
+  if (!hasAnyProposal) {
     return (
       <Card>
         <CardContent className="py-4">
@@ -69,8 +69,8 @@ export function ProposalsClient({
             aria-hidden
           />
           <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            value={search.typed}
+            onChange={(e) => search.setTyped(e.target.value)}
             placeholder={t('search')}
             className="ps-9"
           />
@@ -78,7 +78,7 @@ export function ProposalsClient({
         {newButton && <div className="ms-auto">{newButton}</div>}
       </div>
 
-      <Card>
+      <Card aria-busy={search.pending} className={search.pending ? 'opacity-60 transition-opacity' : undefined}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-body">
@@ -92,7 +92,7 @@ export function ProposalsClient({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
+                {items.map((p) => (
                   <ProposalRow key={p.id} row={p} />
                 ))}
               </tbody>
@@ -100,6 +100,7 @@ export function ProposalsClient({
           </div>
         </CardContent>
       </Card>
+      {pager}
     </div>
   );
 }

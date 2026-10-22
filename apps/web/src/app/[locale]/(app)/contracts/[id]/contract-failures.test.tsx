@@ -110,7 +110,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
   test('generating a contract answered contract_exists', async () => {
     contracts.generateContract.mockResolvedValue({ ok: false, error: 'contract_exists' });
     const proposal = { id: 'p-1', number: 7, titleAr: null, titleEn: 'Villa', issueDate: null, createdAt: '2026-01-01' };
-    renderWithIntl(<ContractsClient items={[]} generatable={[proposal]} canManage />, { locale });
+    renderWithIntl(<ContractsClient items={[]} generatable={[proposal]} canManage pager={null} />, { locale });
     fireEvent.click(screen.getAllByRole('button', { name: at('contracts.generate') })[0]);
     const row = screen.getByText('Villa').parentElement!;
     await act(async () => {

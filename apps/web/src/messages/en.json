@@ -693,7 +693,15 @@
     "required": "required",
     "undo": "Undo",
     "moreActions": "More actions",
-    "cannotUndo": "This can't be undone."
+    "cannotUndo": "This can't be undone.",
+    "pager": {
+      "label": "Pages",
+      "range": "Showing {from} to {to} of {total}",
+      "pageOf": "Page {page} of {pageCount}",
+      "page": "Page {page}",
+      "previous": "Previous",
+      "next": "Next"
+    }
   },
   "hints": {
     "proposal": {
@@ -1402,6 +1410,7 @@
     "title": "Proposals",
     "subtitle": "Quotations (عروض الأسعار) for your clients.",
     "search": "Search by title",
+    "pagerLabel": "Proposal pages",
     "allStatuses": "All statuses",
     "itemsCount": "{count} proposals",
     "statuses": {
@@ -1659,6 +1668,7 @@
   "contracts": {
     "title": "Contracts",
     "subtitle": "Generated from accepted proposals. Issue for the client's electronic acknowledgement.",
+    "pagerLabel": "Contract pages",
     "costs": {
       "tab": "Costs",
       "intro": "What the job actually cost: materials, labour, subcontractors and more. Book each cost to a line, a section, or the whole contract.",

@@ -2,7 +2,7 @@
 
 import { FileSignature, Loader2, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -30,10 +30,13 @@ export function ContractsClient({
   items,
   generatable,
   canManage,
+  pager,
 }: {
   items: ContractListRow[];
   generatable: Generatable[];
   canManage: boolean;
+  /** The register's pager, rendered by the server page under the table. */
+  pager: ReactNode;
 }) {
   const t = useTranslations('contracts');
   const te = useTranslations('errors');
@@ -162,6 +165,7 @@ export function ContractsClient({
           </CardContent>
         </Card>
       )}
+      {pager}
     </div>
   );
 }
