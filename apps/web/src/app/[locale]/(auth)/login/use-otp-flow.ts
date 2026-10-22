@@ -13,6 +13,7 @@ import {
   type OtpChannel,
   type OtpField,
 } from '@/lib/auth/otp-field-rules';
+import { signInErrorTranslator } from './sign-in-errors';
 
 type Status = 'idle' | 'sending' | 'code-sent' | 'verifying' | 'error' | 'success';
 
@@ -27,6 +28,7 @@ const RESEND_SECONDS = 60;
  */
 export function useOtpFlow() {
   const te = useTranslations('errors');
+  const tl = useTranslations('login');
   const router = useRouter();
   const [, startTransition] = useTransition();
   const countdown = useCountdown(RESEND_SECONDS);
@@ -38,7 +40,7 @@ export function useOtpFlow() {
   // Only the box on screen can show a refusal; one about the other step's box
   // (a resend that finds the address refused) is said in the status line.
   const rendered: readonly OtpField[] = phase === 'request' ? [channel] : ['token'];
-  const errors = useFieldErrors({ fields: rendered, translate: te });
+  const errors = useFieldErrors({ fields: rendered, translate: signInErrorTranslator(te, tl('pageRefused')) });
 
   /** Run one call; its answer when it succeeded, else null. A refusal or a rejection is shown. */
   async function attempt<Result extends ActionResult>(call: () => Promise<Result>): Promise<Result | null> {
