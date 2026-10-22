@@ -16,12 +16,12 @@ const actions = vi.hoisted(() => ({
   sendPhoneOtp: vi.fn(),
   verifyEmailOtp: vi.fn(),
   verifyPhoneOtp: vi.fn(),
-  resolvePostLoginPath: vi.fn(),
 }));
-vi.mock('@/lib/auth/actions', () => actions);
+vi.mock('@/lib/auth/otp-client', () => actions);
 
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockReset();
+  router.push.mockReset();
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) => {
@@ -134,6 +134,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
       },
       locale,
     });
+  });
+
+  test.each([['/dashboard'], ['/onboarding']])('a verified code goes where the answer says: %s', async (next) => {
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    actions.verifyEmailOtp.mockResolvedValue({ ok: true, next });
+    renderLogin();
+    await sendTo('mona@firm.example');
+    await act(async () => {
+      fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
+    });
+    expect(actions.verifyEmailOtp).toHaveBeenCalledWith('mona@firm.example', '123456');
+    expect(router.push).toHaveBeenCalledWith(next);
   });
 
   test('pressing Verify on a short code says how many digits, without sending', async () => {
