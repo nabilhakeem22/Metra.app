@@ -32,6 +32,7 @@ async function postOtp<Result extends ActionResult>(path: string, request: OtpSe
   });
   const isJson = (response.headers.get('content-type') ?? '').toLowerCase().includes('application/json');
   const body: unknown = isJson ? await response.json().catch(() => null) : null;
+  // developer-only: the message carries the HTTP status code, never a person's data.
   if (!isAnswer(body)) throw new Error(`auth endpoint answered ${response.status}`);
   return body as Result;
 }

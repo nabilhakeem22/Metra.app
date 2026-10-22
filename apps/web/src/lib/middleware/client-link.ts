@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { LOCALES, LOCALE_COOKIE_NAME, type Locale } from '@/i18n/routing';
+import { LOCALES, LOCALE_COOKIE_MAX_AGE_SECONDS, LOCALE_COOKIE_NAME, type Locale } from '@/i18n/routing';
 
 // The client-link fast path of the middleware. PURE: no Supabase, no next-intl
 // middleware.
@@ -15,9 +15,6 @@ import { LOCALES, LOCALE_COOKIE_NAME, type Locale } from '@/i18n/routing';
 
 /** The request header next-intl's server functions read the locale from. */
 const LOCALE_REQUEST_HEADER = 'X-NEXT-INTL-LOCALE';
-
-/** One year, the attributes next-intl 3.26.5 `syncCookie` writes. */
-const LOCALE_COOKIE_MAX_AGE_SECONDS = 31536000;
 
 // Case-sensitive on purpose: `/EN/d/x` is not a known locale, so it falls
 // through to next-intl, which redirects it as before.
@@ -35,6 +32,7 @@ export function clientLinkResponse(request: NextRequest, locale: Locale): NextRe
   headers.set(LOCALE_REQUEST_HEADER, locale);
   const response = NextResponse.next({ request: { headers } });
   if (request.cookies.get(LOCALE_COOKIE_NAME)?.value !== locale) {
+    // The attributes next-intl 3.26.5 `syncCookie` writes.
     response.cookies.set(LOCALE_COOKIE_NAME, locale, { sameSite: 'lax', maxAge: LOCALE_COOKIE_MAX_AGE_SECONDS });
   }
   return response;

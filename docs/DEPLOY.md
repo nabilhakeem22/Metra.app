@@ -35,6 +35,7 @@ upgrade: OpenNext refuses Next 15 after its support window ended on Oct 21
 ```bash
 cd apps/web
 NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+node scripts/emit-static-pages.mjs
 npx wrangler deploy
 ```
 
@@ -42,6 +43,39 @@ Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
 `main` triggers `deploy.yml`, which builds and `wrangler deploy`s the worker.
 `DEPLOY_ENABLED` must be `true` or the deploy job is skipped, so a merge with
 the flag unset ships nothing and reports nothing.
+
+### Static pages are served before the Worker
+
+On the Workers Free plan every Worker request may use 10 ms of CPU, and a
+request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`
+and `/en/login` never reach the Worker: they are static assets, which
+Cloudflare serves before the Worker runs, at no CPU cost.
+
+- `/` is `apps/web/public/index.html`, a tiny page that picks the locale in the
+  browser (the `NEXT_LOCALE` cookie, then the browser's languages, then
+  `ar-EG`).
+- The landing and login pages are pre-rendered at build time.
+  `scripts/emit-static-pages.mjs` copies their HTML into `.open-next/assets`
+  (OpenNext does not). It runs after the OpenNext build in both workflows and
+  fails the build if a page stopped being static. A manual build without it
+  still works, but the Worker renders those pages again, 1102s and all.
+
+Three rules keep this working:
+
+1. **Never make a server action reachable from the landing or login page.**
+   Next posts a server action to the current page URL, and Cloudflare answers
+   any POST to a static asset with **405 Method Not Allowed**. It works in
+   `next dev` (no asset layer) and breaks only in production. That is why
+   sign-in posts to `/api/auth/otp/send` and `/api/auth/otp/verify`.
+   `src/test/static-pages.test.ts` fails if an action module becomes reachable.
+2. **Never set `run_worker_first` or `not_found_handling`** on the `assets`
+   block of `wrangler.jsonc`. The first sends every request through the Worker
+   again. `not_found_handling: "single-page-application"` would answer every
+   unknown navigation with `index.html`, the `/` redirector.
+   `src/test/wrangler-assets.test.ts` fails on either.
+3. **Keep both pages free of request-time APIs** (`cookies()`, `headers()`, the
+   Supabase server client). They export `dynamic = 'error'`, so the build fails
+   rather than quietly rendering them per request.
 
 ### Two things that were fixed to get here
 

@@ -212,6 +212,15 @@ jobs:
         # Next 16 upgrade, which is the next planned piece of work.
         run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
 
+      - name: Emit the pre-rendered pages as static assets
+        working-directory: apps/web
+        # The landing and login pages are served as static assets, before the
+        # Worker runs (Workers Free plan 10 ms CPU cap, Error 1102). OpenNext
+        # does not copy pre-rendered HTML into .open-next/assets; this does, and
+        # fails if a page stopped being static. Before the secret scan, so the
+        # scan covers the HTML. See docs/DEPLOY.md.
+        run: node scripts/emit-static-pages.mjs
+
       - name: Assert no secret was baked into the Worker bundle
         working-directory: apps/web
         # OpenNext COMPILES the project's .env* FILES into
