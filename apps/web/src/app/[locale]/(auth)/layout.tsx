@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { setRequestLocale } from 'next-intl/server';
 import type { CSSProperties, ReactNode } from 'react';
+import { LocaleCookieSync } from '@/components/i18n/locale-cookie-sync';
 import { LandingNav } from '@/components/landing/landing-nav';
+import type { Locale } from '@/i18n/routing';
 import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 import '../landing.css';
@@ -26,10 +29,23 @@ export const metadata: Metadata = PRIVATE_METADATA;
  * `--auth-chrome` tells the shell below how much vertical room the bar took, so
  * the card still centres in what is left instead of pushing a scrollbar onto a
  * page that should be exactly one screen tall.
+ *
+ * The login page is a static asset (login/page.tsx), so the middleware never
+ * syncs the locale cookie for it: `LocaleCookieSync` does, in the browser. The
+ * [locale] layout has already refused an unknown locale.
  */
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default async function AuthLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
   return (
     <ScopedIntlProvider scope="auth">
+      <LocaleCookieSync locale={locale as Locale} />
       <div className="landing" style={{ '--auth-chrome': '64px' } as CSSProperties}>
         <LandingNav variant="return" />
         {children}

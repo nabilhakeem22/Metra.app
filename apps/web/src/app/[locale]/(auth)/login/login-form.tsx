@@ -1,34 +1,32 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useSearchParams } from 'next/navigation';
 import { useRef } from 'react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
-import { Link } from '@/i18n/routing';
 import { OTP_LENGTH } from '@/lib/auth/otp-field-rules';
+import { ByLoginMode } from './login-mode';
 import { LoginRequestStep } from './login-request-step';
 import { LoginVerifyStep } from './login-verify-step';
+import { ModeSwitchLink } from './mode-switch-link';
 import { useOtpFlow } from './use-otp-flow';
-
-type Mode = 'signin' | 'signup';
 
 /**
  * Passwordless auth form. A `?mode=signup` / `?mode=signin` (default) search
- * param drives the sign-in vs create-account FRAMING only — heading, subcopy,
- * and the switch link. The OTP send/verify flow and the post-login routing are
+ * param drives the sign-in vs create-account FRAMING only: heading, subcopy,
+ * and the switch link (each a `ByLoginMode`, so the static page carries the
+ * whole sign-in form). The switch link rewrites `?mode` in place, so what was
+ * typed survives it. The OTP send/verify flow and the post-login routing are
  * identical in both modes: a new email still auto-creates the account and lands
  * on onboarding, an existing one on the dashboard.
  */
 export function LoginForm() {
   const t = useTranslations('login');
   const th = useTranslations('hints.auth');
-  const searchParams = useSearchParams();
   const flow = useOtpFlow();
   const stepRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalid(stepRef, flow.errors.invalidAttempt);
 
-  const mode: Mode = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
   const sending = flow.status === 'sending';
   const verifying = flow.status === 'verifying';
   const busy = sending || verifying || flow.status === 'success';
@@ -38,11 +36,11 @@ export function LoginForm() {
       <div className="space-y-6">
         <div className="space-y-1">
           <h1 className="text-heading font-bold">
-            {mode === 'signup' ? t('signUpTitle') : t('signInTitle')}
+            <ByLoginMode signin={t('signInTitle')} signup={t('signUpTitle')} />
           </h1>
           {flow.phase === 'request' && (
             <p className="text-body text-muted-foreground">
-              {mode === 'signup' ? t('signUpSubtitle') : t('signInSubtitle')}
+              <ByLoginMode signin={t('signInSubtitle')} signup={t('signUpSubtitle')} />
             </p>
           )}
         </div>
@@ -89,27 +87,24 @@ export function LoginForm() {
         </p>
 
         <p className="text-center text-body text-muted-foreground">
-          {mode === 'signup' ? (
-            <>
-              {t('switchToSignInPrompt')}{' '}
-              <Link
-                href={{ pathname: '/login', query: { mode: 'signin' } }}
-                className="font-medium text-primary hover:underline"
-              >
-                {t('switchToSignInLink')}
-              </Link>
-            </>
-          ) : (
-            <>
-              {t('switchToSignUpPrompt')}{' '}
-              <Link
-                href={{ pathname: '/login', query: { mode: 'signup' } }}
-                className="font-medium text-primary hover:underline"
-              >
-                {t('switchToSignUpLink')}
-              </Link>
-            </>
-          )}
+          <ByLoginMode
+            signin={
+              <>
+                {t('switchToSignUpPrompt')}{' '}
+                <ModeSwitchLink mode="signup" className="font-medium text-primary hover:underline">
+                  {t('switchToSignUpLink')}
+                </ModeSwitchLink>
+              </>
+            }
+            signup={
+              <>
+                {t('switchToSignInPrompt')}{' '}
+                <ModeSwitchLink mode="signin" className="font-medium text-primary hover:underline">
+                  {t('switchToSignInLink')}
+                </ModeSwitchLink>
+              </>
+            }
+          />
         </p>
       </div>
     </AuthShell>
