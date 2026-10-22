@@ -7,8 +7,10 @@ import 'server-only';
 //
 // Each is gated on the `cost_entries` row alone (./access.ts): a project
 // manager or a site engineer reads and records costs without the contract
-// page, so none of these answers carries the contract's money. The line
-// search answers descriptions and section titles only.
+// page, so none of these answers carries the contract's money. The entries
+// list is further scoped by the margin rule: a member who may not see margin
+// gets only the entries it recorded and no totals. The line search answers
+// descriptions and section titles only.
 //
 // The input is `unknown` ON PURPOSE: what reaches a server action is whatever
 // was serialised across the boundary, not what its declared type promised.
@@ -17,10 +19,11 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { searchContractLines, type ContractLineOptionsPage } from '@/lib/contracts/queries';
 import type { OrgContext } from '@/lib/db/context';
+import { resolveSeeMargin } from '@/lib/org/queries';
 import { cleanSearchQuery } from '@/lib/search/query-input';
 import { isUuid, NOT_UUID, optionalUuid } from '@/lib/uuid';
 import { validIsoDate } from '@/lib/validation/iso-date';
-import { mayReadCostEntries, maySearchCostEntryLines } from './access';
+import { costEntriesScopeFor, mayReadCostEntries, maySearchCostEntryLines } from './access';
 import { listCostSections } from './contract-view';
 import { listCostEntries, type CostEntriesRequest } from './queries';
 import {
@@ -70,13 +73,17 @@ function readRequest(input: unknown): RequestRead {
   return { ok: true, request: { contractId, filter: { category, sectionId }, cursor: cursor.cursor } };
 }
 
-/** A page of a contract's entries for the filter; `record_not_found` when the contract is not the caller's. */
+/**
+ * A page of a contract's entries for the filter: all of them with the totals
+ * for a member who may see margin, only its own and no totals for one who may
+ * not (./access.ts). `record_not_found` when the contract is not the caller's.
+ */
 export async function loadCostEntriesCore(ctx: OrgContext, input: unknown): Promise<ActionResult & { data?: CostEntriesPage }> {
   if (!mayReadCostEntries(ctx.role)) return err('forbidden');
   const read = readRequest(input);
   if (!read.ok) return read.answer;
   try {
-    const page = await listCostEntries(ctx, read.request);
+    const page = await listCostEntries(ctx, read.request, costEntriesScopeFor(await resolveSeeMargin(ctx)));
     return page ? { ok: true, data: page } : err('record_not_found');
   } catch (error) {
     return unexpectedFailure('cost entries read failed', error);
