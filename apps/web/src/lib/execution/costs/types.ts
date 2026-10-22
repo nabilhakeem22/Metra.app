@@ -82,12 +82,20 @@ export interface CostEntriesTotals {
   amount: string;
 }
 
+/**
+ * Whose entries a member lists (owner ruling, Oct 21): `all` for a member who
+ * may see margin, `own` (only the entries it recorded, and no totals) for one
+ * who may not, so no job cost is there to subtract from the contract value.
+ */
+export type CostEntriesScope = 'all' | 'own';
+
 export interface CostEntriesPage {
   entries: CostEntryRow[];
   /** The cursor of the next page; null on the last one. */
   next: CostEntriesCursor | null;
-  /** Read with the first page only; a later page leaves it null. */
+  /** Read with the first page only, and only in the `all` scope; otherwise null. */
   totals: CostEntriesTotals | null;
+  scope: CostEntriesScope;
 }
 
 /** The costs page's contract header: what it is and where it stands, and no money. */

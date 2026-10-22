@@ -9,6 +9,7 @@ import {
   type CostEntriesCursor,
   type CostEntriesFilter,
   type CostEntriesPage,
+  type CostEntriesScope,
   type CostEntriesTotals,
 } from '@/lib/execution/costs/types';
 
@@ -54,6 +55,7 @@ export function useCostEntries(contractId: string) {
     startTransition(async () => {
       const entries: CostEntriesPage['entries'] = [];
       let totals: CostEntriesTotals | null = null;
+      let scope: CostEntriesScope = 'own';
       let next: CostEntriesCursor | null = null;
       let read = 0;
       do {
@@ -63,13 +65,13 @@ export function useCostEntries(contractId: string) {
           setFailure(describeReadFailure(answer.failure, te, t('loadFailed')));
           return;
         }
-        if (read === 0) totals = answer.page.totals;
+        if (read === 0) ({ totals, scope } = answer.page);
         entries.push(...answer.page.entries);
         next = answer.page.next;
         read += 1;
       } while (read < pages && next !== null);
       setFailure(null);
-      setList({ filter, page: { entries, next, totals }, pages: read });
+      setList({ filter, page: { entries, next, totals, scope }, pages: read });
     });
   }
 
@@ -89,7 +91,7 @@ export function useCostEntries(contractId: string) {
       setFailure(null);
       setList((current) => ({
         filter,
-        page: { entries: [...(current.page?.entries ?? []), ...answer.page.entries], next: answer.page.next, totals: current.page?.totals ?? null },
+        page: { entries: [...(current.page?.entries ?? []), ...answer.page.entries], next: answer.page.next, totals: current.page?.totals ?? null, scope: answer.page.scope },
         pages: current.pages + 1,
       }));
     });
@@ -103,6 +105,8 @@ export function useCostEntries(contractId: string) {
     loaded: list.page !== null,
     entries: list.page?.entries ?? [],
     totals: list.page?.totals ?? null,
+    /** Null until the first answer lands; 'own' is a member who sees only the costs it recorded. */
+    scope: list.page?.scope ?? null,
     hasMore: (list.page?.next ?? null) !== null,
     pending,
     failure,

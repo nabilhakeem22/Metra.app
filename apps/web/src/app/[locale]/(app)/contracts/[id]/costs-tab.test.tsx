@@ -11,7 +11,9 @@ import { CostsTab } from './costs-tab';
 // after a write, shows the market price only where the read joined one, and
 // voids after a confirm. Fix round: edit and void only on the rows this member
 // may change, a reload after a write asks again for every page shown, the
-// sections come a page at a time, and an edit shows money as typed.
+// sections come a page at a time, and an edit shows money as typed. Owner
+// ruling (Oct 21): a member who may not see margin is told it sees only the
+// costs it recorded, and is shown no total.
 
 const actions = vi.hoisted(() => ({
   createCostEntry: vi.fn(),
@@ -42,6 +44,7 @@ const FIRST: CostEntriesPage = {
   ],
   next: { incurredOn: '2026-10-01', id: row(2).id },
   totals: { count: 1, amount: '100.0000' },
+  scope: 'all',
 };
 const ALL = { category: null, sectionId: null };
 
@@ -88,7 +91,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
 
   test('asks for the next page after the last entry shown, and appends it', async () => {
     await renderTab(locale);
-    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(3)], next: null, totals: null } });
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(3)], next: null, totals: null, scope: 'all' } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: at('contracts.costs.showMore') }));
     });
@@ -100,7 +103,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
 
   test('a category asks the server for its first page and its total', async () => {
     await renderTab(locale);
-    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [], next: null, totals: { count: 0, amount: '0.0000' } } });
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [], next: null, totals: { count: 0, amount: '0.0000' }, scope: 'all' } });
     await pickOption('costs-filter-category', at('contracts.costs.categories.labour'));
     expect(actions.loadCostEntries).toHaveBeenLastCalledWith({ contractId: 'k-1', filter: { category: 'labour', sectionId: null }, cursor: null });
     expect(screen.getByText(at('contracts.costs.noMatch'))).toBeTruthy();
@@ -122,6 +125,27 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
     expect(actions.loadCostEntries).toHaveBeenCalledTimes(2);
   });
 
+  test('the own scope says the member sees only the costs it recorded, and shows no total', async () => {
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(1)], next: null, totals: null, scope: 'own' } });
+    await renderTab(locale);
+    expect(screen.getByText(at('contracts.costs.ownNote'))).toBeTruthy();
+    expect(screen.queryByText(at('contracts.costs.total'))).toBeNull();
+    expect(screen.queryByText(at('contracts.costs.entries'))).toBeNull();
+  });
+
+  test('the own scope with nothing recorded says the member has recorded none', async () => {
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [], next: null, totals: null, scope: 'own' } });
+    await renderTab(locale);
+    expect(screen.getByText(at('contracts.costs.emptyOwn'))).toBeTruthy();
+    expect(screen.queryByText(at('contracts.costs.empty'))).toBeNull();
+  });
+
+  test('the full scope shows the total and no own-costs note', async () => {
+    await renderTab(locale);
+    expect(screen.getByText(at('contracts.costs.total'))).toBeTruthy();
+    expect(screen.queryByText(at('contracts.costs.ownNote'))).toBeNull();
+  });
+
   test('offers no Record on a draft contract, and says why', async () => {
     await renderTab(locale, 'draft');
     expect(screen.queryByRole('button', { name: at('contracts.costs.record') })).toBeNull();
@@ -129,13 +153,13 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
   });
 
   test('offers edit and void only on a row this member may change', async () => {
-    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(1, { editable: false }), row(3)], next: null, totals: { count: 2, amount: '200.0000' } } });
+    actions.loadCostEntries.mockResolvedValue({ ok: true, data: { entries: [row(1, { editable: false }), row(3)], next: null, totals: { count: 2, amount: '200.0000' }, scope: 'all' } });
     await renderTab(locale);
     expect(screen.getAllByRole('button', { name: at('common.moreActions') })).toHaveLength(1);
   });
 
   test('after a void, asks again for every page shown, so the row stays in view', async () => {
-    const second: CostEntriesPage = { entries: [row(3)], next: null, totals: null };
+    const second: CostEntriesPage = { entries: [row(3)], next: null, totals: null, scope: 'all' };
     actions.voidCostEntry.mockResolvedValue({ ok: true });
     await renderTab(locale);
     actions.loadCostEntries.mockResolvedValueOnce({ ok: true, data: second });
@@ -175,7 +199,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('CostsTab (%s)', (locale) => {
   test('an edit shows the money as typed, not at four decimals', async () => {
     actions.loadCostEntries.mockResolvedValue({
       ok: true,
-      data: { entries: [row(1, { amount: '410.0000', qty: '2.5000', unit: 'sqm', unitCost: '164.0000' })], next: null, totals: { count: 1, amount: '410.0000' } },
+      data: { entries: [row(1, { amount: '410.0000', qty: '2.5000', unit: 'sqm', unitCost: '164.0000' })], next: null, totals: { count: 1, amount: '410.0000' }, scope: 'all' },
     });
     await renderTab(locale);
     openMenu(at('common.moreActions'));
