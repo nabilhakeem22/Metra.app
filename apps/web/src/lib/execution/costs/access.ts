@@ -7,15 +7,25 @@
 //   opening the contract page and its money.
 // - Editing and voiding are scoped by row: owner and admin keep every entry;
 //   any other role that may update keeps only what it recorded itself.
+// - Listing is scoped by the margin rule (owner ruling, Oct 21): a member who
+//   may not see margin (`resolveSeeMargin`: no `margin_pnl`, or a project
+//   manager while the studio hides margin from PMs) lists only the entries it
+//   recorded, with no totals.
 import type { MemberRole } from '@/lib/permissions/roles';
 import { can } from '@/lib/permissions/can';
+import type { CostEntriesScope } from './types';
 
 /** The roles that may edit or void ANY live entry, whoever recorded it. */
 export const COST_ENTRY_KEEPERS: readonly MemberRole[] = ['owner', 'admin'];
 
-/** Lists a contract's costs (with their amounts and totals). */
+/** Lists a contract's costs: all of them with their totals, or only its own (costEntriesScopeFor). */
 export function mayReadCostEntries(role: MemberRole): boolean {
   return can(role, 'cost_entries', 'read');
+}
+
+/** Whose entries a reader lists: every one if it may see margin, else only the ones it recorded. */
+export function costEntriesScopeFor(seesMargin: boolean): CostEntriesScope {
+  return seesMargin ? 'all' : 'own';
 }
 
 /** Records a new cost. */

@@ -116,6 +116,14 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     expect(screen.getByRole('link', { name: text })).toBeTruthy();
   });
 
+  test('a long next-action label wraps across the full width of the card instead of running past it (390 px)', () => {
+    renderWithIntl(<CommandCardExecution view={view('send_milestone_request')} />, { locale });
+    const link = screen.getByRole('link');
+    expect(link.className).toMatch(/(^| )w-full( |$)/);
+    expect(link.className).toMatch(/(^| )whitespace-normal( |$)/);
+    expect(link.className).not.toMatch(/whitespace-nowrap/);
+  });
+
   test('a role that can only read the money is told the owner, an admin or the accountant does each money step', () => {
     const steps = ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment', 'prepare_final_account', 'review_final_account'] as const;
     for (const kind of steps) {

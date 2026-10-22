@@ -5,6 +5,7 @@ import { getCostContractHeader } from '@/lib/execution/costs/contract-view';
 import { createCostEntryCore, updateCostEntryCore, voidCostEntryCore } from '@/lib/execution/costs/core';
 import { loadCostEntriesCore, loadCostSectionsCore, searchCostEntryLinesCore } from '@/lib/execution/costs/reads';
 import { NO_COST_FILTER } from '@/lib/execution/costs/types';
+import { canSeeMargin } from '@/lib/permissions/can';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { closeExecutionFixture, ownerQuery, seedClientProject, seedExecutionContract, type ExecutionContract } from './execution-fixture';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -109,7 +110,10 @@ describe('who may do what with costs (F1, S1)', () => {
     const rows = (await list(as)).data?.entries ?? [];
     const byId = new Map(rows.map((row) => [row.id, row]));
     expect(byId.get(own)?.editable).toBe(true);
-    expect(byId.get(ownersEntry)?.editable).toBe(keeper);
+    // A member who may not see margin (here the site engineer; this studio shows
+    // margin to PMs) lists only what it recorded (owner ruling, Oct 21).
+    if (canSeeMargin(role, false)) expect(byId.get(ownersEntry)?.editable).toBe(keeper);
+    else expect(byId.has(ownersEntry)).toBe(false);
     for (const row of rows) expect(Object.keys(row)).not.toContain('recordedBy');
   });
 

@@ -3,8 +3,9 @@ import 'server-only';
 // keyset-paged on (incurred_on desc, id desc) over the table's own index, so a
 // page costs the Worker COST_ENTRIES_PAGE_SIZE rows however many entries the
 // contract holds (AC37). The market reference is joined in the SAME statement
-// from the seed book (A16), and only where the units compare; the first page
-// also sums the live entries in SQL. Who recorded an entry never leaves this
+// from the seed book (A16), and only where the units compare; in the `all`
+// scope the first page also sums the live entries in SQL, while the `own`
+// scope lists only the member's entries and sums none. Who recorded an entry never leaves this
 // module: each row says only whether THIS member may edit it (./access.ts).
 import {
   contractCostEntries,
@@ -23,6 +24,7 @@ import {
   type CostEntriesCursor,
   type CostEntriesFilter,
   type CostEntriesPage,
+  type CostEntriesScope,
   type CostEntryMarketReference,
   type CostEntryRow,
 } from './types';
@@ -63,9 +65,11 @@ const ROW_COLUMNS = {
   marketUnitCost: marketSeedBook.unitCost,
 };
 
-function matching(request: CostEntriesRequest): SQL | undefined {
+/** The request's entries; in the `own` scope, only the ones this member recorded (./access.ts). */
+function matching(ctx: OrgContext, request: CostEntriesRequest, scope: CostEntriesScope): SQL | undefined {
   return and(
     eq(e.contractId, request.contractId),
+    scope === 'own' ? eq(e.recordedBy, ctx.userId) : undefined,
     request.filter.category ? eq(e.category, request.filter.category) : undefined,
     request.filter.sectionId ? eq(e.contractSectionId, request.filter.sectionId) : undefined,
   );
@@ -79,10 +83,16 @@ function marketReference(unitCost: string | null, marketUnitCost: string | null)
 }
 
 /**
- * One page of the contract's entries (voided ones included, marked), or null
- * when the contract is not the caller's to see (RLS, or no such id).
+ * One page of the contract's entries in `scope` (voided ones included,
+ * marked), or null when the contract is not the caller's to see (RLS, or no
+ * such id). The `own` scope never sums: a member who may not see margin gets
+ * no job total to subtract from the contract value.
  */
-export function listCostEntries(ctx: OrgContext, request: CostEntriesRequest): Promise<CostEntriesPage | null> {
+export function listCostEntries(
+  ctx: OrgContext,
+  request: CostEntriesRequest,
+  scope: CostEntriesScope,
+): Promise<CostEntriesPage | null> {
   return withOrgContext(ctx, async (tx) => {
     const [contract] = await tx.select({ id: contracts.id }).from(contracts).where(eq(contracts.id, request.contractId)).limit(1);
     if (!contract) return null;
@@ -95,7 +105,7 @@ export function listCostEntries(ctx: OrgContext, request: CostEntriesRequest): P
       .leftJoin(costItems, eq(costItems.id, e.costItemId))
       // The seed book's unit is the market unit's studio twin, so this join IS the units-compare rule.
       .leftJoin(marketSeedBook, and(eq(marketSeedBook.itemId, costItems.marketItemId), eq(marketSeedBook.unit, e.unit)))
-      .where(and(matching(request), cursor ? sql`(${e.incurredOn}, ${e.id}) < (${cursor.incurredOn}::date, ${cursor.id}::uuid)` : undefined))
+      .where(and(matching(ctx, request, scope), cursor ? sql`(${e.incurredOn}, ${e.id}) < (${cursor.incurredOn}::date, ${cursor.id}::uuid)` : undefined))
       .orderBy(desc(e.incurredOn), desc(e.id))
       .limit(COST_ENTRIES_PAGE_SIZE + 1);
     const page = rows.slice(0, COST_ENTRIES_PAGE_SIZE);
@@ -107,13 +117,13 @@ export function listCostEntries(ctx: OrgContext, request: CostEntriesRequest): P
       market: marketReference(row.unitCost, marketUnitCost),
     }));
     const next = rows.length > COST_ENTRIES_PAGE_SIZE && last ? { incurredOn: last.incurredOn, id: last.id } : null;
-    if (cursor) return { entries, next, totals: null };
+    if (cursor || scope === 'own') return { entries, next, totals: null, scope };
     const [totals] = await tx
       // Plain numeric, kept at 4 decimals: a sum may pass what one entry's
       // numeric(18,4) holds (101 entries at the cap), and must still load.
       .select({ count: sql<number>`count(*)::int`, amount: sql<string>`round(coalesce(sum(${e.amount}), 0), 4)::text` })
       .from(e)
-      .where(and(matching(request), isNull(e.voidedAt)));
-    return { entries, next, totals };
+      .where(and(matching(ctx, request, scope), isNull(e.voidedAt)));
+    return { entries, next, totals, scope };
   });
 }

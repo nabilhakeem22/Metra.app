@@ -1673,10 +1673,12 @@
       "tab": "Costs",
       "intro": "What the job actually cost: materials, labour, subcontractors and more. Book each cost to a line, a section, or the whole contract.",
       "draftNote": "You can record costs once the contract has been issued.",
+      "ownNote": "You see only the costs you recorded.",
       "total": "Total recorded",
       "entries": "Entries",
       "record": "Record a cost",
       "empty": "No costs recorded on this contract yet.",
+      "emptyOwn": "You have not recorded any costs on this contract yet.",
       "noMatch": "No cost matches this filter.",
       "loading": "Loading the costs",
       "filterCategory": "Category",
@@ -1743,7 +1745,8 @@
       },
       "page": {
         "title": "Costs of {number}",
-        "subtitle": "Record and review what this contract's works actually cost."
+        "subtitle": "Record and review what this contract's works actually cost.",
+        "subtitleOwn": "Record your costs on this contract and review the ones you recorded."
       }
     },
     "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",

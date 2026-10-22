@@ -27,7 +27,8 @@ const ALL = '__all__';
  * The costs (المصروفات) of an execution contract, on the contract page's Costs
  * tab and on the costs page alike: what was recorded, 50 at a time newest
  * first (asked when it opens), narrowed by category or section, with the live
- * total of what is shown; record for a role that may, and edit and void on
+ * total of what is shown (a member who may not see margin sees only the costs
+ * it recorded, and no total); record for a role that may, and edit and void on
  * the rows this member may change (each row says so), each followed by the
  * list asked again as far as it was shown.
  */
@@ -54,6 +55,8 @@ export function CostsTab({
   const { confirm, dialog } = useConfirm();
   const [voiding, startVoid] = useTransition();
   const filtered = list.filter.category !== null || list.filter.sectionId !== null;
+  // A member who may not see margin lists only the costs it recorded, and no total (./access.ts).
+  const ownOnly = list.scope === 'own';
   // A draft contract takes no cost yet (the cores answer contract_not_issued).
   const canRecord = canCreate && contractStatus !== 'draft';
 
@@ -76,6 +79,7 @@ export function CostsTab({
       {dialog}
       <CostEntryForm contractId={contractId} sections={sections} entry={entry} canPickCostItem={canPickCostItem} />
       <p className="text-body text-muted-foreground">{t('intro')}</p>
+      {ownOnly && <p className="text-body text-muted-foreground">{t('ownNote')}</p>}
       {canCreate && !canRecord && <p className="text-body text-muted-foreground">{t('draftNote')}</p>}
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1 text-caption">
@@ -119,7 +123,7 @@ export function CostsTab({
           {list.entries.length === 0 ? (
             // A first load that failed says so above (the alert), not "loading" for ever.
             !(list.failure && !list.loaded) && (
-              <p className="py-6 text-center text-body text-muted-foreground">{t(!list.loaded ? 'loading' : filtered ? 'noMatch' : 'empty')}</p>
+              <p className="py-6 text-center text-body text-muted-foreground">{t(!list.loaded ? 'loading' : filtered ? 'noMatch' : ownOnly ? 'emptyOwn' : 'empty')}</p>
             )
           ) : (
             <table className="w-full text-body">
