@@ -5,6 +5,8 @@ import 'server-only';
 // (AC31). What is inside it is `resolveSeeMargin`: a project manager in a
 // studio that hides margin from PMs gets billing only, `cost = null`, so no
 // value, budget or cost is there to subtract a margin from (F10, S1). The
+// costs list reads the same rule (../costs/access.ts, costEntriesScopeFor):
+// such a member lists only the costs it recorded, with no totals. The
 // 'use server' wrapper in ./actions.ts adds the session.
 import { err, type ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
