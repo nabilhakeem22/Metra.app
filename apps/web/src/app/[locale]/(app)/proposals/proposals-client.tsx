@@ -4,6 +4,7 @@ import { FileText, Plus, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import type { ProposalListRow } from '@/lib/proposals/queries';
+import type { RegisterView } from '@/lib/registers/register-view';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -17,8 +18,8 @@ export interface ProposalsClientProps {
   items: ProposalListRow[];
   /** Whether the studio has any proposal at all, whatever the search. */
   hasAnyProposal: boolean;
-  /** The search the page was loaded with (?q=). */
-  query: string;
+  /** The view the page was loaded with (?q=&page=), as the URL asks for it. */
+  view: RegisterView;
   canManage: boolean;
   hasClients: boolean;
   /** The register's pager, rendered by the server page under the table. */
@@ -28,14 +29,14 @@ export interface ProposalsClientProps {
 export function ProposalsClient({
   items,
   hasAnyProposal,
-  query,
+  view,
   canManage,
   hasClients,
   pager,
 }: ProposalsClientProps) {
   const t = useTranslations('proposals');
   const router = useRouter();
-  const search = useProposalSearch(query);
+  const search = useProposalSearch(view);
 
   const newButton = canManage && hasClients && (
     <Button variant="default" onClick={() => router.push('/proposals/new')}>

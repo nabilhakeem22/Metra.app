@@ -31,7 +31,7 @@ export default async function ProposalsPage({
       <ProposalsClient
         items={register.rows}
         hasAnyProposal={register.hasAnyProposal}
-        query={view.query}
+        view={view}
         canManage={canManage}
         hasClients={clientOptions.length > 0}
         pager={
