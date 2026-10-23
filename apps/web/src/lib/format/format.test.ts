@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { bidiIsolate } from './bidi';
 import { formatDate, formatMonth, formatTime } from './date';
 import { formatDocNumber } from './doc-number';
 import { formatMoney, formatMoneyAmount, moneySymbol } from './money';
-import { formatNumber, formatPercent, formatQuantity } from './number';
+import { formatNumber, formatPercent, formatQuantity, parentheticalPercent } from './number';
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -144,6 +145,17 @@ describe('formatPercent — exactly 2 fraction digits + %', () => {
     expect(formatPercent(undefined, 'en')).toBe('');
     expect(formatPercent('not-a-number', 'en')).toBe('');
     expect(formatPercent(Number.NaN, 'en')).toBe('');
+  });
+});
+
+describe('parentheticalPercent: a margin percentage beside its amount', () => {
+  it('isolates the percentage, so an Arabic figure before it cannot move the sign', () => {
+    expect(parentheticalPercent(35.99, 'ar-EG')).toBe(` (${bidiIsolate('35.99%')})`);
+    expect(parentheticalPercent('12.5', 'en')).toBe(` (${bidiIsolate('12.50%')})`);
+  });
+  it('is empty when there is no percentage', () => {
+    expect(parentheticalPercent(null, 'ar-EG')).toBe('');
+    expect(parentheticalPercent('', 'en')).toBe('');
   });
 });
 

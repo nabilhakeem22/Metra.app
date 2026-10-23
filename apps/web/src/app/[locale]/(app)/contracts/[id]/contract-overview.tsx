@@ -5,8 +5,11 @@ import { useLocale, useTranslations } from 'next-intl';
 import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { ChargesForm } from './charges-form';
 import { ContractFinishDate } from './contract-finish-date';
 import { ContractHeaderForm } from './contract-header-form';
@@ -38,12 +41,29 @@ export function ContractOverview({
   onTerminate: () => void;
 }) {
   const t = useTranslations('contracts');
+  const tc = useTranslations('common');
   const locale = useLocale();
+  const { confirm, dialog } = useConfirm();
   const revised = detail.revisedValue !== detail.originalValue;
   const execution = detail.sourceBoqId !== null;
 
+  // Terminating cannot be undone and rejects the change orders still waiting,
+  // so it asks first, naming the contract; the server action is unchanged.
+  async function askToTerminate() {
+    const number = formatDocNumber('C', detail.number, docYear(null, detail.createdAt));
+    const confirmed = await confirm({
+      title: t('terminateConfirm.title', { number: bidiIsolate(number) }),
+      description: t('terminateConfirm.body'),
+      confirmLabel: t('terminateConfirm.confirm'),
+      cancelLabel: tc('cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) onTerminate();
+  }
+
   return (
     <div className="space-y-4">
+      {dialog}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 py-4 text-body">
           <span className={`rounded-pill px-2 py-0.5 text-caption`}>
@@ -81,7 +101,7 @@ export function ContractOverview({
                   size="sm"
                   variant="secondary"
                   disabled={pending}
-                  onClick={onTerminate}
+                  onClick={() => void askToTerminate()}
                 >
                   {t('terminate')}
                 </Button>

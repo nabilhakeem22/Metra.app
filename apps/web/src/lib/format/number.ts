@@ -1,6 +1,7 @@
 // Western (Latin) digits everywhere, in BOTH locales (§4.1). The `-u-nu-latn`
 // Unicode extension forces the latn numbering system; ar-EG uses comma/period
 // separators, matching Egyptian business and tax documents.
+import { bidiIsolate } from './bidi';
 import { cachedNumberFormat } from './intl-cache';
 
 // Frozen: the formatter cache works out a frozen options object's key once.
@@ -37,6 +38,17 @@ export function formatPercent(
   if (!Number.isFinite(n)) return '';
   if (Object.is(n, -0)) n = 0;
   return `${formatNumber(n, locale, TWO_DECIMALS)}%`;
+}
+
+/**
+ * A percentage in parentheses after a figure, " (35.99%)", for a margin shown
+ * beside its amount. The percentage is bidi-isolated: after an Arabic money
+ * figure the currency letters would make its digits Arabic numbers to the bidi
+ * algorithm and put the sign on the wrong side ("(%35.99)"). '' for none.
+ */
+export function parentheticalPercent(value: number | string | null | undefined, locale: string): string {
+  const percent = formatPercent(value, locale);
+  return percent === '' ? '' : ` (${bidiIsolate(percent)})`;
 }
 
 /**

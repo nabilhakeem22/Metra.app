@@ -10,7 +10,7 @@ import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { loadScheduleRows, scheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { billingBalance, finalAccountBalance } from '../money/final-account';
-import type { ExecutionContractFacts, ExecutionFacts } from '../stage';
+import { executionStage, type ExecutionContractFacts, type ExecutionFacts, type ExecutionStage } from '../stage';
 import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from './money-facts';
 
@@ -58,6 +58,12 @@ async function loadIssuedBoqId(tx: MetraDb, engagementId: string): Promise<strin
 
 type DeliveryContract = NonNullable<Awaited<ReturnType<typeof loadDeliveryContract>>>;
 
+/** What deriving a contract's stage reads off the contract row. */
+export type StagedContract = Pick<
+  DeliveryContract,
+  'id' | 'status' | 'originalValue' | 'taxAmount' | 'taxRate' | 'supervisionPct' | 'discountPct'
+>;
+
 /** The first schedule row no issued request bills yet. */
 function firstUnbilled(rows: ScheduleRowView[], money: ContractMoneyFacts): (ScheduleRowView & { amount: string }) | null {
   const billed = new Set(money.billedMilestoneIds);
@@ -74,7 +80,7 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
 /** A signed contract's billing facts, and the row it bills next; a draft or an unsigned one bills nothing yet. */
 async function contractFacts(
   tx: MetraDb,
-  contract: DeliveryContract,
+  contract: StagedContract,
 ): Promise<{ facts: ExecutionContractFacts; next: { labelAr: string | null; labelEn: string | null } | null }> {
   const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
   const idle: ExecutionContractFacts = {
@@ -134,5 +140,17 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
       nextInstalment: billing?.next ?? null,
       facts: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
     };
+  });
+}
+
+/**
+ * The stage of ONE execution contract (stage.ts), by the same facts the
+ * delivery card reads: its page says where it stands (signed, final account
+ * issued, settled) rather than how it began.
+ */
+export function getContractExecutionStage(ctx: OrgContext, contract: StagedContract): Promise<ExecutionStage> {
+  return withOrgContext(ctx, async (tx) => {
+    const { facts } = await contractFacts(tx, contract);
+    return executionStage({ hasIssuedBoq: true, contract: facts }).stage;
   });
 }

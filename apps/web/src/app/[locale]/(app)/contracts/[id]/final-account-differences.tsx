@@ -17,6 +17,7 @@ import type { FinalAccountView } from '@/lib/execution/final-account/load';
 import { formatNumber, formatPercent } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { formatMeasuredQty, measurableLineLabel } from './measurement-row';
+import { QuantityWithUnit } from './quantity-with-unit';
 
 const FIGURE_CELL = `${STACKED_CELL} sm:text-end`;
 
@@ -41,11 +42,7 @@ export function FinalAccountDifferences({
 }) {
   const t = useTranslations('contracts.execution.finalAccount.differences');
   const locale = useLocale();
-  const qty = (value: string, unit: string) => (
-    <span dir="ltr" className="font-mono tabular-nums">
-      {formatMeasuredQty(value, locale)} {unit}
-    </span>
-  );
+  const qty = (value: string, unit: string) => <QuantityWithUnit qty={formatMeasuredQty(value, locale)} unit={unit} />;
   const count = (value: number) => formatNumber(value, locale);
   const discounted = parseMoney4(view.documentDiscountPct) !== 0n;
 

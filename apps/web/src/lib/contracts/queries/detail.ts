@@ -9,7 +9,7 @@ import { variationOrders, type MetraDb } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { computeRevisedContractValue } from '@/lib/aggregates/contract-value';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { approvedVariationsCharge } from '@/lib/execution/money/variation-charge';
+import { executionRevisedValue } from '@/lib/execution/money/variation-charge';
 import { loadContractHeader } from './detail-header';
 import { loadContractSections } from './detail-sections';
 import type { ContractDetail, ContractHeaderDetail, ContractPageDetail } from './detail-types';
@@ -48,8 +48,7 @@ function revisedValueOf(contract: ContractValueBasis, approvedNetDeltas: string[
   if (contract.sourceBoqId === null) {
     return computeRevisedContractValue(contract.originalValue, approvedNetDeltas);
   }
-  const charge = approvedVariationsCharge(approvedNetDeltas, contract.taxRate, contract.supervisionPct);
-  return computeRevisedContractValue(contract.originalValue, [charge]);
+  return executionRevisedValue(contract.originalValue, approvedNetDeltas, contract.taxRate, contract.supervisionPct);
 }
 
 /**

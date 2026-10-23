@@ -4,6 +4,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { FinalAccountView } from '@/lib/execution/final-account/load';
 import { MEASUREMENT_FIELDS } from '@/lib/execution/measurements/input';
 import { REQUEST_TERM_FIELDS } from '@/lib/execution/requests/input';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { issueFinalAccountControlId, IssueFinalAccountDialog } from './issue-final-account-dialog';
@@ -77,7 +78,9 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the final account dialogs (%s)', (lo
 
   test('a quantity more than ten times the contract quantity is flagged before Save, and still saved (S3)', async () => {
     show(recordDialog());
-    const warning = at('contracts.execution.measurements.record.farBeyond').replace('{qty}', '20 sqm');
+    // The contract quantity in the warning: its unit named in the page's language, never the stored code.
+    const contractQty = `${bidiIsolate('20')} ${at('priceBook.units.sqm')}`;
+    const warning = at('contracts.execution.measurements.record.farBeyond').replace('{qty}', contractQty);
     type(recordMeasurementControlId('measuredQty'), '200');
     expect(screen.queryByText(warning)).toBeNull();
     type(recordMeasurementControlId('measuredQty'), '200.5');

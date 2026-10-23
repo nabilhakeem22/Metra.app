@@ -23,6 +23,7 @@ import {
   saveVariationDraftCore,
 } from '@/lib/variations/core';
 import { getVariationByToken, respondToVariationByToken } from '@/lib/variations/public';
+import { typedDescriptionColumn, typedHeaderColumns } from '@/lib/variations/typed-columns';
 import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
@@ -128,6 +129,27 @@ describe('variation draft save recomputes server-side (AC8)', () => {
       lines: [{ descriptionEn: 'Cut scope', qty: '-2', unit: 'lump_sum', unitCost: '0', unitPrice: '500', discountPct: '0' }],
     });
     expect((await readSavedVariation(voId)).netDelta).toBe('-1000.0000');
+  });
+
+  it('a change order typed on the Arabic page keeps its title, reason and lines in Arabic', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const header = typedHeaderColumns('ar-EG', { title: 'باب إضافي للمطبخ', reason: 'طلب العميل' });
+    const voId = ((await createVariationDraftCore(ctx, { contractId, ...header })) as { data?: string }).data!;
+    const saved = await saveVariationDraftCore(ctx, {
+      id: voId,
+      header,
+      lines: [{ ...typedDescriptionColumn('ar-EG', 'باب خشب زان'), qty: '1', unit: 'pcs', unitPrice: '900', discountPct: '0' }],
+    });
+    expect(saved.ok).toBe(true);
+    const [order] = await raw.query<Record<string, string | null>>(
+      `select title_ar, title_en, reason_ar, reason_en from public.variation_orders where id = '${voId}'`,
+    );
+    expect(order).toEqual({ title_ar: 'باب إضافي للمطبخ', title_en: null, reason_ar: 'طلب العميل', reason_en: null });
+    const lines = await raw.query<Record<string, string | null>>(
+      `select description_ar, description_en from public.variation_order_lines where variation_order_id = '${voId}'`,
+    );
+    expect(lines).toEqual([{ description_ar: 'باب خشب زان', description_en: null }]);
   });
 
   it('rejects creating a VO against a draft (non-issued) contract', async () => {

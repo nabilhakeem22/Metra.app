@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
+import { useUnitLabel } from '@/hooks/use-unit-label';
 import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { variationLinePath } from '@/lib/variations/line-fields';
 import { BaselineLinePicker } from './baseline-line-picker';
@@ -34,6 +35,7 @@ export function VariationLineRow({
   create: VariationCreateApi;
 }) {
   const tv = useTranslations('variations');
+  const unitLabel = useUnitLabel();
   const cell = (column: VoLineColumn) => ({
     id: variationLineControlId(line.key, column),
     ...create.errors.bind(variationLinePath(line.key, column)),
@@ -52,8 +54,8 @@ export function VariationLineRow({
       <FormField {...cell('description')} label={tv('line.description')}>
         <Input
           className="w-40"
-          value={line.descriptionEn}
-          onChange={(e) => update({ descriptionEn: e.target.value })}
+          value={line.description}
+          onChange={(e) => update({ description: e.target.value })}
         />
       </FormField>
       <FormField {...cell('qty')} label={tv('line.qty')}>
@@ -64,7 +66,7 @@ export function VariationLineRow({
           className="h-9 w-auto min-w-20"
           value={line.unit}
           onValueChange={(value) => update({ unit: value as CostItemUnit })}
-          options={UNIT_TOKENS.map((unit) => ({ value: unit, label: unit }))}
+          options={UNIT_TOKENS.map((unit) => ({ value: unit, label: unitLabel(unit) }))}
         />
       </FormField>
       <FormField {...cell('unitPrice')} label={tv('line.unitPrice')}>

@@ -23,12 +23,22 @@ function blockedReason(view: FinalAccountView): Blocked | null {
   return withinMagnitude(view.figures.balance) ? null : 'tooLarge';
 }
 
+/**
+ * The figures as a two-column grid: one column of labels, one of amounts as
+ * wide as the widest, each amount LTR and set at its end in tabular digits
+ * (the money law), so the amounts line up digit under digit in both
+ * languages. Every row is ruled under but the last.
+ */
+const FIGURES = 'grid max-w-xl grid-cols-[minmax(0,1fr)_auto] gap-x-6 text-body [&>*]:border-b [&>*]:py-1.5 [&>*:nth-last-child(-n+2)]:border-0';
+
 function Figure({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-1.5 last:border-0">
+    <>
       <dt className={strong ? 'font-semibold' : 'text-muted-foreground'}>{label}</dt>
-      <dd dir="ltr" className={`whitespace-nowrap font-mono tabular-nums ${strong ? 'font-semibold' : ''}`}>{value}</dd>
-    </div>
+      <dd dir="ltr" className={`whitespace-nowrap text-end font-mono tabular-nums ${strong ? 'font-semibold' : ''}`}>
+        {value}
+      </dd>
+    </>
   );
 }
 
@@ -68,7 +78,7 @@ export function FinalAccountCard({ contractId, canIssue, m }: { contractId: stri
           data.loading && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t('loading')} />
         ) : (
           <>
-            <dl className="max-w-xl text-body">
+            <dl className={FIGURES}>
               <Figure label={t('originalValue')} value={m(view.originalValue)} />
               <Figure label={t('variationsCharge')} value={m(view.figures.variationsCharge)} />
               <Figure label={t('adjustmentWorks')} value={m(view.figures.adjustmentWorks)} />
@@ -82,7 +92,7 @@ export function FinalAccountCard({ contractId, canIssue, m }: { contractId: stri
                 <p className="text-body font-semibold">
                   {t('issued.title')} <span dir="ltr">{view.issued.documentNumber}</span>
                 </p>
-                <dl className="max-w-xl text-body">
+                <dl className={FIGURES}>
                   <Figure label={t('issued.amount')} value={m(view.issued.amount)} />
                   <Figure label={t('issued.paid')} value={m(view.issued.paid)} />
                   <Figure label={t('issued.outstanding')} value={m(view.issued.outstanding)} strong />

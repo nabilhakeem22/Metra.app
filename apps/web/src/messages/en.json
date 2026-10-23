@@ -1328,7 +1328,8 @@
           "discount": "Disc. %",
           "total": "Total",
           "code": "Code",
-          "provisionalShort": "P"
+          "provisionalShort": "Prov.",
+          "provisionalHint": "Provisional line: its quantity is settled by measurement"
         },
         "unit": {
           "sqm": "m²",
@@ -1660,6 +1661,15 @@
   "contracts": {
     "title": "Contracts",
     "subtitle": "Generated from accepted proposals. Issue for the client's electronic acknowledgement.",
+    "detailSubtitle": {
+      "draftProposal": "Generated from the accepted proposal. Issue it for the client's electronic acknowledgement.",
+      "draftBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
+      "issued": "Issued. Waiting for the client's acknowledgement.",
+      "signed": "Signed by the client. The work is under way.",
+      "finalAccount": "The final account is issued. Waiting for the last payments.",
+      "settled": "Settled. Nothing is left to bill or collect.",
+      "terminated": "Terminated. Nothing more can be billed or changed on it."
+    },
     "costs": {
       "tab": "Costs",
       "intro": "What the job actually cost: materials, labour, subcontractors and more. Book each cost to a line, a section, or the whole contract.",
@@ -1740,7 +1750,6 @@
         "subtitleOwn": "Record your costs on this contract and review the ones you recorded."
       }
     },
-    "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
     "empty": "No contracts yet. Generate one from an accepted proposal.",
     "generate": "Generate contract",
     "generateFromProposal": "Generate contract from this proposal",
@@ -1759,6 +1768,11 @@
     "issued": "Contract issued",
     "terminate": "Terminate",
     "terminated": "Contract terminated",
+    "terminateConfirm": {
+      "title": "Terminate contract {number}?",
+      "body": "Terminating ends this contract for good. Change orders still waiting for a decision are rejected, and no new payment requests or measurements can be recorded on it. This can't be undone.",
+      "confirm": "Terminate the contract"
+    },
     "shareLink": "Acknowledgement link",
     "copyLink": "Copy link",
     "copied": "Copied",
@@ -1778,7 +1792,8 @@
       "retentionPct": "Retention %",
       "paymentTermsDays": "Payment terms (days)",
       "defectsLiabilityDays": "Defects liability (days)",
-      "terms": "Terms"
+      "termsEn": "Terms (English)",
+      "termsAr": "Terms (Arabic)"
     },
     "ack": {
       "title": "Electronic acknowledgement",
@@ -2114,7 +2129,6 @@
     "number": "Number",
     "title_": "Title",
     "reason": "Reason",
-    "netDelta": "Net change",
     "line": {
       "add": "Add line",
       "baseline": "Contract line",
@@ -2125,7 +2139,8 @@
       "unitPrice": "Unit price",
       "find": "Find a contract line",
       "capped": "Showing the first {count} lines. Type a word from the line or its section to narrow them, or ask for more results.",
-      "more": "More results"
+      "more": "More results",
+      "newScope": "New work, not on the contract"
     },
     "saveDraft": "Save draft",
     "saved": "Saved",

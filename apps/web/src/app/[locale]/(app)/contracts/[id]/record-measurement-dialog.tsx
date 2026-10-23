@@ -7,8 +7,10 @@ import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useUnitLabel } from '@/hooks/use-unit-label';
 import { todayInCairo } from '@/lib/automation/clock';
 import { recordMeasurement } from '@/lib/execution/measurements/actions';
+import { bidiIsolate } from '@/lib/format/bidi';
 import {
   isFarBeyondContractQty,
   MEASUREMENT_FIELDS,
@@ -73,6 +75,7 @@ export function RecordMeasurementDialog({
   const tc = useTranslations('common');
   const te = useTranslations('errors');
   const locale = useLocale();
+  const unitLabel = useUnitLabel();
   const today = todayInCairo(new Date());
   const [typed, setTyped] = useState<TypedMeasurement>({ measuredQty: '', measuredOn: today, note: '' });
   const [pending, startTransition] = useTransition();
@@ -123,7 +126,7 @@ export function RecordMeasurementDialog({
       </FormField>
       {farBeyond(typed.measuredQty, line) && (
         <p className="text-caption text-[color:var(--warn)]" role="status">
-          {t('farBeyond', { qty: `${formatMeasuredQty(line.qty, locale)} ${line.unit}` })}
+          {t('farBeyond', { qty: `${bidiIsolate(formatMeasuredQty(line.qty, locale))} ${unitLabel(line.unit)}` })}
         </p>
       )}
       <FormField id={recordMeasurementControlId('measuredOn')} label={t('measuredOn')} {...errors.bind('measuredOn')}>

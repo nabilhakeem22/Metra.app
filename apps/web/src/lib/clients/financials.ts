@@ -10,9 +10,11 @@ import 'server-only';
 // The client columns are deliberately KEPT (and still served by Public API v1 as
 // `advance_pct` / `retention_pct`) — removing them would be a breaking API change
 // for no gain, and they remain a usable default when a contract is drafted.
-import { contracts, type MetraDb } from '@metra/db';
+import { contracts, variationOrders, type MetraDb } from '@metra/db';
 import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { executionRevisedValue } from '@/lib/execution/money/variation-charge';
 import { weightedRates, type ClientEffectiveRates } from './rates';
 
 /** Contract statuses that represent a real commercial commitment. `draft` is a
@@ -21,18 +23,38 @@ import { weightedRates, type ClientEffectiveRates } from './rates';
 export const COMMITTED_STATUSES = ['issued', 'signed'] as const;
 
 /**
- * The ORIGINAL value of the committed (issued or signed) EXECUTION contracts
+ * The REVISED value of the committed (issued or signed) EXECUTION contracts
  * `scope` selects, as a scale-4 string: the part of a contracted value with no
- * accepted proposal behind it (A5 fix round F4). A proposal contract is its
- * accepted proposal, so a caller adding this to its accepted-proposal sum
- * counts that contract once. Draft and terminated contracts are not counted.
+ * accepted proposal behind it (A5 fix round F4). Each contract counts its
+ * original value plus every approved change order's full charge, VAT and
+ * supervision included (D4a, `executionRevisedValue`), exactly as its contract
+ * page shows it. A proposal contract is its accepted proposal, so a caller
+ * adding this to its accepted-proposal sum counts that contract once. Draft and
+ * terminated contracts are not counted. One statement: each contract's
+ * approved net changes arrive as one short array, and the money rule (rounded
+ * per order) runs here in exact scale-4 BigInt.
  */
 export async function committedExecutionValue(tx: MetraDb, scope: SQL): Promise<string> {
-  const [row] = await tx
-    .select({ total: sql<string>`coalesce(sum(${contracts.originalValue}), 0)::text` })
+  const rows = await tx
+    .select({
+      originalValue: sql<string>`${contracts.originalValue}::text`,
+      taxRate: sql<string>`${contracts.taxRate}::text`,
+      supervisionPct: sql<string>`${contracts.supervisionPct}::text`,
+      approvedNetDeltas: sql<string[]>`coalesce(jsonb_agg(${variationOrders.netDelta}::text) filter (where ${variationOrders.id} is not null), '[]'::jsonb)`,
+    })
     .from(contracts)
-    .where(and(scope, isNotNull(contracts.sourceBoqId), inArray(contracts.status, [...COMMITTED_STATUSES])));
-  return row?.total ?? '0';
+    .leftJoin(
+      variationOrders,
+      and(eq(variationOrders.contractId, contracts.id), eq(variationOrders.status, 'approved')),
+    )
+    .where(and(scope, isNotNull(contracts.sourceBoqId), inArray(contracts.status, [...COMMITTED_STATUSES])))
+    .groupBy(contracts.id);
+  const total4 = rows.reduce(
+    (total, row) =>
+      total + parseMoney4(executionRevisedValue(row.originalValue, row.approvedNetDeltas, row.taxRate, row.supervisionPct)),
+    0n,
+  );
+  return formatMoney4(total4);
 }
 
 /** The effective rates, and how many committed EXECUTION contracts sit beside them. */

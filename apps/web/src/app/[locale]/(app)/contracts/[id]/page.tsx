@@ -9,12 +9,14 @@ import { mayIssueRequests, mayRecordPayments, maySeeBilling } from '@/lib/execut
 import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
 import { mayReadCostEntries, mayRecordCostEntries } from '@/lib/execution/costs/access';
 import { mayReadMeasurements, mayRecordMeasurements } from '@/lib/execution/measurements/access';
+import { getContractExecutionStage } from '@/lib/execution/queries/facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
 import { contractPagePayload } from './page-payload';
+import { contractSubtitle } from './subtitle';
 import { contractTabsFor, openingContractTab } from './tabs';
 
 export default async function ContractDetailPage({
@@ -52,6 +54,8 @@ export default async function ContractDetailPage({
   // never read them (A3 reliability R1). Opened elsewhere, the overview asks
   // for its first page when it is shown.
   const openingSections = openingTab === 'overview' ? await getContractSectionsPage(ctx, id, null) : null;
+  // Only a signed execution contract has a stage beyond its status to tell.
+  const stage = detail.sourceBoqId !== null && detail.status === 'signed' ? await getContractExecutionStage(ctx, detail) : null;
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
@@ -62,7 +66,7 @@ export default async function ContractDetailPage({
     <div className="space-y-6">
       <PageHeader
         title={formatDocNumber('C', detail.number, docYear(null, detail.createdAt))}
-        description={t(detail.sourceBoqId === null ? 'subtitle' : 'subtitleBoq')}
+        description={t(`detailSubtitle.${contractSubtitle(detail, stage)}`)}
       />
       <ContractDetailClient
         {...contractPagePayload(detail, access)}

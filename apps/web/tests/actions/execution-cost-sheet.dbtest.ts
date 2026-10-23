@@ -5,11 +5,12 @@ import { getClientEffectiveRates, getProjectEffectiveRates } from '@/lib/clients
 import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { loadCostSheetCore } from '@/lib/execution/cost-sheet/read-core';
 import { getClientOverview } from '@/lib/clients/queries';
+import { getContractPage } from '@/lib/contracts/queries';
 import { getProjectOverview } from '@/lib/projects/queries';
 import { mintShareToken } from '@/lib/share/token';
 import { seedPayment } from './execution-billing-fixture';
 import { seedOrderWithLines } from './execution-final-account-fixture';
-import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest } from './execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest, seedVariation } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // PR A5.3: the cost sheet (كشف التكلفة) from SQL aggregates. AC30 (totals
@@ -23,6 +24,8 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // and on the project's Financials (F10, S1), and the project's contracted
 // value counts its execution contract (F4); the client's contracted value
 // counts its execution contracts and its rates leave them out the same way.
+// Both count an execution contract at its REVISED value (approved change
+// orders with their VAT and supervision), the figure its contract page shows.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -231,6 +234,30 @@ describe('getCostSheet', () => {
     await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [terminated.contractId]);
     expect((await getClientOverview(ctx.owner!, terminated.clientId)).contractedTotal).toBe('0.0000');
     expect((await getClientEffectiveRates(ctx.owner!, terminated.clientId)).executionContractCount).toBe(0);
+  });
+
+  it('the project\'s and the client\'s contracted value is the execution contract\'s REVISED value, as its page shows it', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    // VAT 14% and supervision 10% on each approved order's works (D4a): +10,000
+    // adds 12,400 and a -2,000 de-scope takes 2,480 off; an order still waiting
+    // for the client's answer, and a rejected one, move nothing.
+    await seedVariation(orgId, contract, 'approved', { netDelta: '10000' });
+    await seedVariation(orgId, contract, 'approved', { netDelta: '-2000' });
+    await seedVariation(orgId, contract, 'issued', { netDelta: '5000' });
+    await seedVariation(orgId, contract, 'rejected', { netDelta: '7000' });
+    const revised = '133920.0000';
+    expect((await getProjectOverview(ctx.owner!, contract.projectId)).contractedTotal).toBe(revised);
+    expect((await getClientOverview(ctx.owner!, contract.clientId)).contractedTotal).toBe(revised);
+    expect((await getContractPage(ctx.owner!, contract.contractId, true))?.revisedValue).toBe(revised);
+    // A second execution contract of the same client, with no orders, adds its original value.
+    const second = await seedExecutionContract(orgId, { state: 'draft' });
+    const token = mintShareToken();
+    await ownerQuery(`update public.contracts set client_id = $2 where id = $1`, [second.contractId, contract.clientId]);
+    await ownerQuery(
+      `update public.contracts set status = 'issued', token_hash = $2, share_expires_at = now() + interval '30 days' where id = $1`,
+      [second.contractId, token.hash],
+    );
+    expect((await getClientOverview(ctx.owner!, contract.clientId)).contractedTotal).toBe('257920.0000');
   });
 
   it('answers record_not_found for a proposal contract or another org\'s, and malformed for a bad id', async () => {

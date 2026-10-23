@@ -11,10 +11,11 @@ import { searchBaselineLines } from '@/lib/contracts/lines-actions';
 import { formatNumber } from '@/lib/format/number';
 import { useBaselineLineSearch } from './use-baseline-line-search';
 
-// Radix Select forbids an empty-string item value, so the "net delta" choice
-// (stored as '' on the line) rides a sentinel that is mapped back to '' at the
-// state boundary: the persisted contractLineId stays byte-identical.
-const NET_DELTA = '__net_delta__';
+// Radix Select forbids an empty-string item value, so the "new work, not on
+// the contract" choice (stored as '' on the line) rides a sentinel that is
+// mapped back to '' at the state boundary: the persisted contractLineId stays
+// byte-identical.
+const NEW_SCOPE = '__new_scope__';
 
 type BoundField = Omit<ComponentProps<typeof FormField>, 'label' | 'children'>;
 
@@ -49,7 +50,7 @@ export function BaselineLinePicker({
   const options = [...picked, ...search.options];
   const pick = (value: string) =>
     onPick(
-      value === NET_DELTA
+      value === NEW_SCOPE
         ? { contractLineId: '', contractLineLabel: '' }
         : { contractLineId: value, contractLineLabel: options.find((option) => option.value === value)?.label ?? '' },
     );
@@ -62,9 +63,9 @@ export function BaselineLinePicker({
       <FormField {...field} label={tv('line.baseline')}>
         <SelectControl
           className="h-9 w-auto min-w-40"
-          value={contractLineId || NET_DELTA}
+          value={contractLineId || NEW_SCOPE}
           onValueChange={pick}
-          options={[{ value: NET_DELTA, label: tv('netDelta') }, ...options]}
+          options={[{ value: NEW_SCOPE, label: tv('line.newScope') }, ...options]}
         />
       </FormField>
       {search.hasMore && (

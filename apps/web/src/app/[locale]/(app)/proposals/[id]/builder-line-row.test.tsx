@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import type { LineState } from './builder-model';
 import { BuilderLineRow } from './builder-line-row';
-import { useUnitLabel } from './use-unit-label';
+import { useUnitLabel } from '@/hooks/use-unit-label';
 import type { DraftCellError } from './use-draft-field-errors';
 
 const STORED_LINE: LineState = {
