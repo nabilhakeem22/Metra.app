@@ -11,6 +11,7 @@ import { useUnitLabel } from '@/hooks/use-unit-label';
 import { todayInCairo } from '@/lib/automation/clock';
 import { recordMeasurement } from '@/lib/execution/measurements/actions';
 import { bidiIsolate } from '@/lib/format/bidi';
+import { formatQuantity } from '@/lib/format/number';
 import {
   isFarBeyondContractQty,
   MEASUREMENT_FIELDS,
@@ -21,7 +22,6 @@ import {
 } from '@/lib/execution/measurements/input';
 import { readNonNegativeExactFigure } from '@/lib/validation/amount-field';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
-import { formatMeasuredQty } from './measurement-row';
 
 /** The DOM id of a box of the dialog: its refusal sits under it. */
 export const recordMeasurementControlId = (field: MeasurementField) => `record-measurement-${field}`;
@@ -126,7 +126,7 @@ export function RecordMeasurementDialog({
       </FormField>
       {farBeyond(typed.measuredQty, line) && (
         <p className="text-caption text-[color:var(--warn)]" role="status">
-          {t('farBeyond', { qty: `${bidiIsolate(formatMeasuredQty(line.qty, locale))} ${unitLabel(line.unit)}` })}
+          {t('farBeyond', { qty: `${bidiIsolate(formatQuantity(line.qty, locale))} ${unitLabel(line.unit)}` })}
         </p>
       )}
       <FormField id={recordMeasurementControlId('measuredOn')} label={t('measuredOn')} {...errors.bind('measuredOn')}>

@@ -30,7 +30,7 @@ export function computeVariationNetDelta(lines: LineTotals[]): string {
  */
 export function computeRevisedContractValue(
   originalValue: string,
-  approvedDeltas: string[],
+  approvedDeltas: readonly string[],
 ): string {
   let total = parseMoney4(originalValue);
   for (const d of approvedDeltas) total += parseMoney4(d);

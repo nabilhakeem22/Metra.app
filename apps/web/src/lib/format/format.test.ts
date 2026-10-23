@@ -159,7 +159,13 @@ describe('parentheticalPercent: a margin percentage beside its amount', () => {
   });
 });
 
-describe('formatQuantity — up to 2 fraction digits, no forced zeros', () => {
+describe('formatQuantity: every stored digit (up to 4), no forced zeros', () => {
+  it.each(['en', 'ar-EG'])('never rounds a scale-4 quantity away (%s)', (locale) => {
+    expect(formatQuantity('0.0001', locale)).toBe('0.0001');
+    expect(formatQuantity('0.1250', locale)).toBe('0.125');
+    expect(formatQuantity('1234.5678', locale)).toBe('1,234.5678');
+    expect(formatQuantity('220.0000', locale)).toBe('220');
+  });
   it('trims a scale-4 integer qty to a bare integer', () => {
     expect(formatQuantity('1.0000', 'en')).toBe('1');
   });

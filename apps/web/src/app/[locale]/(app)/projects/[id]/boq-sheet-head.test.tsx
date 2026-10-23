@@ -22,4 +22,16 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the BOQ sheet header (%s)', (locale)
     });
     expect((await screen.findAllByText(messageAt(locale, 'projects.profile.boq.col.provisionalHint'))).length).toBeGreaterThan(0);
   });
+
+  test('the figure headers are LTR like their figures, so they sit over them on an Arabic sheet (F4)', () => {
+    renderWithIntl(
+      <table>
+        <BoqSheetHead canEdit={false} discounted />
+      </table>,
+      { locale },
+    );
+    const headed = (key: string) => screen.getByText(messageAt(locale, `projects.profile.boq.col.${key}`)).closest('th');
+    for (const figure of ['qty', 'rate', 'discount', 'total']) expect(headed(figure)?.getAttribute('dir')).toBe('ltr');
+    for (const text of ['code', 'description', 'unit']) expect(headed(text)?.hasAttribute('dir')).toBe(false);
+  });
 });

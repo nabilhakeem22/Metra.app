@@ -95,6 +95,13 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  test('a line quantity shows every stored digit, trailing zeros trimmed, as the measurements tab does (F1)', () => {
+    const lines = ['0.0001', '0.1250', '1234.5678', '220.0000'].map((qty, n) => ({ ...line(n + 1), qty }));
+    showCard(section(4, lines));
+    const quantities = screen.getAllByRole('row').map((row) => row.querySelector('td:nth-child(2) [dir="ltr"]')?.textContent);
+    expect(quantities).toEqual(['0.0001', '0.125', '1,234.5678', '220']);
+  });
+
   test('"show more" asks for the lines after the last one shown, and goes when none remain', async () => {
     lineReads.loadSectionLines.mockResolvedValue({ ok: true, data: { lines: [line(3), line(4)], hasMore: false } });
     showCard(section(4, [line(1), line(2)]));

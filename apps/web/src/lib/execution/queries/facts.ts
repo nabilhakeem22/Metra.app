@@ -1,13 +1,14 @@
 import 'server-only';
 // Everything the delivery's execution card needs to derive its stage: the
 // delivery's issued BOQ, the contract on it (plan A26), and that contract's
-// money facts. One transaction, and nothing in it grows with the number of
-// lines: the schedule has at most 12 rows, and money, the measured works
-// included, is aggregated in SQL to single figures.
+// money facts; and the same stage, with its schedule, for one contract's page.
+// One transaction each, and nothing in it grows with the number of lines: the
+// schedule has at most 12 rows, and money, the measured works included, is
+// aggregated in SQL to single figures.
 import { boqs, contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { loadScheduleRows, scheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
+import { loadScheduleRows, scheduleView, type ContractScheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { billingBalance, finalAccountBalance } from '../money/final-account';
 import { executionStage, type ExecutionContractFacts, type ExecutionFacts, type ExecutionStage } from '../stage';
@@ -81,8 +82,8 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
 async function contractFacts(
   tx: MetraDb,
   contract: StagedContract,
+  schedule: ContractScheduleView,
 ): Promise<{ facts: ExecutionContractFacts; next: { labelAr: string | null; labelEn: string | null } | null }> {
-  const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
   const idle: ExecutionContractFacts = {
     status: contract.status,
     scheduleValid: schedule.valid,
@@ -131,7 +132,7 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
     // issued one: the card offers to contract that one instead.
     const replaced = newest?.status === 'terminated' && boqId !== null && newest.sourceBoqId !== boqId;
     const contract = replaced ? null : newest;
-    const billing = contract ? await contractFacts(tx, contract) : null;
+    const billing = contract ? await contractFacts(tx, contract, scheduleView(await loadScheduleRows(tx, contract.id), contract)) : null;
     return {
       boqId,
       contract: contract
@@ -143,14 +144,33 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
   });
 }
 
+/** What an execution contract's page reads beyond the contract: its schedule and its stage. */
+export interface ContractPageExecution {
+  /** The Schedule tab's rows, when that tab shows. */
+  schedule: ContractScheduleView | null;
+  /** Where a SIGNED contract stands (signed, final account issued, settled); null before it is signed. */
+  stage: ExecutionStage | null;
+}
+
 /**
- * The stage of ONE execution contract (stage.ts), by the same facts the
- * delivery card reads: its page says where it stands (signed, final account
- * issued, settled) rather than how it began.
+ * An execution contract page's reads, in ONE transaction that reads the
+ * schedule rows once: the Schedule tab's view of them, and for a signed
+ * contract its stage (stage.ts) by the same facts the delivery card reads, so
+ * its page says where it stands rather than how it began. A page that needs
+ * neither opens no transaction.
  */
-export function getContractExecutionStage(ctx: OrgContext, contract: StagedContract): Promise<ExecutionStage> {
+export async function getContractPageExecution(
+  ctx: OrgContext,
+  contract: StagedContract,
+  wants: { schedule: boolean },
+): Promise<ContractPageExecution> {
+  const signed = contract.status === 'signed';
+  if (!wants.schedule && !signed) return { schedule: null, stage: null };
   return withOrgContext(ctx, async (tx) => {
-    const { facts } = await contractFacts(tx, contract);
-    return executionStage({ hasIssuedBoq: true, contract: facts }).stage;
+    const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
+    const stage = signed
+      ? executionStage({ hasIssuedBoq: true, contract: (await contractFacts(tx, contract, schedule)).facts }).stage
+      : null;
+    return { schedule: wants.schedule ? schedule : null, stage };
   });
 }

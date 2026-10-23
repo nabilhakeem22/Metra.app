@@ -2,16 +2,14 @@ import 'server-only';
 import {
   activities,
   clients,
-  contracts,
   projects,
   proposals,
   type Activity,
   type Client,
 } from '@metra/db';
 import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
-import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { committedExecutionValue } from './financials';
+import { contractedValue } from './financials';
 
 export interface ListClientsFilter {
   active?: boolean;
@@ -131,10 +129,10 @@ export interface ClientOverview {
   projectCount: number;
   activeProposalCount: number;
   /**
-   * Sum of ACCEPTED proposal totals for this client, plus the value of its
-   * committed (issued or signed) EXECUTION contracts, which come from a BOQ and
-   * have no proposal behind them (A5 fix round F4, as on a project). A proposal
-   * contract is its accepted proposal, so it is counted once. Scale-4 money string.
+   * Every committed (issued or signed) contract of this client at its revised
+   * value, as its contract page shows it, plus each accepted proposal with no
+   * committed contract at its total (`contractedValue`, as on a project).
+   * Scale-4 money string.
    */
   contractedTotal: string;
   recentActivity: Activity[];
@@ -165,18 +163,7 @@ export function getClientOverview(
         ),
       );
 
-    const [contractedRow] = await tx
-      .select({
-        total: sql<string>`coalesce(sum(${proposals.total}), 0)::text`,
-      })
-      .from(proposals)
-      .where(
-        and(
-          eq(proposals.clientId, clientId),
-          eq(proposals.status, 'accepted'),
-        ),
-      );
-    const executionTotal = await committedExecutionValue(tx, eq(contracts.clientId, clientId));
+    const contractedTotal = await contractedValue(tx, { column: 'clientId', id: clientId });
 
     const recentActivity = await tx
       .select()
@@ -193,7 +180,7 @@ export function getClientOverview(
     return {
       projectCount: Number(projRow?.n ?? 0),
       activeProposalCount: Number(activeRow?.n ?? 0),
-      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionTotal)),
+      contractedTotal,
       recentActivity,
     };
   });

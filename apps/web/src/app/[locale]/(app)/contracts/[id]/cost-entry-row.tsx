@@ -5,7 +5,7 @@ import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { StatusChip } from '@/components/ui/status-chip';
 import type { CostEntryRow as CostEntry } from '@/lib/execution/costs/types';
 import { formatDate } from '@/lib/format/date';
-import { formatNumber } from '@/lib/format/number';
+import { formatNumber, formatQuantity } from '@/lib/format/number';
 import { cn } from '@/lib/utils';
 import { targetLabel } from './cost-entry-labels';
 
@@ -57,7 +57,7 @@ export function CostEntryRow({
         </div>
         {entry.qty !== null && entry.unit !== null && entry.unitCost !== null && (
           <div className="text-caption text-muted-foreground">
-            {t('quantity', { qty: formatNumber(entry.qty, locale), unit: tp(`units.${entry.unit}`), unitCost: m(entry.unitCost) })}
+            {t('quantity', { qty: formatQuantity(entry.qty, locale), unit: tp(`units.${entry.unit}`), unitCost: m(entry.unitCost) })}
           </div>
         )}
       </td>

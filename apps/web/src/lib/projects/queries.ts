@@ -2,19 +2,16 @@ import 'server-only';
 import {
   activities,
   clients,
-  contracts,
   projects,
   projectStages,
   projectTypes,
-  proposals,
   type Activity,
   type Project,
   type ProjectStage,
   type ProjectStatus,
 } from '@metra/db';
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
-import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { committedExecutionValue } from '@/lib/clients/financials';
+import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
+import { contractedValue } from '@/lib/clients/financials';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { currentStage } from '@/lib/project-stages/queries';
 
@@ -126,10 +123,9 @@ export interface ProjectOverview {
   /** round(avg(progress_pct)) across all stages, 0 if none. */
   overallProgress: number;
   /**
-   * Sum of ACCEPTED proposal totals for this project, plus the value of its
-   * committed (issued or signed) EXECUTION contracts, which come from a BOQ and
-   * have no proposal behind them (A5 fix round F4). A proposal contract is its
-   * accepted proposal, so it is counted once. Scale-4 money string.
+   * Every committed (issued or signed) contract of this project at its revised
+   * value, as its contract page shows it, plus each accepted proposal with no
+   * committed contract at its total (`contractedValue`). Scale-4 money string.
    */
   contractedTotal: string;
   recentActivity: Activity[];
@@ -162,16 +158,7 @@ export function getProjectOverview(
         )
       : 0;
 
-    const [contractedRow] = await tx
-      .select({ total: sql<string>`coalesce(sum(${proposals.total}), 0)::text` })
-      .from(proposals)
-      .where(
-        and(
-          eq(proposals.projectId, projectId),
-          eq(proposals.status, 'accepted'),
-        ),
-      );
-    const executionTotal = await committedExecutionValue(tx, eq(contracts.projectId, projectId));
+    const contractedTotal = await contractedValue(tx, { column: 'projectId', id: projectId });
 
     const recentActivity = await tx
       .select()
@@ -191,7 +178,7 @@ export function getProjectOverview(
       totalStages: stages.length,
       doneStages,
       overallProgress,
-      contractedTotal: formatMoney4(parseMoney4(contractedRow?.total) + parseMoney4(executionTotal)),
+      contractedTotal,
       recentActivity,
     };
   });

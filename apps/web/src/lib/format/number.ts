@@ -6,7 +6,8 @@ import { cachedNumberFormat } from './intl-cache';
 
 // Frozen: the formatter cache works out a frozen options object's key once.
 const TWO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const UP_TO_TWO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// A quantity is numeric(18,4): every stored digit is shown, none forced.
+const UP_TO_FOUR_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 0, maximumFractionDigits: 4 });
 
 function latnLocale(locale: string): string {
   return locale.includes('-u-nu-') ? locale : `${locale}-u-nu-latn`;
@@ -52,9 +53,10 @@ export function parentheticalPercent(value: number | string | null | undefined, 
 }
 
 /**
- * Format a line-item quantity for DISPLAY: up to 2 fraction digits, but with no
- * forced trailing zeros — an integer qty stays "1", "1.5" stays "1.5", and a
- * scale-4 "1.0000" trims to "1". Western digits. Guard mirrors formatMoney.
+ * Format a quantity for DISPLAY, the one rule for every quantity surface: up to
+ * 4 fraction digits (the stored scale, so nothing is rounded away: "0.0001"
+ * stays "0.0001", "0.125" stays "0.125") with trailing zeros trimmed ("1.0000"
+ * reads "1", "1.5000" reads "1.5"). Western digits. Guard mirrors formatMoney.
  */
 export function formatQuantity(
   value: number | string | null | undefined,
@@ -65,7 +67,7 @@ export function formatQuantity(
   let n = typeof value === 'string' ? Number(value) : value;
   if (!Number.isFinite(n)) return '';
   if (Object.is(n, -0)) n = 0;
-  return formatNumber(n, locale, UP_TO_TWO_DECIMALS);
+  return formatNumber(n, locale, UP_TO_FOUR_DECIMALS);
 }
 
 export { latnLocale };

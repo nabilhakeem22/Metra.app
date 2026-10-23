@@ -56,26 +56,33 @@ async function cost(contractId: string, sectionId: string | null, amount: string
   );
 }
 
-/** An ISSUED proposal contract on the client and project, its accepted proposal worth `value`, with its own advance and retention. */
-async function seedIssuedProposalContract(
-  clientId: string,
-  projectId: string,
-  terms: { advancePct: string; retentionPct: string; value: string },
-): Promise<void> {
+/** An accepted proposal worth `value` on the client and project. */
+async function seedAcceptedProposal(clientId: string, projectId: string, value: string): Promise<string> {
   const [proposal] = await ownerQuery<{ id: string }>(
     `insert into public.proposals (org_id, number, title_en, client_id, project_id, status, total)
      values ($1, 800000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted', $4) returning id`,
-    [orgId, clientId, projectId, terms.value],
+    [orgId, clientId, projectId, value],
   );
+  return proposal.id;
+}
+
+/** A proposal contract on the client and project, its accepted proposal worth `value`, with its own advance and retention: ISSUED unless `draft`. */
+async function seedIssuedProposalContract(
+  clientId: string,
+  projectId: string,
+  terms: { advancePct: string; retentionPct: string; value: string; draft?: boolean },
+): Promise<{ contractId: string; projectId: string }> {
+  const proposalId = await seedAcceptedProposal(clientId, projectId, terms.value);
   const token = mintShareToken();
-  await ownerQuery(
+  const [contract] = await ownerQuery<{ id: string }>(
     `insert into public.contracts (org_id, number, title_en, source_proposal_id, client_id, project_id,
                                    status, advance_pct, retention_pct, original_value, token_hash, share_expires_at)
      values ($1, 700000 + floor(random() * 99999)::int, 'Quote contract', $2, $3, $4, 'draft', $5, $6, $7, $8,
-             now() + interval '30 days')`,
-    [orgId, proposal.id, clientId, projectId, terms.advancePct, terms.retentionPct, terms.value, token.hash],
+             now() + interval '30 days') returning id`,
+    [orgId, proposalId, clientId, projectId, terms.advancePct, terms.retentionPct, terms.value, token.hash],
   );
-  await ownerQuery(`update public.contracts set status = 'issued' where token_hash = $1`, [token.hash]);
+  if (!terms.draft) await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [contract.id]);
+  return { contractId: contract.id, projectId };
 }
 
 async function sheet(contractId: string, member = ctx.owner!) {
@@ -258,6 +265,25 @@ describe('getCostSheet', () => {
       [second.contractId, token.hash],
     );
     expect((await getClientOverview(ctx.owner!, contract.clientId)).contractedTotal).toBe('257920.0000');
+  });
+
+  it('F2: a signed PROPOSAL contract counts at its revised value too: 400,000 + an approved +50,000 is 450,000 everywhere', async () => {
+    // A draft execution contract counts nothing: it only gives the quote a client and a project of its own.
+    const { clientId, projectId } = await seedExecutionContract(orgId, { state: 'draft' });
+    const quote = await seedIssuedProposalContract(clientId, projectId, { advancePct: '10', retentionPct: '5', value: '400000' });
+    await ownerQuery(`update public.contracts set status = 'signed' where id = $1`, [quote.contractId]);
+    // A proposal contract adds an order's net change (no VAT or supervision on top); one still waiting moves nothing.
+    await seedVariation(orgId, quote, 'approved', { netDelta: '50000' });
+    await seedVariation(orgId, quote, 'issued', { netDelta: '7000' });
+    const revised = '450000.0000';
+    expect((await getContractPage(ctx.owner!, quote.contractId, true))?.revisedValue).toBe(revised);
+    expect((await getProjectOverview(ctx.owner!, projectId)).contractedTotal).toBe(revised);
+    expect((await getClientOverview(ctx.owner!, clientId)).contractedTotal).toBe(revised);
+    // An accepted proposal with no contract counts its total, and so does one whose contract is still a draft, as before.
+    await seedAcceptedProposal(clientId, projectId, '1000');
+    await seedIssuedProposalContract(clientId, projectId, { advancePct: '0', retentionPct: '0', value: '2000', draft: true });
+    expect((await getProjectOverview(ctx.owner!, projectId)).contractedTotal).toBe('453000.0000');
+    expect((await getClientOverview(ctx.owner!, clientId)).contractedTotal).toBe('453000.0000');
   });
 
   it('answers record_not_found for a proposal contract or another org\'s, and malformed for a bad id', async () => {
