@@ -42,6 +42,12 @@ export const FIELD_CODE_PARAMS = {
   // A count that must be whole (days a change order adds) typed with a
   // fraction: the range is not what is wrong, so the range is not said.
   not_whole_number: [],
+  // A moment the device clock puts more than a few minutes ahead of the
+  // server's (a site check-in or photo time): the phone's clock is wrong.
+  in_future: [],
+  // A moment older than the site diary accepts (a check-in or photo time past
+  // 30 days): the phone's clock is wrong, or the item waited there too long.
+  too_old: [],
 } as const satisfies Record<string, readonly string[]>;
 
 export type FieldCode = keyof typeof FIELD_CODE_PARAMS;

@@ -68,6 +68,16 @@ const ROWS: Record<Capability, string[]> = {
   // a correction is a new reading, so there is no U and no A. The people on site
   // and those who run the job record them; the accountant and the viewer read.
   site_measurements: ['CR', 'CR', 'CR', 'CR', 'R', '', 'R'],
+  // The site diary (Stage 3): visits, photos, materials delivered and notes.
+  // Its entries are evidence, so C records and U only voids: U voids anyone's
+  // entry and moves the site pin, A publishes a visit to the client. The site
+  // engineer records (on his assigned projects only, a row-level rule); the
+  // accountant and the viewer read, without location (lib/site/access.ts).
+  site_diary: ['CRUA', 'CRUA', 'CRUA', 'CR', 'R', '', 'R'],
+  // Who is assigned to a project's site: the people who run the job assign and
+  // unassign (U closes an assignment; none is ever deleted); the engineer and
+  // the viewer read.
+  site_assignments: ['CRU', 'CRU', 'CRU', 'R', '', '', 'R'],
   cost_entry_approval: ['A', 'A', 'A', '', 'A', '', ''],
   custody_issue: ['A', 'A', '', '', 'A', '', ''],
   custody_settle: ['RU', 'RU', 'RU', 'C', 'CRUA', '', ''],

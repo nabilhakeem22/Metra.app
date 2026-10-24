@@ -368,3 +368,63 @@ describe('site_measurements capability (Stage 2, A18)', () => {
     }
   });
 });
+
+describe('site_diary capability (Stage 3 site app)', () => {
+  const expected: Record<string, string> = {
+    owner: 'CRUA',
+    admin: 'CRUA',
+    project_manager: 'CRUA',
+    site_engineer: 'CR',
+    accountant: 'R',
+    client: '',
+    viewer: 'R',
+  };
+  const letters = { create: 'C', read: 'R', update: 'U', approve: 'A' } as const;
+
+  it.each(MEMBER_ROLES)('%s holds exactly its plan cell', (role) => {
+    for (const [action, letter] of Object.entries(letters) as Array<[keyof typeof letters, string]>) {
+      expect(can(role, 'site_diary', action), `${role} ${action}`).toBe(expected[role].includes(letter));
+    }
+  });
+
+  it('only owner, admin and PM may void entries, move the pin (U) or publish to the client (A)', () => {
+    for (const role of MEMBER_ROLES) {
+      const runsTheJob = role === 'owner' || role === 'admin' || role === 'project_manager';
+      expect(can(role, 'site_diary', 'update'), role).toBe(runsTheJob);
+      expect(can(role, 'site_diary', 'approve'), role).toBe(runsTheJob);
+    }
+  });
+
+  it('the client role has no access at all', () => {
+    for (const action of ['create', 'read', 'update', 'approve'] as const) {
+      expect(can('client', 'site_diary', action)).toBe(false);
+    }
+  });
+});
+
+describe('site_assignments capability (Stage 3 site app)', () => {
+  it('owner, admin and PM assign and unassign; nobody approves', () => {
+    for (const role of ['owner', 'admin', 'project_manager'] as const) {
+      expect(can(role, 'site_assignments', 'create')).toBe(true);
+      expect(can(role, 'site_assignments', 'read')).toBe(true);
+      expect(can(role, 'site_assignments', 'update')).toBe(true);
+    }
+    for (const role of MEMBER_ROLES) expect(can(role, 'site_assignments', 'approve')).toBe(false);
+  });
+
+  it('the site engineer and the viewer only read', () => {
+    for (const role of ['site_engineer', 'viewer'] as const) {
+      expect(can(role, 'site_assignments', 'read')).toBe(true);
+      expect(can(role, 'site_assignments', 'create')).toBe(false);
+      expect(can(role, 'site_assignments', 'update')).toBe(false);
+    }
+  });
+
+  it('the accountant and the client have no access', () => {
+    for (const role of ['accountant', 'client'] as const) {
+      for (const action of ['create', 'read', 'update', 'approve'] as const) {
+        expect(can(role, 'site_assignments', action)).toBe(false);
+      }
+    }
+  });
+});
