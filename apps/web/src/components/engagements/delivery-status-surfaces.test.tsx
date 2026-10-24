@@ -67,7 +67,6 @@ function fixture(whoseMove: WhoseMove, updatedAt: string) {
     renderManifestHash: null,
     rendersReadyAt: null,
     clientExpected: null,
-    clientHasEmail: true,
     createdAt: '2026-05-01T00:00:00.000Z',
   } satisfies EngagementHeader;
   return { listRow, dashboardRow, header };

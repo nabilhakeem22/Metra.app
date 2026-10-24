@@ -74,7 +74,7 @@ export default async function EngagementDetailPage({
     header,
     gatePreview,
     pendingClaimCount: paymentClaims.length,
-    execution,
+    execution: execution && execution.flow,
     now: new Date(),
   });
 

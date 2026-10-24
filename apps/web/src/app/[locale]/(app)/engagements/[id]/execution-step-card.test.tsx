@@ -3,14 +3,18 @@ import { describe, expect, test, vi } from 'vitest';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import { executionDeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { DesignSummary } from '@/lib/engagements/design-summary';
-import type { ExecutionCardView } from '@/lib/execution/card-view';
+import { executionCardView, type ExecutionCardView } from '@/lib/execution/card-view';
 import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS } from '@/lib/execution/next-action-target';
 import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES, type ExecutionNextActionKind, type ExecutionStage } from '@/lib/execution/stage';
+import { executionPosition, type ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
 import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
+import type { Actor } from '@/lib/flow/types';
+import { executionModels, flowFactsOf } from '@/test/execution-flow-model';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import type { ExecutionCockpit } from './command-card-props';
 import { ExecutionStepCard, type ExecutionStepCardProps } from './execution-step-card';
+import { STUDIO_TAKES_BACK } from './execution-step-copy';
 
 // The cockpit at `execution` (client home H2, AC 22 to 25): the design folds
 // into one line above the five-step execution rail, and the card names ONE next
@@ -57,32 +61,49 @@ const READS_MONEY_ONLY = { ...EVERYTHING, sendRequests: false, recordPayments: f
 const INSTALMENT = { en: 'Advance', 'ar-EG': 'دفعة مقدمة' } as const;
 const NOTHING_OPEN: DesignSummary = { openInstalments: 0, pendingClaims: 0, awaitingReply: 0 };
 
-/** The stage each next action is shown at. */
-function stageOf(kind: ExecutionNextActionKind): ExecutionStage {
-  if (kind === 'record_signed_offline') return 'awaiting_signature';
-  if (kind === 'open_boq') return 'no_boq';
-  if (kind === 'create_contract') return 'no_contract';
-  if (kind === 'set_schedule' || kind === 'send_contract') return 'draft';
-  if (kind === 'review_final_account') return 'final_account';
-  return 'in_progress';
+/** Every fact set a real contract can be in (lib/flow's shared model), with where it locates. */
+const FLOWS = [...executionModels(1)].map((m) => {
+  const flow = flowFactsOf(m);
+  return { flow, result: executionPosition(flow).result, whoseMove: locateExecutionForStudio(flow).whoseMove };
+});
+
+/** The first real fact set showing `kind`; the two waits the studio can take back default to the client holding them. */
+function flowFor(kind: ExecutionNextActionKind, holder?: Actor): ExecutionFlowFacts {
+  const wanted = holder ?? (STUDIO_TAKES_BACK.has(kind) ? 'client' : undefined);
+  const found = FLOWS.find(({ result, whoseMove }) => result.next?.kind === kind && (wanted === undefined || whoseMove === wanted));
+  if (!found) throw new Error(`no model shows ${kind} held by ${String(wanted)}`);
+  return found.flow;
 }
 
+function flowAt(stage: ExecutionStage): ExecutionFlowFacts {
+  const found = FLOWS.find(({ result }) => result.stage === stage && result.next === null);
+  if (!found) throw new Error(`no model ends at ${stage}`);
+  return found.flow;
+}
+
+/** The card's view of real facts, as the page builds it (lib/execution/card-view.ts). */
+function viewOf(flow: ExecutionFlowFacts, may = EVERYTHING): ExecutionCardView {
+  const contract = flow.stage.contract;
+  return executionCardView(
+    {
+      flow,
+      boqId: 'b-1',
+      contract: contract && { id: 'c-1', number: 7, createdAt: '2026-10-01T09:00:00.000Z', status: contract.status },
+      nextInstalment: { labelAr: 'دفعة مقدمة', labelEn: 'Advance' },
+    },
+    { projectId: 'p-1', may },
+  );
+}
+
+/** The card showing `kind`, or a finished stage when `kind` is null; `stage` overrides the stage for the costs and measurements links. */
 function view(kind: ExecutionNextActionKind | null, may = EVERYTHING, stage?: ExecutionStage): ExecutionCardView {
-  return {
-    stage: stage ?? (kind ? stageOf(kind) : 'settled'),
-    next: kind ? { kind } : null,
-    projectId: 'p-1',
-    boqId: 'b-1',
-    contract: { id: 'c-1', documentNumber: 'C-2026-0007' },
-    nextInstalment: { labelAr: 'دفعة مقدمة', labelEn: 'Advance' },
-    may,
-  };
+  const base = viewOf(kind ? flowFor(kind) : flowAt(stage ?? 'settled'), may);
+  return stage ? { ...base, stage } : base;
 }
 
 function cardProps(cockpit: ExecutionCockpit, extra: Partial<ExecutionStepCardProps> = {}): ExecutionStepCardProps {
   return {
-    status: executionDeliveryStatus(locateExecutionForStudio(cockpit.view)),
-    clientHasEmail: true,
+    status: executionDeliveryStatus(locateExecutionForStudio(cockpit.view.flow)),
     pending: false,
     paymentClaims: [],
     canResolveClaims: true,
@@ -275,18 +296,43 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution step card (%s)', (loca
     expect(container.querySelectorAll('[data-rail-who]')).toHaveLength(0);
   });
 
-  test('the no-email notice shows while the client holds the move and has no email, and only then (AC25)', () => {
-    const clientKinds = EXECUTION_NEXT_ACTION_KINDS.filter((kind) => locateExecutionForStudio({ stage: stageOf(kind), next: { kind } }).whoseMove === 'client');
-    expect(clientKinds.length).toBeGreaterThan(0);
-    for (const kind of EXECUTION_NEXT_ACTION_KINDS) {
-      const { container, unmount } = renderCard(view(kind), { locale, extra: { clientHasEmail: false } });
-      const notice = container.querySelector('[data-no-email-notice]');
-      if (clientKinds.includes(kind)) expect(notice?.textContent, kind).toBe(at(`engagements.flow.noEmail.${kind}`));
-      else expect(notice, kind).toBeNull();
-      unmount();
+  test('a closed signing window is the studio move: the card says so and offers the paper signature', () => {
+    const { container, body } = renderCard(viewOf(flowFor('record_signed_offline', 'studio')), { locale });
+    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.studioTakesBack.record_signed_offline.headline'));
+    expect(body.getByText(at('execution.card.studioTakesBack.record_signed_offline.hint'))).toBeTruthy();
+    expect(body.getByText(`${at('engagements.command.nextAction')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
+    expect(body.getByRole('button', { name: at('contracts.execution.signOffline.open') })).toBeTruthy();
+    expect(body.queryByText(at('execution.card.waitingOnClient'))).toBeNull();
+    expect(container.querySelector('[data-rail-step][aria-current="step"] [data-rail-who]')?.textContent).toBe(at('engagements.flow.who.now.studio'));
+  });
+
+  test('a change order approved inside the studio is the studio move: issue it', () => {
+    const { body, unmount } = renderCard(viewOf(flowFor('await_variation_answer', 'studio')), { locale });
+    const issue = at('execution.card.studioTakesBack.await_variation_answer.headline');
+    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(issue);
+    expect(body.getByText(at('execution.card.studioTakesBack.await_variation_answer.hint'))).toBeTruthy();
+    expect(body.getByRole('link', { name: issue }).getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=variations$/);
+    unmount();
+    // Issued to the client and waiting on their answer: the client's wait, in the old words.
+    const waiting = renderCard(viewOf(flowFor('await_variation_answer', 'client')), { locale });
+    expect(waiting.body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.next.await_variation_answer'));
+  });
+});
+
+describe('the waits the studio can take back', () => {
+  test('every next action whose holder depends on the facts has the studio wording in both languages', () => {
+    const holders = new Map<ExecutionNextActionKind, Set<Actor | null>>();
+    for (const { result, whoseMove } of FLOWS) {
+      if (!result.next) continue;
+      holders.set(result.next.kind, (holders.get(result.next.kind) ?? new Set<Actor | null>()).add(whoseMove));
     }
-    const { container } = renderCard(view('record_signed_offline'), { locale, extra: { clientHasEmail: true } });
-    expect(container.querySelector('[data-no-email-notice]')).toBeNull();
+    const shifting = [...holders].filter(([, actors]) => actors.size > 1).map(([kind]) => kind);
+    expect(new Set(shifting)).toEqual(STUDIO_TAKES_BACK);
+    for (const kind of STUDIO_TAKES_BACK) {
+      for (const locale of ['en', 'ar-EG'] as const) {
+        for (const field of ['headline', 'hint']) expect(messageAt(locale, `execution.card.studioTakesBack.${kind}.${field}`)).toBeTruthy();
+      }
+    }
   });
 });
 
@@ -334,7 +380,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the design summary line (%s)', (loca
   });
 
   test('no em dash and no physical inline direction anywhere in the card', () => {
-    const { container } = renderCard(view('record_signed_offline'), { locale, summary: { openInstalments: 1, pendingClaims: 1, awaitingReply: 1 }, extra: { clientHasEmail: false } });
+    const { container } = renderCard(view('record_signed_offline'), { locale, summary: { openInstalments: 1, pendingClaims: 1, awaitingReply: 1 } });
     fireEvent.click(toggle());
     expect(container.textContent).not.toMatch(/[\u2013\u2014]/);
     for (const element of container.querySelectorAll('[class]')) {

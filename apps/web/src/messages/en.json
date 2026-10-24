@@ -2892,11 +2892,6 @@
           "client": "The client's",
           "site": "The site team's"
         }
-      },
-      "noEmail": {
-        "record_signed_offline": "The client has no email on file, so they cannot sign online. Add their email, or record the paper signature.",
-        "record_payment": "The client has no email on file, so they cannot report a payment online. Add their email on the client page.",
-        "await_variation_answer": "The client has no email on file, so they cannot answer the change order online. Add their email on the client page."
       }
     },
     "designSummary": {
@@ -3415,7 +3410,17 @@
         "prepare_final_account": "Prepare the final account",
         "review_final_account": "Review the final account"
       },
-      "recordMeasurements": "Record measurements"
+      "recordMeasurements": "Record measurements",
+      "studioTakesBack": {
+        "record_signed_offline": {
+          "headline": "The online signing window has closed: record the paper signature",
+          "hint": "The client can no longer sign on their link. If they signed on paper, record it here."
+        },
+        "await_variation_answer": {
+          "headline": "Issue the change order to the client",
+          "hint": "It is approved inside the studio and not sent yet, so the client cannot see it."
+        }
+      }
     }
   }
 }

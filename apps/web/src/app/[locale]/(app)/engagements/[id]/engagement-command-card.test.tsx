@@ -111,7 +111,6 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     onNudge: () => {},
     clientExpected: null,
     execution: null,
-    clientHasEmail: true,
     onOpenTab: () => {},
     ...overrides,
   };
@@ -298,6 +297,12 @@ describe('a closed delivery', () => {
     const view: ExecutionCardView = {
       stage: 'no_boq',
       next: { kind: 'open_boq' },
+      flow: {
+        stage: { hasIssuedBoq: false, contract: null },
+        signingOpen: false,
+        issuedChangeOrderCount: 0,
+        unclaimedDueRequestCount: 0,
+      },
       projectId: 'p-1',
       boqId: null,
       contract: null,

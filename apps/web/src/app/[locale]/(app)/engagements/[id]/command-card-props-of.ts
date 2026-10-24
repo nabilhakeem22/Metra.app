@@ -79,7 +79,6 @@ export function commandCardPropsOf(
         awaitingReplyCount: detail.awaitingReplyCount,
       }),
     },
-    clientHasEmail: header.clientHasEmail,
     onOpenTab,
   };
 }

@@ -83,8 +83,6 @@ export interface EngagementCommandCardProps {
   clientExpected: ClientExpectedCard | null;
   /** At `execution`: what the execution step card renders from; null elsewhere. */
   execution: ExecutionCockpit | null;
-  /** Has the client an email on file a code could go to (the header read)? */
-  clientHasEmail: boolean;
   /** Switch the cockpit's tab strip below the card to `tab`. */
   onOpenTab: (tab: EngagementTab) => void;
 }

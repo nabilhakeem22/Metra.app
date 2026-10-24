@@ -1,6 +1,5 @@
 'use client';
 
-import { MailWarning } from 'lucide-react';
 import { StepCard, StepHeadline } from '@/components/flow/step-card';
 import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
 import { buildPhaseView } from '@/lib/flow/build-view';
@@ -17,7 +16,7 @@ import { useExecutionStepCopy } from './execution-step-copy';
 /** The command card props this card reads. */
 export type ExecutionStepCardProps = Pick<
   EngagementCommandCardProps,
-  'status' | 'clientHasEmail' | 'pending' | 'paymentClaims' | 'canResolveClaims' | 'runAction' | 'actionError' | 'onOpenTab'
+  'status' | 'pending' | 'paymentClaims' | 'canResolveClaims' | 'runAction' | 'actionError' | 'onOpenTab'
 >;
 
 // The cockpit's STEP CARD AT EXECUTION: the same shared card the design phase
@@ -30,8 +29,8 @@ export type ExecutionStepCardProps = Pick<
 // command-card-execution.tsx, the rail execution-phase-rail.tsx.
 export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCardProps; execution: ExecutionCockpit }) {
   const { view, designSummary } = execution;
-  const location = locateExecutionForStudio(view);
-  const copy = useExecutionStepCopy({ view, location, clientHasEmail: card.clientHasEmail });
+  const location = locateExecutionForStudio(view.flow);
+  const copy = useExecutionStepCopy({ view, location });
 
   return (
     <StepCard
@@ -49,17 +48,9 @@ export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCard
       }
     >
       <div className="space-y-4" data-execution-stage={view.stage}>
+        {/* One block: the headline is a fragment, and the body's spacing must not split it. */}
         <div>
           <StepHeadline eyebrow={copy.eyebrow} headline={copy.headline} hint={copy.hint} />
-          {copy.noEmailNotice && (
-            <p
-              data-no-email-notice
-              className="flex items-start gap-2 rounded-item border border-[color:var(--warn-tint)] bg-[color:var(--track)] px-3 py-2.5 text-small text-[color:var(--text)]"
-            >
-              <MailWarning className="mt-0.5 size-4 shrink-0 text-[color:var(--warn)]" aria-hidden />
-              {copy.noEmailNotice}
-            </p>
-          )}
         </div>
         {view.next && copy.actionLabel && (
           <ExecutionNextAction view={view} kind={view.next.kind} label={copy.actionLabel} />

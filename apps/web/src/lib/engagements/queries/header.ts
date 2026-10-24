@@ -1,5 +1,5 @@
 import 'server-only';
-import { clientContacts, clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
+import { clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { ClientExpectedRecord } from '../client-expected-view';
@@ -45,12 +45,6 @@ export interface EngagementHeader {
   rendersReadyAt: string | null;
   /** The date the client page promises for the next step (0058); null when unset. */
   clientExpected: ClientExpectedRecord | null;
-  /**
-   * Has the client an email address a one-time code could go to: the primary
-   * contact's, else the client's own (the client home plan's code rule). Only
-   * whether one exists crosses this boundary, never the address.
-   */
-  clientHasEmail: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,17 +83,6 @@ export function getEngagementHeader(
         clientExpectedOn: designEngagements.clientExpectedOn,
         clientExpectedState: designEngagements.clientExpectedState,
         clientExpectedSetAt: designEngagements.clientExpectedSetAt,
-        // In this one statement, so the flag costs no round trip of its own.
-        clientHasEmail: sql<boolean>`(
-          nullif(btrim(${clients.email}), '') is not null
-          or exists (
-            select 1 from ${clientContacts}
-             where ${clientContacts.orgId} = ${designEngagements.orgId}
-               and ${clientContacts.clientId} = ${designEngagements.clientId}
-               and ${clientContacts.isPrimary}
-               and nullif(btrim(${clientContacts.email}), '') is not null
-          )
-        )`,
         createdAt: designEngagements.createdAt,
         updatedAt: designEngagements.updatedAt,
       })

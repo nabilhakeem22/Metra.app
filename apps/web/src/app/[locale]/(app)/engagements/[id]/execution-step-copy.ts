@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
 import { STAGES_WAITING_ON_CLIENT } from '@/lib/execution/next-action-target';
+import type { ExecutionNextActionKind } from '@/lib/execution/stage';
 import type { StepLocation } from '@/lib/flow/types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -16,9 +17,19 @@ export interface ExecutionStepCopy {
   hint: string | null;
   /** The next action's words, for its own control; null when there is none. */
   actionLabel: string | null;
-  /** Said when the client holds the move and has no email on file; null otherwise. */
-  noEmailNotice: string | null;
 }
+
+/**
+ * The client waits the studio takes back (lib/flow/locate/execution-studio.ts):
+ * a contract whose online signing window closed can only be signed on paper,
+ * and a change order approved inside the studio has to be issued before the
+ * client can answer it. While the studio holds one, the card says the studio's
+ * act (`execution.card.studioTakesBack.*`), not the client's wait.
+ */
+export const STUDIO_TAKES_BACK: ReadonlySet<ExecutionNextActionKind> = new Set<ExecutionNextActionKind>([
+  'record_signed_offline',
+  'await_variation_answer',
+]);
 
 /**
  * The headline is the next action itself (`execution.card.next.*`), the hint
@@ -26,28 +37,24 @@ export interface ExecutionStepCopy {
  * so, as it does on the design card; once settled or terminated the stage is
  * the headline and there is no action to name.
  */
-export function useExecutionStepCopy(options: {
-  view: ExecutionCardView;
-  location: StepLocation;
-  clientHasEmail: boolean;
-}): ExecutionStepCopy {
+export function useExecutionStepCopy(options: { view: ExecutionCardView; location: StepLocation }): ExecutionStepCopy {
   const t = useTranslations('execution.card');
   const tcmd = useTranslations('engagements.command');
-  const tflow = useTranslations('engagements.flow');
   const locale = useLocale();
-  const { view, location, clientHasEmail } = options;
-
-  const instalment = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
-  const actionLabel = view.next && t(`next.${view.next.kind}`, { instalment: instalment || t('anInstalment') });
+  const { view, location } = options;
   const actor = location.whoseMove === null ? t('title') : tcmd(location.whoseMove === 'client' ? 'pill.waitingClient' : 'nextAction');
+  // `·` not a dash: the eyebrow renders in ar-EG (scripts/i18n/style-guide.md rule 6).
+  const eyebrow = view.contract ? `${actor} · ${bidiIsolate(view.contract.documentNumber)}` : actor;
   const stage = t(`stage.${view.stage}`);
-  return {
-    // `·` not a dash: the eyebrow renders in ar-EG (scripts/i18n/style-guide.md rule 6).
-    eyebrow: view.contract ? `${actor} · ${bidiIsolate(view.contract.documentNumber)}` : actor,
-    headline: actionLabel ?? stage,
-    hint: actionLabel === null ? null : STAGES_WAITING_ON_CLIENT.has(view.stage) ? t('waitingOnClient') : stage,
-    actionLabel,
-    noEmailNotice:
-      view.next && location.whoseMove === 'client' && !clientHasEmail ? tflow(`noEmail.${view.next.kind}`) : null,
-  };
+  if (!view.next) return { eyebrow, headline: stage, hint: null, actionLabel: null };
+
+  const { kind } = view.next;
+  if (location.whoseMove === 'studio' && STUDIO_TAKES_BACK.has(kind)) {
+    const actionLabel = t(`studioTakesBack.${kind}.headline`);
+    return { eyebrow, headline: actionLabel, hint: t(`studioTakesBack.${kind}.hint`), actionLabel };
+  }
+  const instalment = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
+  const actionLabel = t(`next.${kind}`, { instalment: instalment || t('anInstalment') });
+  const waiting = location.whoseMove === 'client' && STAGES_WAITING_ON_CLIENT.has(view.stage);
+  return { eyebrow, headline: actionLabel, hint: waiting ? t('waitingOnClient') : stage, actionLabel };
 }

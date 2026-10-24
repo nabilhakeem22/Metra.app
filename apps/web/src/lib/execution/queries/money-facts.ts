@@ -9,7 +9,11 @@ import { sql } from 'drizzle-orm';
 export interface ContractMoneyFacts {
   pendingClaimCount: number;
   unpaidRequestCount: number;
+  /** Issued requests with something still due and no pending "I paid" claim on them. */
+  unclaimedDueRequestCount: number;
   openVariationCount: number;
+  /** Of the open change orders, the ones issued to the client (the rest are approved internally). */
+  issuedVariationCount: number;
   /** Approved change orders that add money and have no issued request. */
   unbilledVariationCount: number;
   /** Σ amount of every ISSUED request (void ones are not billed). */
@@ -28,7 +32,9 @@ export interface ContractMoneyFacts {
 type Row = {
   pending_claims: number;
   unpaid_requests: number;
+  unclaimed_due_requests: number;
   open_variations: number;
+  issued_variations: number;
   unbilled_variations: number;
   issued_total: string;
   approved_deltas: string[];
@@ -51,7 +57,12 @@ export async function loadContractMoneyFacts(tx: MetraDb, contractId: string): P
       (select count(*) from public.contract_payment_claims c
         where c.contract_id = ${contractId} and c.status = 'pending')::int as pending_claims,
       (select count(*) from req where status = 'issued' and amount > paid)::int as unpaid_requests,
+      (select count(*) from req where status = 'issued' and amount > paid
+          and not exists (select 1 from public.contract_payment_claims c
+                           where c.contract_id = ${contractId} and c.request_id = req.id and c.status = 'pending'))::int
+        as unclaimed_due_requests,
       (select count(*) from vo where status in ('internal_approved', 'issued'))::int as open_variations,
+      (select count(*) from vo where status = 'issued')::int as issued_variations,
       (select count(*) from vo
         where status = 'approved' and net_delta > 0
           and not exists (select 1 from req where req.variation_order_id = vo.id and req.status = 'issued'))::int
@@ -72,7 +83,9 @@ export async function loadContractMoneyFacts(tx: MetraDb, contractId: string): P
   return {
     pendingClaimCount: row.pending_claims,
     unpaidRequestCount: row.unpaid_requests,
+    unclaimedDueRequestCount: row.unclaimed_due_requests,
     openVariationCount: row.open_variations,
+    issuedVariationCount: row.issued_variations,
     unbilledVariationCount: row.unbilled_variations,
     issuedRequestsTotal: row.issued_total,
     approvedVariationNetDeltas: row.approved_deltas,

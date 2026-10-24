@@ -35,8 +35,8 @@ import {
 } from '@/lib/engagements/queries';
 import { mayRecordHandoverConfirmation } from '@/lib/engagements/handover-recorders';
 import { getExecutionFacts } from '@/lib/execution/queries/facts';
-import type { ExecutionStageResult } from '@/lib/execution/stage';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
+import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
 import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
@@ -152,14 +152,14 @@ export function engagementCapabilities(
  * `pendingClaimCount` is the page's own claims read, which applies the same
  * finance-read gate as the list's batch count, so both agree for every role.
  *
- * At `execution` the design is finished, so the status follows the execution
- * stage instead (`execution` is the stage the page derived; null elsewhere).
+ * At `execution` the design is finished, so the status follows whose move it
+ * is in the execution phase instead (`execution` is its facts; null elsewhere).
  */
 export function deliveryStatusOf(input: {
   header: EngagementHeader;
   gatePreview: EngagementGatePreview;
   pendingClaimCount: number;
-  execution: ExecutionStageResult | null;
+  execution: ExecutionFlowFacts | null;
   now: Date;
 }): DeliveryStatus {
   const { header, gatePreview, pendingClaimCount, execution, now } = input;

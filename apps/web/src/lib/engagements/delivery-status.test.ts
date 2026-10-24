@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES } from '@/lib/execution/stage';
 import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import { executionModels, flowFactsOf, model } from '@/test/execution-flow-model';
 import {
   deliveryStatusTone,
   executionDeliveryStatus,
@@ -72,26 +72,25 @@ describe('the rules the product reads', () => {
 });
 
 describe('executionDeliveryStatus: at execution the header follows whose move it is', () => {
-  it('every stage with every next action: the studio move is yours, the client move waits unaged, no move is delivered', () => {
-    for (const stage of EXECUTION_STAGES) {
-      for (const kind of [...EXECUTION_NEXT_ACTION_KINDS, null]) {
-        const location = locateExecutionForStudio({ stage, next: kind === null ? null : { kind } });
-        const status = executionDeliveryStatus(location);
-        if (location.status !== 'active' || location.whoseMove === null) expect(status, `${stage}/${kind}`).toEqual({ kind: 'delivered' });
-        else if (location.whoseMove === 'client') expect(status, `${stage}/${kind}`).toEqual({ kind: 'waitingClient', days: null });
-        else expect(status, `${stage}/${kind}`).toEqual({ kind: 'yourMove' });
-      }
+  it('every reachable fact set: the studio move is yours, the client move waits unaged, no move is delivered', () => {
+    for (const m of executionModels(1)) {
+      const location = locateExecutionForStudio(flowFactsOf(m));
+      const status = executionDeliveryStatus(location);
+      if (location.status !== 'active' || location.whoseMove === null) expect(status, JSON.stringify(m)).toEqual({ kind: 'delivered' });
+      else if (location.whoseMove === 'client') expect(status, JSON.stringify(m)).toEqual({ kind: 'waitingClient', days: null });
+      else expect(status, JSON.stringify(m)).toEqual({ kind: 'yourMove' });
     }
   });
 
-  it('the readings the cockpit shows: signature waits on the client, a draft is yours, settled is delivered', () => {
-    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'awaiting_signature', next: { kind: 'record_signed_offline' } }))).toEqual({
-      kind: 'waitingClient',
-      days: null,
-    });
-    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'draft', next: { kind: 'send_contract' } }))).toEqual({ kind: 'yourMove' });
-    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'settled', next: null }))).toEqual({ kind: 'delivered' });
-    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'terminated', next: null }))).toEqual({ kind: 'delivered' });
+  it('the readings the cockpit shows: an open signature waits on the client, a closed one and a draft are yours, settled is delivered', () => {
+    const statusOf = (overrides: Parameters<typeof model>[0]) => executionDeliveryStatus(locateExecutionForStudio(flowFactsOf(model(overrides))));
+    expect(statusOf({ contract: 'issued_open' })).toEqual({ kind: 'waitingClient', days: null });
+    expect(statusOf({ contract: 'issued_closed' })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ contract: 'draft' })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ internalChangeOrders: 1 })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ issuedChangeOrders: 1 })).toEqual({ kind: 'waitingClient', days: null });
+    expect(statusOf({})).toEqual({ kind: 'delivered' });
+    expect(statusOf({ contract: 'terminated' })).toEqual({ kind: 'delivered' });
   });
 
   it("a move the site team holds is the studio's own", () => {
