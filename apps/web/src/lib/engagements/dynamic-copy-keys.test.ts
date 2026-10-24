@@ -72,7 +72,9 @@ describe('dynamic engagement copy keys exist in both catalogs', () => {
     }
   });
 
-  it.each([...TERMINAL_STATES])('closed %s: a headline', (state) => {
+  // `execution` is the one terminal state the design card never draws: the
+  // cockpit wears the execution step card there (engagement-command-card.tsx).
+  it.each([...TERMINAL_STATES].filter((state) => state !== 'execution'))('closed %s: a headline', (state) => {
     expectInBothCatalogs(`engagements.command.closed.${state}.headline`);
   });
 

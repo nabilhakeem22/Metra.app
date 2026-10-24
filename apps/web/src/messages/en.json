@@ -2407,10 +2407,6 @@
         "recorded": "Payment recorded"
       },
       "closed": {
-        "execution": {
-          "headline": "Closed: the client is building with you",
-          "hint": "The design is done. The build runs on the execution contract below."
-        },
         "closed_design_only": {
           "headline": "Closed: design-only handover complete",
           "hint": "The client confirmed receipt of the handover pack."
@@ -2875,6 +2871,42 @@
       "showing": "Client sees: expected by {date}",
       "stale": "The date passed, set a new one.",
       "moved": "The delivery moved to a new stage, so the client no longer sees this date. Set a date for this stage."
+    },
+    "flow": {
+      "execution": {
+        "contract": "Contract",
+        "signature": "Signature",
+        "works": "Works and payments",
+        "final_account": "Final account",
+        "settled": "Settled"
+      },
+      "who": {
+        "done": "Done",
+        "now": {
+          "studio": "Your move",
+          "client": "Waiting on the client",
+          "site": "On site"
+        },
+        "later": {
+          "studio": "Yours",
+          "client": "The client's",
+          "site": "The site team's"
+        }
+      },
+      "noEmail": {
+        "record_signed_offline": "The client has no email on file, so they cannot sign online. Add their email, or record the paper signature.",
+        "record_payment": "The client has no email on file, so they cannot report a payment online. Add their email on the client page.",
+        "await_variation_answer": "The client has no email on file, so they cannot answer the change order online. Add their email on the client page."
+      }
+    },
+    "designSummary": {
+      "complete": "Design: complete",
+      "openInstalments": "{count, plural, one {{n} payment open} other {{n} payments open}}",
+      "pendingClaims": "{count, plural, one {{n} payment to confirm} other {{n} payments to confirm}}",
+      "awaitingReply": "{count, plural, one {{n} question awaiting a reply} other {{n} questions awaiting a reply}}",
+      "show": "Show",
+      "hide": "Hide",
+      "detailsIn": "Details in"
     }
   },
   "delivery": {

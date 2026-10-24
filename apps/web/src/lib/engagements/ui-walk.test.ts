@@ -37,6 +37,9 @@ import {
   type ExecutionFacts,
   type ExecutionStage,
 } from '@/lib/execution/stage';
+import { buildPhaseView } from '@/lib/flow/build-view';
+import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
 import ar from '@/messages/ar-EG.json';
 import en from '@/messages/en.json';
 
@@ -566,5 +569,43 @@ describe('the execution card offers an action it can take, at every derived stag
     const target = NEXT_ACTION_TARGET.open_boq;
     expect(target).toEqual({ kind: 'link', page: 'project_boq' });
     expect(executionCardHref('project_boq', { projectId: 'p-1', contractId: null })).toBe('/projects/p-1?tab=boq');
+  });
+});
+
+// The cockpit's execution step card (client home H2): every derived stage sits
+// on exactly one step of the execution rail, that step says whose move it is in
+// both languages, and a move the client holds has the words the card says when
+// the client has no email on file. A new stage or action fails here until the
+// rail and the card can say it.
+describe('the execution rail places every derived stage and says whose move it is', () => {
+  type Catalog = typeof en;
+  const flowOf = (catalog: Catalog) => catalog.engagements.flow;
+  for (const stage of EXECUTION_STAGES) {
+    it(`${stage}: one step on the rail, named, with its whose-move words`, () => {
+      const result = executionStage(EXECUTION_WALK[stage]);
+      const location = locateExecutionForStudio(result);
+      const view = buildPhaseView(EXECUTION_PHASE, location, 'studio');
+      const current = view.steps.filter((step) => step.status === 'current');
+      expect(current, `"${stage}" is live but no step is current`).toHaveLength(EXECUTION_STAGES_WITHOUT_ACTION.has(stage) ? 0 : 1);
+      for (const catalog of Object.values(messageCatalogs) as Catalog[]) {
+        for (const step of view.steps) expect(flowOf(catalog).execution[step.key as keyof Catalog['engagements']['flow']['execution']]).toBeTruthy();
+        for (const step of current) expect(flowOf(catalog).who.now[step.actor]).toBeTruthy();
+        if (location.whoseMove === 'client') {
+          const notice = flowOf(catalog).noEmail as Record<string, string>;
+          expect(notice[result.next!.kind], `no no-email words for "${result.next!.kind}"`).toBeTruthy();
+        }
+      }
+    });
+  }
+
+  it('every next action the client holds has its no-email words in both languages', () => {
+    for (const kind of EXECUTION_NEXT_ACTION_KINDS) {
+      for (const stage of EXECUTION_STAGES) {
+        if (locateExecutionForStudio({ stage, next: { kind } }).whoseMove !== 'client') continue;
+        for (const catalog of Object.values(messageCatalogs) as Catalog[]) {
+          expect((flowOf(catalog).noEmail as Record<string, string>)[kind], `${kind} at ${stage}`).toBeTruthy();
+        }
+      }
+    }
   });
 });

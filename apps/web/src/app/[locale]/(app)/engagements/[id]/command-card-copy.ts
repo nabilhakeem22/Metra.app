@@ -13,11 +13,8 @@ export interface CommandCardCopy {
   actor: StageActor | null;
 }
 
-/** The closed endings whose copy carries a second line. */
-const CLOSED_WITH_HINT: ReadonlySet<DesignState> = new Set<DesignState>([
-  'execution',
-  'closed_design_only',
-]);
+/** The closed endings whose copy carries a second line. `execution` wears the execution step card instead. */
+const CLOSED_WITH_HINT: ReadonlySet<DesignState> = new Set<DesignState>(['closed_design_only']);
 
 /**
  * The card names the LITERAL ACT of this stage rather than announcing that a step

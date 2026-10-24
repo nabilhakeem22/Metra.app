@@ -10,7 +10,11 @@ import type { OrgContext } from '@/lib/db/context';
 import { deriveFeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
 import { daysSince } from '@/lib/engagements/delivery-age';
-import { resolveDeliveryStatus, type DeliveryStatus } from '@/lib/engagements/delivery-status';
+import {
+  executionDeliveryStatus,
+  resolveDeliveryStatus,
+  type DeliveryStatus,
+} from '@/lib/engagements/delivery-status';
 import {
   getEngagementGatePreview,
   type EngagementGatePreview,
@@ -31,7 +35,9 @@ import {
 } from '@/lib/engagements/queries';
 import { mayRecordHandoverConfirmation } from '@/lib/engagements/handover-recorders';
 import { getExecutionFacts } from '@/lib/execution/queries/facts';
+import type { ExecutionStageResult } from '@/lib/execution/stage';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
+import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
 import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
 import type { PanelCapabilities } from './engagement-panels';
@@ -145,14 +151,19 @@ export function engagementCapabilities(
  * `updatedAt`. Computed on the SERVER so the header renders one stable value.
  * `pendingClaimCount` is the page's own claims read, which applies the same
  * finance-read gate as the list's batch count, so both agree for every role.
+ *
+ * At `execution` the design is finished, so the status follows the execution
+ * stage instead (`execution` is the stage the page derived; null elsewhere).
  */
 export function deliveryStatusOf(input: {
   header: EngagementHeader;
   gatePreview: EngagementGatePreview;
   pendingClaimCount: number;
+  execution: ExecutionStageResult | null;
   now: Date;
 }): DeliveryStatus {
-  const { header, gatePreview, pendingClaimCount, now } = input;
+  const { header, gatePreview, pendingClaimCount, execution, now } = input;
+  if (execution) return executionDeliveryStatus(locateExecutionForStudio(execution));
   return resolveDeliveryStatus({
     state: header.state,
     whoseMove: resolveWhoseMove({ state: header.state, preview: gatePreview, pendingClaimCount }),

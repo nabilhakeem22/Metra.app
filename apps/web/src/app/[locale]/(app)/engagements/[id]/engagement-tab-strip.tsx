@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { StatusChip } from '@/components/ui/status-chip';
 import type { BudgetBadge } from '@/lib/engagements/budget-badge';
-import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
+import { ENGAGEMENT_TAB_STRIP_ID, ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 const TAB_BASE =
   'inline-flex items-center gap-1.5 rounded-item px-3.5 py-1.5 text-small transition-colors disabled:cursor-not-allowed disabled:opacity-60 coarse:min-h-11';
@@ -46,6 +46,7 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
   const tp = useTranslations('engagements.panels');
   return (
     <div
+      id={ENGAGEMENT_TAB_STRIP_ID}
       className="flex flex-wrap gap-1 rounded-item p-1"
       style={{ background: 'var(--track)' }}
       role="tablist"

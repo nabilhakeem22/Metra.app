@@ -6,7 +6,6 @@ import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardActionError } from './command-card-action-error';
 import { CommandCardClosedClaims } from './command-card-closed-claims';
-import { CommandCardExecution } from './command-card-execution';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardHeadline } from './command-card-headline';
 import { deriveCommandCardModel } from './command-card-model';
@@ -15,6 +14,7 @@ import { CommandCardSteps } from './command-card-steps';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
 import { EngagementStageSpine } from './engagement-stage-spine';
+import { ExecutionStepCard } from './execution-step-card';
 
 // The cockpit COMMAND CARD: the single "what's next" surface, as a stacked card.
 // COMPOSITION ONLY: it wears the shared step card (components/flow/step-card.tsx)
@@ -32,7 +32,20 @@ import { EngagementStageSpine } from './engagement-stage-spine';
 // (never also a hint interpolation or a note under the button). The hint POINTS
 // at the checklist and does not restate it; a second rendering of either is a
 // regression.
+//
+// THE PHASE SWITCH, by the state alone: at `execution` the design is finished
+// and the job runs on the BOQ contract, so the card becomes the execution step
+// card, which folds the design into one line above the execution rail. The
+// design card is never drawn at `execution`.
 export function EngagementCommandCard(props: EngagementCommandCardProps) {
+  if (props.state !== 'execution') return <DesignStepCard {...props} />;
+  // developer-only: the loader reads the execution facts whenever the state is `execution`.
+  if (!props.execution) throw new Error('EngagementCommandCard: at execution without the execution facts');
+  return <ExecutionStepCard card={props} execution={props.execution} />;
+}
+
+/** The design phase's card: the stage spine, the one action, the checklist behind it. */
+function DesignStepCard(props: EngagementCommandCardProps) {
   const { engagementId, preview, state, pending, canShare, canUpload, onNudge } = props;
   const th = useTranslations('engagements.hero');
   const { view, closed, chrome, ctas } = deriveCommandCardModel(props);
@@ -51,8 +64,6 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
         review={{ state, clientDecision: preview.clientDecision }}
         awaitingReplyCount={props.awaitingReplyCount}
       />
-
-      {closed && props.execution && <CommandCardExecution view={props.execution} />}
 
       {closed && props.canResolveClaims && (
         <CommandCardClosedClaims

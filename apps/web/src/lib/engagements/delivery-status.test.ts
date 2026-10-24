@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryStatusTone, resolveDeliveryStatus, type DeliveryStatus } from './delivery-status';
+import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES } from '@/lib/execution/stage';
+import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import {
+  deliveryStatusTone,
+  executionDeliveryStatus,
+  resolveDeliveryStatus,
+  type DeliveryStatus,
+} from './delivery-status';
 import { DESIGN_STATES, type DesignState } from './states';
 import type { WhoseMove } from './whose-move';
 
@@ -61,5 +68,33 @@ describe('the rules the product reads', () => {
     expect(deliveryStatusTone({ kind: 'confirmPayment' })).toBe('yourMove');
     expect(deliveryStatusTone({ kind: 'waitingClient', days: 1 })).toBe('waiting');
     expect(deliveryStatusTone({ kind: 'stalled', days: 9 })).toBe('stalled');
+  });
+});
+
+describe('executionDeliveryStatus: at execution the header follows whose move it is', () => {
+  it('every stage with every next action: the studio move is yours, the client move waits unaged, no move is delivered', () => {
+    for (const stage of EXECUTION_STAGES) {
+      for (const kind of [...EXECUTION_NEXT_ACTION_KINDS, null]) {
+        const location = locateExecutionForStudio({ stage, next: kind === null ? null : { kind } });
+        const status = executionDeliveryStatus(location);
+        if (location.status !== 'active' || location.whoseMove === null) expect(status, `${stage}/${kind}`).toEqual({ kind: 'delivered' });
+        else if (location.whoseMove === 'client') expect(status, `${stage}/${kind}`).toEqual({ kind: 'waitingClient', days: null });
+        else expect(status, `${stage}/${kind}`).toEqual({ kind: 'yourMove' });
+      }
+    }
+  });
+
+  it('the readings the cockpit shows: signature waits on the client, a draft is yours, settled is delivered', () => {
+    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'awaiting_signature', next: { kind: 'record_signed_offline' } }))).toEqual({
+      kind: 'waitingClient',
+      days: null,
+    });
+    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'draft', next: { kind: 'send_contract' } }))).toEqual({ kind: 'yourMove' });
+    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'settled', next: null }))).toEqual({ kind: 'delivered' });
+    expect(executionDeliveryStatus(locateExecutionForStudio({ stage: 'terminated', next: null }))).toEqual({ kind: 'delivered' });
+  });
+
+  it("a move the site team holds is the studio's own", () => {
+    expect(executionDeliveryStatus({ step: 'works', whoseMove: 'site', status: 'active' })).toEqual({ kind: 'yourMove' });
   });
 });

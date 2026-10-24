@@ -23,3 +23,6 @@ export const ENGAGEMENT_TABS = [
 ] as const;
 
 export type EngagementTab = (typeof ENGAGEMENT_TABS)[number];
+
+/** The tab strip's element id, so a control above it (the design summary line) can bring it into view. */
+export const ENGAGEMENT_TAB_STRIP_ID = 'engagement-tabs';

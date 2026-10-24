@@ -4,6 +4,7 @@ import type { ClientExpectedCard } from './client-expected-card';
 import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
+import type { DesignSummary } from '@/lib/engagements/design-summary';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
@@ -11,7 +12,16 @@ import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
 import type { DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
+import type { EngagementTab } from './tabs';
 import type { RunAction } from './use-engagement-action';
+
+/** What the execution step card renders from, at `execution`. */
+export interface ExecutionCockpit {
+  /** The BOQ contract's derived stage, its next action and what this role may do. */
+  view: ExecutionCardView;
+  /** What is still open on the finished design, for the line it folds into. */
+  designSummary: DesignSummary;
+}
 
 /**
  * Everything the cockpit hands the command card, as ONE named contract.
@@ -71,6 +81,10 @@ export interface EngagementCommandCardProps {
   onNudge: () => void;
   /** The client's expected date for the next step; null when not offered. */
   clientExpected: ClientExpectedCard | null;
-  /** At `execution`: the BOQ contract's derived stage and next action; null elsewhere. */
-  execution: ExecutionCardView | null;
+  /** At `execution`: what the execution step card renders from; null elsewhere. */
+  execution: ExecutionCockpit | null;
+  /** Has the client an email on file a code could go to (the header read)? */
+  clientHasEmail: boolean;
+  /** Switch the cockpit's tab strip below the card to `tab`. */
+  onOpenTab: (tab: EngagementTab) => void;
 }

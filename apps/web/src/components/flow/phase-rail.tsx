@@ -28,7 +28,7 @@ export interface PhaseRailProps {
   labels: Readonly<Record<string, string>>;
   /** The glyph each step carries once reached. Decoration only: it always sits beside its label. */
   icons: Readonly<Record<string, LucideIcon>>;
-  /** Per step key, the whose-move chip and caption drawn under its name. */
+  /** Per step key, the whose-move chip and caption drawn under its name (from md up). */
   notes?: Readonly<Record<string, StepNote>>;
 }
 
@@ -123,13 +123,16 @@ function StepSegment({
           {label}
         </span>
       </span>
+      {/* From md up only: on a phone a step is a few dozen pixels wide, a chip
+          under it would run into its neighbours, and the card the rail sits on
+          already says whose move it is. */}
       {note && (
-        <>
+        <span className="hidden flex-col gap-1.5 md:flex">
           <span data-rail-who>
             <WhoseMoveChip actor={step.actor} status={step.status} label={note.who} />
           </span>
           {note.caption && <span className="text-caption text-[color:var(--text-faint)]">{note.caption}</span>}
-        </>
+        </span>
       )}
     </li>
   );

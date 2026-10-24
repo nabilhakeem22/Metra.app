@@ -95,6 +95,11 @@ describe('PhaseRail', () => {
     const chips = [...container.querySelectorAll('[data-rail-who] [data-tone]')];
     expect(chips.map((chip) => chip.getAttribute('data-tone'))).toEqual(['done', 'yourMove']);
     expect(container.querySelector('[aria-current="step"]')?.textContent).toContain(caption);
+    // A phone draws the step names alone: a chip would run into the next, narrow, step.
+    for (const chip of container.querySelectorAll('[data-rail-who]')) {
+      expect(chip.parentElement!.className).toMatch(/(^| )hidden( |$)/);
+      expect(chip.parentElement!.className).toMatch(/(^| )md:flex( |$)/);
+    }
   });
 
   test('refuses to draw a step it has no name for', () => {
