@@ -10,9 +10,10 @@ describe('classify', () => {
     expect(classify(200, { ok: true, already: true, visit: { id: 'x' } })).toBe('done');
   });
 
-  it('401 pauses the queue, whichever code it carries', () => {
+  it('401 device_revoked is its own verdict; any other coded 401 pauses the queue', () => {
+    expect(classify(401, { ok: false, error: 'device_revoked' })).toBe('device_revoked');
     expect(classify(401, { ok: false, error: 'unauthorized' })).toBe('pause_auth');
-    expect(classify(401, { ok: false, error: 'device_revoked' })).toBe('pause_auth');
+    expect(classify(401, { ok: false, error: 'generic' })).toBe('pause_auth');
   });
 
   it.each([
@@ -153,10 +154,18 @@ describe('nextRunnable', () => {
     expect(nextRunnable([foreign, mine], 0, ENGINEER)).toBe(mine);
   });
 
-  it("sends nothing while any of the user's records is paused for sign-in", () => {
-    const paused = queued(checkIn('v1'), { state: 'paused_auth' });
-    const other = queued(checkIn('v2'));
+  it("sends nothing while any of the user's records is paused for sign-in, in any studio", () => {
+    const paused = queued(checkIn('v1'), { state: 'paused_auth', orgId: 'org-1' });
+    const other = queued(checkIn('v2'), { orgId: 'org-2' });
     expect(nextRunnable([paused, other], 0, ENGINEER)).toBeNull();
+  });
+
+  // F1 (S1 functional test): a revoked device used to stop the user's other studios too.
+  it("a studio's ops parked for a revoked device do not hold back the user's other studio", () => {
+    const revoked = queued(checkIn('va'), { orgId: 'org-1', state: 'needs_attention', lastError: { status: 401, code: 'device_revoked' } });
+    const otherStudio = queued(checkIn('vb'), { orgId: 'org-2', nextAttemptAt: 5_000 });
+    expect(nextRunnable([revoked, otherStudio], 1e7, ENGINEER)).toBe(otherStudio);
+    expect(nextAttemptDue([revoked, otherStudio], ENGINEER)).toBe(5_000);
   });
 
   it('an empty outbox has nothing to send', () => {

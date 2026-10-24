@@ -45,4 +45,18 @@ describe('cairoDate', () => {
     expect(() => cairoDate('not a date')).toThrow(RangeError);
     expect(() => cairoDate('')).toThrow(RangeError);
   });
+
+  // F8 (S1 functional test): these were silently rolled over, guessed or read in the host's zone.
+  it('refuses what is not a strict instant with an offset, rather than normalising it', () => {
+    for (const value of ['2026-02-30T10:00:00Z', '1', '2026-10-23T23:30:00', '-000001-06-01T00:00:00Z']) {
+      expect(() => cairoDate(value), value).toThrow(RangeError);
+    }
+  });
+
+  it('always answers YYYY-MM-DD, and refuses an instant whose Cairo day leaves the 4-digit years', () => {
+    expect(cairoDate('1000-06-01T00:00:00Z')).toBe('1000-06-01');
+    expect(() => cairoDate('0999-06-01T00:00:00Z')).toThrow(RangeError);
+    expect(() => cairoDate('0000-01-01T00:00:00Z')).toThrow(RangeError);
+    expect(() => cairoDate('9999-12-31T23:00:00Z')).toThrow(RangeError);
+  });
 });

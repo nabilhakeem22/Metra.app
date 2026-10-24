@@ -3443,11 +3443,11 @@
         "needs_attention": "Needs your attention",
         "paused_auth": "Sign in again to carry on uploading"
       },
-      "unsent": "{count, plural, one {# item has not uploaded yet} other {# items have not uploaded yet}}"
+      "unsent": "{count, plural, one {{countText} item has not uploaded yet} other {{countText} items have not uploaded yet}}"
     },
     "signOut": {
       "button": "Sign out",
-      "confirmUnsent": "{count, plural, one {Delete # item that has not uploaded yet} other {Delete # items that have not uploaded yet}}"
+      "confirmUnsent": "{count, plural, one {Delete {countText} item that has not uploaded yet} other {Delete {countText} items that have not uploaded yet}}"
     },
     "settings": {
       "signOutOthers": "Sign out of all other devices"

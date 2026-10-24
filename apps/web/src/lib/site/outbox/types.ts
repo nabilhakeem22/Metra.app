@@ -70,8 +70,9 @@ export type SiteOp =
 
 /**
  * queued: waits its turn (or its backoff). needs_attention: the server refused
- * it; it stays until the engineer discards it. paused_auth: the session was
- * refused (401); the whole queue waits for a new sign-in.
+ * it, its studio removed this phone, or it is malformed; it stays until the
+ * engineer retries or discards it. paused_auth: the session is gone (401); the
+ * whole queue, every studio's, waits for a new sign-in.
  */
 export const OUTBOX_STATES = ['queued', 'needs_attention', 'paused_auth'] as const;
 

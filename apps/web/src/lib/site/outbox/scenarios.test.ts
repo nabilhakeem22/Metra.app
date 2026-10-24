@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { checkIn, checkOut, ENGINEER, material, note, photo, queued } from '@/test/site-outbox-records';
+import { checkIn, checkOut, ENGINEER, material, note, photo, queued, voidOf } from '@/test/site-outbox-records';
 import { discardPlan } from './dependencies';
 import { attemptError, classify, nextAttemptDue, nextRunnable, type AttemptStatus } from './drain';
-import { afterFailedAttempt, resumedAfterSignIn } from './transitions';
+import { afterFailedAttempt, parkedForRevokedDevice, parkedOnDependencyCycle, resumedAfterSignIn, retriedByUser } from './transitions';
 import type { OutboxRecord, SiteOp } from './types';
 
 // The outbox decisions driven end to end against a fake site API (plan AC20 to
@@ -12,7 +12,14 @@ import type { OutboxRecord, SiteOp } from './types';
 
 const CF_1102_PAGE = '<!DOCTYPE html><html><body>Error 1102: Worker exceeded resource limits</body></html>';
 
-type Fault = 'network' | 'cpu_kill_before_commit' | 'cpu_kill_after_commit' | 'refuse_fields' | 'refuse_not_assigned';
+type Fault =
+  | 'network'
+  | 'cpu_kill_before_commit'
+  | 'cpu_kill_after_commit'
+  | 'refuse_fields'
+  | 'refuse_not_assigned'
+  | 'refuse_photo_too_large'
+  | 'photo_not_uploaded';
 
 interface Answer {
   status: AttemptStatus;
@@ -22,6 +29,10 @@ interface Answer {
 class FakeSiteServer {
   online = true;
   sessionValid = true;
+  /** The studios that removed this phone: their requests answer 401 device_revoked. */
+  readonly revokedOrgs = new Set<string>();
+  /** The projects the engineer is assigned to; null assigns him everywhere. */
+  assignedProjects: Set<string> | null = null;
   /** Committed rows by client key: what the database would hold. */
   readonly rows = new Map<string, SiteOp>();
   /** Every request that reached the server, in order: [key, clock]. */
@@ -36,15 +47,21 @@ class FakeSiteServer {
     return [...this.rows.values()].filter((op) => op.kind === kind);
   }
 
-  handle(op: SiteOp, now: number): Answer {
+  handle({ op, orgId }: OutboxRecord, now: number): Answer {
     if (!this.online) return { status: 'network', body: undefined };
     this.requests.push([op.key, now]);
     if (!this.sessionValid) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+    if (this.revokedOrgs.has(orgId)) return { status: 401, body: { ok: false, error: 'device_revoked' } };
+    if (op.kind === 'check_in' && this.assignedProjects !== null && !this.assignedProjects.has(op.projectId)) {
+      return { status: 403, body: { ok: false, error: 'not_assigned' } };
+    }
     const fault = this.faults.get(op.key)?.shift();
     if (fault === 'network') return { status: 'network', body: undefined };
     if (fault === 'cpu_kill_before_commit') return { status: 503, body: CF_1102_PAGE };
     if (fault === 'refuse_fields') return { status: 422, body: { ok: false, error: 'check_fields', fields: { body: { code: 'required' } } } };
     if (fault === 'refuse_not_assigned') return { status: 403, body: { ok: false, error: 'not_assigned' } };
+    if (fault === 'refuse_photo_too_large') return { status: 422, body: { ok: false, error: 'photo_too_large' } };
+    if (fault === 'photo_not_uploaded') return { status: 409, body: { ok: false, error: 'photo_not_uploaded' } };
     if ('visitKey' in op && !this.rows.has(op.visitKey)) return { status: 404, body: { ok: false, error: 'visit_not_found' } };
     const already = this.rows.has(op.key);
     if (!already) this.rows.set(op.key, op);
@@ -66,6 +83,7 @@ class Drain {
   /** Sends until nothing can go at or before `until`, sleeping through backoffs on the fake clock. */
   runUntil(until: number): void {
     for (let step = 0; step < 1000; step++) {
+      this.save(parkedOnDependencyCycle(this.outbox, ENGINEER));
       const record = nextRunnable(this.outbox, this.now, ENGINEER);
       if (record === null) {
         const due = nextAttemptDue(this.outbox, ENGINEER);
@@ -73,17 +91,28 @@ class Drain {
         this.now = Math.max(this.now, due);
         continue;
       }
-      const { status, body } = this.server.handle(record.op, this.now);
+      const { status, body } = this.server.handle(record, this.now);
       const verdict = classify(status, body);
-      const index = this.outbox.indexOf(record);
-      if (verdict === 'done') this.outbox.splice(index, 1);
-      else this.outbox[index] = afterFailedAttempt(record, verdict, attemptError(status, body), this.now, this.random);
+      const error = attemptError(status, body);
+      if (verdict === 'done') this.outbox.splice(this.outbox.indexOf(record), 1);
+      else if (verdict === 'device_revoked') this.save(parkedForRevokedDevice(this.outbox, record, error));
+      else this.save([afterFailedAttempt(record, verdict, error, this.now, this.random)]);
     }
     throw new Error('The drain did not settle in 1000 steps.');
   }
 
+  /** Writes changed records over their old versions, as the store's `put` does. */
+  save(changed: readonly OutboxRecord[]): void {
+    for (const record of changed) this.outbox[this.outbox.findIndex(({ seq }) => seq === record.seq)] = record;
+  }
+
+  retry(seq: number): void {
+    this.save([retriedByUser(this.outbox.find((record) => record.seq === seq)!, this.now)]);
+  }
+
   discard(seq: number): string[] {
     const plan = discardPlan(this.outbox, seq);
+    this.save(plan.rewritten);
     const gone = new Set(plan.seqs);
     this.outbox.splice(0, this.outbox.length, ...this.outbox.filter((record) => !gone.has(record.seq)));
     return plan.blobIds;
@@ -217,14 +246,163 @@ describe('AC23: a 401 pauses the whole queue without losing anything', () => {
     expect(server.requests.map(([key]) => key)).toEqual(['v1', 'n1']);
 
     server.sessionValid = true;
-    for (const resumed of resumedAfterSignIn(drain.outbox, ENGINEER, drain.now)) {
-      drain.outbox[drain.outbox.findIndex((record) => record.seq === resumed.seq)] = resumed;
-    }
+    drain.save(resumedAfterSignIn(drain.outbox, ENGINEER, drain.now));
     drain.runUntil(3 * HOUR);
 
     expect(drain.outbox).toEqual([]);
     expect(server.requests.map(([key]) => key)).toEqual(['v1', 'n1', 'n1', 'n2', 'o1']);
     expect(server.rowsOf('note')).toHaveLength(2);
     expect(server.rowsOf('check_out')).toHaveLength(1);
+  });
+});
+
+describe('AC22: the engineer clears a parked op by retrying or discarding it', () => {
+  // F3 (S1 functional test): a refusal that clears later used to cost the whole visit.
+  it('a check-in refused not_assigned goes, with all its children, once he is assigned and retries', () => {
+    const server = new FakeSiteServer();
+    server.assignedProjects = new Set();
+    const visit = queued(checkIn('v1'));
+    const drain = new Drain([visit, queued(photo('p1', 'v1')), queued(note('n1', 'v1')), queued(checkOut('o1', 'v1'))], server);
+
+    drain.runUntil(HOUR);
+    expect(drain.outbox.map((record) => [record.op.key, record.state])).toEqual([
+      ['v1', 'needs_attention'],
+      ['p1', 'queued'],
+      ['n1', 'queued'],
+      ['o1', 'queued'],
+    ]);
+    expect(nextAttemptDue(drain.outbox, ENGINEER)).toBeNull();
+
+    server.assignedProjects.add('project-1');
+    drain.retry(visit.seq);
+    drain.runUntil(2 * HOUR);
+
+    expect(drain.outbox).toEqual([]);
+    expect([...server.rows.keys()]).toEqual(['v1', 'p1', 'n1', 'o1']);
+  });
+
+  // F2 (S1 functional test): discarding a photo used to discard the delivery that cited it.
+  it('discarding a refused photo keeps the material that showed it, which then goes without the photo', () => {
+    const server = new FakeSiteServer();
+    server.fail('p1', 'refuse_photo_too_large');
+    const shot = queued(photo('p1', 'v1'));
+    const drain = new Drain([queued(checkIn('v1')), shot, queued(material('m1', 'v1', 'p1'))], server);
+
+    drain.runUntil(HOUR);
+    expect(drain.outbox.map((record) => [record.op.key, record.state])).toEqual([
+      ['p1', 'needs_attention'],
+      ['m1', 'queued'],
+    ]);
+
+    expect(drain.discard(shot.seq)).toEqual(['p1-display', 'p1-thumb']);
+    drain.runUntil(2 * HOUR);
+
+    expect(drain.outbox).toEqual([]);
+    expect(server.rows.get('m1')).toEqual(material('m1', 'v1'));
+    expect(server.rowsOf('photo')).toEqual([]);
+  });
+
+  // F4 (S1 functional test): this answer for a non-photo op used to throw in the runner step.
+  it('photo_not_uploaded on a material parks it instead of breaking the drain', () => {
+    const server = new FakeSiteServer();
+    server.fail('m1', 'photo_not_uploaded');
+    const drain = new Drain([queued(checkIn('v1')), queued(material('m1', 'v1')), queued(note('n1', 'v1'))], server);
+
+    drain.runUntil(HOUR);
+
+    expect(drain.outbox).toHaveLength(1);
+    expect(drain.outbox[0]).toMatchObject({ state: 'needs_attention', op: { key: 'm1' }, lastError: { status: 409, code: 'photo_not_uploaded' } });
+    expect([...server.rows.keys()]).toEqual(['v1', 'n1']);
+  });
+
+  // F5 (S1 functional test): a malformed op on a cycle used to stay "queued" for ever.
+  it('ops on a dependency cycle are parked as malformed, and the rest of the queue goes', () => {
+    const server = new FakeSiteServer();
+    const selfVoid = queued(voidOf('x1', { kind: 'note', key: 'x1' }));
+    const looped = queued(note('nc', 'vc'));
+    const loopBack = queued(voidOf('vc', { kind: 'note', key: 'nc' }));
+    const drain = new Drain([selfVoid, looped, loopBack, queued(checkIn('v1')), queued(note('n1', 'v1'))], server);
+
+    drain.runUntil(HOUR);
+
+    expect(drain.outbox.map((record) => [record.op.key, record.state, record.lastError])).toEqual([
+      ['x1', 'needs_attention', { status: 0, code: 'malformed' }],
+      ['nc', 'needs_attention', { status: 0, code: 'malformed' }],
+      ['vc', 'needs_attention', { status: 0, code: 'malformed' }],
+    ]);
+    expect([...server.rows.keys()]).toEqual(['v1', 'n1']);
+  });
+});
+
+describe('AC23: a lost session pauses every studio', () => {
+  it('a 401 unauthorized in one studio pauses the ops of all of them until the user signs in', () => {
+    const server = new FakeSiteServer();
+    server.sessionValid = false;
+    const drain = new Drain([queued(checkIn('v1'), { orgId: 'org-1' }), queued(checkIn('v2'), { orgId: 'org-2' })], server);
+
+    drain.runUntil(HOUR);
+    expect(drain.outbox.map((record) => [record.op.key, record.state])).toEqual([
+      ['v1', 'paused_auth'],
+      ['v2', 'queued'],
+    ]);
+    expect(nextAttemptDue(drain.outbox, ENGINEER)).toBeNull();
+
+    server.sessionValid = true;
+    drain.save(resumedAfterSignIn(drain.outbox, ENGINEER, drain.now));
+    drain.runUntil(2 * HOUR);
+    expect(drain.outbox).toEqual([]);
+  });
+});
+
+describe('AC37: a studio removes this phone', () => {
+  // F1 (S1 functional test): device_revoked from one studio used to pause every studio's ops.
+  it('parks the ops of that studio with the reason, and the other studio keeps working on the phone', () => {
+    const server = new FakeSiteServer();
+    server.revokedOrgs.add('org-1');
+    const drain = new Drain(
+      [
+        queued(checkIn('va'), { orgId: 'org-1' }),
+        queued(photo('pa', 'va'), { orgId: 'org-1' }),
+        queued(note('na', 'va'), { orgId: 'org-1' }),
+        queued(checkIn('vb'), { orgId: 'org-2' }),
+        queued(note('nb', 'vb'), { orgId: 'org-2' }),
+      ],
+      server,
+    );
+
+    drain.runUntil(HOUR);
+
+    expect([...server.rows.keys()]).toEqual(['vb', 'nb']);
+    expect(drain.outbox.map((record) => [record.op.key, record.state, record.attempts, record.lastError])).toEqual([
+      ['va', 'needs_attention', 0, { status: 401, code: 'device_revoked' }],
+      ['pa', 'needs_attention', 0, { status: 401, code: 'device_revoked' }],
+      ['na', 'needs_attention', 0, { status: 401, code: 'device_revoked' }],
+    ]);
+    // Only the first op of that studio was sent: the rest were parked with it, not tried one by one.
+    expect(server.requests.map(([key]) => key)).toEqual(['va', 'vb', 'nb']);
+    expect(nextAttemptDue(drain.outbox, ENGINEER)).toBeNull();
+
+    // The studio adds the phone back and the engineer retries: the visit and its children go.
+    server.revokedOrgs.delete('org-1');
+    for (const record of [...drain.outbox]) drain.retry(record.seq);
+    drain.runUntil(2 * HOUR);
+    expect(drain.outbox).toEqual([]);
+    expect(server.rowsOf('check_in')).toHaveLength(2);
+  });
+
+  it('an op made for that studio after the revoke is parked the same way, and the other studio is unaffected', () => {
+    const server = new FakeSiteServer();
+    server.revokedOrgs.add('org-1');
+    const drain = new Drain([queued(checkIn('va'), { orgId: 'org-1' })], server);
+    drain.runUntil(HOUR);
+
+    drain.outbox.push(queued(checkIn('va2'), { orgId: 'org-1' }), queued(checkIn('vb'), { orgId: 'org-2' }));
+    drain.runUntil(2 * HOUR);
+
+    expect(drain.outbox.map((record) => [record.op.key, record.state])).toEqual([
+      ['va', 'needs_attention'],
+      ['va2', 'needs_attention'],
+    ]);
+    expect([...server.rows.keys()]).toEqual(['vb']);
   });
 });
