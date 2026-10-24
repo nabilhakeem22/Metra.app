@@ -4,17 +4,18 @@ import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { mayRecordSignedOffline } from '@/lib/contracts/lifecycle';
 import { getContractPage, getContractSectionsPage } from '@/lib/contracts/queries';
-import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import { mayIssueRequests, mayRecordPayments, maySeeBilling } from '@/lib/execution/billing/access';
 import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
 import { mayReadCostEntries, mayRecordCostEntries } from '@/lib/execution/costs/access';
 import { mayReadMeasurements, mayRecordMeasurements } from '@/lib/execution/measurements/access';
+import { getContractPageExecution } from '@/lib/execution/queries/facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
 import { contractPagePayload } from './page-payload';
+import { contractSubtitle } from './subtitle';
 import { contractTabsFor, openingContractTab } from './tabs';
 
 export default async function ContractDetailPage({
@@ -43,10 +44,13 @@ export default async function ContractDetailPage({
   // A proposal contract has no execution tab: nothing on it is a billing role's.
   if (tabs.length === 0) notFound();
   const variations = tabs.includes('variations') ? await listVariations(ctx, { contractId: id }) : [];
-  // Only an execution contract has a schedule: at most 12 rows. Its costs are
+  // Only an execution contract has a schedule (at most 12 rows) and, once
+  // signed, a stage beyond its status to tell: one read for both. Its costs are
   // asked by the Costs tab when it opens, so this page costs the same however
   // many the contract holds.
-  const schedule = tabs.includes('schedule') ? await getContractSchedule(ctx, detail) : null;
+  const execution =
+    detail.sourceBoqId !== null ? await getContractPageExecution(ctx, detail, { schedule: tabs.includes('schedule') }) : null;
+  const schedule = execution?.schedule ?? null;
   const openingTab = openingContractTab((await searchParams).tab, tabs);
   // Only the overview shows the sections: the schedule and the change orders
   // never read them (A3 reliability R1). Opened elsewhere, the overview asks
@@ -62,7 +66,7 @@ export default async function ContractDetailPage({
     <div className="space-y-6">
       <PageHeader
         title={formatDocNumber('C', detail.number, docYear(null, detail.createdAt))}
-        description={t(detail.sourceBoqId === null ? 'subtitle' : 'subtitleBoq')}
+        description={t(`detailSubtitle.${contractSubtitle(detail, execution?.stage ?? null)}`)}
       />
       <ContractDetailClient
         {...contractPagePayload(detail, access)}

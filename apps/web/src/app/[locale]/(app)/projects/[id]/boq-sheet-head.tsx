@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Th } from './boq-sheet-cells';
 
 /**
@@ -30,7 +31,7 @@ export function BoqSheetHead({
         <col style={{ width: 116 }} />
         {discounted && <col style={{ width: 88 }} />}
         <col style={{ width: 132 }} />
-        <col style={{ width: 48 }} />
+        <col style={{ width: 72 }} />
         {canEdit && <col style={{ width: 44 }} />}
       </colgroup>
       <thead>
@@ -42,7 +43,19 @@ export function BoqSheetHead({
           <Th num>{t('col.rate')}</Th>
           {discounted && <Th num>{t('col.discount')}</Th>}
           <Th num>{t('col.total')}</Th>
-          <Th>{t('col.provisionalShort')}</Th>
+          <Th>
+            {/* The column is narrow, so its header is a short word; the tooltip says what it marks. */}
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0} className="cursor-help">
+                    {t('col.provisionalShort')}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{t('col.provisionalHint')}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Th>
           {canEdit && <Th> </Th>}
         </tr>
       </thead>

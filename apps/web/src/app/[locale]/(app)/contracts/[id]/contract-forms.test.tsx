@@ -200,4 +200,29 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
     expect(variations.saveVariationDraft.mock.calls[1][0].id).toBe('v-1');
     expect(document.getElementById(VO_TITLE_ID)).toBeNull();
   });
+
+  test('the title, reason and line description are sent in the columns of the page language', async () => {
+    variations.createVariationDraft.mockResolvedValue({ ok: true, data: 'v-1' });
+    variations.saveVariationDraft.mockResolvedValue({ ok: true });
+    await openRegister();
+    fireEvent.change(document.getElementById(VO_TITLE_ID)!, { target: { value: 'باب إضافي' } });
+    fireEvent.change(document.getElementById(VO_REASON_ID)!, { target: { value: 'طلب العميل' } });
+    await press(at('variations.line.add'))();
+    fireEvent.change(document.getElementById(variationLineControlId(FIRST_ROW, 'description'))!, { target: { value: 'باب خشب' } });
+    await press(at('variations.saveDraft'))();
+    const arabic = locale === 'ar-EG';
+    const created = variations.createVariationDraft.mock.calls[0][0];
+    const line = variations.saveVariationDraft.mock.calls[0][0].lines[0];
+    if (arabic) {
+      expect(created).toMatchObject({ titleAr: 'باب إضافي', reasonAr: 'طلب العميل' });
+      expect(line).toMatchObject({ descriptionAr: 'باب خشب' });
+    } else {
+      expect(created).toMatchObject({ titleEn: 'باب إضافي', reasonEn: 'طلب العميل' });
+      expect(line).toMatchObject({ descriptionEn: 'باب خشب' });
+    }
+    // The other language's columns are never sent, so nothing typed there is blanked.
+    const otherTitle = arabic ? 'titleEn' : 'titleAr';
+    expect(otherTitle in created).toBe(false);
+    expect((arabic ? 'descriptionEn' : 'descriptionAr') in line).toBe(false);
+  });
 });

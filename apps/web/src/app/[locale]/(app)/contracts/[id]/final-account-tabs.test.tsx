@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { FinalAccountView } from '@/lib/execution/final-account/load';
 import type { MeasurementsView } from '@/lib/execution/measurements/read-core';
 import type { CostSheet } from '@/lib/execution/money/cost-sheet-types';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CostSheetTab } from './cost-sheet-tab';
 import { FinalAccountCard } from './final-account-card';
@@ -164,5 +165,35 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the A5 tabs (%s)', (locale) => {
     for (const hidden of ['value.valueExVat', 'rows.budget', 'rows.actual', 'margin.projected']) {
       expect(screen.queryByText(at(`contracts.execution.costSheet.${hidden}`))).toBeNull();
     }
+  });
+
+  test('measurements: a quantity is trimmed and its unit named in the page language, never the stored code', async () => {
+    measurements.loadMeasurements.mockResolvedValue({ ok: true, data: measurementsView() });
+    await show(<MeasurementsTab contractId={CONTRACT} canRecord />);
+    const row = screen.getAllByRole('row')[1];
+    expect(row.textContent).toContain(`200 ${at('priceBook.units.sqm')}`);
+    expect(row.textContent).not.toContain('sqm');
+    expect(row.textContent).not.toContain('200.0000');
+  });
+
+  test('final account: the differences name their units; the figures are LTR, set at their end, in tabular digits', async () => {
+    finalAccount.loadFinalAccount.mockResolvedValue({ ok: true, data: account({ differences: { rows: [DIFFERENCE], nextCursor: null } }) });
+    await show(<FinalAccountCard contractId={CONTRACT} canIssue m={m} />);
+    const row = screen.getAllByRole('row')[1];
+    expect(row.textContent).toContain(`210 ${at('priceBook.units.sqm')}`);
+    expect(row.textContent).not.toContain('sqm');
+    const figures = document.querySelectorAll('dl dd');
+    expect(figures.length).toBe(7);
+    for (const figure of figures) {
+      expect(figure.getAttribute('dir')).toBe('ltr');
+      expect(figure.className).toContain('text-end');
+      expect(figure.className).toContain('tabular-nums');
+    }
+  });
+
+  test('cost sheet: a margin percentage is isolated, so the sign stays on its side in Arabic', async () => {
+    costSheet.loadCostSheet.mockResolvedValue({ ok: true, data: SHEET });
+    await show(<CostSheetTab contractId={CONTRACT} m={m} />);
+    expect(screen.getByText(`${m('109780.0000')} (${bidiIsolate('99.80%')})`)).toBeTruthy();
   });
 });

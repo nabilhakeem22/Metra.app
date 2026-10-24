@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { loadCostSheet } from '@/lib/execution/cost-sheet/actions';
 import type { CostSheet } from '@/lib/execution/money/cost-sheet-types';
-import { formatPercent } from '@/lib/format/number';
+import { parentheticalPercent } from '@/lib/format/number';
 import { CostSheetRows } from './cost-sheet-rows';
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -51,7 +51,6 @@ export function CostSheetTab({ contractId, m }: { contractId: string; m: (value:
   }, [contractId, te]);
 
   const cost = sheet?.cost ?? null;
-  const pct = (value: number | null) => (value === null ? '' : ` (${formatPercent(value, locale)})`);
 
   return (
     <Card>
@@ -81,8 +80,8 @@ export function CostSheetTab({ contractId, m }: { contractId: string; m: (value:
                 <section className="space-y-2">
                   <h3 className="text-body font-semibold">{t('margin.title')}</h3>
                   <dl className="grid grid-cols-2 gap-3">
-                    <Figure label={t('margin.planned')} value={`${m(cost.margin.planned)}${pct(cost.margin.plannedPct)}`} />
-                    <Figure label={t('margin.projected')} value={`${m(cost.margin.projected)}${pct(cost.margin.projectedPct)}`} />
+                    <Figure label={t('margin.planned')} value={`${m(cost.margin.planned)}${parentheticalPercent(cost.margin.plannedPct, locale)}`} />
+                    <Figure label={t('margin.projected')} value={`${m(cost.margin.projected)}${parentheticalPercent(cost.margin.projectedPct, locale)}`} />
                   </dl>
                   <p className="text-caption text-muted-foreground">{t('margin.note')}</p>
                 </section>

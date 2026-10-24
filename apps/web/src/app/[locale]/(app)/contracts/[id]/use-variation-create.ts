@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
@@ -8,12 +8,14 @@ import type { ActionResult } from '@/lib/actions/result';
 import { createVariationDraft, saveVariationDraft } from '@/lib/variations/actions';
 import { keyedLineErrors, variationLinePath, type VariationLineColumn } from '@/lib/variations/line-fields';
 import { TIME_EXTENSION_FIELD, timeExtensionFieldErrors } from '@/lib/variations/time-extension';
+import { typedDescriptionColumn, typedHeaderColumns } from '@/lib/variations/typed-columns';
 import type { DraftVoLine } from './contract-vo-types';
 
 // The "new variation order" flow: its typed state, and the two writes it makes
 // (open the draft, then save its lines). Every refusal is said under the box or
 // line cell it is about; Save is never disabled for an empty title, pressing it
-// says what is missing.
+// says what is missing. What the studio types is saved in the columns of the
+// page's language (lib/variations/typed-columns.ts).
 
 /** The line cells the form renders; a refusal of any other cell is said above Save. */
 export const VO_LINE_COLUMNS = [
@@ -29,7 +31,7 @@ export type VoLineColumn = (typeof VO_LINE_COLUMNS)[number];
 const NEW_LINE: Omit<DraftVoLine, 'key'> = {
   contractLineId: '',
   contractLineLabel: '',
-  descriptionEn: '',
+  description: '',
   qty: '1',
   unit: 'lump_sum',
   unitPrice: '0',
@@ -53,6 +55,7 @@ function onSentRows(result: ActionResult, sent: readonly DraftVoLine[]): ActionR
  */
 export function useVariationCreate(contractId: string, withDays: boolean) {
   const te = useTranslations('errors');
+  const locale = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -92,7 +95,7 @@ export function useVariationCreate(contractId: string, withDays: boolean) {
   }
 
   async function send(): Promise<ActionResult> {
-    const header = { titleEn: title, reasonEn: reason || null, timeExtensionDays: withDays ? days : undefined };
+    const header = { ...typedHeaderColumns(locale, { title, reason }), timeExtensionDays: withDays ? days : undefined };
     let id = createdId.current;
     if (!id) {
       const created = await createVariationDraft({ contractId, ...header });
@@ -105,7 +108,7 @@ export function useVariationCreate(contractId: string, withDays: boolean) {
       header,
       lines: lines.map((line, index) => ({
         contractLineId: line.contractLineId || null,
-        descriptionEn: line.descriptionEn,
+        ...typedDescriptionColumn(locale, line.description),
         qty: line.qty,
         unit: line.unit,
         unitPrice: line.unitPrice,

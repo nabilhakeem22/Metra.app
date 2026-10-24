@@ -7,10 +7,11 @@ import {
 } from '@/lib/contracts/core';
 import { saveContractScheduleCore } from '@/lib/contracts/schedule/save';
 import type { OrgContext } from '@/lib/db/context';
-import { getExecutionFacts } from '@/lib/execution/queries/facts';
+import { getContractPage } from '@/lib/contracts/queries';
+import { getContractPageExecution, getExecutionFacts } from '@/lib/execution/queries/facts';
 import { executionStage } from '@/lib/execution/stage';
 import { seedBoq, seedDelivery } from './contract-from-boq-fixture';
-import { closeExecutionFixture, ownerQuery, seedClientProject, seedRequest } from './execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedClientProject, seedExecutionContract, seedRequest } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // PR A3.5, AC10 (the data half): the delivery's execution card derives one
@@ -158,5 +159,23 @@ describe('the execution card, stage by stage', () => {
 
     const elsewhere = await seedDelivery(orgId, ids, 'execution');
     expect(await stageOf(elsewhere)).toMatchObject({ stage: 'no_boq', card: { contract: null, boqId: null } });
+  });
+});
+
+describe('the contract page: its schedule and its stage in one read (A5 fix round F5)', () => {
+  it('reads a signed contract\'s stage by the card\'s rule, its schedule only when its tab shows, and nothing for a draft that shows none', async () => {
+    const schedule = SPLIT.map(({ labelEn, value }) => ({ labelEn, basis: 'percent' as const, value }));
+    const signed = await seedExecutionContract(orgId, { state: 'signed', schedule });
+    const header = (await getContractPage(owner, signed.contractId, true))!;
+    const withTab = await getContractPageExecution(owner, header, { schedule: true });
+    expect(withTab.stage).toBe('in_progress');
+    expect(withTab.schedule?.valid).toBe(true);
+    expect(withTab.schedule?.rows.map((row) => row.labelEn)).toEqual(['Advance', 'Works', 'Handover']);
+    // A reader with no Schedule tab (billing only) still gets the stage, and no rows.
+    expect(await getContractPageExecution(owner, header, { schedule: false })).toEqual({ schedule: null, stage: 'in_progress' });
+
+    const draft = await seedExecutionContract(orgId, { state: 'draft' });
+    const draftHeader = (await getContractPage(owner, draft.contractId, true))!;
+    expect(await getContractPageExecution(owner, draftHeader, { schedule: false })).toEqual({ schedule: null, stage: null });
   });
 });

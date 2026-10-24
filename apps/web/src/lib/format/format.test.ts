@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { bidiIsolate } from './bidi';
 import { formatDate, formatMonth, formatTime } from './date';
 import { formatDocNumber } from './doc-number';
 import { formatMoney, formatMoneyAmount, moneySymbol } from './money';
-import { formatNumber, formatPercent, formatQuantity } from './number';
+import { formatNumber, formatPercent, formatQuantity, parentheticalPercent } from './number';
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -147,7 +148,24 @@ describe('formatPercent — exactly 2 fraction digits + %', () => {
   });
 });
 
-describe('formatQuantity — up to 2 fraction digits, no forced zeros', () => {
+describe('parentheticalPercent: a margin percentage beside its amount', () => {
+  it('isolates the percentage, so an Arabic figure before it cannot move the sign', () => {
+    expect(parentheticalPercent(35.99, 'ar-EG')).toBe(` (${bidiIsolate('35.99%')})`);
+    expect(parentheticalPercent('12.5', 'en')).toBe(` (${bidiIsolate('12.50%')})`);
+  });
+  it('is empty when there is no percentage', () => {
+    expect(parentheticalPercent(null, 'ar-EG')).toBe('');
+    expect(parentheticalPercent('', 'en')).toBe('');
+  });
+});
+
+describe('formatQuantity: every stored digit (up to 4), no forced zeros', () => {
+  it.each(['en', 'ar-EG'])('never rounds a scale-4 quantity away (%s)', (locale) => {
+    expect(formatQuantity('0.0001', locale)).toBe('0.0001');
+    expect(formatQuantity('0.1250', locale)).toBe('0.125');
+    expect(formatQuantity('1234.5678', locale)).toBe('1,234.5678');
+    expect(formatQuantity('220.0000', locale)).toBe('220');
+  });
   it('trims a scale-4 integer qty to a bare integer', () => {
     expect(formatQuantity('1.0000', 'en')).toBe('1');
   });

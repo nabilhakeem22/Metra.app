@@ -32,6 +32,12 @@ const KIND: Partial<Record<HeaderKey, 'date' | 'number'>> = {
   defectsLiabilityDays: 'number',
 };
 
+/** The two terms boxes hold one language each, so each is typed in its own direction on either page. */
+const TEXT_DIRECTION: Partial<Record<HeaderKey, 'ltr' | 'rtl'>> = {
+  termsEn: 'ltr',
+  termsAr: 'rtl',
+};
+
 /**
  * Draft-only header editor — wires the tested saveContractDraftCore so staff set
  * retention/advance/terms/dates/payment terms before issuing. An execution
@@ -73,7 +79,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
       <FormField id={`ch-${key}`} label={label} {...errors.bind(key)}>
         <Input
           type={kind ?? 'text'}
-          dir={kind ? 'ltr' : undefined}
+          dir={kind ? 'ltr' : TEXT_DIRECTION[key]}
           value={form[key]}
           onChange={(e) => {
             setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -102,8 +108,8 @@ export function ContractHeaderForm({ detail }: { detail: ContractHeaderDetail })
           {field('paymentTermsDays', th('paymentTermsDays'))}
           {field('defectsLiabilityDays', th('defectsLiabilityDays'))}
         </div>
-        {field('termsEn', th('terms'))}
-        {field('termsAr', th('terms'))}
+        {field('termsEn', th('termsEn'))}
+        {field('termsAr', th('termsAr'))}
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" disabled={pending} onClick={save}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
