@@ -1,8 +1,9 @@
 // Which phases a flow runs through, and which one a delivery is in. PURE and
 // CLIENT-SAFE. Keyed by the flow registry (lib/entitlements/flows.ts), so a new
 // vertical does not compile until it says which phases it has.
+import { DESIGN_STATES, type DesignState } from '@/lib/engagements/states';
 import type { Flow } from '@/lib/entitlements/flows';
-import type { DesignState } from '@/lib/engagements/states';
+import { assertOneOf, entryOf } from './assert';
 import type { EntryPhase, PhaseKey } from './types';
 
 export const FLOW_PHASES: Readonly<Record<Flow, readonly PhaseKey[]>> = {
@@ -11,7 +12,7 @@ export const FLOW_PHASES: Readonly<Record<Flow, readonly PhaseKey[]>> = {
 
 /** The phases a delivery goes through: the flow's, from the phase it entered at. */
 export function phasesOf(flow: Flow, entry: EntryPhase): readonly PhaseKey[] {
-  const phases = FLOW_PHASES[flow];
+  const phases = entryOf(FLOW_PHASES, flow, 'flow');
   const start = phases.indexOf(entry);
   // developer-only: the message carries a flow key and a phase key, never a person's data.
   if (start < 0) throw new Error(`flow ${flow} has no ${entry} phase`);
@@ -24,5 +25,6 @@ export function phasesOf(flow: Flow, entry: EntryPhase): readonly PhaseKey[] {
  * alone decides.
  */
 export function currentPhaseOf(state: DesignState): PhaseKey {
+  assertOneOf(DESIGN_STATES, state, 'design state');
   return state === 'execution' ? 'execution' : 'design';
 }

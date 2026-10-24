@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPhaseView } from './build-view';
-import type { PhaseDefinition } from './types';
+import type { PhaseDefinition, PhaseStatus, StepLocation } from './types';
 
 const PHASE: PhaseDefinition = {
   key: 'design',
@@ -49,6 +49,19 @@ describe('buildPhaseView', () => {
     const view = buildPhaseView(PHASE, { step: null, whoseMove: null, status: 'closed' }, 'studio');
     expect(view.steps.every((step) => step.status === 'upcoming')).toBe(true);
     expect(view.currentStep).toBeNull();
+  });
+
+  it('refuses a location the phase cannot draw (F8)', () => {
+    const refused: [string, StepLocation, RegExp][] = [
+      ['complete short of the last step', { step: 'c', whoseMove: null, status: 'complete' }, /complete design phase/],
+      ['complete on a step it lacks', { step: 'bogus', whoseMove: null, status: 'complete' }, /complete design phase/],
+      ['complete with a move', { step: 'd', whoseMove: 'studio', status: 'complete' }, /complete design phase/],
+      ['closed on a step', { step: 'a', whoseMove: null, status: 'closed' }, /closed design phase/],
+      ['closed with a move', { step: null, whoseMove: 'client', status: 'closed' }, /closed design phase/],
+      ['an unknown status', { step: 'a', whoseMove: null, status: 'paused' as PhaseStatus }, /unknown phase status/],
+      ['active on no step', { step: null, whoseMove: 'studio', status: 'active' }, /not a step of the design phase/],
+    ];
+    for (const [label, at, message] of refused) expect(() => buildPhaseView(PHASE, at, 'studio'), label).toThrow(message);
   });
 
   it('refuses a location on a step the phase does not have', () => {

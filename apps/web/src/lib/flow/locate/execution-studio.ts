@@ -1,53 +1,42 @@
 // Where a delivery is in the EXECUTION phase, for the studio. PURE and
-// CLIENT-SAFE. It reads the stage and the one next action `executionStage()`
-// already derives (lib/execution/stage.ts). Both maps are total `Record`s, so a
-// new stage or next action does not compile until it is given a step and an
-// actor here.
-import type { ExecutionNextActionKind, ExecutionStage, ExecutionStageResult } from '@/lib/execution/stage';
+// CLIENT-SAFE. The step is the contract stage's (./execution-facts.ts), the
+// same the client is shown; whose move it is follows the one next action
+// `executionStage()` derives. The actor table is a total `Record`, so a new
+// next action does not compile until it is given an actor here.
+import type { ExecutionNextActionKind } from '@/lib/execution/stage';
 import type { ExecutionStepKey } from '../phases/execution';
-import type { Actor, PhaseStatus, StepLocation } from '../types';
+import type { Actor, StepLocation } from '../types';
+import { executionPosition, internalChangeOrderCount, type ExecutionFlowFacts } from './execution-facts';
 
-interface StagePlace {
-  step: ExecutionStepKey | null;
-  status: PhaseStatus;
-}
-
-const active = (step: ExecutionStepKey): StagePlace => ({ step, status: 'active' });
-
-const STAGE_PLACE: Readonly<Record<ExecutionStage, StagePlace>> = {
-  no_boq: active('contract'),
-  no_contract: active('contract'),
-  draft: active('contract'),
-  awaiting_signature: active('signature'),
-  in_progress: active('works'),
-  final_account: active('final_account'),
-  settled: { step: 'settled', status: 'complete' },
-  terminated: { step: null, status: 'closed' },
-};
+const studio = (): Actor => 'studio';
+const client = (): Actor => 'client';
 
 /**
  * Who the next action waits on. The client holds the move while the job waits
  * for their signature, their payment or their answer to a change order; the
  * studio can still act on each (sign on paper, record the payment), but the
- * thing that moves the job is the client's. Everything else is the studio's.
+ * thing that moves the job is the client's (D1). Two of those waits are the
+ * studio's after all: once the online signing window has closed only a paper
+ * signature can move the job, and a change order approved internally has to be
+ * issued before the client can answer it. Everything else is the studio's.
  */
-const NEXT_ACTION_ACTOR: Readonly<Record<ExecutionNextActionKind, Actor>> = {
-  open_boq: 'studio',
-  create_contract: 'studio',
-  set_schedule: 'studio',
-  send_contract: 'studio',
-  record_signed_offline: 'client',
-  review_payment_claim: 'studio',
-  send_milestone_request: 'studio',
-  send_variation_request: 'studio',
-  record_payment: 'client',
-  await_variation_answer: 'client',
-  prepare_final_account: 'studio',
-  review_final_account: 'studio',
+const NEXT_ACTION_ACTOR: Readonly<Record<ExecutionNextActionKind, (facts: ExecutionFlowFacts) => Actor>> = {
+  open_boq: studio,
+  create_contract: studio,
+  set_schedule: studio,
+  send_contract: studio,
+  record_signed_offline: (facts) => (facts.signingOpen ? 'client' : 'studio'),
+  review_payment_claim: studio,
+  send_milestone_request: studio,
+  send_variation_request: studio,
+  record_payment: client,
+  await_variation_answer: (facts) => (internalChangeOrderCount(facts) > 0 ? 'studio' : 'client'),
+  prepare_final_account: studio,
+  review_final_account: studio,
 };
 
-export function locateExecutionForStudio(result: ExecutionStageResult): StepLocation<ExecutionStepKey> {
-  const place = STAGE_PLACE[result.stage];
-  const whoseMove = place.status === 'active' && result.next ? NEXT_ACTION_ACTOR[result.next.kind] : null;
-  return { step: place.step, whoseMove, status: place.status };
+export function locateExecutionForStudio(facts: ExecutionFlowFacts): StepLocation<ExecutionStepKey> {
+  const { result, step, status } = executionPosition(facts);
+  const whoseMove = result.next ? NEXT_ACTION_ACTOR[result.next.kind](facts) : null;
+  return { step, whoseMove, status };
 }

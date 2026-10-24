@@ -43,13 +43,35 @@ function stepStatus(phase: PhaseStatus, index: number, currentIndex: number): St
   return index === currentIndex ? 'current' : 'upcoming';
 }
 
-/** The index of the current step while active, -1 otherwise. A step the phase lacks is a locator bug. */
+/**
+ * The index of the current step while active, -1 otherwise. A location the
+ * phase cannot draw is a locator bug: an active step the phase lacks, a
+ * complete phase that does not end on its last step or still names a move,
+ * a closed one that names a step or a move, or an unknown status.
+ */
 function currentIndexOf(steps: AudienceStep[], definition: PhaseDefinition, at: StepLocation): number {
-  if (at.status !== 'active') return -1;
-  const index = steps.findIndex((step) => step.key === at.step);
-  // developer-only: the message carries a step key and a phase key from code definitions, never a person's data.
-  if (index < 0) throw new Error(`step ${String(at.step)} is not a step of the ${definition.key} phase`);
-  return index;
+  switch (at.status) {
+    case 'active': {
+      const index = steps.findIndex((step) => step.key === at.step);
+      // developer-only: the message carries a step key and a phase key from code definitions, never a person's data.
+      if (index < 0) throw new Error(`step ${String(at.step)} is not a step of the ${definition.key} phase`);
+      return index;
+    }
+    case 'complete':
+      if (at.step !== steps[steps.length - 1].key || at.whoseMove !== null) {
+        // developer-only: the message carries a phase key from code definitions, never a person's data.
+        throw new Error(`a complete ${definition.key} phase ends on its last step with nobody's move`);
+      }
+      return -1;
+    case 'closed':
+      if (at.step !== null || at.whoseMove !== null) {
+        // developer-only: the message carries a phase key from code definitions, never a person's data.
+        throw new Error(`a closed ${definition.key} phase has no step and nobody's move`);
+      }
+      return -1;
+    default:
+      throw new Error('unknown phase status');
+  }
 }
 
 export function buildPhaseView(definition: PhaseDefinition, at: StepLocation, audience: Audience): PhaseView {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
-import { spinePosition, spineStageKeyOf } from '@/lib/engagements/stage-spine';
-import { DESIGN_STATES } from '@/lib/engagements/states';
+import { SPINE_STAGES, spinePosition, spineStageKeyOf } from '@/lib/engagements/stage-spine';
+import { DESIGN_STATES, type DesignState } from '@/lib/engagements/states';
 import { buildPhaseView } from '../build-view';
 import { DESIGN_PHASE } from '../phases/design';
 import { locateDesignForStudio } from './design-studio';
@@ -38,6 +38,28 @@ describe('locateDesignForStudio', () => {
     expect(locateDesignForStudio('concept_review', { kind: 'waitingClient', days: 1 }).atGate).toBe('gateA');
     expect(locateDesignForStudio('final_approval', { kind: 'yourMove' }).atGate).toBe('gateB');
     expect(locateDesignForStudio('negotiation', { kind: 'yourMove' }).atGate).toBeUndefined();
+  });
+
+  it('draws the rail the spine drew: the same status per stage, and the gates where the spine has them', () => {
+    for (const state of DESIGN_STATES) {
+      const position = spinePosition(state);
+      const spine = SPINE_STAGES.map((_, index) => {
+        if (position.closed) return 'muted';
+        if (position.allComplete || index < position.index) return 'done';
+        return index === position.index ? 'current' : 'upcoming';
+      });
+      for (const [status] of STATUSES) {
+        const view = buildPhaseView(DESIGN_PHASE, locateDesignForStudio(state, status), 'studio');
+        expect(view.steps.map((step) => (view.status === 'closed' ? 'muted' : step.status)), state).toEqual(spine);
+        expect(view.atGate, state).toBe(position.atGate);
+        expect(view.steps.map((step) => step.gateBefore ?? null), state).toEqual([null, null, null, null, 'gateA', 'gateB', null, null]);
+      }
+    }
+  });
+
+  it('refuses a state or a status it does not know (F8)', () => {
+    expect(() => locateDesignForStudio('bogus' as DesignState, { kind: 'yourMove' })).toThrow(/unknown design state/);
+    expect(() => locateDesignForStudio('survey', { kind: 'bogus' } as unknown as DeliveryStatus)).toThrow(/unknown delivery status/);
   });
 
   it('completes the phase at both endings and closes it when abandoned', () => {
