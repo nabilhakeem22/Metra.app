@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  EXECUTION_NEXT_ACTION_KINDS,
-  EXECUTION_STAGES,
-  executionStage,
-  type ExecutionNextActionKind,
-  type ExecutionStage,
-} from '@/lib/execution/stage';
-import { buildPhaseView } from '../build-view';
-import { EXECUTION_PHASE } from '../phases/execution';
+import { executionStage, type ExecutionNextActionKind, type ExecutionStage } from '@/lib/execution/stage';
+import { executionModels, flowFactsOf, model } from '@/test/execution-flow-model';
 import { locateExecutionForStudio } from './execution-studio';
 
 const EXPECTED_STEP: Record<ExecutionStage, string | null> = {
@@ -21,64 +14,66 @@ const EXPECTED_STEP: Record<ExecutionStage, string | null> = {
   terminated: null,
 };
 
-const CLIENT_KINDS: ReadonlySet<ExecutionNextActionKind> = new Set([
+const WAITS_ON_CLIENT: ReadonlySet<ExecutionNextActionKind> = new Set([
   'record_signed_offline',
   'record_payment',
   'await_variation_answer',
 ]);
 
 describe('locateExecutionForStudio', () => {
-  it('puts every stage, with every next action or none, on exactly one step with one whose-move', () => {
-    for (const stage of EXECUTION_STAGES) {
-      for (const kind of [...EXECUTION_NEXT_ACTION_KINDS, null]) {
-        const at = locateExecutionForStudio({ stage, next: kind === null ? null : { kind } });
-        expect(at.step, `${stage}/${kind}`).toBe(EXPECTED_STEP[stage]);
-        // The view builds without throwing, so the step is one the phase has.
-        const view = buildPhaseView(EXECUTION_PHASE, at, 'studio');
-        expect(view.steps.filter((step) => step.status === 'current').length, stage).toBe(at.status === 'active' ? 1 : 0);
-        if (at.status !== 'active' || kind === null) expect(at.whoseMove, `${stage}/${kind}`).toBeNull();
-        else expect(at.whoseMove, `${stage}/${kind}`).toBe(CLIENT_KINDS.has(kind) ? 'client' : 'studio');
-      }
+  it('puts every reachable model on its stage step, with the next action naming whose move it is', () => {
+    for (const m of executionModels(2)) {
+      const facts = flowFactsOf(m);
+      const { stage, next } = executionStage(facts.stage);
+      const at = locateExecutionForStudio(facts);
+      const label = JSON.stringify(m);
+      expect(at.step, label).toBe(EXPECTED_STEP[stage]);
+      if (next === null) expect(at.whoseMove, label).toBeNull();
+      else if (!WAITS_ON_CLIENT.has(next.kind)) expect(at.whoseMove, label).toBe('studio');
     }
   });
 
   it('completes the phase once settled and closes it once terminated', () => {
-    expect(locateExecutionForStudio({ stage: 'settled', next: null })).toEqual({
-      step: 'settled',
-      whoseMove: null,
-      status: 'complete',
-    });
-    expect(locateExecutionForStudio({ stage: 'terminated', next: null })).toEqual({
+    expect(locateExecutionForStudio(flowFactsOf(model()))).toEqual({ step: 'settled', whoseMove: null, status: 'complete' });
+    expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'terminated' })))).toEqual({
       step: null,
       whoseMove: null,
       status: 'closed',
     });
   });
 
-  it('reads the derived stage: a sent contract waits on the client signature', () => {
-    const result = executionStage({
-      hasIssuedBoq: true,
-      contract: {
-        status: 'issued',
-        scheduleValid: true,
-        nextUnbilledMilestone: null,
-        pendingClaimCount: 0,
-        unbilledVariationCount: 0,
-        finalAccountOutstanding: null,
-        unpaidRequestCount: 0,
-        openVariationCount: 0,
-        billingBalance: '0',
-        finalAccountBalance: '0',
-      },
+  it('waits on the client signature while the signing window is open, and on the studio once it has closed (F4)', () => {
+    expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'issued_open' })))).toEqual({
+      step: 'signature',
+      whoseMove: 'client',
+      status: 'active',
     });
-    expect(locateExecutionForStudio(result)).toEqual({ step: 'signature', whoseMove: 'client', status: 'active' });
+    expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'issued_closed' }))).whoseMove).toBe('studio');
   });
 
-  it('gives the studio the move while it has the BOQ, the contract or a claim to deal with', () => {
-    expect(locateExecutionForStudio({ stage: 'no_boq', next: { kind: 'open_boq' } }).whoseMove).toBe('studio');
-    expect(locateExecutionForStudio({ stage: 'draft', next: { kind: 'set_schedule' } }).whoseMove).toBe('studio');
-    expect(
-      locateExecutionForStudio({ stage: 'in_progress', next: { kind: 'review_payment_claim' } }).whoseMove,
-    ).toBe('studio');
+  it('waits on the client for a change order issued to them, and on the studio for one it has not issued (F6)', () => {
+    expect(locateExecutionForStudio(flowFactsOf(model({ issuedChangeOrders: 1 }))).whoseMove).toBe('client');
+    expect(locateExecutionForStudio(flowFactsOf(model({ internalChangeOrders: 1 }))).whoseMove).toBe('studio');
+    expect(locateExecutionForStudio(flowFactsOf(model({ issuedChangeOrders: 1, internalChangeOrders: 1 }))).whoseMove).toBe(
+      'studio',
+    );
+  });
+
+  it('waits on the client for a payment with no claim, and gives the studio a claim to review', () => {
+    const due = { kind: 'milestone', state: 'due' } as const;
+    expect(locateExecutionForStudio(flowFactsOf(model({ requests: [due] }))).whoseMove).toBe('client');
+    const claimed = { kind: 'milestone', state: 'claimed' } as const;
+    expect(locateExecutionForStudio(flowFactsOf(model({ requests: [claimed, due] }))).whoseMove).toBe('studio');
+  });
+
+  it('gives the studio the move while it has the BOQ, the contract or the billing to deal with', () => {
+    for (const contract of ['no_boq', 'no_contract', 'draft_unscheduled', 'draft'] as const) {
+      expect(locateExecutionForStudio(flowFactsOf(model({ contract }))), contract).toEqual({
+        step: 'contract',
+        whoseMove: 'studio',
+        status: 'active',
+      });
+    }
+    expect(locateExecutionForStudio(flowFactsOf(model({ nextMilestone: true, balanceLeft: true }))).whoseMove).toBe('studio');
   });
 });

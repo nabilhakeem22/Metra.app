@@ -1,10 +1,13 @@
 // Where a delivery is in the EXECUTION phase, for the client. PURE and
-// CLIENT-SAFE. The client page knows less than the studio (no BOQ, no draft
-// contract, no balance), so it has its own reason list, read from the facts the
-// client home receives. The first reason that holds wins.
-import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
+// CLIENT-SAFE. It reads the SAME facts as the studio's locator, and the step
+// and status are the contract stage's (./execution-facts.ts), so the client's
+// rail always stands where the studio's does. What differs is the reason the
+// client is told and whose move it is: within a stage, the client's own
+// decisions first, then what they owe, then what the studio is checking.
+import type { ExecutionStage } from '@/lib/execution/stage';
 import type { ExecutionStepKey } from '../phases/execution';
-import type { StepLocation } from '../types';
+import type { Actor, StepLocation } from '../types';
+import { executionPosition, type ExecutionFlowFacts } from './execution-facts';
 
 export const CLIENT_EXECUTION_REASONS = [
   'preparing_contract',
@@ -15,77 +18,65 @@ export const CLIENT_EXECUTION_REASONS = [
   'payment_being_confirmed',
   'works_in_progress',
   'final_account_due',
+  'final_account_in_review',
   'settled',
   'terminated',
 ] as const;
 
 export type ClientExecutionReason = (typeof CLIENT_EXECUTION_REASONS)[number];
 
-/** One payment request as the client page lists it (the fields this locator reads). */
-export interface ClientPaymentRequestFacts {
-  target: { kind: 'milestone' | 'variation' | 'final_account' };
-  /** What is still due, a scale-4 string; zero on a void request. */
-  outstanding: string;
-  void: boolean;
-  /** When the client's "I paid" was sent and is still unanswered; else null. */
-  claimedAt: string | null;
-}
-
-/** What the client home knows about the execution phase. */
-export interface ClientExecutionFacts {
-  /** The contract the client can see; null while the studio is still preparing it. */
-  contract: { status: 'issued' | 'signed' | 'terminated'; signingOpen: boolean } | null;
-  /** Change orders issued to the client and not yet decided. */
-  openVariationCount: number;
-  /** The payment requests; null when none can be shown yet. */
-  money: { requests: readonly ClientPaymentRequestFacts[] } | null;
-}
-
 export type ClientExecutionLocation = StepLocation<ExecutionStepKey> & { reason: ClientExecutionReason };
 
-const REASON_PLACE: Readonly<Record<ClientExecutionReason, StepLocation<ExecutionStepKey>>> = {
-  preparing_contract: { step: 'contract', whoseMove: 'studio', status: 'active' },
-  sign_contract: { step: 'signature', whoseMove: 'client', status: 'active' },
-  signing_closed: { step: 'signature', whoseMove: 'studio', status: 'active' },
-  decide_change_order: { step: 'works', whoseMove: 'client', status: 'active' },
-  pay_request: { step: 'works', whoseMove: 'client', status: 'active' },
-  payment_being_confirmed: { step: 'works', whoseMove: 'studio', status: 'active' },
-  works_in_progress: { step: 'works', whoseMove: 'site', status: 'active' },
-  final_account_due: { step: 'final_account', whoseMove: 'client', status: 'active' },
-  settled: { step: 'settled', whoseMove: null, status: 'complete' },
-  terminated: { step: null, whoseMove: null, status: 'closed' },
+/** Who holds the move for each reason; null once the phase has ended. */
+const REASON_MOVE: Readonly<Record<ClientExecutionReason, Actor | null>> = {
+  preparing_contract: 'studio',
+  sign_contract: 'client',
+  signing_closed: 'studio',
+  decide_change_order: 'client',
+  pay_request: 'client',
+  payment_being_confirmed: 'studio',
+  works_in_progress: 'site',
+  final_account_due: 'client',
+  final_account_in_review: 'studio',
+  settled: null,
+  terminated: null,
 };
 
-const isDue = (request: ClientPaymentRequestFacts): boolean =>
-  !request.void && parseMoney4(request.outstanding) > 0n;
-
-/** After the contract is signed: decisions first, then money, then the end state. */
-function signedReason(facts: ClientExecutionFacts): ClientExecutionReason {
-  if (facts.openVariationCount > 0) return 'decide_change_order';
-  const requests = facts.money?.requests ?? [];
-  const unclaimedDue = requests.filter((request) => isDue(request) && request.claimedAt === null);
-  if (unclaimedDue.some((request) => request.target.kind === 'final_account')) return 'final_account_due';
-  if (unclaimedDue.length > 0) return 'pay_request';
-  if (requests.some((request) => isDue(request) && request.claimedAt !== null)) return 'payment_being_confirmed';
-  // Nothing is due or waiting here, so an issued final account is fully paid.
-  const finalAccountIssued = requests.some((request) => !request.void && request.target.kind === 'final_account');
-  return finalAccountIssued ? 'settled' : 'works_in_progress';
+/**
+ * A signed contract, from the client's side: a change order issued to them,
+ * then anything due they have not claimed (`due`), then a claim the studio is
+ * checking; with none of those, the stage's own news (`otherwise`).
+ */
+function signedReason(
+  facts: ExecutionFlowFacts,
+  due: ClientExecutionReason,
+  otherwise: ClientExecutionReason,
+): ClientExecutionReason {
+  if (facts.issuedChangeOrderCount > 0) return 'decide_change_order';
+  if (facts.unclaimedDueRequestCount > 0) return due;
+  if ((facts.stage.contract?.pendingClaimCount ?? 0) > 0) return 'payment_being_confirmed';
+  return otherwise;
 }
 
-export function clientExecutionReason(facts: ClientExecutionFacts): ClientExecutionReason {
-  const { contract } = facts;
-  if (contract === null) return 'preparing_contract';
-  switch (contract.status) {
-    case 'terminated':
-      return 'terminated';
-    case 'issued':
-      return contract.signingOpen ? 'sign_contract' : 'signing_closed';
-    case 'signed':
-      return signedReason(facts);
-  }
-}
+/**
+ * Total over the stages, so a new stage does not compile until the client is
+ * given a reason for it. Before the contract is issued the client sees only
+ * that it is being prepared. Once the final account is issued, whatever is
+ * still due, an older milestone included, is the final account's remainder.
+ */
+const STAGE_REASON: Readonly<Record<ExecutionStage, (facts: ExecutionFlowFacts) => ClientExecutionReason>> = {
+  no_boq: () => 'preparing_contract',
+  no_contract: () => 'preparing_contract',
+  draft: () => 'preparing_contract',
+  awaiting_signature: (facts) => (facts.signingOpen ? 'sign_contract' : 'signing_closed'),
+  in_progress: (facts) => signedReason(facts, 'pay_request', 'works_in_progress'),
+  final_account: (facts) => signedReason(facts, 'final_account_due', 'final_account_in_review'),
+  settled: () => 'settled',
+  terminated: () => 'terminated',
+};
 
-export function locateExecutionForClient(facts: ClientExecutionFacts): ClientExecutionLocation {
-  const reason = clientExecutionReason(facts);
-  return { ...REASON_PLACE[reason], reason };
+export function locateExecutionForClient(facts: ExecutionFlowFacts): ClientExecutionLocation {
+  const { result, step, status } = executionPosition(facts);
+  const reason = STAGE_REASON[result.stage](facts);
+  return { step, whoseMove: REASON_MOVE[reason], status, reason };
 }

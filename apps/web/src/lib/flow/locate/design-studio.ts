@@ -5,7 +5,8 @@
 // with them.
 import type { DeliveryStatus, DeliveryStatusKind } from '@/lib/engagements/delivery-status';
 import { spinePosition, spineStageKeyOf, type SpineStageKey } from '@/lib/engagements/stage-spine';
-import type { DesignState } from '@/lib/engagements/states';
+import { DESIGN_STATES, type DesignState } from '@/lib/engagements/states';
+import { assertOneOf, entryOf } from '../assert';
 import type { Actor, StepLocation } from '../types';
 
 /** Total over the status kinds, so a new kind does not compile until it names an actor. */
@@ -19,12 +20,14 @@ const STATUS_ACTOR: Readonly<Record<DeliveryStatusKind, Actor | null>> = {
 };
 
 export function locateDesignForStudio(state: DesignState, deliveryStatus: DeliveryStatus): StepLocation<SpineStageKey> {
+  assertOneOf(DESIGN_STATES, state, 'design state');
+  const whoseMove = entryOf(STATUS_ACTOR, deliveryStatus.kind, 'delivery status');
   const position = spinePosition(state);
   if (position.closed) return { step: null, whoseMove: null, status: 'closed' };
   if (position.allComplete) return { step: spineStageKeyOf(state), whoseMove: null, status: 'complete' };
   return {
     step: spineStageKeyOf(state),
-    whoseMove: STATUS_ACTOR[deliveryStatus.kind],
+    whoseMove,
     status: 'active',
     ...(position.atGate ? { atGate: position.atGate } : {}),
   };
