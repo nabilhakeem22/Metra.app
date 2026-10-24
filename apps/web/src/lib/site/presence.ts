@@ -53,8 +53,17 @@ const UNUSABLE_ACCURACY_M = 500;
 
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
-/** Great-circle (haversine) distance between two points, in whole metres. */
-export function distanceMeters(from: GeoPoint, to: GeoPoint): number {
+/** A finite latitude within ±90 and longitude within ±180. */
+function isGeoPoint(lat: number | undefined, lng: number | undefined): boolean {
+  return Number.isFinite(lat) && Math.abs(lat!) <= 90 && Number.isFinite(lng) && Math.abs(lng!) <= 180;
+}
+
+/** A finite, non-negative number of metres (a radius, an accuracy). */
+function isMetres(value: number | undefined): boolean {
+  return Number.isFinite(value) && value! >= 0;
+}
+
+function haversineMeters(from: GeoPoint, to: GeoPoint): number {
   const deltaLat = toRadians(to.lat - from.lat);
   const deltaLng = toRadians(to.lng - from.lng);
   const chord =
@@ -63,11 +72,27 @@ export function distanceMeters(from: GeoPoint, to: GeoPoint): number {
   return Math.round(2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(chord))));
 }
 
-/** The point and accuracy of a fixed reading. A fixed reading without finite numbers is a caller bug. */
+/** Great-circle (haversine) distance between two points, in whole metres. A point off the globe is a caller bug. */
+export function distanceMeters(from: GeoPoint, to: GeoPoint): number {
+  if (!isGeoPoint(from.lat, from.lng) || !isGeoPoint(to.lat, to.lng)) {
+    throw new RangeError('distanceMeters needs a finite lat within ±90 and lng within ±180 on both points.');
+  }
+  return haversineMeters(from, to);
+}
+
+/** The pin, checked. A pin off the globe or with a negative or non-finite radius is a caller bug. */
+function pinOf(site: SitePin): SitePin {
+  if (!isGeoPoint(site.lat, site.lng) || !isMetres(site.radiusM)) {
+    throw new RangeError('A site pin needs a finite lat within ±90, lng within ±180 and a radius of 0 m or more.');
+  }
+  return site;
+}
+
+/** The point and accuracy of a fixed reading. A fixed reading without them, or off the globe, is a caller bug. */
 function fixOf(reading: LocationReading): GeoPoint & { accuracyM: number } {
   const { lat, lng, accuracyM } = reading;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracyM)) {
-    throw new RangeError('A fixed location reading needs a finite lat, lng and accuracyM.');
+  if (!isGeoPoint(lat, lng) || !isMetres(accuracyM)) {
+    throw new RangeError('A fixed location reading needs a finite lat within ±90, lng within ±180 and an accuracyM of 0 or more.');
   }
   return { lat: lat!, lng: lng!, accuracyM: accuracyM! };
 }
@@ -76,16 +101,18 @@ function fixOf(reading: LocationReading): GeoPoint & { accuracyM: number } {
  * The presence verdict for one reading against the project's pin. In order:
  * no pin, no fix, an unusable fix (still measured), inside the radius plus the
  * capped accuracy, beyond the radius plus the whole accuracy, else uncertain.
+ * A pin or a fix that cannot be real (pinOf, fixOf) throws RangeError.
  */
 export function sitePresence(site: SitePin | null, reading: LocationReading): PresenceVerdict {
   if (site === null) return { presence: 'no_site_pin', distanceM: null };
+  const pin = pinOf(site);
   if (reading.status !== 'fixed') return { presence: 'no_location', distanceM: null };
   const fix = fixOf(reading);
-  const distanceM = distanceMeters(site, fix);
+  const distanceM = haversineMeters(pin, fix);
   if (fix.accuracyM > UNUSABLE_ACCURACY_M) return { presence: 'uncertain', distanceM };
-  if (distanceM <= site.radiusM + Math.min(fix.accuracyM, ACCURACY_BENEFIT_CAP_M)) {
+  if (distanceM <= pin.radiusM + Math.min(fix.accuracyM, ACCURACY_BENEFIT_CAP_M)) {
     return { presence: 'on_site', distanceM };
   }
-  if (distanceM > site.radiusM + fix.accuracyM) return { presence: 'off_site', distanceM };
+  if (distanceM > pin.radiusM + fix.accuracyM) return { presence: 'off_site', distanceM };
   return { presence: 'uncertain', distanceM };
 }

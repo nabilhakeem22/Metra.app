@@ -106,3 +106,54 @@ describe('sitePresence: the edges of each rule', () => {
     expect(() => sitePresence(PIN, { status: 'fixed', lat: 30, lng: Infinity, accuracyM: 10 })).toThrow(RangeError);
   });
 });
+
+// F9 (S1 functional test): finite but impossible numbers used to get a verdict.
+describe('sitePresence: refuses coordinates and metres that cannot be real', () => {
+  const fix = (overrides: Partial<LocationReading>): LocationReading => ({ ...fixAt(120, 20), ...overrides });
+
+  it.each([
+    ['lat 91', { lat: 91 }],
+    ['lat -90.000001', { lat: -90.000001 }],
+    ['lng 180.5', { lng: 180.5 }],
+    ['lng -181', { lng: -181 }],
+    ['accuracy -50 (it would shrink the radius)', { accuracyM: -50 }],
+    ['accuracy NaN', { accuracyM: Number.NaN }],
+  ] as const)('a fix with %s', (_case, overrides) => {
+    expect(() => sitePresence(PIN, fix(overrides))).toThrow(RangeError);
+  });
+
+  it.each([
+    ['a NaN lat', { ...PIN, lat: Number.NaN }],
+    ['an infinite lng', { ...PIN, lng: Infinity }],
+    ['lat 91', { ...PIN, lat: 91 }],
+    ['lng 200', { ...PIN, lng: 200 }],
+    ['a negative radius', { ...PIN, radiusM: -1 }],
+    ['a NaN radius', { ...PIN, radiusM: Number.NaN }],
+  ])('a pin with %s, whatever the reading', (_case, pin) => {
+    expect(() => sitePresence(pin, fixAt(120, 20))).toThrow(RangeError);
+    expect(() => sitePresence(pin, { status: 'denied' })).toThrow(RangeError);
+  });
+
+  it('still decides on the edges of the globe and at accuracy 0', () => {
+    expect(sitePresence({ lat: 90, lng: 180, radiusM: 150 }, { status: 'fixed', lat: 90, lng: -180, accuracyM: 0 })).toEqual({
+      presence: 'on_site',
+      distanceM: 0,
+    });
+    expect(sitePresence({ ...PIN, radiusM: 0 }, fixAt(0, 0)).presence).toBe('on_site');
+  });
+
+  it('a reading that is not fixed ignores its numbers, as before', () => {
+    expect(sitePresence(PIN, { status: 'timeout', lat: 91, accuracyM: -5 })).toEqual({ presence: 'no_location', distanceM: null });
+  });
+});
+
+describe('distanceMeters: refuses a point off the globe', () => {
+  it.each([
+    [{ lat: 91, lng: 0 }],
+    [{ lat: 0, lng: -180.1 }],
+    [{ lat: Number.NaN, lng: 0 }],
+  ])('%o', (point) => {
+    expect(() => distanceMeters(point, PIN)).toThrow(RangeError);
+    expect(() => distanceMeters(PIN, point)).toThrow(RangeError);
+  });
+});

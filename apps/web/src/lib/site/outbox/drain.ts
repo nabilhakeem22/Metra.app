@@ -4,12 +4,13 @@
 //
 // Every /api/site call can die of the Workers CPU limit (Cloudflare's error
 // 1102 is an HTML page, not our JSON), so anything that is not a coded answer
-// from Metra is retried with backoff. Only a coded refusal parks an op, and
-// only a refused session pauses the queue. Nothing here ever drops an op.
+// from Metra is retried with backoff. Only a coded refusal parks an op, a
+// revoked device parks its studio's ops, and only a lost session pauses the
+// whole queue. Nothing here ever drops an op.
 import { prerequisiteKeys } from './dependencies';
 import type { OutboxError, OutboxRecord } from './types';
 
-export type AttemptVerdict = 'done' | 'retry' | 'pause_auth' | 'needs_attention' | 'refresh_upload';
+export type AttemptVerdict = 'done' | 'retry' | 'pause_auth' | 'device_revoked' | 'needs_attention' | 'refresh_upload';
 
 /** The HTTP status of an answer, or 'network' when none came back (offline, timeout, aborted). */
 export type AttemptStatus = number | 'network';
@@ -33,7 +34,9 @@ function readAnswer(body: unknown): SiteAnswer | null {
 
 /**
  * What one answer means for its op. 200 with `ok` is done (an `already` too).
- * 401 pauses the queue. 400, 403, 404, 409 and 422 park the op, except 409
+ * 401 `device_revoked` (this phone was removed from that studio) parks the
+ * studio's ops; any other 401 (the session is gone) pauses the whole queue,
+ * every studio's. 400, 403, 404, 409 and 422 park the op, except 409
  * `photo_not_uploaded`, which presigns again. Everything else retries: 429,
  * 5xx, no answer, any body that is not a coded answer (an HTML 1102 page, a
  * captive portal) and any status outside the site API's map.
@@ -43,7 +46,7 @@ export function classify(status: AttemptStatus, body: unknown): AttemptVerdict {
   const answer = readAnswer(body);
   if (answer === null) return 'retry';
   if (status === 200) return answer.ok ? 'done' : 'retry';
-  if (status === 401) return 'pause_auth';
+  if (status === 401) return !answer.ok && answer.error === 'device_revoked' ? 'device_revoked' : 'pause_auth';
   if (!REFUSAL_STATUSES.has(status)) return 'retry';
   if (status === 409 && !answer.ok && answer.error === 'photo_not_uploaded') return 'refresh_upload';
   return 'needs_attention';
@@ -74,7 +77,12 @@ function queueOf(records: readonly OutboxRecord[], userId: string): OutboxRecord
   return records.filter((record) => record.userId === userId).sort((a, b) => a.seq - b.seq);
 }
 
-/** The user's queued records whose prerequisites have all left the outbox; none while the queue is paused. */
+/**
+ * The user's queued records whose prerequisites have all left the outbox. None
+ * while the queue is paused: a lost session stops every studio's ops. A revoked
+ * device instead parks its own studio's ops (parkedForRevokedDevice), so the
+ * user's other studios keep sending.
+ */
 function unblocked(records: readonly OutboxRecord[], userId: string): OutboxRecord[] {
   const queue = queueOf(records, userId);
   if (queue.some((record) => record.state === 'paused_auth')) return [];

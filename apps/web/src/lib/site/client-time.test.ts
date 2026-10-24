@@ -6,8 +6,9 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const before = (ms: number) => new Date(SERVER_NOW.getTime() - ms);
-const after = (ms: number) => new Date(SERVER_NOW.getTime() + ms);
+/** The device time `ms` before or after the server's now, written as the phone writes it. */
+const before = (ms: number) => new Date(SERVER_NOW.getTime() - ms).toISOString();
+const after = (ms: number) => new Date(SERVER_NOW.getTime() + ms).toISOString();
 
 describe('deviceTimeProblem: the plan examples (AC3)', () => {
   it('a check-in 10 minutes ahead of the server is in_future', () => {
@@ -36,13 +37,20 @@ describe('deviceTimeProblem: the edges', () => {
     expect(deviceTimeProblem(before(30 * DAY + 1), SERVER_NOW)).toBe('too_old');
   });
 
-  it('accepts the server instant itself', () => {
-    expect(deviceTimeProblem(SERVER_NOW, SERVER_NOW)).toBeNull();
+  it('accepts the server instant itself, and reads an explicit offset as its instant', () => {
+    expect(deviceTimeProblem('2026-10-23T09:00:00Z', SERVER_NOW)).toBeNull();
+    expect(deviceTimeProblem('2026-10-23T12:05:00+03:00', SERVER_NOW)).toBeNull();
+    expect(deviceTimeProblem('2026-10-23T12:05:00.001+03:00', SERVER_NOW)).toBe('in_future');
   });
 
-  it('refuses to judge an invalid instant rather than wave it through', () => {
-    expect(() => deviceTimeProblem(new Date('nope'), SERVER_NOW)).toThrow(RangeError);
-    expect(() => deviceTimeProblem(SERVER_NOW, new Date('nope'))).toThrow(RangeError);
+  it('refuses to judge an invalid server instant rather than wave it through', () => {
+    expect(() => deviceTimeProblem(before(0), new Date('nope'))).toThrow(RangeError);
+  });
+
+  // F8 (S1 functional test): the clock checks read device times as strictly as cairoDate.
+  it.each(['nope', '2026-02-30T08:00:00Z', '2026-10-23T08:00:00', '1'])('refuses the device time %s', (deviceTime) => {
+    expect(() => deviceTimeProblem(deviceTime, SERVER_NOW)).toThrow(RangeError);
+    expect(() => isLateUpload(deviceTime, SERVER_NOW)).toThrow(RangeError);
   });
 });
 
@@ -57,7 +65,7 @@ describe('isLateUpload', () => {
     expect(isLateUpload(after(4 * MINUTE), SERVER_NOW)).toBe(false);
   });
 
-  it('refuses an invalid instant', () => {
-    expect(() => isLateUpload(new Date('nope'), SERVER_NOW)).toThrow(RangeError);
+  it('refuses an invalid server instant', () => {
+    expect(() => isLateUpload(before(0), new Date('nope'))).toThrow(RangeError);
   });
 });
