@@ -35,33 +35,23 @@ export interface PhaseRailProps {
 /** A closed phase (abandoned, terminated) mutes every step: none of it is reached any more. */
 type SegmentStatus = StepStatus | 'muted';
 
-function barClass(status: SegmentStatus): string {
-  switch (status) {
-    case 'done':
-      return 'bg-[color:var(--spine-done)]';
-    case 'current':
-      return 'bg-brand';
-    case 'muted':
-      return 'bg-[color:var(--rule)]';
-    default:
-      return 'bg-[color:var(--track)]';
-  }
-}
+const BAR_CLASS: Readonly<Record<SegmentStatus, string>> = {
+  done: 'bg-[color:var(--spine-done)]',
+  current: 'bg-brand',
+  upcoming: 'bg-[color:var(--track)]',
+  muted: 'bg-[color:var(--rule)]',
+};
 
 // HIERARCHY BY WEIGHT, NOT BY FADING. Pushing `--text-faint` down until it was
 // legible on --track brought it close to --text-muted, which flattens a
 // colour-only hierarchy. Weight carries the difference instead, and unlike
 // lightness it costs nothing in contrast.
-function labelClass(status: SegmentStatus): string {
-  switch (status) {
-    case 'current':
-      return 'font-bold text-brand-ink';
-    case 'done':
-      return 'font-medium text-[color:var(--text-muted)]';
-    default:
-      return 'font-normal text-[color:var(--text-faint)]';
-  }
-}
+const LABEL_CLASS: Readonly<Record<SegmentStatus, string>> = {
+  done: 'font-medium text-[color:var(--text-muted)]',
+  current: 'font-bold text-brand-ink',
+  upcoming: 'font-normal text-[color:var(--text-faint)]',
+  muted: 'font-normal text-[color:var(--text-faint)]',
+};
 
 function required<T>(entries: Readonly<Record<string, T>>, key: string, what: string): T {
   const entry = entries[key];
@@ -111,11 +101,11 @@ function StepSegment({
       className="flex min-w-[52px] flex-[1_1_auto] flex-col gap-1.5 md:min-w-max"
       aria-current={status === 'current' ? 'step' : undefined}
     >
-      <span className={`h-1 rounded-full ${barClass(status)}`} aria-hidden />
+      <span className={`h-1 rounded-full ${BAR_CLASS[status]}`} aria-hidden />
       {/* ICONS WHERE THEY MEAN SOMETHING. A step behind the job and the one it
           is on carry their glyph; a step not reached carries a dot, so the eye
           lands on where the icons stop without reading a word. */}
-      <span className={`flex min-w-0 items-start gap-1.5 ${labelClass(status)}`}>
+      <span className={`flex min-w-0 items-start gap-1.5 ${LABEL_CLASS[status]}`}>
         {status === 'done' || status === 'current' ? (
           <Icon className="size-[13px] shrink-0" aria-hidden />
         ) : (
