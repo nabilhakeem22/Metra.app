@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
+import { AnchoredLayer } from '@/components/ui/anchored-layer';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { ListboxOption } from '@/components/ui/listbox-option';
+import { useOutsidePointerDown } from '@/hooks/use-outside-pointer-down';
 
 export interface SectionOption {
   id: string;
@@ -10,12 +12,16 @@ export interface SectionOption {
   nameAr: string | null;
 }
 
+/** The tallest the suggestion list gets before it scrolls (max-h-56). */
+const LIST_MAX_HEIGHT = 224;
+
 /**
  * Section-title combobox (create-on-use). A single localized text field over a
- * lightweight popover of saved titles (no cmdk, no Radix Popover — one-new-dep
- * budget spent on the tooltip). Picking an option fills BOTH title fields;
- * typing a brand-new name keeps it on the section and fire-and-forgets onCreate
- * so it joins the library. Filtering matches either language. Logical CSS only.
+ * lightweight list of saved titles (no cmdk, no Radix Popover), drawn in an
+ * AnchoredLayer so the next card can never cover it. Picking an option fills
+ * BOTH title fields; typing a brand-new name keeps it on the section and
+ * fire-and-forgets onCreate so it joins the library. Filtering matches either
+ * language. Logical CSS only.
  */
 export function SectionCombobox({
   valueEn,
@@ -43,10 +49,10 @@ export function SectionCombobox({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
-  const listId = useMemo(
-    () => `sec-cb-${Math.random().toString(36).slice(2, 8)}`,
-    [],
-  );
+  const inputRef = useRef<HTMLInputElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  // React's id: the same on the server and the client, so aria-controls survives hydration.
+  const listId = useId();
 
   const label = (o: SectionOption) =>
     (isAr ? o.nameAr || o.nameEn : o.nameEn || o.nameAr) ?? '';
@@ -63,15 +69,8 @@ export function SectionCombobox({
     return list.slice(0, 8);
   }, [options, current]);
 
-  // Outside-click closes the popover.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
-  }, [open]);
+  // A press outside the field and its list closes the list.
+  useOutsidePointerDown(open, [rootRef, layerRef], () => setOpen(false));
 
   function setTyped(v: string) {
     onChange({
@@ -116,14 +115,16 @@ export function SectionCombobox({
         maybeCreate();
         setOpen(false);
       }
-    } else if (e.key === 'Escape') {
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      // Tab moves on to the next field (the list is not in the Tab order).
       setOpen(false);
     }
   }
 
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
+    <div ref={rootRef} className={className}>
       <Input
+        ref={inputRef}
         dir={isAr ? 'rtl' : 'ltr'}
         role="combobox"
         aria-expanded={open}
@@ -138,31 +139,28 @@ export function SectionCombobox({
         onBlur={maybeCreate}
       />
       {open && filtered.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          className="absolute start-0 z-20 mt-1 max-h-56 w-full overflow-auto border border-border bg-popover py-1 text-body shadow-card"
+        <AnchoredLayer
+          anchorRef={inputRef}
+          layerRef={layerRef}
+          width="anchor"
+          maxHeight={LIST_MAX_HEIGHT}
+          className="border border-border bg-popover py-1 text-body shadow-card"
         >
-          {filtered.map((o, i) => (
-            <li key={o.id} role="option" aria-selected={i === active}>
-              <button
-                type="button"
+          <ul id={listId} role="listbox">
+            {filtered.map((o, i) => (
+              <ListboxOption
+                key={o.id}
+                active={i === active}
                 dir={isAr ? 'rtl' : 'ltr'}
-                className={cn(
-                  'flex w-full items-center px-2.5 py-1.5 text-start transition-colors',
-                  i === active ? 'bg-muted text-foreground' : 'text-popover-foreground',
-                )}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  pick(o);
-                }}
-                onMouseEnter={() => setActive(i)}
+                className="items-center"
+                onPick={() => pick(o)}
+                onHover={() => setActive(i)}
               >
                 {label(o)}
-              </button>
-            </li>
-          ))}
-        </ul>
+              </ListboxOption>
+            ))}
+          </ul>
+        </AnchoredLayer>
       )}
     </div>
   );
