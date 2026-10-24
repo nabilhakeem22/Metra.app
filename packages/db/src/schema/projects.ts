@@ -5,8 +5,10 @@ import {
   check,
   date,
   index,
+  numeric,
   pgTable,
   text,
+  timestamp,
   unique,
   uniqueIndex,
   uuid,
@@ -25,6 +27,11 @@ import { projectTypes } from './project-types';
  * bilingual name, a same-org client, a nullable `type_id` referencing editable
  * project_types (set null on type delete), advance/retention %, an optional
  * description, a lifecycle status, dates/location, soft-deleted.
+ *
+ * The SITE PIN (Stage 3, 0064): the point and radius the site app's check-in
+ * is judged against. All five columns are set together or not at all
+ * (`projects_site_pin_shape`); the first engineer on site may set it, and only
+ * owner, admin or PM may move it (the cores decide; the audit log records it).
  */
 export const projects = pgTable(
   'projects',
@@ -52,6 +59,11 @@ export const projects = pgTable(
     address: text('address'),
     notes: text('notes'),
     active: boolean('active').notNull().default(true),
+    siteLat: numeric('site_lat', { precision: 9, scale: 6 }),
+    siteLng: numeric('site_lng', { precision: 9, scale: 6 }),
+    siteRadiusM: integer('site_radius_m'),
+    sitePinSetBy: uuid('site_pin_set_by'),
+    sitePinSetAt: timestamp('site_pin_set_at', { withTimezone: true }),
   },
   (t) => [
     unique('projects_org_id_id_unique').on(t.orgId, t.id),
@@ -65,6 +77,14 @@ export const projects = pgTable(
     check(
       'projects_retention_pct_range',
       sql`retention_pct >= 0 and retention_pct <= 100`,
+    ),
+    check(
+      'projects_site_pin_shape',
+      sql`num_nonnulls(site_lat, site_lng, site_radius_m, site_pin_set_by, site_pin_set_at) in (0, 5)`,
+    ),
+    check(
+      'projects_site_pin_range',
+      sql`site_lat between -90 and 90 and site_lng between -180 and 180 and site_radius_m between 30 and 2000`,
     ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     // Nullable type reference (set null when a type is deleted).

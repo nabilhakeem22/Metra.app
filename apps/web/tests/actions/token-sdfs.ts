@@ -64,6 +64,9 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // token-resolved and must not be reachable with an API key.
   { name: 'app_delivery_logo_by_token', args: 'text' },
   { name: 'app_delivery_close_target_by_token', args: 'text' },
+  // Stage 3 (0064): the studio-published site updates of the delivery's
+  // project. It returns object keys inside the studio's storage prefix.
+  { name: 'app_delivery_site_updates_by_token', args: 'text, date, integer' },
 ];
 
 /** The regprocedure text of one listed function. */

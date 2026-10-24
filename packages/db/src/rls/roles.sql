@@ -93,6 +93,26 @@ grant select, insert, update on public.contract_payment_claims to metra_app;
 -- Actual costs: editable and voidable (voided_at / voided_by), never deleted.
 revoke all on public.contract_cost_entries from metra_app;
 grant select, insert, update on public.contract_cost_entries to metra_app;
+-- Stage 3, the site diary (0064). The same `revoke all ... ; grant <exactly
+-- this>` form as the Stage 2 block, so a re-run converges any drift. All seven
+-- are SELECT + INSERT + UPDATE and NEVER DELETE: an assignment, a consent and a
+-- device end by a stamp (revoked_at / withdrawn_at), and a diary row is
+-- evidence whose only change is a void, a check-out, a publication or the
+-- coordinate purge (the guards in policies/70-site.sql say which columns).
+revoke all on public.project_assignments from metra_app;
+grant select, insert, update on public.project_assignments to metra_app;
+revoke all on public.site_location_consents from metra_app;
+grant select, insert, update on public.site_location_consents to metra_app;
+revoke all on public.site_devices from metra_app;
+grant select, insert, update on public.site_devices to metra_app;
+revoke all on public.site_visits from metra_app;
+grant select, insert, update on public.site_visits to metra_app;
+revoke all on public.site_photos from metra_app;
+grant select, insert, update on public.site_photos to metra_app;
+revoke all on public.site_material_receipts from metra_app;
+grant select, insert, update on public.site_material_receipts to metra_app;
+revoke all on public.site_notes from metra_app;
+grant select, insert, update on public.site_notes to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
@@ -356,6 +376,16 @@ grant execute on function public.enforce_payment_request_frozen() to metra_app;
 -- right after its CREATE (functions/35-execution.sql).
 grant execute on function public.enforce_contract_payment_fits() to metra_app;
 revoke execute on function public.enforce_contract_payment_fits() from public;
+-- Stage 3, the site diary (0064). The assignment write gate is SECURITY
+-- DEFINER and called by the restrictive insert policy AS the caller, so
+-- metra_app keeps EXECUTE and nobody else has it. The two evidence guards are
+-- plain trigger functions, granted for symmetry with the guards above. The
+-- gate is also locked down in place, right after its CREATE
+-- (functions/80-site.sql).
+grant execute on function public.app_may_write_site_project(uuid) to metra_app;
+revoke execute on function public.app_may_write_site_project(uuid) from public;
+grant execute on function public.enforce_site_entry_guard() to metra_app;
+grant execute on function public.enforce_site_visit_guard() to metra_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -372,6 +402,11 @@ revoke execute on function public.app_invitation_by_token(text) from public;
 -- Current-user orgs (SECURITY DEFINER); same least-privilege treatment.
 grant execute on function public.app_current_user_orgs() to metra_app;
 revoke execute on function public.app_current_user_orgs() from public;
+-- ...and the same rows as seen from one auth session (Stage 3, 0064): minus the
+-- orgs where that session's site device is revoked. Also locked down in place
+-- (functions/00-org-context.sql).
+grant execute on function public.app_current_user_orgs_for_session(uuid) to metra_app;
+revoke execute on function public.app_current_user_orgs_for_session(uuid) from public;
 
 -- Membership second-factor helpers for RLS (SECURITY DEFINER); same treatment.
 grant execute on function public.app_is_current_org_member() to metra_app;
@@ -481,6 +516,11 @@ grant execute on function public.app_boq_releasable(uuid) to metra_app;
 revoke execute on function public.app_boq_releasable(uuid) from public;
 grant execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) to metra_app;
 revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from public;
+-- Stage 3, the site diary (0064): the client's published site updates, by
+-- share token. Same treatment as the other portal SDFs; also locked down in
+-- place, right after its CREATE (functions/85-site-portal.sql).
+grant execute on function public.app_delivery_site_updates_by_token(text, date, integer) to metra_app;
+revoke execute on function public.app_delivery_site_updates_by_token(text, date, integer) from public;
 
 do $$
 declare
@@ -640,6 +680,19 @@ begin
       );
       execute format(
         'revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from %I',
+        r
+      );
+      -- Stage 3, the site diary (0064).
+      execute format(
+        'revoke execute on function public.app_current_user_orgs_for_session(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_may_write_site_project(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_site_updates_by_token(text, date, integer) from %I',
         r
       );
     end if;

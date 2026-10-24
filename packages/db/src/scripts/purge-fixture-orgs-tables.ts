@@ -18,7 +18,11 @@ import { orgScopedTableNames } from './schema-catalogue';
  * this block references proposals/contracts/variation_orders.
  */
 export const TRIGGER_GUARDED_TABLES = [
-  // Stage 2 (0063), FIRST: payment requests reference variation orders and the
+  // Stage 3 (0064), FIRST: the site diary's evidence guards raise MT100 on any
+  // DELETE. Notes, materials and photos point at a visit (3-column restrict);
+  // a material at a photo (set null), a contract and a contract line.
+  'site_notes', 'site_material_receipts', 'site_photos', 'site_visits',
+  // Stage 2 (0063), next: payment requests reference variation orders and the
   // schedule (restrict) and are frozen by trg_payment_requests_frozen, the
   // schedule by the contract child-draft guard. Claims -> payments -> requests
   // -> milestones, then measurements and cost entries (3-column FKs into
@@ -40,7 +44,10 @@ export const REMAINING_TABLES = [
   'engagement_change_orders', 'payment_events',
   'engagement_events', 'engagement_artifacts',
   'engagement_milestones', 'engagement_transitions', 'design_engagements',
-  'price_change_lines', 'price_changes', 'project_stages', 'projects',
+  'price_change_lines', 'price_changes', 'project_stages',
+  // Stage 3 (0064): assignments point at projects (restrict); consents and
+  // devices only at the org.
+  'project_assignments', 'site_location_consents', 'site_devices', 'projects',
   'project_types', 'stage_templates', 'activities', 'client_contacts',
   'clients', 'cost_items', 'sections', 'files', 'document_categories',
   'notifications', 'automation_run_log', 'automation_settings', 'audit_log',

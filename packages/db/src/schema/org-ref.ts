@@ -85,17 +85,44 @@ export interface SameContractTarget {
   id: AnyPgColumn;
 }
 
+export interface SameProjectTarget {
+  orgId: AnyPgColumn;
+  projectId: AnyPgColumn;
+  id: AnyPgColumn;
+}
+
 /**
- * The 3-column FK `(org_id, contract_id, <name>_id) -> target(org_id, contract_id, id)`
- * (Stage 2, 0063): a child that names a row of a contract (a line, a section, a
- * payment request) can only name a row of ITS OWN contract, as a database fact.
- * Precondition: `target` has unique(org_id, contract_id, id).
- *
- * RESTRICT by default; `cascade` only where the child is part of its parent
- * (a contract line of its section). NO index is emitted: every caller declares
+ * The 3-column FK `(org_id, <scope>_id, <name>_id) -> target(org_id, <scope>_id, id)`:
+ * a child that names a row inside a scope (a contract, a project) can only name
+ * a row of ITS OWN scope, as a database fact. Precondition: `target` has
+ * unique(org_id, <scope>_id, id). NO index is emitted: every caller declares
  * the index its reads need. A nullable `<name>_id` is unchecked while null
  * (MATCH SIMPLE), which is what an optional target means. Never `set null`: it
- * would null contract_id too (the 0052 defect, one column wider).
+ * would null the scope column too (the 0052 defect, one column wider).
+ */
+function sameScopeFk(
+  t: Record<string, AnyPgColumn>,
+  scope: 'contract' | 'project',
+  name: string,
+  targetScopeColumn: AnyPgColumn,
+  target: { orgId: AnyPgColumn; id: AnyPgColumn },
+  onDelete: 'restrict' | 'cascade',
+) {
+  const table = getTableName(
+    (t.orgId as unknown as { table: Parameters<typeof getTableName>[0] }).table,
+  );
+  return foreignKey({
+    columns: [t.orgId, t[`${scope}Id`], t[`${name}Id`]],
+    foreignColumns: [target.orgId, targetScopeColumn, target.id],
+    name: `${table}_${name}_same_${scope}_fk`,
+  }).onDelete(onDelete);
+}
+
+/**
+ * `(org_id, contract_id, <name>_id) -> target(org_id, contract_id, id)` (Stage 2,
+ * 0063): a line, a section, a payment request of THIS contract. RESTRICT by
+ * default; `cascade` only where the child is part of its parent (a contract
+ * line of its section).
  */
 export function sameContractFk(
   t: Record<string, AnyPgColumn>,
@@ -103,12 +130,18 @@ export function sameContractFk(
   target: SameContractTarget,
   opts?: { onDelete?: 'restrict' | 'cascade' },
 ) {
-  const table = getTableName(
-    (t.orgId as unknown as { table: Parameters<typeof getTableName>[0] }).table,
-  );
-  return foreignKey({
-    columns: [t.orgId, t.contractId, t[`${name}Id`]],
-    foreignColumns: [target.orgId, target.contractId, target.id],
-    name: `${table}_${name}_same_contract_fk`,
-  }).onDelete(opts?.onDelete ?? 'restrict');
+  return sameScopeFk(t, 'contract', name, target.contractId, target, opts?.onDelete ?? 'restrict');
+}
+
+/**
+ * `(org_id, project_id, <name>_id) -> target(org_id, project_id, id)` (Stage 3,
+ * 0064): a site visit, an execution contract of THIS project. Always RESTRICT:
+ * a diary row is evidence and is never removed with its parent.
+ */
+export function sameProjectFk(
+  t: Record<string, AnyPgColumn>,
+  name: string,
+  target: SameProjectTarget,
+) {
+  return sameScopeFk(t, 'project', name, target.projectId, target, 'restrict');
 }

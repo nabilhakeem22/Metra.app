@@ -51,7 +51,7 @@ interface Catalogues {
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
 
-/** The sixteen tables `verify-rls-applied.ts` reads back, in the order it asks. */
+/** The twenty-three tables `verify-rls-applied.ts` reads back, in the order it asks. */
 const NARROWED_TABLE_NAMES = [
   'boqs',
   'contract_cost_entries',
@@ -68,6 +68,13 @@ const NARROWED_TABLE_NAMES = [
   'market_price_observations',
   'market_seed_book',
   'payment_requests',
+  'project_assignments',
+  'site_devices',
+  'site_location_consents',
+  'site_material_receipts',
+  'site_notes',
+  'site_photos',
+  'site_visits',
   'workspace_entitlements',
 ];
 
@@ -280,7 +287,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('58 tables, 58 policies, 18 triggers, 47 functions');
+    expect(declaredCounts()).toBe('65 tables, 69 policies, 22 triggers, 52 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -289,11 +296,13 @@ describe('verifyRlsApplied', () => {
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
       'grants verified — design_engagements update narrowed to 19 columns with no ' +
-        'table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, ' +
+        'table-level update, and 23 narrowed table(s) (boqs, contract_cost_entries, ' +
         'contract_line_measurements, contract_payment_claims, contract_payments, ' +
         'document_categories, engagement_document_comments, engagement_milestones, ' +
         'market_bulletins, market_categories, market_item_details, market_items, ' +
-        'market_price_observations, market_seed_book, payment_requests, workspace_entitlements) ' +
+        'market_price_observations, market_seed_book, payment_requests, project_assignments, ' +
+        'site_devices, site_location_consents, site_material_receipts, site_notes, site_photos, ' +
+        'site_visits, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every ' +
         'column but seq; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.',
     );

@@ -211,8 +211,9 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
       'boqs.source_proposal_id',
       'contract_payment_claims.confirmed_payment_id',
       'contract_cost_entries.cost_item_id',
+      'site_material_receipts.photo_id',
     ]);
-    expect(declaredCompositeSetNullFks().size).toBe(15);
+    expect(declaredCompositeSetNullFks().size).toBe(16);
     expect([...narrowedBy0052(), ...narrowedAtCreation()].sort()).toEqual(declaredEdges());
   });
 

@@ -153,6 +153,70 @@ begin
 end
 $$;
 
+-- The current user's orgs AS SEEN FROM ONE AUTH SESSION (Stage 3, 0064): the
+-- same rows as app_current_user_orgs(), minus every org in which the caller's
+-- site device for that session (site_devices.auth_session_id = the JWT
+-- `session_id` claim) has been REVOKED. So an owner who revokes a phone cuts
+-- that phone from that studio only, in the site app and in the studio pages,
+-- while the same user's other studios, and his other sessions, keep working.
+-- An unknown session (no device row) loses nothing.
+--
+-- SECURITY DEFINER, scoped to app.current_user_id exactly like its sibling,
+-- which it reads rather than repeats; the device rows it consults are the
+-- caller's own. It never widens: it can only return FEWER rows than
+-- app_current_user_orgs(). Not dropped first: it is new, and its return type
+-- is its sibling's. (A `$$` body records no dependency, so the sibling's own
+-- drop above still runs; this CREATE re-validates against it in the same
+-- transaction.)
+create or replace function public.app_current_user_orgs_for_session(p_session_id uuid)
+returns table (
+  org_id uuid,
+  role public.member_role,
+  name_ar text,
+  name_en text,
+  account_id uuid,
+  account_name_ar text,
+  account_name_en text
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select o.org_id, o.role, o.name_ar, o.name_en, o.account_id, o.account_name_ar, o.account_name_en
+  from public.app_current_user_orgs() o
+  where not exists (
+    select 1
+      from public.site_devices d
+     where d.org_id = o.org_id
+       and d.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+       and d.auth_session_id = p_session_id
+       and d.revoked_at is not null
+  )
+$$;
+
+-- Same-transaction lockdown, as for its sibling: a NEW function is executable
+-- by PUBLIC from the moment CREATE commits, and roles.sql runs several files
+-- later.
+revoke all on function public.app_current_user_orgs_for_session(uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_current_user_orgs_for_session(uuid) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_current_user_orgs_for_session(uuid) to metra_app;
+  end if;
+end
+$$;
+
 -- ===========================================================================
 -- Membership second factor for RLS. These run inside the request transaction
 -- (as metra_app, which is granted execute) and read the request GUCs. SECURITY

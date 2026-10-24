@@ -35,6 +35,8 @@ export const RLS_APPLY_ORDER = [
   'functions/40-delivery-read.sql',
   'functions/50-delivery-write.sql',
   'functions/60-delivery-documents.sql',
+  'functions/80-site.sql',
+  'functions/85-site-portal.sql',
   'immutability.sql',
   'rom-issue-trigger.sql',
   'roles.sql',
@@ -46,6 +48,7 @@ export const RLS_APPLY_ORDER = [
   'policies/40-engagements.sql',
   'policies/50-automation.sql',
   'policies/60-market.sql',
+  'policies/70-site.sql',
 ] as const;
 
 export type RlsFile = (typeof RLS_APPLY_ORDER)[number];

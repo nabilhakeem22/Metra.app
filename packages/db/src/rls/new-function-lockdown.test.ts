@@ -111,6 +111,19 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     signature: 'public.app_variation_respond_by_token(text, text, text, text, text)',
     grantsApp: true,
   },
+  // Stage 3 (0064): the session-scoped org list, the assignment write gate the
+  // restrictive insert policy calls, and the client's published site updates.
+  {
+    file: 'functions/00-org-context.sql',
+    signature: 'public.app_current_user_orgs_for_session(uuid)',
+    grantsApp: true,
+  },
+  { file: 'functions/80-site.sql', signature: 'public.app_may_write_site_project(uuid)', grantsApp: true },
+  {
+    file: 'functions/85-site-portal.sql',
+    signature: 'public.app_delivery_site_updates_by_token(text, date, integer)',
+    grantsApp: true,
+  },
 ];
 
 /** The argument types a CREATE declares, as `pg_proc` would list them: `text, uuid`. */
