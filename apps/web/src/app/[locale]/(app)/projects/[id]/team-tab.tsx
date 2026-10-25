@@ -25,6 +25,7 @@ export async function TeamTab({ projectId, data }: { projectId: string; data: Te
     <SiteTeamPanel
       projectId={projectId}
       members={data.members}
+      notShown={data.notShown}
       canManage={data.access === 'manage'}
       currentUserId={data.currentUserId}
     />

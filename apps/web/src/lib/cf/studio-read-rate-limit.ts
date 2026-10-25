@@ -15,8 +15,10 @@ import type { OrgContext } from '@/lib/db/context';
 //                              book picker, which ask once per pause in
 //                              typing, the market prices search
 //                              (/market-book?q=, once per submitted search),
-//                              and the price book's market link combobox
-//                              (once per pause in typing).
+//                              the price book's market link combobox
+//                              (once per pause in typing), and the project
+//                              site team picker (once per pause in typing,
+//                              and once per page it fills).
 //
 // THE KEY is the surface, the workspace and the member: one budget per member
 // per surface in each workspace, so one picker never spends the other's.
@@ -40,6 +42,7 @@ const STUDIO_READ_BINDINGS = {
   price_book_picker: 'STUDIO_SEARCH_RATE_LIMITER',
   market_search: 'STUDIO_SEARCH_RATE_LIMITER',
   market_link_search: 'STUDIO_SEARCH_RATE_LIMITER',
+  site_team_candidates: 'STUDIO_SEARCH_RATE_LIMITER',
 } as const;
 
 export type StudioReadSurface = keyof typeof STUDIO_READ_BINDINGS;

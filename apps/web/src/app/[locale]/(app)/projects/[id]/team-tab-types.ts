@@ -1,19 +1,20 @@
 // What the project's Team tab renders, as plain data: built on the server
 // (./team-tab-data.ts), read by the client tab. Types only.
-import type { MemberRole } from '@/lib/permissions/roles';
+import type { SiteTeamPerson } from '@/lib/site/assignments/types';
 
-/** A studio member who may be on this project's site team. */
-export interface SiteTeamMember {
-  userId: string;
-  role: MemberRole;
-  /** The display name the member gave himself, cleaned; null when he gave none. */
-  name: string | null;
-  /** The verified email, only for a viewer who manages the site team; else null. */
-  email: string | null;
-  /** ISO time his live assignment on this project began; null when he is not on it. */
-  assignedAt: string | null;
+/** A member on this project's site team. */
+export interface SiteTeamMember extends SiteTeamPerson {
+  /** ISO time his live assignment on this project began. */
+  assignedAt: string;
 }
 
 export type TeamTabData =
   | { access: 'none' }
-  | { access: 'read' | 'manage'; members: SiteTeamMember[]; currentUserId: string };
+  | {
+      access: 'read' | 'manage';
+      /** The first SITE_TEAM_LIST_LIMIT members of the site team. */
+      members: SiteTeamMember[];
+      /** How many more are on the team and not rendered. */
+      notShown: number;
+      currentUserId: string;
+    };

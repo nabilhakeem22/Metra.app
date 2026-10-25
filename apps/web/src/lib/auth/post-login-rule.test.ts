@@ -11,9 +11,16 @@ const FROM_SITE_APP = { returnTo: 'site' as const, siteAppLive: true };
 const NOT_LIVE = { siteAppLive: false };
 
 describe('postLoginPathOf, with the site app live', () => {
-  it('sends the site app login link (return=site) to /site, whatever the memberships', () => {
-    const cases: Array<readonly MemberRole[] | null> = [['owner'], ['site_engineer'], [], null];
+  it('sends the site app login link (return=site) to /site for anyone with an internal membership', () => {
+    const cases: Array<readonly MemberRole[]> = [['owner'], ['site_engineer'], ['viewer', 'client'], ['accountant']];
     for (const roles of cases) expect(postLoginPathOf(roles, FROM_SITE_APP), String(roles)).toBe('/site');
+  });
+
+  it('sends return=site with no internal membership along the normal path (F5)', () => {
+    expect(postLoginPathOf([], FROM_SITE_APP), 'no membership').toBe('/onboarding');
+    expect(postLoginPathOf(['client'], FROM_SITE_APP), 'a client membership only').toBe('/dashboard');
+    expect(postLoginPathOf(['client', 'client'], FROM_SITE_APP)).toBe('/dashboard');
+    expect(postLoginPathOf(null, FROM_SITE_APP), 'an unread probe').toBe('/dashboard');
   });
 
   it('sends a person whose every internal membership is site engineer to /site', () => {

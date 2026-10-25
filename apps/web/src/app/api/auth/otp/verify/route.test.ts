@@ -95,10 +95,18 @@ describe('POST /api/auth/otp/verify', () => {
       expect((await verify(EMAIL_CODE)).body).toEqual({ ok: true, next: '/dashboard' });
     });
 
-    it('with the app live, a failed probe still honours return=site', async () => {
+    it('with the app live, return=site with no internal membership takes the normal path (F5)', async () => {
+      siteApp.live = true;
+      doubles.withUserContext.mockResolvedValueOnce([]);
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/onboarding' });
+      doubles.withUserContext.mockResolvedValueOnce([{ role: 'client' }]);
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/dashboard' });
+    });
+
+    it('with the app live, a failed probe takes the normal path even with return=site', async () => {
       siteApp.live = true;
       doubles.withUserContext.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
-      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/site' });
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/dashboard' });
     });
   });
 

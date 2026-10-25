@@ -524,7 +524,8 @@
       "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
       "not_whole_number": "Enter a whole number, without a fraction.",
       "in_future": "This time is later than now. Check the clock on your phone, then try again.",
-      "too_old": "This is from more than 30 days ago, too long ago to record. Check the clock on your phone."
+      "too_old": "This is from more than 30 days ago, too long ago to record. Check the clock on your phone.",
+      "not_internal_member": "This person is no longer an internal member of the studio, so we took them off the list. Pick someone else."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -1304,7 +1305,15 @@
         "assignedOn": "On the team since {date}",
         "noCandidates": "Everyone in the studio is already on this site team.",
         "readonly": "Only the owner, an admin or a project manager can change the site team.",
-        "noAccess": "Your role does not show the site team."
+        "noAccess": "Your role does not show the site team.",
+        "findLabel": "Find a member",
+        "findHint": "Type the start of a name or an email. The list shows 20 members at a time.",
+        "candidatesLoading": "Loading members",
+        "noMatches": "No member here matches that name or email.",
+        "moreCandidates": "More members",
+        "notShown": "{count, plural, one {Plus {countText} more member on the team, not shown here.} other {Plus {countText} more members on the team, not shown here.}}",
+        "alreadyRemoved": "They were already off the site team. The list is up to date now.",
+        "candidatesFailed": "We could not load the members. Try again."
       },
       "proposals": {
         "title": "Proposals",
@@ -3276,7 +3285,8 @@
         "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
         "not_whole_number": "Please enter a whole number, without a fraction.",
         "in_future": "This time is later than now. Please check the clock on your device and try again.",
-        "too_old": "This is from more than 30 days ago, too long ago to record. Please check the clock on your device."
+        "too_old": "This is from more than 30 days ago, too long ago to record. Please check the clock on your device.",
+        "not_internal_member": "This person is no longer an internal member of the studio, so they were taken off the list. Choose someone else."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",

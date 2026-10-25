@@ -262,22 +262,85 @@ describe('what the database still refuses after a core assigned (S2 rules the co
 });
 
 describe('listProjectSiteTeam', () => {
-  it('lists every internal member once, with the live assignment on this project only, and no client', async () => {
+  it('lists only the members with a live assignment on this project, longest on it first, and never a client', async () => {
     const project = await freshProject();
     const elsewhere = await freshProject();
     await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: memberOf.site_engineer });
     await assignSiteMemberCore(ownerCtx(), { projectId: elsewhere, userId: memberOf.viewer });
     await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: memberOf.accountant });
     await unassignSiteMemberCore(ownerCtx(), { projectId: project, userId: memberOf.accountant });
+    await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: memberOf.project_manager });
 
-    const team = await listProjectSiteTeam(ctxOf('viewer'), project);
-    const byUser = new Map(team.map((row) => [row.userId, row]));
-    expect(team.length).toBe(byUser.size);
-    expect(byUser.has(memberOf.client)).toBe(false);
-    expect(byUser.get(memberOf.site_engineer)?.assignedAt).toBeInstanceOf(Date);
-    expect(byUser.get(memberOf.viewer)?.assignedAt, 'assigned on another project').toBeNull();
-    expect(byUser.get(memberOf.accountant)?.assignedAt, 'taken off').toBeNull();
-    expect(byUser.get(ownerId)).toEqual({ userId: ownerId, role: 'owner', assignedAt: null });
-    expect(team.some((row) => row.userId === otherOrgMemberId)).toBe(false);
+    const team = await listProjectSiteTeam(ctxOf('viewer'), project, 30);
+    expect(team.members.map((member) => member.userId)).toEqual([memberOf.site_engineer, memberOf.project_manager]);
+    expect(team.members[0]).toMatchObject({ role: 'site_engineer', assignedAt: expect.any(Date) });
+    expect(team.total).toBe(2);
+  });
+
+  it('renders at most `limit` of a long team and counts the whole of it', async () => {
+    const project = await freshProject();
+    for (let index = 0; index < 5; index += 1) {
+      await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: await seedMember(orgId, 'site_engineer') });
+    }
+    const team = await listProjectSiteTeam(ownerCtx(), project, 3);
+    expect(team.members).toHaveLength(3);
+    expect(team.total).toBe(5);
+    expect(await listProjectSiteTeam(ownerCtx(), await freshProject(), 3)).toEqual({ members: [], total: 0 });
+  });
+
+  it("shows another studio's project as an empty team", async () => {
+    expect(await listProjectSiteTeam(ownerCtx(), otherOrgProjectId, 30)).toEqual({ members: [], total: 0 });
+  });
+});
+
+describe('the security test repros (S3 round), kept', () => {
+  it.each<MemberRole>(['site_engineer', 'viewer', 'accountant', 'client'])(
+    'a %s carrying a forged owner role in its context cannot assign or take off: the database refuses',
+    async (real) => {
+      const project = await freshProject();
+      const engineer = await seedMember(orgId, 'site_engineer');
+      const forged = ctxFor(orgId, memberOf[real], 'owner');
+      expect((await assignSiteMemberCore(forged, { projectId: project, userId: engineer })).ok).toBe(false);
+      expect(await assignmentsOf(project, engineer)).toEqual([]);
+      await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: engineer });
+      expect((await unassignSiteMemberCore(forged, { projectId: project, userId: engineer })).ok).toBe(false);
+      expect((await assignmentsOf(project, engineer))[0].revoked_at).toBeNull();
+    },
+  );
+
+  it('a project manager removed mid-session (his context still says PM) cannot assign', async () => {
+    const pm = await seedMember(orgId, 'project_manager');
+    const engineer = await seedMember(orgId, 'site_engineer');
+    const project = await freshProject();
+    await ownerQuery(`delete from public.memberships where org_id = $1 and user_id = $2`, [orgId, pm]);
+    expect((await assignSiteMemberCore(ctxFor(orgId, pm, 'project_manager'), { projectId: project, userId: engineer })).ok).toBe(false);
+    expect(await assignmentsOf(project, engineer)).toEqual([]);
+  });
+
+  it('a member who is an engineer here and a client in another studio is assigned, audited with his role here', async () => {
+    const engineer = await seedMember(orgId, 'site_engineer');
+    await ownerQuery(`insert into public.memberships (org_id, user_id, role) values ($1, $2, 'client')`, [otherOrgId, engineer]);
+    const project = await freshProject();
+    expect(await assignSiteMemberCore(ownerCtx(), { projectId: project, userId: engineer })).toEqual({ ok: true });
+    const [row] = await assignmentsOf(project, engineer);
+    expect((await auditOf(row.id))[0].after).toEqual({ project_id: project, user_id: engineer, role: 'site_engineer' });
+  });
+
+  it("another studio's engineer on another studio's project is project_not_found (the project is checked first), and nothing is written", async () => {
+    expect(await assignSiteMemberCore(ownerCtx(), { projectId: otherOrgProjectId, userId: otherOrgMemberId })).toEqual({
+      ok: false,
+      error: 'project_not_found',
+    });
+    const rows = await ownerQuery(`select id from public.project_assignments where user_id = $1`, [otherOrgMemberId]);
+    expect(rows).toEqual([]);
+  });
+
+  it.each<[string, unknown]>([
+    ['an array for the member', { projectId: randomUUID(), userId: ['x'] }],
+    ['an object that prints as a uuid', { projectId: { toString: () => randomUUID() }, userId: randomUUID() }],
+    ['a quote-or-1=1 project id', { projectId: "' or 1=1 --", userId: randomUUID() }],
+  ])('%s is malformed for both cores', async (_label, input) => {
+    expect(await assignSiteMemberCore(ownerCtx(), input as never)).toEqual({ ok: false, error: 'malformed' });
+    expect(await unassignSiteMemberCore(ownerCtx(), input as never)).toEqual({ ok: false, error: 'malformed' });
   });
 });

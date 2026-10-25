@@ -13,12 +13,19 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import { recordAudit } from '@/lib/audit';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { closeSiteAccessOfRemovedMember } from '@/lib/site/member-removal';
+import { closeSiteAccessOf } from '@/lib/site/close-site-access';
+import { mayJoinSiteTeam } from '@/lib/site/access';
 
 function isMemberRole(role: string): role is MemberRole {
   return (MEMBER_ROLES as readonly string[]).includes(role);
 }
 
+/**
+ * Change a member's role. A role that may not be on a site team (today: client)
+ * closes his live site assignments and phones here in the same transaction
+ * (lib/site/close-site-access.ts); giving the old role back revives none of
+ * them, he is assigned again from the project's Team tab.
+ */
 export async function changeMemberRoleCore(
   ctx: OrgContext,
   input: { userId: string; role: MemberRole },
@@ -58,13 +65,16 @@ export async function changeMemberRoleCore(
         before: { role: target.role },
         after: { role },
       });
+      if (!mayJoinSiteTeam(role)) {
+        await closeSiteAccessOf(tx, audit, { memberId: input.userId, closedBy: ctx.userId, via: 'role_changed' });
+      }
     },
   );
 }
 
 /**
  * Remove a member from the studio. In the same transaction his live site
- * assignments and signed-in phones here are revoked (lib/site/member-removal.ts),
+ * assignments and signed-in phones here are revoked (lib/site/close-site-access.ts),
  * so nothing on the site side outlives the membership.
  */
 export async function removeMemberCore(
@@ -92,7 +102,7 @@ export async function removeMemberCore(
         await ensureNotLastOwner(tx);
       }
 
-      await closeSiteAccessOfRemovedMember(tx, audit, { memberId: userId, removedBy: ctx.userId });
+      await closeSiteAccessOf(tx, audit, { memberId: userId, closedBy: ctx.userId, via: 'member_removed' });
       await tx.delete(memberships).where(eq(memberships.id, target.id));
       await audit({
         entity: 'membership',

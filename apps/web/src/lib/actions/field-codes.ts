@@ -48,6 +48,9 @@ export const FIELD_CODE_PARAMS = {
   // A moment older than the site diary accepts (a check-in or photo time past
   // 30 days): the phone's clock is wrong, or the item waited there too long.
   too_old: [],
+  // A member picked for a project's site team who meanwhile left the studio
+  // or became a client: he is no longer someone who may be on a site team.
+  not_internal_member: [],
 } as const satisfies Record<string, readonly string[]>;
 
 export type FieldCode = keyof typeof FIELD_CODE_PARAMS;

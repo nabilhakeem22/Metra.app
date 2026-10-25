@@ -8,7 +8,11 @@ import { formatDate } from '@/lib/format/date';
 import { siteTeamMemberLabel } from './site-team-label';
 import type { SiteTeamMember } from './team-tab-types';
 
-/** The members on the project's site team; a remove button on each when `onRemove` is given. */
+/**
+ * The members on the project's site team; a remove button on each when
+ * `onRemove` is given. The button is never disabled while a removal is in
+ * flight (`onRemove` ignores a second press), so the keyboard focus stays on it.
+ */
 export function TeamSiteList({
   members,
   currentUserId,
@@ -59,7 +63,8 @@ export function TeamSiteList({
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={removing}
+                  className="aria-disabled:opacity-60"
+                  aria-disabled={removing}
                   onClick={() => onRemove(member.userId, label)}
                   aria-label={`${t('remove')}: ${label}`}
                 >
