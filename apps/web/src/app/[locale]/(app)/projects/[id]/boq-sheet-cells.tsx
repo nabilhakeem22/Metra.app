@@ -21,8 +21,11 @@ export function Th({
   sticky?: StickyColumn;
 }) {
   return (
+    // A figure's header is LTR like the figures under it (the money law), so on
+    // an Arabic sheet it sits over them, as the payments Amount header does.
     <th
       scope="col"
+      dir={num ? 'ltr' : undefined}
       className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 text-caption font-bold text-[color:var(--thead-ink)] ltr:font-mono ltr:uppercase ltr:tracking-[0.09em] ${num ? 'text-end' : 'text-start'}`}
       style={{
         zIndex: sticky ? 4 : 3,

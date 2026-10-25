@@ -15,7 +15,7 @@ Everything below assumes these. Nobody had written them down in one place.
 | Postgres | Supabase `eu-west-1`, reached through the **Hyperdrive** binding to the **session pooler `:5432`**. The Worker never dials Supabase directly |
 | Files | Supabase Storage, private `metra-files` bucket, signed URLs |
 | PDF | `@cloudflare/puppeteer` on the **`BROWSER`** binding (Cloudflare Browser Rendering) - **not** a bundled Chromium |
-| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). It **fails open**; the contract is [API.md](API.md), which this file deliberately does not restate |
+| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). A binding **error** (or a limiter that does not answer in time) **fails open**; a binding **missing** on Cloudflare is a misdeployed Worker and the surface **refuses** rather than serve unlimited. The Public API contract is [API.md](API.md); the studio read budgets have a smoke test under *The rescue ledger and the studio read budgets* |
 | Cron | worker **`metra-cron`** (`workers/cron`), a separate wrangler project outside the npm workspaces. Needs `APP_ORIGIN` and a `CRON_SECRET` matching `metra-web`'s |
 | Deploy trigger | `deploy.yml`, on `workflow_run` of **CI** on `main`, gated on the repository variable **`DEPLOY_ENABLED == 'true'`** |
 | Rollback lever | **`npx wrangler rollback <version-id>`** on the Worker (from `apps/web`) - not a git revert. The command and what it does not undo are under *Rolling back* |
@@ -28,9 +28,14 @@ CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
 
 Manual deploy (fallback, from a machine with `wrangler login` done):
 
+The build carries `--dangerouslyUseUnsupportedNextVersion` until the Next 16
+upgrade: OpenNext refuses Next 15 after its support window ended on Oct 21
+2026, and the flag skips only that date check (owner decision, Oct 22).
+
 ```bash
 cd apps/web
-NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build
+NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+node scripts/emit-static-pages.mjs
 npx wrangler deploy
 ```
 
@@ -38,6 +43,39 @@ Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
 `main` triggers `deploy.yml`, which builds and `wrangler deploy`s the worker.
 `DEPLOY_ENABLED` must be `true` or the deploy job is skipped, so a merge with
 the flag unset ships nothing and reports nothing.
+
+### Static pages are served before the Worker
+
+On the Workers Free plan every Worker request may use 10 ms of CPU, and a
+request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`
+and `/en/login` never reach the Worker: they are static assets, which
+Cloudflare serves before the Worker runs, at no CPU cost.
+
+- `/` is `apps/web/public/index.html`, a tiny page that picks the locale in the
+  browser (the `NEXT_LOCALE` cookie, then the browser's languages, then
+  `ar-EG`).
+- The landing and login pages are pre-rendered at build time.
+  `scripts/emit-static-pages.mjs` copies their HTML into `.open-next/assets`
+  (OpenNext does not). It runs after the OpenNext build in both workflows and
+  fails the build if a page stopped being static. A manual build without it
+  still works, but the Worker renders those pages again, 1102s and all.
+
+Three rules keep this working:
+
+1. **Never make a server action reachable from the landing or login page.**
+   Next posts a server action to the current page URL, and Cloudflare answers
+   any POST to a static asset with **405 Method Not Allowed**. It works in
+   `next dev` (no asset layer) and breaks only in production. That is why
+   sign-in posts to `/api/auth/otp/send` and `/api/auth/otp/verify`.
+   `src/test/static-pages.test.ts` fails if an action module becomes reachable.
+2. **Never set `run_worker_first` or `not_found_handling`** on the `assets`
+   block of `wrangler.jsonc`. The first sends every request through the Worker
+   again. `not_found_handling: "single-page-application"` would answer every
+   unknown navigation with `index.html`, the `/` redirector.
+   `src/test/wrangler-assets.test.ts` fails on either.
+3. **Keep both pages free of request-time APIs** (`cookies()`, `headers()`, the
+   Supabase server client). They export `dynamic = 'error'`, so the build fails
+   rather than quietly rendering them per request.
 
 ### Two things that were fixed to get here
 
@@ -2728,6 +2766,28 @@ in the same revert, or the next `db:apply-rls` fails on the missing table.
 **(3) The seeded items:** a studio seeded at sign-up or from its empty price
 book has the same `MKT-` codes and market links as one the CLI seeded, so the
 undo of *Seeding studio price books from the market book* removes them too.
+
+### The rescue ledger and the studio read budgets (PR BR): smoke test
+
+No database step. The deploy adds two Rate Limiting bindings, which
+`wrangler deploy` creates from `apps/web/wrangler.jsonc`:
+`STUDIO_READ_RATE_LIMITER` (namespace 1005, 30 per 60 s: the rescue ledger
+route) and `STUDIO_SEARCH_RATE_LIMITER` (namespace 1006, 120 per 60 s: the
+contract line picker, the price book picker and the market prices search).
+Each is keyed per surface, workspace and member.
+
+**Smoke test, right after the Deploy workflow is green (owner, 3 minutes),**
+with `npx wrangler tail metra-web` open in a terminal (from `apps/web`):
+
+1. Open the dashboard as the owner. The Rescue ledger block renders below the
+   charts, with its cards and both monthly charts (zeros are fine on a quiet
+   studio). A "We could not load the ledger" card instead is a failure.
+2. Do one picker search: in a draft proposal's builder, open "From price book"
+   and type a word. Matches (or "no matches") come back; a "Too many requests"
+   line on the first search is a failure.
+3. Read the tail. It must show NO line containing `limiter missing`. Such a
+   line names the binding the deployed Worker lacks: the surface is refusing
+   every request, and the fix is a redeploy with `wrangler.jsonc` intact.
 
 ### 0063 and Stage 2 DB step A (execution first release): owner runbook
 

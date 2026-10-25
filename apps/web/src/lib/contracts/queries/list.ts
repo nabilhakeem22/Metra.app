@@ -5,9 +5,13 @@ import {
   projects,
   type ContractStatus,
 } from '@metra/db';
-import { and, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { boundedPage } from '@/lib/db/list-bounds';
+import {
+  REGISTER_PAGE_SIZE,
+  registerPageWindow,
+  type RegisterPage,
+} from '@/lib/registers/register-view';
 
 export interface ContractListRow {
   id: string;
@@ -29,8 +33,8 @@ export interface ListContractsFilter {
   projectId?: string;
   clientId?: string;
   q?: string;
-  limit?: number;
-  offset?: number;
+  /** 1-based; a page past the end reads as the last page. */
+  page: number;
 }
 
 /** The register's columns, as DATA. No cost or margin reaches this surface. */
@@ -49,8 +53,8 @@ const CONTRACT_LIST_COLUMNS = {
   projectNameAr: projects.nameAr,
 } as const;
 
-/** The filter as SQL. `q` matches either title, so an Arabic-only one still finds. */
-function listConditions(filter: ListContractsFilter): SQL[] {
+/** The filter as SQL, over `contracts` alone. `q` matches either title, so an Arabic-only one still finds. */
+function listConditions(filter: ListContractsFilter): SQL | undefined {
   const conditions: SQL[] = [];
   if (filter.status) conditions.push(eq(contracts.status, filter.status));
   if (filter.projectId) conditions.push(eq(contracts.projectId, filter.projectId));
@@ -63,25 +67,37 @@ function listConditions(filter: ListContractsFilter): SQL[] {
     );
     if (match) conditions.push(match);
   }
-  return conditions;
+  return conditions.length ? and(...conditions) : undefined;
 }
 
-export function listContracts(
+/**
+ * One page of the contract register, newest number first, and how many match.
+ * The count reads `contracts` alone (no join), in the same transaction, so the
+ * page asked for is clamped to the last one before any row is read: a page past
+ * the end (an old link) shows the last page, never an error.
+ */
+export function listContractsPage(
   ctx: OrgContext,
-  filter: ListContractsFilter = {},
-): Promise<ContractListRow[]> {
+  filter: ListContractsFilter,
+): Promise<RegisterPage<ContractListRow>> {
   return withOrgContext(ctx, async (tx) => {
-    const conditions = listConditions(filter);
-    const page = boundedPage(filter);
+    const where = listConditions(filter);
+    const [{ total }] = await tx.select({ total: count() }).from(contracts).where(where);
+    const { page, offset } = registerPageWindow(total, filter.page);
+    if (total === 0) return { rows: [], total, page };
     const rows = await tx
       .select(CONTRACT_LIST_COLUMNS)
       .from(contracts)
       .leftJoin(clients, eq(clients.id, contracts.clientId))
       .leftJoin(projects, eq(projects.id, contracts.projectId))
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(where)
       .orderBy(desc(contracts.number))
-      .limit(page.limit)
-      .offset(page.offset);
-    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+      .limit(REGISTER_PAGE_SIZE)
+      .offset(offset);
+    return {
+      rows: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+      total,
+      page,
+    };
   });
 }

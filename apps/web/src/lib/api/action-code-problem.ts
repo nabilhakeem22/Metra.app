@@ -38,6 +38,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   invite_not_found: 'not-found',
   otp_verify_failed: 'bad-request',
   otp_rate_limited: 'rate-limited',
+  rate_limited: 'rate-limited',
   otp_sms_unavailable: 'internal',
   otp_email_unavailable: 'internal',
   immutable: 'bad-request',
@@ -199,4 +200,9 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   cost_entry_not_found: 'not-found',
   cost_entry_voided: 'conflict',
   line_not_in_contract: 'bad-request',
+  market_item_not_found: 'not-found',
+  market_unit_incompatible: 'bad-request',
+  market_item_already_added: 'conflict',
+  market_item_unpriced: 'conflict',
+  name_taken: 'conflict',
 };

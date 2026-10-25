@@ -21,6 +21,7 @@ const ROW_COLUMNS = {
   etaItemCode: costItems.etaItemCode,
   etaCodeType: costItems.etaCodeType,
   active: costItems.active,
+  marketItemId: costItems.marketItemId,
 };
 
 export type PriceBookRow = Pick<CostItem, keyof typeof ROW_COLUMNS>;

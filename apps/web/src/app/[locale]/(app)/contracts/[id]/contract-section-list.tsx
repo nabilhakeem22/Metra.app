@@ -10,8 +10,9 @@ import { describeReadFailure, type ShownFailure } from '@/lib/actions/error-mess
 import type { ActionResult } from '@/lib/actions/result';
 import { loadContractSections, loadSectionLines } from '@/lib/contracts/lines-actions';
 import type { ContractSectionSummary } from '@/lib/contracts/queries';
-import { formatNumber } from '@/lib/format/number';
+import { formatNumber, formatQuantity } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { QuantityWithUnit } from './quantity-with-unit';
 import type { KeptSectionLines } from './use-kept-section-lines';
 import type { KeptSections } from './use-kept-sections';
 
@@ -23,6 +24,18 @@ interface ReadFailure {
 
 /** The key of the list's own ask; a section's lines are asked under the section's id. */
 const SECTIONS = 'sections';
+
+/** One set of column widths for every section's table, so their columns line up down the page. */
+function LineColumns() {
+  return (
+    <colgroup>
+      <col />
+      <col className="w-44" />
+      <col className="w-36" />
+      <col className="w-40" />
+    </colgroup>
+  );
+}
 
 /**
  * The contract's sections on its page, as ONE list (A3 reliability R1): a page
@@ -131,23 +144,24 @@ export function ContractSectionList({
         <CardContent className="p-0">
           <div className="flex items-center justify-between border-b px-4 py-2">
             <h2 className="text-body font-semibold">{pick(summary.titleAr, summary.titleEn)}</h2>
-            <span className="text-body" dir="ltr">
+            <span className="text-body tabular-nums" dir="ltr">
               {m(summary.sectionSubtotal)}
             </span>
           </div>
           {shown.lines.length > 0 && (
-            <table className="w-full text-body">
+            <table className="w-full table-fixed text-body">
+              <LineColumns />
               <tbody>
                 {shown.lines.map((line) => (
                   <tr key={line.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{pick(line.descriptionAr, line.descriptionEn)}</td>
-                    <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {line.qty} {line.unit}
+                    <td className="px-4 py-2 text-muted-foreground">
+                      <QuantityWithUnit qty={formatQuantity(line.qty, locale)} unit={line.unit} />
                     </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">
+                    <td className="px-4 py-2 text-end tabular-nums" dir="ltr">
                       {m(line.unitPrice)}
                     </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">
+                    <td className="px-4 py-2 text-end tabular-nums" dir="ltr">
                       {m(line.lineTotal)}
                     </td>
                   </tr>

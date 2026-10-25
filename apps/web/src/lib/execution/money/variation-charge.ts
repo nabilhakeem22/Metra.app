@@ -40,6 +40,21 @@ export function approvedVariationsCharge(netDeltas: readonly string[], taxRate: 
   return formatMoney4(total4);
 }
 
+/**
+ * An execution contract's revised value: its original value (VAT and
+ * supervision already in it) plus every approved order's full charge (D4a).
+ * The contract page and the project's and the client's contracted value read
+ * this one rule; the cost sheet shows the same sum as its revised value.
+ */
+export function executionRevisedValue(
+  originalValue: string,
+  approvedNetDeltas: readonly string[],
+  taxRate: string,
+  supervisionPct: string,
+): string {
+  return formatMoney4(parseMoney4(originalValue) + parseMoney4(approvedVariationsCharge(approvedNetDeltas, taxRate, supervisionPct)));
+}
+
 /** A change order may become a payment request only when it adds money (> 0). */
 export function isVariationBillable(netDelta: string): boolean {
   return parseMoney4(netDelta) > 0n;

@@ -14,7 +14,7 @@ const thisFile = fileURLToPath(import.meta.url);
 const ALLOWED_TS = new Set([
   'node:fs', 'node:path', 'node:url', 'node:crypto', 'node:util', 'node:os', 'node:child_process',
   'postgres', '@metra/db', '@metra/db/client', '@metra/db/schema', '@metra/db/lock-timeout', '@metra/db/sqlstate',
-  '@metra/db/market-seed', '@metra/db/market-seed/db',
+  '@metra/db/market-seed', '@metra/db/market-seed/db', '@metra/db/market-percent',
   'vitest', 'vitest/config', 'dotenv',
 ]);
 const ALLOWED_PY = new Set(['argparse', 'pathlib', 'sys', 'pymupdf']);

@@ -10,7 +10,7 @@ import { formatQuantity } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { PreviewModal } from '../preview-modal';
-import { useUnitLabel } from '../use-unit-label';
+import { useUnitLabel } from '@/hooks/use-unit-label';
 import { useProposalViewActions } from './use-proposal-view-actions';
 
 export function ProposalView({

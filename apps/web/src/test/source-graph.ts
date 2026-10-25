@@ -18,6 +18,9 @@ export interface SourceGraph {
   /** The modules under src that `path` loads at runtime (packages aside). A
    *  file outside `files` (a test) is parsed on demand. */
   importsOf(path: string): string[];
+  /** The package specifiers `path` loads at runtime (`drizzle-orm`,
+   *  `next/headers`, `@metra/db/schema`): everything that is not `@/…` or relative. */
+  packagesOf(path: string): string[];
   /** The file's leading directive ('use client', 'use server'), or null. */
   directiveOf(path: string): string | null;
 }
@@ -32,9 +35,12 @@ function sourcePaths(directory: string): string[] {
 
 /** The src module a local specifier (`@/…` or relative) names, or null for a
  *  package or a path that does not exist. */
+function isLocalSpecifier(specifier: string): boolean {
+  return specifier.startsWith('@/') || specifier.startsWith('.');
+}
+
 export function resolveImport(from: string, specifier: string): string | null {
-  const local = specifier.startsWith('@/') || specifier.startsWith('.');
-  if (!local) return null;
+  if (!isLocalSpecifier(specifier)) return null;
   const base = specifier.startsWith('@/') ? join(SRC_ROOT, specifier.slice(2)) : resolve(dirname(from), specifier);
   const candidates = [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')];
   return candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null;
@@ -73,6 +79,9 @@ export function loadSourceGraph(): SourceGraph {
         imports.set(path, targets.filter((target): target is string => target !== null && files.has(target)));
       }
       return imports.get(path)!;
+    },
+    packagesOf(path) {
+      return runtimeSpecifiers(files.get(path) ?? parse(path)).filter((specifier) => !isLocalSpecifier(specifier));
     },
     directiveOf(path) {
       const first = files.get(path)!.statements[0];

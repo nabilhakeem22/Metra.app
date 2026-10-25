@@ -32,6 +32,8 @@ vi.mock('@/lib/price-book/actions', () => priceBook);
 const sectionActions = vi.hoisted(() => ({ addSection: vi.fn() }));
 vi.mock('@/lib/sections/actions', () => sectionActions);
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
+// The edit sheet's market link: its actions are not what these tests are about.
+vi.mock('@/lib/market-book/actions', () => ({ linkCostItemToMarket: vi.fn(), searchMarketLinks: vi.fn() }));
 
 const SECTIONS = [{ id: 's-1', key: 'civil', nameEn: 'Civil', nameAr: 'مدني' }];
 const ITEM = {
@@ -47,6 +49,7 @@ const ITEM = {
   etaItemCode: null,
   etaCodeType: null,
   active: true,
+  marketItemId: null,
 } as PriceBookItem;
 
 beforeEach(() => {
@@ -125,6 +128,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('price-book forms (%s)', (locale) => 
       <PriceBookClient
         view={FIRST_VIEW}
         book={{ rows: [ITEM], sectionCounts: { 's-1': 1 }, matched: 1, page: 1, pageCount: 1, hasAnyItem: true }}
+        market={{ bulletin: null, refs: {} }}
         sections={SECTIONS}
         canManage
       />,

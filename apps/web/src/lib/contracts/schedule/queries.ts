@@ -1,10 +1,10 @@
 import 'server-only';
-// The payment schedule of one contract, as the Schedule tab, the issue gate and
-// the delivery's execution card read it. At most 12 rows (MAX_SCHEDULE_ROWS),
-// so nothing here grows with the size of the contract.
+// The payment schedule of one contract, as the contract page
+// (getContractPageExecution), the issue gate and the delivery's execution card
+// read it. At most 12 rows (MAX_SCHEDULE_ROWS), so nothing here grows with the
+// size of the contract.
 import { contractPaymentMilestones, type MetraDb } from '@metra/db';
 import { asc, eq } from 'drizzle-orm';
-import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { milestoneAmounts } from '@/lib/execution/money/milestone-amounts';
 import { validateSchedule, type CleanScheduleRow } from '@/lib/execution/money/schedule';
 
@@ -59,12 +59,4 @@ export function scheduleView(
       taxAmount: amounts[index]?.taxAmount ?? null,
     })),
   };
-}
-
-/** The Schedule tab's read. */
-export function getContractSchedule(
-  ctx: OrgContext,
-  contract: { id: string; originalValue: string; taxAmount: string },
-): Promise<ContractScheduleView> {
-  return withOrgContext(ctx, async (tx) => scheduleView(await loadScheduleRows(tx, contract.id), contract));
 }

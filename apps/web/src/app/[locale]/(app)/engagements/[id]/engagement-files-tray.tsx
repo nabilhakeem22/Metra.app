@@ -94,8 +94,14 @@ export function EngagementFilesTray({
               key={row.category}
               className="flex items-center gap-[11px] rounded-item border border-[color:var(--rule)] bg-card px-3 py-2.5"
             >
-              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-item bg-brand-tint text-small font-semibold text-brand-ink ltr:font-mono">
-                {t(`badge.${row.category}`)}
+              {/* The badge grows with its word ("المقايسة" is wider than "2D"), up to a
+                  cap past which it truncates and names the category on hover, so it
+                  never runs under the title beside it. */}
+              <span
+                title={t(`category.${row.category}`)}
+                className="inline-flex h-[30px] min-w-[30px] max-w-24 shrink-0 items-center justify-center rounded-item bg-brand-tint px-1.5 text-small font-semibold text-brand-ink ltr:font-mono"
+              >
+                <span className="truncate">{t(`badge.${row.category}`)}</span>
               </span>
               <div className="min-w-0">
                 <div className="truncate text-small font-semibold">{name}</div>

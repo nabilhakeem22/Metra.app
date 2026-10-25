@@ -1,11 +1,24 @@
 import { act, fireEvent, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { LoginForm } from './login-form';
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('') }));
+// useSearchParams follows the address, as Next's own does after
+// history.replaceState (its app router patches replaceState to tell it).
+const address = vi.hoisted(() => ({ listeners: new Set<() => void>() }));
+vi.mock('next/navigation', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    address.listeners.add(listener);
+    return () => address.listeners.delete(listener);
+  };
+  return {
+    useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search)),
+    usePathname: () => window.location.pathname,
+  };
+});
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
@@ -16,13 +29,21 @@ const actions = vi.hoisted(() => ({
   sendPhoneOtp: vi.fn(),
   verifyEmailOtp: vi.fn(),
   verifyPhoneOtp: vi.fn(),
-  resolvePostLoginPath: vi.fn(),
 }));
-vi.mock('@/lib/auth/actions', () => actions);
+vi.mock('@/lib/auth/otp-client', () => actions);
 
+const replaceAddress = window.history.replaceState.bind(window.history);
+let replaceState: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockReset();
+  router.push.mockReset();
+  replaceAddress(null, '', '/en/login');
+  replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, url) => {
+    replaceAddress(data, unused, url);
+    for (const listener of address.listeners) listener();
+  });
 });
+afterEach(() => replaceState.mockRestore());
 
 describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) => {
   const at = (path: string) => messageAt(locale, path);
@@ -94,6 +115,70 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
     expect(identifier().getAttribute('aria-invalid')).toBeNull();
   });
 
+  test.each(['forbidden', 'malformed'])(
+    'a %s answer is said as a sign-in sentence, not the studio one (F1)',
+    async (code) => {
+      actions.sendEmailOtp.mockResolvedValue({ ok: false, error: code });
+      renderLogin();
+      await sendTo('mona@firm.example');
+      expect(status()).toBe(at('login.pageRefused'));
+      expect(status()).not.toBe(at(`errors.${code}`));
+      expect(identifier().getAttribute('aria-invalid')).toBeNull();
+    },
+  );
+
+  test('a forbidden answer to the code is the same sign-in sentence (F1)', async () => {
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    actions.verifyEmailOtp.mockResolvedValue({ ok: false, error: 'forbidden' });
+    renderLogin();
+    await sendTo('mona@firm.example');
+    await act(async () => {
+      fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
+    });
+    expect(status()).toBe(at('login.pageRefused'));
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  test('an address longer than the endpoint takes is said under the box and never sent (F3)', async () => {
+    renderLogin();
+    await sendTo(`${'a'.repeat(310)}@example.com`);
+    expect(actions.sendEmailOtp).not.toHaveBeenCalled();
+    expect(under('identifier')).toBe(at('errors.field.too_long').replace('{max}', '320'));
+    expect(identifier().getAttribute('aria-invalid')).toBe('true');
+    expect(status()).toBe('');
+  });
+
+  test('switching to create-account and back keeps the typed address, without leaving the page (F2)', async () => {
+    renderLogin();
+    fireEvent.change(identifier(), { target: { value: 'keep@me.test' } });
+    const toSignUp = screen.getByRole('link', { name: at('login.switchToSignUpLink') });
+    expect(toSignUp.getAttribute('href')).toBe(`/${locale}/login?mode=signup`);
+    await act(async () => {
+      expect(fireEvent.click(toSignUp)).toBe(false);
+    });
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', `${window.location.origin}/${locale}/login?mode=signup`);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(at('login.signUpTitle'));
+    expect(identifier().value).toBe('keep@me.test');
+
+    const toSignIn = screen.getByRole('link', { name: at('login.switchToSignInLink') });
+    await act(async () => {
+      expect(fireEvent.click(toSignIn)).toBe(false);
+    });
+    expect(window.location.search).toBe('?mode=signin');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(at('login.signInTitle'));
+    expect(identifier().value).toBe('keep@me.test');
+  });
+
+  test('a modified click on the switch link is left to the browser (a new tab)', async () => {
+    renderLogin();
+    const toSignUp = screen.getByRole('link', { name: at('login.switchToSignUpLink') });
+    await act(async () => {
+      fireEvent.click(toSignUp, { ctrlKey: true });
+    });
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(at('login.signInTitle'));
+  });
+
   test('a rejected send leaves the sending state and says why (AC 28)', async () => {
     actions.sendEmailOtp.mockRejectedValue(new TypeError('fetch failed'));
     renderLogin();
@@ -134,6 +219,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
       },
       locale,
     });
+  });
+
+  test.each([['/dashboard'], ['/onboarding']])('a verified code goes where the answer says: %s', async (next) => {
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    actions.verifyEmailOtp.mockResolvedValue({ ok: true, next });
+    renderLogin();
+    await sendTo('mona@firm.example');
+    await act(async () => {
+      fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
+    });
+    expect(actions.verifyEmailOtp).toHaveBeenCalledWith('mona@firm.example', '123456');
+    expect(router.push).toHaveBeenCalledWith(next);
   });
 
   test('pressing Verify on a short code says how many digits, without sending', async () => {

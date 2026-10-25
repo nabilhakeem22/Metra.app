@@ -9,35 +9,50 @@ import { createSql } from '@metra/db';
 
 const pg = createSql(process.env.DATABASE_URL as string, { max: 2, prepare: false });
 
-const seeded = { bulletins: new Set<string>(), items: new Set<string>() };
+const seeded = { bulletins: new Set<string>(), items: new Set<string>(), leaves: new Set<string>() };
 
-/** The leaf every fixture item sits under; upserted, never deleted (shared with real data). */
-const CATEGORY = { top: 'finishing', leaf: 'finishing.glass' };
+/** A leaf of the finishing category. One that exists already (shared with real data) is never deleted; one this process created is. */
+export interface MarketLeaf {
+  key: string;
+  nameAr: string;
+  nameEn: string;
+}
 
-async function categoryId(): Promise<string> {
+/** The leaf every fixture item sits under unless it names another. */
+const GLASS_LEAF: MarketLeaf = { key: 'finishing.glass', nameAr: 'الزجاج', nameEn: 'Glass' };
+const TOP_KEY = 'finishing';
+
+async function categoryId(leaf: MarketLeaf): Promise<string> {
   await pg`insert into public.market_categories (key, name_ar, name_en, sort_order)
-           values (${CATEGORY.top}, 'خامات التشطيب', 'Finishing materials', 1) on conflict (key) do nothing`;
-  await pg`insert into public.market_categories (key, parent_id, name_ar, name_en, sort_order)
-           select ${CATEGORY.leaf}, id, 'الزجاج', 'Glass', 4 from public.market_categories where key = ${CATEGORY.top}
-           on conflict (key) do nothing`;
-  const [row] = await pg<{ id: string }[]>`select id from public.market_categories where key = ${CATEGORY.leaf}`;
+           values (${TOP_KEY}, 'خامات التشطيب', 'Finishing materials', 1) on conflict (key) do nothing`;
+  const created = await pg<{ id: string }[]>`insert into public.market_categories (key, parent_id, name_ar, name_en, sort_order)
+           select ${leaf.key}, id, ${leaf.nameAr}, ${leaf.nameEn}, 4 from public.market_categories where key = ${TOP_KEY}
+           on conflict (key) do nothing returning id`;
+  if (leaf.key !== GLASS_LEAF.key) created.forEach(({ id }) => seeded.leaves.add(id));
+  const [row] = await pg<{ id: string }[]>`select id from public.market_categories where key = ${leaf.key}`;
   return row.id;
 }
 
 export interface MarketItemOptions {
   nameAr?: string;
   nameEn?: string;
+  specAr?: string;
+  specEn?: string;
   /** A roll's one-length pack, in metres (a roll needs one). */
   packLengthM?: number;
   status?: 'active' | 'discontinued';
+  /** The leaf it sits in (a `finishing.<name>` key); Glass unless given. */
+  leaf?: MarketLeaf;
 }
 
 /** A fresh market item (unit sqm unless given); its key is unique to this run. */
 export async function seedMarketItem(unit = 'sqm', options: MarketItemOptions = {}): Promise<{ id: string; key: string }> {
-  const key = `${CATEGORY.leaf}.dbtest_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  const leaf = options.leaf ?? GLASS_LEAF;
+  const key = `${leaf.key}.dbtest_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const [row] = await pg<{ id: string }[]>`
-    insert into public.market_items (key, category_id, name_ar, name_en, unit, unit_label_ar, pack_length_m, status)
-    values (${key}, ${await categoryId()}, ${options.nameAr ?? 'زجاج شفاف'}, ${options.nameEn ?? 'Clear glass'}, ${unit}::market_unit, 'م2',
+    insert into public.market_items (key, category_id, name_ar, name_en, spec_ar, spec_en, unit, unit_label_ar, pack_length_m, status)
+    values (${key}, ${await categoryId(leaf)}, ${options.nameAr ?? 'زجاج شفاف'}, ${options.nameEn ?? 'Clear glass'},
+            ${options.specAr ?? null}, ${options.specEn ?? null}, ${unit}::market_unit, 'م2',
             ${options.packLengthM ?? null}, ${options.status ?? 'active'}::market_item_status)
     returning id`;
   seeded.items.add(row.id);
@@ -105,7 +120,7 @@ export async function asAppRole<T>(gucs: Record<string, string>, query: string):
 
 class RolledBack extends Error {}
 
-/** Removes every bulletin, observation and item this process seeded. */
+/** Removes every bulletin, observation, item and leaf this process seeded. */
 export async function clearMarket(): Promise<void> {
   const bulletins = [...seeded.bulletins];
   const items = [...seeded.items];
@@ -113,8 +128,10 @@ export async function clearMarket(): Promise<void> {
   await pg`delete from public.market_item_details where bulletin_id = any(${bulletins}::uuid[]) or item_id = any(${items}::uuid[])`;
   await pg`delete from public.market_bulletins where id = any(${bulletins}::uuid[])`;
   await pg`delete from public.market_items where id = any(${items}::uuid[])`;
+  await pg`delete from public.market_categories where id = any(${[...seeded.leaves]}::uuid[])`;
   seeded.bulletins.clear();
   seeded.items.clear();
+  seeded.leaves.clear();
 }
 
 export async function closeMarketFixture(): Promise<void> {

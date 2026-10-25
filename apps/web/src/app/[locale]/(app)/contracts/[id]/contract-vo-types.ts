@@ -9,7 +9,8 @@ export interface DraftVoLine {
   contractLineId: string;
   /** What the picked contract line reads as, kept so it shows after another search. */
   contractLineLabel: string;
-  descriptionEn: string;
+  /** Saved in the column of the page's language (use-variation-create.ts). */
+  description: string;
   qty: string;
   unit: CostItemUnit;
   unitPrice: string;

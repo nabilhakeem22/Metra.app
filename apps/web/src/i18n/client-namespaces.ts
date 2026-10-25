@@ -20,11 +20,12 @@ import type { AbstractIntlMessages } from 'next-intl';
 // each list equals the sub-trees the client code there calls useTranslations
 // with (less any that another one already contains).
 /** The `errors` sub-trees a small route hands over instead of the whole
- *  catalogue (R5): exactly the codes its server actions can answer, which
+ *  catalogue (R5): exactly the codes its server actions (or, for sign-in, the
+ *  app/api/auth routes) can answer, which
  *  client-namespaces.test.ts proves by scanning everything the route loads. */
 const errorsOf = (...keys: string[]) => keys.map((key) => `errors.${key}`);
 
-const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'generic', 'otp_email_unavailable', 'otp_rate_limited', 'otp_sms_unavailable', 'otp_verify_failed', 'phone_invalid', 'phone_required', 'reference', 'uncertain', 'unreachable');
+const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'forbidden', 'generic', 'malformed', 'otp_email_unavailable', 'otp_rate_limited', 'otp_sms_unavailable', 'otp_verify_failed', 'phone_invalid', 'phone_required', 'reference', 'uncertain', 'unreachable');
 const ONBOARDING_ERRORS = errorsOf('amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'file_too_large', 'firm_type_unavailable', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'logo_image_unsupported', 'name_required', 'phone_required', 'record_not_found', 'reference', 'storage_unavailable', 'uncertain', 'unreachable');
 const INVITE_ERRORS = errorsOf('already_member', 'amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'invite_expired', 'invite_not_found', 'invite_wrong_account', 'last_owner', 'malformed', 'owner_immutable', 'pending_exists', 'record_not_found', 'reference', 'self', 'token_invalid', 'uncertain', 'unreachable');
 
@@ -33,9 +34,10 @@ export const CLIENT_NAMESPACES = {
   root: ['app'],
   /** app/[locale]/(app): the studio. */
   studio: [
-    'account', 'apiKeys', 'app', 'automation', 'clients', 'common', 'contracts', 'dashboard.range',
+    'account', 'apiKeys', 'app', 'automation', 'clients', 'common', 'contracts', 'dashboard.range', 'dashboard.rescue',
     'delivery.share', 'engagements', 'errors', 'execution.card', 'help', 'hints.account', 'hints.client',
-    'hints.costItem', 'hints.org', 'hints.priceBook', 'hints.project', 'hints.proposal', 'hints.team', 'nav', 'notifications',
+    'hints.costItem', 'hints.org', 'hints.priceBook', 'hints.project', 'hints.proposal', 'hints.team', 'marketBook', 'nav',
+    'notifications',
     'onboarding', 'org', 'priceBook', 'projects', 'proposals', 'roles', 'settings', 'shell', 'team', 'theme',
     'tour', 'variations',
   ],

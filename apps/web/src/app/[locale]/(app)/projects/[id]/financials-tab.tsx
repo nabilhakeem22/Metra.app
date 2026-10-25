@@ -2,9 +2,10 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from '@/i18n/routing';
+import { showsContractRates } from '@/lib/clients/rates';
 import type { ProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { formatMoney } from '@/lib/format/money';
-import { formatPercent } from '@/lib/format/number';
+import { formatPercent, parentheticalPercent } from '@/lib/format/number';
 
 /** Job cost and margin: hidden from a role without the cost sheet, else the execution contract's (none yet: null). */
 export type ProjectCost = { visible: false } | { visible: true; summary: ProjectCostSummary | null };
@@ -46,9 +47,7 @@ export async function FinancialsTab({
   const summary = cost.visible ? cost.summary : null;
   // Why a cost card has no figure: not this role's, or no execution contract yet.
   const missing = cost.visible ? t('noExecutionContract') : t('notShown');
-  // An execution contract has no advance or retention terms (F4): on a project
-  // with only those, the two cards would show 0.00% for terms that do not exist.
-  const showRates = contractCount > 0 || executionContractCount === 0;
+  const showRates = showsContractRates(contractCount, executionContractCount);
   const jobCost = summary?.cost;
 
   return (
@@ -99,7 +98,7 @@ export async function FinancialsTab({
           {jobCost ? (
             <Stat
               label={t('margin')}
-              value={`${m(jobCost.projectedMargin.value)}${jobCost.projectedMargin.pct === null ? '' : ` (${formatPercent(jobCost.projectedMargin.pct, locale)})`}`}
+              value={`${m(jobCost.projectedMargin.value)}${parentheticalPercent(jobCost.projectedMargin.pct, locale)}`}
             />
           ) : (
             <Stat label={t('margin')} value={missing} figure={false} />

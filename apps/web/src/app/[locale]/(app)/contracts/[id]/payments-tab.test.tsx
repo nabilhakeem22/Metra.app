@@ -220,6 +220,16 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the Payments tab (%s)', (locale) => 
     expect(screen.queryByRole('button', { name: at('contracts.execution.payments.send.open') })).toBeNull();
   });
 
+  test('F1: each request is a card on a phone, every figure under its label, its buttons in no sideways scroller', async () => {
+    await show();
+    const row = rowOf('2');
+    const labels = [...row.querySelectorAll('td > span.sm\\:hidden')].map((label) => label.textContent);
+    expect(labels).toEqual(['amount', 'paid', 'outstanding', 'state'].map((key) => at(`contracts.execution.payments.requests.${key}`)));
+    expect(row.className).toContain('sm:table-row');
+    expect(row.closest('table')?.className).toContain('sm:table');
+    expect(row.closest('.overflow-x-auto')).toBeNull();
+  });
+
   test('a refused read is said above the tab', async () => {
     reads.loadContractBilling.mockResolvedValue({ ok: false, error: 'forbidden' });
     await show({ issue: false, record: false });

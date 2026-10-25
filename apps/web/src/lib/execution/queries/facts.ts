@@ -1,16 +1,17 @@
 import 'server-only';
 // Everything the delivery's execution card needs to derive its stage: the
 // delivery's issued BOQ, the contract on it (plan A26), and that contract's
-// money facts. One transaction, and nothing in it grows with the number of
-// lines: the schedule has at most 12 rows, and money, the measured works
-// included, is aggregated in SQL to single figures.
+// money facts; and the same stage, with its schedule, for one contract's page.
+// One transaction each, and nothing in it grows with the number of lines: the
+// schedule has at most 12 rows, and money, the measured works included, is
+// aggregated in SQL to single figures.
 import { boqs, contracts, type ContractStatus, type MetraDb } from '@metra/db';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { loadScheduleRows, scheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
+import { loadScheduleRows, scheduleView, type ContractScheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { billingBalance, finalAccountBalance } from '../money/final-account';
-import type { ExecutionContractFacts, ExecutionFacts } from '../stage';
+import { executionStage, type ExecutionContractFacts, type ExecutionFacts, type ExecutionStage } from '../stage';
 import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from './money-facts';
 
@@ -58,6 +59,12 @@ async function loadIssuedBoqId(tx: MetraDb, engagementId: string): Promise<strin
 
 type DeliveryContract = NonNullable<Awaited<ReturnType<typeof loadDeliveryContract>>>;
 
+/** What deriving a contract's stage reads off the contract row. */
+export type StagedContract = Pick<
+  DeliveryContract,
+  'id' | 'status' | 'originalValue' | 'taxAmount' | 'taxRate' | 'supervisionPct' | 'discountPct'
+>;
+
 /** The first schedule row no issued request bills yet. */
 function firstUnbilled(rows: ScheduleRowView[], money: ContractMoneyFacts): (ScheduleRowView & { amount: string }) | null {
   const billed = new Set(money.billedMilestoneIds);
@@ -74,9 +81,9 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
 /** A signed contract's billing facts, and the row it bills next; a draft or an unsigned one bills nothing yet. */
 async function contractFacts(
   tx: MetraDb,
-  contract: DeliveryContract,
+  contract: StagedContract,
+  schedule: ContractScheduleView,
 ): Promise<{ facts: ExecutionContractFacts; next: { labelAr: string | null; labelEn: string | null } | null }> {
-  const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
   const idle: ExecutionContractFacts = {
     status: contract.status,
     scheduleValid: schedule.valid,
@@ -125,7 +132,7 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
     // issued one: the card offers to contract that one instead.
     const replaced = newest?.status === 'terminated' && boqId !== null && newest.sourceBoqId !== boqId;
     const contract = replaced ? null : newest;
-    const billing = contract ? await contractFacts(tx, contract) : null;
+    const billing = contract ? await contractFacts(tx, contract, scheduleView(await loadScheduleRows(tx, contract.id), contract)) : null;
     return {
       boqId,
       contract: contract
@@ -134,5 +141,36 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
       nextInstalment: billing?.next ?? null,
       facts: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
     };
+  });
+}
+
+/** What an execution contract's page reads beyond the contract: its schedule and its stage. */
+export interface ContractPageExecution {
+  /** The Schedule tab's rows, when that tab shows. */
+  schedule: ContractScheduleView | null;
+  /** Where a SIGNED contract stands (signed, final account issued, settled); null before it is signed. */
+  stage: ExecutionStage | null;
+}
+
+/**
+ * An execution contract page's reads, in ONE transaction that reads the
+ * schedule rows once: the Schedule tab's view of them, and for a signed
+ * contract its stage (stage.ts) by the same facts the delivery card reads, so
+ * its page says where it stands rather than how it began. A page that needs
+ * neither opens no transaction.
+ */
+export async function getContractPageExecution(
+  ctx: OrgContext,
+  contract: StagedContract,
+  wants: { schedule: boolean },
+): Promise<ContractPageExecution> {
+  const signed = contract.status === 'signed';
+  if (!wants.schedule && !signed) return { schedule: null, stage: null };
+  return withOrgContext(ctx, async (tx) => {
+    const schedule = scheduleView(await loadScheduleRows(tx, contract.id), contract);
+    const stage = signed
+      ? executionStage({ hasIssuedBoq: true, contract: (await contractFacts(tx, contract, schedule)).facts }).stage
+      : null;
+    return { schedule: wants.schedule ? schedule : null, stage };
   });
 }

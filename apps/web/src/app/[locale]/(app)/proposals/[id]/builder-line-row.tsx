@@ -13,7 +13,7 @@ import { CellError, cellA11y } from './draft-cell';
 import type { LineCell } from './draft-field-errors';
 import type { LineFigure } from './draft-completeness';
 import type { DraftCellError } from './use-draft-field-errors';
-import { useUnitLabel } from './use-unit-label';
+import { useUnitLabel } from '@/hooks/use-unit-label';
 
 // Wide enough for a 7-digit amount with a decimal or two: a box shows its figure
 // without trailing zeros (figure-input.tsx), so these hold what studios price.

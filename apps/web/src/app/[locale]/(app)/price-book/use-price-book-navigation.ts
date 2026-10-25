@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import { useHistoryMoves, useLinkFollows } from '@/hooks/use-navigation-events';
 import { useRouter } from '@/i18n/routing';
 import { MAX_SEARCH_LENGTH, priceBookViewSearch, type PriceBookView } from '@/lib/price-book/page-params';
-import { useHistoryMoves, useLinkFollows } from './price-book-location';
+import { locationView } from './price-book-location';
 
 /** How long typing rests before the search is sent: one request per pause, not per key. */
 export const SEARCH_PAUSE_MS = 300;
@@ -123,7 +124,8 @@ export function usePriceBookNavigation(view: PriceBookView): PriceBookNavigation
     go(search);
   }
 
-  useHistoryMoves((target) => {
+  useHistoryMoves(() => {
+    const target = locationView();
     const search = priceBookViewSearch(target);
     // Already on screen: nothing is left to render, so nothing to wait for.
     historyTarget.current = search === latest.current.arrived ? null : search;

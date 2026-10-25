@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { generateExecutionContractCore, issueContractCore, setContractChargesCore } from '@/lib/contracts/core';
 import { saveContractScheduleCore } from '@/lib/contracts/schedule/save';
-import { getContractSchedule } from '@/lib/contracts/schedule/queries';
 import type { OrgContext } from '@/lib/db/context';
+import { getContractPageExecution } from '@/lib/execution/queries/facts';
 import { seedBoq, seedProposalContract } from './contract-from-boq-fixture';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
@@ -52,9 +52,12 @@ describe('AC5 and AC6: saving the schedule', () => {
   it('50/30/20 on 100,000.0001 bills amounts that sum exactly to it, the last row taking the remainder', async () => {
     const contractId = await draftContract('100000.0001');
     expect(await saveContractScheduleCore(owner, { contractId, milestones: SPLIT_50_30_20 })).toEqual({ ok: true, data: undefined });
-    const view = await getContractSchedule(owner, { id: contractId, originalValue: '100000.0001', taxAmount: '0' });
-    expect(view.valid).toBe(true);
-    expect(view.rows.map((stored) => stored.amount)).toEqual(['50000.0001', '30000.0000', '20000.0000']);
+    const draft = { id: contractId, status: 'draft', originalValue: '100000.0001', taxAmount: '0', taxRate: '0', supervisionPct: '0', discountPct: '0' } as const;
+    const { schedule: view, stage } = await getContractPageExecution(owner, draft, { schedule: true });
+    expect(view?.valid).toBe(true);
+    expect(view?.rows.map((stored) => stored.amount)).toEqual(['50000.0001', '30000.0000', '20000.0000']);
+    // A draft has no stage beyond its status to tell.
+    expect(stage).toBeNull();
   });
 
   it('50/30 is schedule_sum_mismatch (expected 100, actual 80); a mixed basis is refused under milestones', async () => {

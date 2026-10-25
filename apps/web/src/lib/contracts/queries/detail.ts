@@ -7,9 +7,8 @@ import 'server-only';
 // the revised value and the days approved change orders add, gate the margin.
 import { variationOrders, type MetraDb } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { computeRevisedContractValue } from '@/lib/aggregates/contract-value';
+import { contractRevisedValue, type ContractValueBasis } from '@/lib/contracts/revised-value';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { approvedVariationsCharge } from '@/lib/execution/money/variation-charge';
 import { loadContractHeader } from './detail-header';
 import { loadContractSections } from './detail-sections';
 import type { ContractDetail, ContractHeaderDetail, ContractPageDetail } from './detail-types';
@@ -29,28 +28,6 @@ export type {
   ContractSectionSummary,
   ContractSigning,
 } from './detail-types';
-
-/** What a contract's value is made of, as far as its change orders are concerned. */
-interface ContractValueBasis {
-  originalValue: string;
-  sourceBoqId: string | null;
-  taxRate: string;
-  supervisionPct: string;
-}
-
-/**
- * Revised value (computed, A3) = original + what the approved orders add. A
- * proposal contract adds their net change, as it always has. An execution
- * contract's original value already carries VAT and supervision, so it adds
- * each order's full charge (D4a, F1), rounded per order as it is billed.
- */
-function revisedValueOf(contract: ContractValueBasis, approvedNetDeltas: string[]): string {
-  if (contract.sourceBoqId === null) {
-    return computeRevisedContractValue(contract.originalValue, approvedNetDeltas);
-  }
-  const charge = approvedVariationsCharge(approvedNetDeltas, contract.taxRate, contract.supervisionPct);
-  return computeRevisedContractValue(contract.originalValue, [charge]);
-}
 
 /**
  * What the APPROVED VOs change, in ONE SQL row: their net changes (the money
@@ -75,7 +52,7 @@ async function computeApprovedChanges(
       ),
     );
   return {
-    revisedValue: revisedValueOf(contract, approved.netDeltas),
+    revisedValue: contractRevisedValue(contract, approved.netDeltas),
     approvedExtensionDays: approved.extensionDays,
   };
 }

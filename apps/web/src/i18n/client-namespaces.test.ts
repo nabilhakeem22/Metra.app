@@ -29,6 +29,13 @@ const SCOPE_SEGMENTS: Record<MessageScope, string | null> = {
   variationLink: 'v',
 };
 
+/** The API routes a scope's client code calls instead of server actions: the
+ *  codes they answer reach that scope's browser too. Sign-in posts to
+ *  app/api/auth (its page is a static asset, so it cannot post an action). */
+const ANSWERING_ROUTES: Partial<Record<MessageScope, string>> = {
+  auth: join('app', 'api', 'auth'),
+};
+
 const graph = loadSourceGraph();
 const scopes = Object.keys(SCOPE_SEGMENTS) as MessageScope[];
 const scopedSegments = new Set(Object.values(SCOPE_SEGMENTS));
@@ -122,7 +129,9 @@ describe('the messages each scope hands the browser', () => {
     const declared: readonly string[] = CLIENT_NAMESPACES[scope];
     const partial = declared.filter((entry) => entry.startsWith('errors.'));
     if (partial.length === 0) return;
-    const reached = [...errorKeysReached(routeFiles(scope))];
+    const answeringRoute = ANSWERING_ROUTES[scope];
+    const answeringFiles = answeringRoute ? filesUnder(join(SRC_ROOT, answeringRoute)) : [];
+    const reached = [...errorKeysReached([...routeFiles(scope), ...answeringFiles])];
     const missing = reached.filter((key) => !partial.some((entry) => within(key, entry)));
     expect(missing, 'codes the segment can answer that its scope does not hand over').toEqual([]);
     expect(partial.filter((entry) => !reached.includes(entry)), 'handed over, never answered').toEqual([]);

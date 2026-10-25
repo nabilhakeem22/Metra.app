@@ -1,13 +1,16 @@
 import type { MemberRole } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
-import { getProjectEffectiveRates } from '@/lib/clients/financials';
+import { getClientEffectiveRates, getProjectEffectiveRates } from '@/lib/clients/financials';
 import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { loadCostSheetCore } from '@/lib/execution/cost-sheet/read-core';
+import { getClientOverview } from '@/lib/clients/queries';
+import { getContractPage } from '@/lib/contracts/queries';
 import { getProjectOverview } from '@/lib/projects/queries';
+import { mintShareToken } from '@/lib/share/token';
 import { seedPayment } from './execution-billing-fixture';
 import { seedOrderWithLines } from './execution-final-account-fixture';
-import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest } from './execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest, seedVariation } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // PR A5.3: the cost sheet (كشف التكلفة) from SQL aggregates. AC30 (totals
@@ -19,7 +22,10 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // a new-scope de-scope counts as it is (F2), cost booked to no section is never
 // over budget (F5), a PM who may not see margin gets billing only on the sheet
 // and on the project's Financials (F10, S1), and the project's contracted
-// value counts its execution contract (F4).
+// value counts its execution contract (F4); the client's contracted value
+// counts its execution contracts and its rates leave them out the same way.
+// Both count an execution contract at its REVISED value (approved change
+// orders with their VAT and supervision), the figure its contract page shows.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -48,6 +54,35 @@ async function cost(contractId: string, sectionId: string | null, amount: string
              case when $6::boolean then now() end, case when $6::boolean then $5::uuid end)`,
     [orgId, contractId, sectionId, amount, ctx.owner!.userId, voided],
   );
+}
+
+/** An accepted proposal worth `value` on the client and project. */
+async function seedAcceptedProposal(clientId: string, projectId: string, value: string): Promise<string> {
+  const [proposal] = await ownerQuery<{ id: string }>(
+    `insert into public.proposals (org_id, number, title_en, client_id, project_id, status, total)
+     values ($1, 800000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted', $4) returning id`,
+    [orgId, clientId, projectId, value],
+  );
+  return proposal.id;
+}
+
+/** A proposal contract on the client and project, its accepted proposal worth `value`, with its own advance and retention: ISSUED unless `draft`. */
+async function seedIssuedProposalContract(
+  clientId: string,
+  projectId: string,
+  terms: { advancePct: string; retentionPct: string; value: string; draft?: boolean },
+): Promise<{ contractId: string; projectId: string }> {
+  const proposalId = await seedAcceptedProposal(clientId, projectId, terms.value);
+  const token = mintShareToken();
+  const [contract] = await ownerQuery<{ id: string }>(
+    `insert into public.contracts (org_id, number, title_en, source_proposal_id, client_id, project_id,
+                                   status, advance_pct, retention_pct, original_value, token_hash, share_expires_at)
+     values ($1, 700000 + floor(random() * 99999)::int, 'Quote contract', $2, $3, $4, 'draft', $5, $6, $7, $8,
+             now() + interval '30 days') returning id`,
+    [orgId, proposalId, clientId, projectId, terms.advancePct, terms.retentionPct, terms.value, token.hash],
+  );
+  if (!terms.draft) await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [contract.id]);
+  return { contractId: contract.id, projectId };
 }
 
 async function sheet(contractId: string, member = ctx.owner!) {
@@ -179,6 +214,76 @@ describe('getCostSheet', () => {
     const draft = await seedExecutionContract(orgId, { state: 'draft' });
     expect((await getProjectOverview(ctx.owner!, draft.projectId)).contractedTotal).toBe('0.0000');
     expect((await getProjectEffectiveRates(ctx.owner!, draft.projectId)).executionContractCount).toBe(0);
+  });
+
+  it('F4: the client\'s rates leave its execution contracts out too, and weigh its proposal contracts alone', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    const executionOnly = { advancePct: null, retentionPct: null, contractCount: 0, executionContractCount: 1 };
+    expect(await getClientEffectiveRates(ctx.owner!, contract.clientId)).toEqual(executionOnly);
+    await seedIssuedProposalContract(contract.clientId, contract.projectId, { advancePct: '20', retentionPct: '5', value: '1000' });
+    // Weighted with the execution contract's stored 0% on 124,000, the advance would read 0.16%.
+    const withProposal = { advancePct: '20.0000', retentionPct: '5.0000', contractCount: 1, executionContractCount: 1 };
+    expect(await getClientEffectiveRates(ctx.owner!, contract.clientId)).toEqual(withProposal);
+    expect(await getProjectEffectiveRates(ctx.owner!, contract.projectId)).toEqual(withProposal);
+  });
+
+  it('F4: the client\'s contracted value counts its committed execution contracts once, never a draft or terminated one', async () => {
+    const signed = await seedExecutionContract(orgId, { state: 'signed' });
+    expect((await getClientOverview(ctx.owner!, signed.clientId)).contractedTotal).toBe('124000.0000');
+    // The proposal contract is its accepted proposal: 1,000 more, not 2,000.
+    await seedIssuedProposalContract(signed.clientId, signed.projectId, { advancePct: '20', retentionPct: '5', value: '1000' });
+    expect((await getClientOverview(ctx.owner!, signed.clientId)).contractedTotal).toBe('125000.0000');
+    const issued = await seedExecutionContract(orgId, { state: 'issued' });
+    expect((await getClientOverview(ctx.owner!, issued.clientId)).contractedTotal).toBe('124000.0000');
+    const draft = await seedExecutionContract(orgId, { state: 'draft' });
+    expect((await getClientOverview(ctx.owner!, draft.clientId)).contractedTotal).toBe('0.0000');
+    const terminated = await seedExecutionContract(orgId, { state: 'signed' });
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [terminated.contractId]);
+    expect((await getClientOverview(ctx.owner!, terminated.clientId)).contractedTotal).toBe('0.0000');
+    expect((await getClientEffectiveRates(ctx.owner!, terminated.clientId)).executionContractCount).toBe(0);
+  });
+
+  it('the project\'s and the client\'s contracted value is the execution contract\'s REVISED value, as its page shows it', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    // VAT 14% and supervision 10% on each approved order's works (D4a): +10,000
+    // adds 12,400 and a -2,000 de-scope takes 2,480 off; an order still waiting
+    // for the client's answer, and a rejected one, move nothing.
+    await seedVariation(orgId, contract, 'approved', { netDelta: '10000' });
+    await seedVariation(orgId, contract, 'approved', { netDelta: '-2000' });
+    await seedVariation(orgId, contract, 'issued', { netDelta: '5000' });
+    await seedVariation(orgId, contract, 'rejected', { netDelta: '7000' });
+    const revised = '133920.0000';
+    expect((await getProjectOverview(ctx.owner!, contract.projectId)).contractedTotal).toBe(revised);
+    expect((await getClientOverview(ctx.owner!, contract.clientId)).contractedTotal).toBe(revised);
+    expect((await getContractPage(ctx.owner!, contract.contractId, true))?.revisedValue).toBe(revised);
+    // A second execution contract of the same client, with no orders, adds its original value.
+    const second = await seedExecutionContract(orgId, { state: 'draft' });
+    const token = mintShareToken();
+    await ownerQuery(`update public.contracts set client_id = $2 where id = $1`, [second.contractId, contract.clientId]);
+    await ownerQuery(
+      `update public.contracts set status = 'issued', token_hash = $2, share_expires_at = now() + interval '30 days' where id = $1`,
+      [second.contractId, token.hash],
+    );
+    expect((await getClientOverview(ctx.owner!, contract.clientId)).contractedTotal).toBe('257920.0000');
+  });
+
+  it('F2: a signed PROPOSAL contract counts at its revised value too: 400,000 + an approved +50,000 is 450,000 everywhere', async () => {
+    // A draft execution contract counts nothing: it only gives the quote a client and a project of its own.
+    const { clientId, projectId } = await seedExecutionContract(orgId, { state: 'draft' });
+    const quote = await seedIssuedProposalContract(clientId, projectId, { advancePct: '10', retentionPct: '5', value: '400000' });
+    await ownerQuery(`update public.contracts set status = 'signed' where id = $1`, [quote.contractId]);
+    // A proposal contract adds an order's net change (no VAT or supervision on top); one still waiting moves nothing.
+    await seedVariation(orgId, quote, 'approved', { netDelta: '50000' });
+    await seedVariation(orgId, quote, 'issued', { netDelta: '7000' });
+    const revised = '450000.0000';
+    expect((await getContractPage(ctx.owner!, quote.contractId, true))?.revisedValue).toBe(revised);
+    expect((await getProjectOverview(ctx.owner!, projectId)).contractedTotal).toBe(revised);
+    expect((await getClientOverview(ctx.owner!, clientId)).contractedTotal).toBe(revised);
+    // An accepted proposal with no contract counts its total, and so does one whose contract is still a draft, as before.
+    await seedAcceptedProposal(clientId, projectId, '1000');
+    await seedIssuedProposalContract(clientId, projectId, { advancePct: '0', retentionPct: '0', value: '2000', draft: true });
+    expect((await getProjectOverview(ctx.owner!, projectId)).contractedTotal).toBe('453000.0000');
+    expect((await getClientOverview(ctx.owner!, clientId)).contractedTotal).toBe('453000.0000');
   });
 
   it('answers record_not_found for a proposal contract or another org\'s, and malformed for a bad id', async () => {

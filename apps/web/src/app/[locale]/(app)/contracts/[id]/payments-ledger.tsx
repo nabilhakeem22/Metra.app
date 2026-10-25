@@ -37,7 +37,10 @@ export function PaymentsLedger({
               <tr className="border-b">
                 <th className="py-2 pe-3 text-start font-medium">{t('receivedOn')}</th>
                 <th className="py-2 pe-3 text-start font-medium">{t('request')}</th>
-                <th className="py-2 pe-3 text-end font-medium">{t('amount')}</th>
+                {/* LTR like the amounts under it (the money law), so it sits over them on an Arabic page too. */}
+                <th className="py-2 pe-3 text-end font-medium" dir="ltr">
+                  {t('amount')}
+                </th>
                 <th className="py-2 text-start font-medium">{t('details')}</th>
               </tr>
             </thead>

@@ -23,4 +23,12 @@ describe('sidebar nav capabilities', () => {
     expect(deliveries?.href).toBe('/engagements');
     expect(deliveries?.capability).toBe('engagements_design');
   });
+
+  it('Market prices sits directly after the Price book, gated on price_book like it', () => {
+    const main = NAV_GROUPS[0].items.map((i) => i.key);
+    expect(main.indexOf('marketBook')).toBe(main.indexOf('priceBook') + 1);
+    const market = allItems.find((i) => i.key === 'marketBook');
+    expect(market?.href).toBe('/market-book');
+    expect(market?.capability).toBe('price_book');
+  });
 });

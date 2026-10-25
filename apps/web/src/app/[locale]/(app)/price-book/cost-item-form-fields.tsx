@@ -11,10 +11,12 @@ import { UNIT_TOKENS } from '@/lib/price-book/import';
 import type { CostItemFormState } from './cost-item-form-state';
 import type { SectionOption } from './types';
 
-/** The control each refusal sits under; `name` (the pair) under the English name. */
+/** The control each refusal sits under; `name` (the pair) under the English name, each half under its own. */
 export const COST_ITEM_CONTROL_ID: Record<CostItemField, string> = {
   code: 'ci-code',
   name: 'ci-nameEn',
+  nameEn: 'ci-nameEn',
+  nameAr: 'ci-nameAr',
   sectionId: 'ci-category',
   unit: 'ci-unit',
   defaultUnitCost: 'ci-cost',
@@ -59,6 +61,12 @@ export function CostItemFormFields({
     />
   );
   const name = bind('name');
+  const nameEn = bind('nameEn');
+  const nameAr = bind('nameAr');
+  const editing = (half: { onEdit: () => void }) => () => {
+    name.onEdit();
+    half.onEdit();
+  };
 
   return (
     <>
@@ -67,12 +75,13 @@ export function CostItemFormFields({
       </FormField>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField id={id.name} label={t('form.nameEn')} hint={th('name')} {...name}>
+        <FormField id={id.nameEn} label={t('form.nameEn')} hint={th('name')} error={name.error ?? nameEn.error} onEdit={editing(nameEn)}>
           {text('nameEn')}
         </FormField>
         {/* The pair shares ONE refusal (D5): it is said under the English name,
-            and the Arabic name points at the same sentence. */}
-        <FormField id="ci-nameAr" label={t('form.nameAr')} hint={th('name')} onEdit={name.onEdit}>
+            and the Arabic name points at the same sentence. A refusal of the
+            Arabic name alone (too long, hidden characters) is said under it. */}
+        <FormField id={id.nameAr} label={t('form.nameAr')} hint={th('name')} error={nameAr.error} onEdit={editing(nameAr)}>
           <Input
             dir="rtl"
             value={form.nameAr}

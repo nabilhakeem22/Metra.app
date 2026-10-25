@@ -12,12 +12,13 @@ export type ExecutionCardDialog = (typeof EXECUTION_CARD_DIALOGS)[number];
 /** The contract tabs a money step happens on: the payments, and the final account (A5). */
 export type MoneyPage = 'contract_payments' | 'contract_final_account';
 
-/** The pages the card links to: a next action's, and the measurements page beside it. */
+/** The pages the card links to: a next action's, and the costs and measurements pages beside it. */
 export type ExecutionCardPage =
   | 'project_boq'
   | 'contract'
   | 'contract_schedule'
   | 'contract_variations'
+  | 'contract_costs'
   | 'contract_measurements'
   | MoneyPage;
 
@@ -61,6 +62,18 @@ export const NEXT_ACTION_TARGET: Readonly<Record<ExecutionNextActionKind, NextAc
 export const STAGES_WAITING_ON_CLIENT: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['awaiting_signature']);
 
 /**
+ * The stages the card offers "Record costs" in, beside the next action: from
+ * works in progress onward (lead ruling on PR B3, F1). A terminated contract
+ * still takes the costs it ran up.
+ */
+export const STAGES_RECORDING_COSTS: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>([
+  'in_progress',
+  'final_account',
+  'settled',
+  'terminated',
+]);
+
+/**
  * The stage the card offers "Record measurements" in, beside the next action:
  * works in progress. Before the client signs nothing can be measured, and an
  * issued final account closes the ledger (A14).
@@ -79,6 +92,7 @@ export function executionCardHref(
   if (page === 'contract_payments') return `${base}?tab=payments`;
   if (page === 'contract_final_account') return `${base}?tab=final_account`;
   if (page === 'contract_variations') return `${base}?tab=variations`;
+  if (page === 'contract_costs') return `${base}/costs`;
   if (page === 'contract_measurements') return `${base}/measurements`;
   return base;
 }

@@ -143,6 +143,7 @@
     "comingSoon": "Coming soon",
     "support": "Support",
     "priceBook": "Price Book",
+    "marketBook": "Market prices",
     "clients": "Clients"
   },
   "shell": {
@@ -175,7 +176,8 @@
     "sending": "Sending…",
     "codeSentTitle": "Enter the 6-digit code",
     "back": "Back",
-    "channelLabel": "How should we send your code?"
+    "channelLabel": "How should we send your code?",
+    "pageRefused": "We could not complete sign-in from this page. Refresh the page and try again."
   },
   "onboarding": {
     "formTitle": "Company profile",
@@ -251,6 +253,43 @@
       "emptyNoProject": "Add a project for your client, then start its delivery.",
       "emptyNoDelivery": "No delivery started yet.",
       "emptyAllClosed": "Every delivery is closed."
+    },
+    "rescue": {
+      "title": "Rescue ledger",
+      "summary": "What Metra caught for you in the last {count, plural, one {month} other {{countText} months}}, from your own records.",
+      "basedOnYourData": "Based on your data",
+      "cards": {
+        "collected": "Collected",
+        "collectedHint": "Real payments only. Never added to estimates.",
+        "heldFees": "Stage fees paid while the stage was held",
+        "changeOrders": "Extra revisions billed and paid",
+        "moneyInputs": "{paymentCount, plural, one {{paymentText} payment} other {{paymentText} payments}} on {deliveryCount, plural, one {{deliveryText} delivery} other {{deliveryText} deliveries}}",
+        "moneyNone": "No payment counted in this period.",
+        "stagesMoved": "Stages moved after a follow up",
+        "stagesMovedInputs": "Metra flagged {followupCount, plural, one {{followupText} wait} other {{followupText} waits}}, you sent a reminder by email or WhatsApp, and the stage moved.",
+        "stagesMovedNone": "No waits flagged in this period.",
+        "protectedTitle": "Protected · estimated",
+        "protectedLocked": "Shows once market rates are set. It will never be added to collected money."
+      },
+      "charts": {
+        "collected": "Collected per month",
+        "collectedSummary": "Money collected in the last {count, plural, one {month} other {{countText} months}}, split by held stage fees and change orders.",
+        "stagesMoved": "Stages moved per month",
+        "stagesMovedSummary": "Stages that moved after a follow up in the last {count, plural, one {month} other {{countText} months}}."
+      },
+      "series": {
+        "heldFees": "Held stage fees",
+        "changeOrders": "Change orders",
+        "stagesMoved": "Stages moved"
+      },
+      "total": "Total",
+      "empty": "Nothing caught in this period yet.",
+      "loading": "Loading the ledger",
+      "loadFailed": "We could not load the ledger.",
+      "retry": "Try again",
+      "rateLimited": "The ledger was asked for too often in a short time. Wait a minute, then try again.",
+      "workspaceChanged": "You switched workspace in another tab. Reload the page to see the ledger of the workspace you are in now.",
+      "reload": "Reload the page"
     }
   },
   "team": {
@@ -498,6 +537,7 @@
     "invite_not_found": "This invitation link is not valid; it may have been used or cancelled. Ask the person who invited you for a new link.",
     "otp_verify_failed": "That code is wrong or has expired. Type the newest code we sent, or ask for a new one.",
     "otp_rate_limited": "Too many codes were requested. Wait a minute, then ask for a new one.",
+    "rate_limited": "Too many requests in a short time. Wait a minute, then try again.",
     "otp_sms_unavailable": "We cannot send text messages right now. Sign in with your email instead.",
     "otp_email_unavailable": "We cannot send email to this address yet. Sign in with your phone number, or contact us.",
     "immutable": "This record is locked, so it cannot be changed. Refresh the page to see its current state.",
@@ -639,7 +679,12 @@
     "cost_entry_not_found": "That cost entry no longer exists. Refresh the page.",
     "cost_entry_voided": "This cost entry was voided, so it cannot be changed.",
     "line_not_in_contract": "That line is not part of this contract. Pick a line of this contract.",
-    "final_account_too_large": "The final account is past the largest amount one request can bill. A measured quantity is probably wrong: check the readings on the Measurements tab."
+    "final_account_too_large": "The final account is past the largest amount one request can bill. A measured quantity is probably wrong: check the readings on the Measurements tab.",
+    "market_item_not_found": "This market item isn't available any more. Refresh the page and pick another one.",
+    "market_unit_incompatible": "The units don't match, so this market item can't be added or linked here.",
+    "market_item_already_added": "This market item is already in your price book. Refresh the page and open it from there instead of adding it again.",
+    "market_item_unpriced": "This market item has never had an official price, so it can't be added to your price book.",
+    "name_taken": "Your own item {code} already has this name. Type a different name."
   },
   "common": {
     "untranslated": "untranslated",
@@ -649,7 +694,15 @@
     "required": "required",
     "undo": "Undo",
     "moreActions": "More actions",
-    "cannotUndo": "This can't be undone."
+    "cannotUndo": "This can't be undone.",
+    "pager": {
+      "label": "Pages",
+      "range": "Showing {from} to {to} of {total}",
+      "pageOf": "Page {page} of {pageCount}",
+      "page": "Page {page}",
+      "previous": "Previous",
+      "next": "Next"
+    }
   },
   "hints": {
     "proposal": {
@@ -723,6 +776,26 @@
   "priceBook": {
     "title": "Price Book",
     "subtitle": "Your catalogue of cost items: costs, prices, and bulk updates.",
+    "market": {
+      "column": "Market",
+      "unlinked": "Not linked to a market item",
+      "unitMismatch": "The market item is priced in another unit, so there is no comparison",
+      "noPrice": "No market price yet",
+      "variance": "{value} against the market price",
+      "link": {
+        "label": "Linked market item",
+        "none": "Not linked",
+        "find": "Find a market item",
+        "pick": "Market item",
+        "unlink": "Unlink",
+        "hint": "Only items priced in this item's unit are offered. Linking never changes the cost or the price.",
+        "more": "Type more words to narrow the list.",
+        "noMatch": "No market item in this unit matches.",
+        "loadFailed": "We couldn't search the market items. Check your connection and try again.",
+        "linked": "Linked to the market item",
+        "unlinked": "Unlinked from the market item"
+      }
+    },
     "search": "Search code or name",
     "allCategories": "All sections",
     "addSection": "Add section",
@@ -845,9 +918,13 @@
       "errors": {
         "row_empty": "Empty row",
         "code_missing": "Missing code",
+        "code_too_long": "Code longer than {codeMax} characters",
+        "code_unprintable": "Hidden or control characters in the code",
         "code_duplicate_in_file": "Duplicate code in file",
         "code_exists": "Code already exists",
         "name_missing": "Missing name",
+        "name_too_long": "Name longer than {nameMax} characters",
+        "name_unprintable": "Hidden or control characters in the name",
         "category_invalid": "Unknown category",
         "unit_invalid": "Unknown unit",
         "cost_invalid": "Invalid cost",
@@ -1259,7 +1336,8 @@
           "discount": "Disc. %",
           "total": "Total",
           "code": "Code",
-          "provisionalShort": "P"
+          "provisionalShort": "Prov.",
+          "provisionalHint": "Provisional line: its quantity is settled by measurement"
         },
         "unit": {
           "sqm": "m²",
@@ -1334,6 +1412,7 @@
     "title": "Proposals",
     "subtitle": "Quotations (عروض الأسعار) for your clients.",
     "search": "Search by title",
+    "pagerLabel": "Proposal pages",
     "allStatuses": "All statuses",
     "itemsCount": "{count} proposals",
     "statuses": {
@@ -1592,7 +1671,96 @@
   "contracts": {
     "title": "Contracts",
     "subtitle": "Generated from accepted proposals. Issue for the client's electronic acknowledgement.",
-    "subtitleBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
+    "pagerLabel": "Contract pages",
+    "detailSubtitle": {
+      "draftProposal": "Generated from the accepted proposal. Issue it for the client's electronic acknowledgement.",
+      "draftBoq": "Generated from the issued BOQ. Issue it for the client's electronic acknowledgement.",
+      "issued": "Issued. Waiting for the client's acknowledgement.",
+      "signed": "Signed by the client. The work is under way.",
+      "finalAccount": "The final account is issued. Waiting for the last payments.",
+      "settled": "Settled. Nothing is left to bill or collect.",
+      "terminated": "Terminated. Nothing more can be billed or changed on it."
+    },
+    "costs": {
+      "tab": "Costs",
+      "intro": "What the job actually cost: materials, labour, subcontractors and more. Book each cost to a line, a section, or the whole contract.",
+      "draftNote": "You can record costs once the contract has been issued.",
+      "ownNote": "You see only the costs you recorded.",
+      "total": "Total recorded",
+      "entries": "Entries",
+      "record": "Record a cost",
+      "empty": "No costs recorded on this contract yet.",
+      "emptyOwn": "You have not recorded any costs on this contract yet.",
+      "noMatch": "No cost matches this filter.",
+      "loading": "Loading the costs",
+      "filterCategory": "Category",
+      "filterSection": "Section",
+      "all": "All",
+      "categories": {
+        "materials": "Materials",
+        "labour": "Labour",
+        "subcontractor": "Subcontractor",
+        "equipment": "Equipment",
+        "transport": "Transport",
+        "other": "Other"
+      },
+      "wholeContract": "Whole contract",
+      "voided": "Voided",
+      "quantity": "{qty} {unit} at {unitCost}",
+      "market": "Market price {price}",
+      "marketVariance": "{value} against the market price",
+      "marketNote": "Market prices are the official guide prices of the Ministry of Housing bulletin, shown for reference only. They change nothing.",
+      "showMore": "Show more",
+      "moreSections": "More sections",
+      "loadFailed": "We couldn't load the costs. Check your connection and try again.",
+      "sectionsFailed": "We couldn't load the sections. Check your connection and try again.",
+      "edit": "Edit",
+      "void": "Void the cost",
+      "voidConfirm": {
+        "title": "Void this cost?",
+        "description": "It stays on the list marked voided and leaves every total.",
+        "confirm": "Void the cost",
+        "cancel": "Keep it"
+      },
+      "toast": {
+        "recorded": "Cost recorded",
+        "already": "This cost was already recorded.",
+        "updated": "Cost updated",
+        "voided": "Cost voided"
+      },
+      "form": {
+        "newTitle": "Record a cost",
+        "editTitle": "Edit the cost",
+        "category": "Category",
+        "description": "Description",
+        "amount": "Amount",
+        "incurredOn": "Date",
+        "section": "Section",
+        "line": "Line",
+        "noLine": "No single line",
+        "findLine": "Find a line",
+        "moreLines": "More lines",
+        "linesCapped": "Showing the first {count} lines. Type to find another one.",
+        "qty": "Quantity",
+        "unit": "Unit",
+        "noUnit": "No unit",
+        "unitCost": "Unit cost",
+        "quantityHint": "Optional. Quantity, unit and unit cost go together.",
+        "supplier": "Supplier",
+        "reference": "Reference",
+        "referenceHint": "An invoice or receipt number.",
+        "costItem": "Price book item",
+        "noCostItem": "None",
+        "findCostItem": "Find in the price book",
+        "costItemHint": "When the item follows a market price, that price shows beside this cost for reference only.",
+        "save": "Save"
+      },
+      "page": {
+        "title": "Costs of {number}",
+        "subtitle": "Record and review what this contract's works actually cost.",
+        "subtitleOwn": "Record your costs on this contract and review the ones you recorded."
+      }
+    },
     "empty": "No contracts yet. Generate one from an accepted proposal.",
     "generate": "Generate contract",
     "generateFromProposal": "Generate contract from this proposal",
@@ -1611,6 +1779,11 @@
     "issued": "Contract issued",
     "terminate": "Terminate",
     "terminated": "Contract terminated",
+    "terminateConfirm": {
+      "title": "Terminate contract {number}?",
+      "body": "Terminating ends this contract for good. Change orders still waiting for a decision are rejected, and no new payment requests or measurements can be recorded on it. This can't be undone.",
+      "confirm": "Terminate the contract"
+    },
     "shareLink": "Acknowledgement link",
     "copyLink": "Copy link",
     "copied": "Copied",
@@ -1630,7 +1803,8 @@
       "retentionPct": "Retention %",
       "paymentTermsDays": "Payment terms (days)",
       "defectsLiabilityDays": "Defects liability (days)",
-      "terms": "Terms"
+      "termsEn": "Terms (English)",
+      "termsAr": "Terms (Arabic)"
     },
     "ack": {
       "title": "Electronic acknowledgement",
@@ -1984,7 +2158,6 @@
     "number": "Number",
     "title_": "Title",
     "reason": "Reason",
-    "netDelta": "Net change",
     "line": {
       "add": "Add line",
       "baseline": "Contract line",
@@ -1995,7 +2168,8 @@
       "unitPrice": "Unit price",
       "find": "Find a contract line",
       "capped": "Showing the first {count} lines. Type a word from the line or its section to narrow them, or ask for more results.",
-      "more": "More results"
+      "more": "More results",
+      "newScope": "New work, not on the contract"
     },
     "saveDraft": "Save draft",
     "saved": "Saved",
@@ -3156,6 +3330,76 @@
     }
   },
   "marketBook": {
+    "title": "Market prices",
+    "subtitle": "Official guide prices of building materials, month by month.",
+    "empty": {
+      "title": "No market prices yet",
+      "body": "Prices show here as soon as the first monthly bulletin is published. Nothing here is sample data."
+    },
+    "railLabel": "Categories",
+    "search": {
+      "label": "Search market prices",
+      "placeholder": "Search by name or size",
+      "submit": "Search",
+      "clear": "Clear search"
+    },
+    "results": {
+      "search": "Results for \"{query}\": {matched}",
+      "truncated": "Showing the first {shown}. Type more words to narrow it down.",
+      "none": "No market item matches this search.",
+      "refused": {
+        "title": "This search did not run",
+        "browse": "Browse the categories"
+      }
+    },
+    "pager": {
+      "label": "Market price pages",
+      "range": "{from} to {to} of {total}",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
+    "table": {
+      "item": "Item",
+      "latest": "Latest price",
+      "mom": "On last month",
+      "ytd": "Since January",
+      "trend": "Last 12 months",
+      "priceBook": "Your price book"
+    },
+    "change": {
+      "up": "Up {value}",
+      "down": "Down {value}",
+      "flat": "No change",
+      "none": "No figure"
+    },
+    "perUnit": "per {unit}",
+    "suspended": "Pricing suspended",
+    "discontinued": "No longer priced",
+    "inPriceBook": "In my price book",
+    "add": "Add to my price book",
+    "trend": "Price trend",
+    "drawer": {
+      "months": "Month by month",
+      "source": "Bulletin of {month}, page {page}",
+      "basis": "Price basis",
+      "loading": "Loading the months"
+    },
+    "addForm": {
+      "description": "A new item in your price book, linked to this market item. Its cost is the latest official price, and you can change it any time.",
+      "costFrom": "Latest official price: {month}",
+      "oldPrice": "This price is more than a year older than the latest bulletin. Check it before you quote with it.",
+      "priceHint": "Leave it empty to sell at cost plus 5%",
+      "defaultPrice": "Selling price if left empty",
+      "defaultPriceRule": "Cost plus 5%",
+      "save": "Add",
+      "added": "Added to your price book"
+    },
+    "attribution": {
+      "source": "Guide prices from the monthly building-materials price bulletin of the Ministry of Housing, Utilities and Urban Communities (Central Administration for Building Materials).",
+      "method": "Collected in Greater Cairo on days {fromDay} to {toDay} of each month. Prices include taxes and exclude transport, unless the item says otherwise. Company list prices before discounts.",
+      "notBinding": "For guidance only, not binding. CAPMAS prices are the legal reference for price-variation compensation.",
+      "asOf": "Latest bulletin: {month}"
+    },
     "units": {
       "ton": "Ton",
       "kg": "Kg",
@@ -3169,7 +3413,8 @@
       "pack": "Pack",
       "thousand_bricks": "1000 bricks"
     },
-    "unitNotSupported": "Your price book has no unit for this item, so it can't be added."
+    "unitNotSupported": "Your price book has no unit for this item, so it can't be added.",
+    "neverPriced": "This item has never had an official price, so it can't be added."
   },
   "execution": {
     "card": {
@@ -3178,6 +3423,7 @@
       "someoneElse": "An owner or an admin does this.",
       "someoneElseMoney": "An owner, an admin or the accountant does this.",
       "anInstalment": "the next instalment",
+      "recordCosts": "Record costs",
       "stage": {
         "no_boq": "No BOQ in Metra yet",
         "no_contract": "The BOQ is issued, with no execution contract yet",

@@ -14,9 +14,12 @@ import { SEARCH_FOLD, searchForm } from './fold';
 // keeps. A mark of another script (Hebrew points, Indic vowel signs) is kept in
 // SQL. Node and Postgres may run different Unicode versions, which matters only
 // for recently assigned characters. Whitespace is not collapsed in SQL, and need
-// not be: a searched word never holds a space. lower() follows the database's
-// ctype: under "C" it lowers ASCII only, so «CAFÉ» typed «café» is missed there.
-// `collate "pg_c_utf8"` would lower all of Unicode for about 2 ms per 2,000 rows,
+// not be: a searched word never holds a space. The typed words are lowered in JS
+// (searchForm), so how a search is typed never matters; the STORED text is
+// lowered by lower(), which follows the database's ctype: under "C" it lowers
+// ASCII only, so a stored non-ASCII capital stays a capital and its word is
+// missed there: a title «École» or «Ünïcode» is not found by «école» or
+// «ünïcode» (a stored «Café» is: its é is already small). `collate "pg_c_utf8"` would lower all of Unicode for about 2 ms per 2,000 rows,
 // but exists only from PostgreSQL 17; it waits until production's version is
 // confirmed. A table of Latin capitals in translate() cost 115 ms, so no.
 

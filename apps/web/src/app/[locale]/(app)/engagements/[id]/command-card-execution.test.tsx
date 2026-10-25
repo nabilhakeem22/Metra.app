@@ -1,8 +1,8 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
-import { NEXT_ACTION_TARGET } from '@/lib/execution/next-action-target';
-import { EXECUTION_NEXT_ACTION_KINDS, type ExecutionNextActionKind } from '@/lib/execution/stage';
+import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS } from '@/lib/execution/next-action-target';
+import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES, type ExecutionNextActionKind } from '@/lib/execution/stage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { CommandCardExecution } from './command-card-execution';
 
@@ -23,8 +23,27 @@ vi.mock('@/lib/contracts/actions', () => ({
   recordContractSignedOffline: vi.fn(),
 }));
 
-const EVERYTHING = { generateContract: true, signOffline: true, openContract: true, sendRequests: true, recordPayments: true, recordMeasurements: false };
-const NOTHING = { generateContract: false, signOffline: false, openContract: false, sendRequests: false, recordPayments: false, recordMeasurements: false };
+// "Record costs" and "Record measurements" sit beside the next action, not in
+// its place: the per-action counts below leave them off, and their own tests
+// turn them on.
+const EVERYTHING = {
+  generateContract: true,
+  signOffline: true,
+  openContract: true,
+  recordCosts: false,
+  sendRequests: true,
+  recordPayments: true,
+  recordMeasurements: false,
+};
+const NOTHING = {
+  generateContract: false,
+  signOffline: false,
+  openContract: false,
+  recordCosts: false,
+  sendRequests: false,
+  recordPayments: false,
+  recordMeasurements: false,
+};
 /** A project manager or a viewer: reads the Payments tab, can take none of its money steps (A4 F6). */
 const READS_MONEY_ONLY = { ...EVERYTHING, sendRequests: false, recordPayments: false };
 const INSTALMENT = { en: 'Advance', 'ar-EG': 'دفعة مقدمة' } as const;
@@ -97,6 +116,14 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     expect(screen.getByRole('link', { name: text })).toBeTruthy();
   });
 
+  test('a long next-action label wraps across the full width of the card instead of running past it (390 px)', () => {
+    renderWithIntl(<CommandCardExecution view={view('send_milestone_request')} />, { locale });
+    const link = screen.getByRole('link');
+    expect(link.className).toMatch(/(^| )w-full( |$)/);
+    expect(link.className).toMatch(/(^| )whitespace-normal( |$)/);
+    expect(link.className).not.toMatch(/whitespace-nowrap/);
+  });
+
   test('a role that can only read the money is told the owner, an admin or the accountant does each money step', () => {
     const steps = ['review_payment_claim', 'send_milestone_request', 'send_variation_request', 'record_payment', 'prepare_final_account', 'review_final_account'] as const;
     for (const kind of steps) {
@@ -152,5 +179,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     renderWithIntl(<CommandCardExecution view={view('record_signed_offline')} />, { locale });
     expect(screen.getByText(at('execution.card.waitingOnClient'))).toBeTruthy();
     expect(screen.getByText(at('execution.card.stage.awaiting_signature'))).toBeTruthy();
+  });
+
+  test('"Record costs" opens the costs page for a role that records them, from works in progress on (F1)', () => {
+    const costs = at('execution.card.recordCosts');
+    for (const stage of EXECUTION_STAGES) {
+      const { unmount } = renderWithIntl(
+        <CommandCardExecution view={{ ...view('record_payment', { ...NOTHING, recordCosts: true }), stage }} />,
+        { locale },
+      );
+      const link = screen.queryByRole('link', { name: costs });
+      if (STAGES_RECORDING_COSTS.has(stage)) expect(link?.getAttribute('href')).toMatch(/\/contracts\/c-1\/costs$/);
+      else expect(link).toBeNull();
+      unmount();
+    }
+    renderWithIntl(<CommandCardExecution view={view('record_payment', EVERYTHING)} />, { locale });
+    expect(screen.queryByRole('link', { name: costs })).toBeNull();
   });
 });

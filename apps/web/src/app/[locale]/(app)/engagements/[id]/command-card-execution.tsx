@@ -9,6 +9,7 @@ import type { ExecutionCardView } from '@/lib/execution/card-view';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import {
   NEXT_ACTION_TARGET,
+  STAGES_RECORDING_COSTS,
   STAGES_RECORDING_MEASUREMENTS,
   STAGES_WAITING_ON_CLIENT,
   executionCardHref,
@@ -37,8 +38,10 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
   }
   const href = executionCardHref(target.page, { projectId: view.projectId, contractId: view.contract?.id ?? null });
   if (!href || !mayFollow(view, target)) return null;
+  // A long label ("Send the payment request for Instalment 1") wraps inside
+  // the card at 390 px instead of running past it: full width, several lines.
   return (
-    <Button asChild variant="default">
+    <Button asChild variant="default" className="w-full whitespace-normal text-center">
       <Link href={href}>{label}</Link>
     </Button>
   );
@@ -48,17 +51,21 @@ function nextActionControl(view: ExecutionCardView, target: NextActionTarget, la
  * The delivery's EXECUTION card, under the closed headline at `execution`:
  * the stage derived from the BOQ contract (lib/execution/stage.ts) and its ONE
  * next action (lib/execution/next-action-target.ts). A role that cannot take
- * that action is told who can, so the card never shows a dead button. While
- * the works are in progress, a role that records measurements also gets
+ * that action is told who can, so the card never shows a dead button. From
+ * works in progress on, a role that records costs also gets "Record costs".
+ * While the works are in progress, a role that records measurements also gets
  * "Record measurements": the site engineer and the PM measure without opening
  * the contract page (A5.1).
  */
 export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
   const t = useTranslations('execution.card');
   const next = view.next;
+  const ids = { projectId: view.projectId, contractId: view.contract?.id ?? null };
+  const costsHref =
+    view.may.recordCosts && STAGES_RECORDING_COSTS.has(view.stage) ? executionCardHref('contract_costs', ids) : null;
   const measurementsHref =
     view.may.recordMeasurements && STAGES_RECORDING_MEASUREMENTS.has(view.stage)
-      ? executionCardHref('contract_measurements', { projectId: view.projectId, contractId: view.contract?.id ?? null })
+      ? executionCardHref('contract_measurements', ids)
       : null;
 
   return (
@@ -81,10 +88,19 @@ export function CommandCardExecution({ view }: { view: ExecutionCardView }) {
           <NextAction view={view} kind={next.kind} />
         </div>
       )}
-      {measurementsHref && (
-        <Button asChild variant="secondary" size="sm">
-          <Link href={measurementsHref}>{t('recordMeasurements')}</Link>
-        </Button>
+      {(costsHref || measurementsHref) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {costsHref && (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={costsHref}>{t('recordCosts')}</Link>
+            </Button>
+          )}
+          {measurementsHref && (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={measurementsHref}>{t('recordMeasurements')}</Link>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

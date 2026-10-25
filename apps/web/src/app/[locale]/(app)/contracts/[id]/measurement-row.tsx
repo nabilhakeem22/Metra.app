@@ -5,13 +5,9 @@ import { Button } from '@/components/ui/button';
 import { STACKED_ACTION_CELL, STACKED_CELL, STACKED_LEAD_CELL, STACKED_ROW, StackedLabel } from '@/components/ui/stacked-table';
 import type { MeasurableLine } from '@/lib/execution/measurements/queries';
 import { formatDate } from '@/lib/format/date';
-import { formatNumber } from '@/lib/format/number';
+import { formatQuantity } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-
-/** A quantity as stored (up to 4 decimals), Latin digits, nothing rounded away. */
-export function formatMeasuredQty(value: string, locale: string): string {
-  return formatNumber(value, locale, { maximumFractionDigits: 4 });
-}
+import { QuantityWithUnit } from './quantity-with-unit';
 
 const FIGURE_CELL = `${STACKED_CELL} sm:text-end`;
 
@@ -26,11 +22,7 @@ export function MeasurementRow({ line, onRecord }: { line: MeasurableLine; onRec
   const t = useTranslations('contracts.execution.measurements');
   const locale = useLocale();
   const section = pickLocale({ titleAr: line.sectionTitleAr, titleEn: line.sectionTitleEn }, 'title', locale).value;
-  const qty = (value: string) => (
-    <span dir="ltr" className="font-mono tabular-nums">
-      {formatMeasuredQty(value, locale)} {line.unit}
-    </span>
-  );
+  const qty = (value: string) => <QuantityWithUnit qty={formatQuantity(value, locale)} unit={line.unit} />;
 
   return (
     <tr className={STACKED_ROW}>

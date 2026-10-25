@@ -32,6 +32,9 @@ const variations = vi.hoisted(() => ({
   issueVariation: vi.fn(),
 }));
 vi.mock('@/lib/variations/actions', () => variations);
+// The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
+vi.mock('@/lib/execution/costs/actions', () => ({}));
+vi.mock('@/lib/price-book/picker-actions', () => ({}));
 // The Payments tab's server actions: never called on these tabs, mocked so the page loads.
 vi.mock('@/lib/execution/billing/actions', () => ({ loadContractBilling: vi.fn(), loadContractPayments: vi.fn() }));
 vi.mock('@/lib/execution/requests/actions', () => ({ issueMilestoneRequest: vi.fn(), issueVariationRequest: vi.fn(), voidPaymentRequest: vi.fn() }));
@@ -92,6 +95,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         tabs={['overview', 'variations']}
         openingTab="overview"
         canSignOffline={false}
+        canCreateCosts={false}
+        canPickCostItem={false}
         canManage={false}
         canIssue
         canDraftVariation={false}
@@ -106,7 +111,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
   test('generating a contract answered contract_exists', async () => {
     contracts.generateContract.mockResolvedValue({ ok: false, error: 'contract_exists' });
     const proposal = { id: 'p-1', number: 7, titleAr: null, titleEn: 'Villa', issueDate: null, createdAt: '2026-01-01' };
-    renderWithIntl(<ContractsClient items={[]} generatable={[proposal]} canManage />, { locale });
+    renderWithIntl(<ContractsClient items={[]} generatable={[proposal]} canManage pager={null} />, { locale });
     fireEvent.click(screen.getAllByRole('button', { name: at('contracts.generate') })[0]);
     const row = screen.getByText('Villa').parentElement!;
     await act(async () => {

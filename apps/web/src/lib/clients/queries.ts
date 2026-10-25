@@ -9,6 +9,7 @@ import {
 } from '@metra/db';
 import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { contractedValue } from './financials';
 
 export interface ListClientsFilter {
   active?: boolean;
@@ -127,7 +128,12 @@ export function getClientById(
 export interface ClientOverview {
   projectCount: number;
   activeProposalCount: number;
-  /** Sum of ACCEPTED proposal totals for this client (scale-4 money string). */
+  /**
+   * Every committed (issued or signed) contract of this client at its revised
+   * value, as its contract page shows it, plus each accepted proposal with no
+   * committed contract at its total (`contractedValue`, as on a project).
+   * Scale-4 money string.
+   */
   contractedTotal: string;
   recentActivity: Activity[];
   // Invoiced/outstanding are intentionally ABSENT — the UI renders a locked
@@ -157,17 +163,7 @@ export function getClientOverview(
         ),
       );
 
-    const [contractedRow] = await tx
-      .select({
-        total: sql<string>`coalesce(sum(${proposals.total}), 0)::text`,
-      })
-      .from(proposals)
-      .where(
-        and(
-          eq(proposals.clientId, clientId),
-          eq(proposals.status, 'accepted'),
-        ),
-      );
+    const contractedTotal = await contractedValue(tx, { column: 'clientId', id: clientId });
 
     const recentActivity = await tx
       .select()
@@ -184,7 +180,7 @@ export function getClientOverview(
     return {
       projectCount: Number(projRow?.n ?? 0),
       activeProposalCount: Number(activeRow?.n ?? 0),
-      contractedTotal: contractedRow?.total ?? '0',
+      contractedTotal,
       recentActivity,
     };
   });
