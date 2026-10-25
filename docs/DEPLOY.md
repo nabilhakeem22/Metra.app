@@ -3299,7 +3299,7 @@ Why this order, one sentence each:
   table, `projects`: it watches the five new pin columns only, which the
   current code never writes, so it never fires for it. Rehearsed: a catalogue
   fingerprint of every policy, function, trigger and table grant was identical
-  before and after step 3, except for the 47 new objects; and the
+  before and after step 3, except for the 51 new objects; and the
   current `main`'s own isolation gate and action tests passed on the 0064
   database, but for two tests that only count schema objects (see
   *Rehearsed* at the end).
@@ -3315,10 +3315,10 @@ Why this order, one sentence each:
 | five new enum types | `site_location_status`, `site_presence`, `site_photo_source`, `site_photo_status`, `site_note_kind` |
 | one new function | `text_has_visible_character`: a delivery's description and a note's body must hold a visible character (an entry made only of invisible marks is refused) |
 | seven new tables | `project_assignments`, `site_location_consents`, `site_devices`, `site_visits`, `site_photos`, `site_material_receipts`, `site_notes`: per studio (`org_id`), empty, and with RLS enabled and forced from the moment they exist (no policy yet, so nobody reads or writes them until step 3's `db:apply-rls`). A photo, a delivery and a note can only name a visit of their own project, and a delivery only a photo of its own project (3-column foreign keys). A photo stores no storage key: its keys are derived from its studio, project and id |
-| `rls/policies/70-site.sql` | the seven tables: RLS enabled and forced, one `org_isolation` policy each, plus TWELVE restrictive policies: a site engineer writes and updates diary rows only on a project he is assigned to, always in his own name, and accountants, viewers and the client role write nothing; only an owner, admin or project manager assigns or revokes; a location consent is recorded or withdrawn only by its own person. Eight guard triggers: a diary row is evidence (only its void, check-out, publication or coordinate purge may change, a voided row is frozen whole, nothing is ever deleted), only a manager publishes or changes what the client sees, a visit's date is the Cairo day of its check-in, and a revoke is final |
-| `rls/functions/80-site.sql`, `85-site-portal.sql` | the two checks the restrictive policies call (may this person write on this project; does this person manage the studio), the photo storage key, the guards, and the client's published site updates by share token (published visits and the photos the studio chose only; never a location, a person, a note or a delivery) |
+| `rls/policies/70-site.sql` | the seven tables: RLS enabled and forced, one `org_isolation` policy each, plus FIFTEEN restrictive policies: a site engineer writes and updates diary rows only on a project he is assigned to, always in his own name, and accountants, viewers and the client role write nothing; only an owner, admin or project manager assigns or revokes; a location consent is recorded or withdrawn only by its own person; a phone registers only itself, and a member sees and revokes only his own phones (a manager every phone). Eight guard triggers: a diary row is evidence (only its void, check-out, publication or coordinate purge may change, a voided row is frozen whole, nothing is ever deleted), only a manager publishes or changes what the client sees, a site engineer voids, checks out and marks stored only his own entries, a new row is checked as strictly as a change (nothing is inserted already published, stored, shown or voided), a visit's date is the Cairo day of its check-in, a revoke is final, and who an assignment or a phone is about never changes |
+| `rls/functions/80-site.sql`, `85-site-portal.sql` | the two checks the restrictive policies call (may this person write on this project; does this person manage the studio), the "own row or a manager" rule, the photo storage key, the guards, and the client's published site updates by share token (published visits and the photos the studio chose only; never a location, a person, a note or a delivery) |
 | `rls/functions/00-org-context.sql` | ADDS `app_current_user_orgs_for_session` beside `app_current_user_orgs` (which is unchanged): the same list, minus a studio where this phone was revoked (used from PR S8) |
-| `rls/roles.sql` | `metra_app`: read, insert and update on the seven tables, never delete, each written `revoke all`, then the exact grant. The four new definer functions are callable by `metra_app` only |
+| `rls/roles.sql` | `metra_app`: read, insert and update on the seven tables, never delete, each written `revoke all`, then the exact grant. The four new definer functions, and the "own row or a manager" rule, are callable by `metra_app` only |
 
 **1. Put the site diary schema code in the production checkout.** This step
 adds no dependency of `db:migrate` or `db:apply-rls`, so the installed
@@ -3329,7 +3329,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/site-s2-schema
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 1fb4cd24 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (1fb4cd24)
+git diff --stat 992bca1e HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (992bca1e)
 git diff --stat 0f9cb2db origin/main -- packages/db    # MUST print nothing: main's database code is still the one undo (0) restores
 ```
 
@@ -3362,7 +3362,7 @@ select
   (select count(*) from pg_constraint where conname = 'contracts_org_project_id_unique') as contract_project_key,
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname in ('project_assignments', 'site_location_consents', 'site_devices', 'site_visits', 'site_photos', 'site_material_receipts', 'site_notes')) as site_tables,
   (select count(*) from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname in ('site_location_status', 'site_presence', 'site_photo_source', 'site_photo_status', 'site_note_kind')) as site_types,
-  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('text_has_visible_character', 'app_may_write_site_project', 'app_may_manage_site_project', 'site_photo_object_key', 'app_current_user_orgs_for_session', 'app_delivery_site_updates_by_token', 'enforce_site_entry_guard', 'enforce_site_photo_state', 'enforce_site_visit_guard', 'enforce_site_visit_date', 'enforce_site_revoke_final', 'enforce_site_pin_writer')) as site_functions,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('text_has_visible_character', 'app_may_write_site_project', 'app_may_manage_site_project', 'app_is_self_or_site_manager', 'site_photo_object_key', 'app_current_user_orgs_for_session', 'app_delivery_site_updates_by_token', 'enforce_site_entry_guard', 'enforce_site_photo_state', 'enforce_site_visit_guard', 'enforce_site_visit_date', 'enforce_site_revoke_final', 'enforce_site_pin_writer')) as site_functions,
   (select count(*) from pg_trigger where tgname = 'trg_projects_site_pin_writer') as pin_trigger;
 ```
 
@@ -3376,7 +3376,7 @@ select (select count(*) from public.projects) as projects,
        (select count(*) from public.contracts) as contracts;
 ```
 
-(d) Expect `policies` 58 and `restrictive` 0. Step 4 (d) expects 77 and 12.
+(d) Expect `policies` 58 and `restrictive` 0. Step 4 (d) expects 80 and 15.
 
 ```sql
 -- Site diary step S 2 (d): policies, and how many are restrictive. Run this one alone.
@@ -3419,13 +3419,15 @@ the same kind:
   then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`
   then ONE new one, once only, for the pin trigger:
   `message: 'trigger "trg_projects_site_pin_writer" for relation "public.projects" does not exist, skipping',`
-  then NINETEEN new ones, once only, one per new policy:
+  then TWENTY-TWO new ones, once only, one per new policy:
   `message: 'policy "org_isolation" for relation "public.project_assignments" does not exist, skipping',`
   and the same for `site_managers_insert` and `site_managers_update` on
   `public.project_assignments`; then `org_isolation`,
   `site_consent_self_insert` and `site_consent_self_update` on
-  `public.site_location_consents`; then `org_isolation` on
-  `public.site_devices`; then `org_isolation`, `site_write_assigned` and
+  `public.site_location_consents`; then `org_isolation`,
+  `site_device_self_insert`, `site_device_self_or_manager_select` and
+  `site_device_self_or_manager_update` on `public.site_devices`; then
+  `org_isolation`, `site_write_assigned` and
   `site_update_assigned` on `public.site_visits`, `public.site_photos`,
   `public.site_material_receipts` and `public.site_notes`, in that order;
   then EIGHT new ones, once only, one per new trigger:
@@ -3444,7 +3446,7 @@ that the command failed). Expected:
 - `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
   count, so run step 4 (a): `migrations` is exactly one higher (65).
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
-  `apply-rls: verified in the catalogues` and goes on `65 tables, 77 policies, 27 triggers, 58 functions, RLS forced on all of them, role metra_app present.`;
+  `apply-rls: verified in the catalogues` and goes on `65 tables, 80 policies, 27 triggers, 59 functions, RLS forced on all of them, role metra_app present.`;
   the second starts `apply-rls: grants verified` and goes on
   `— design_engagements update narrowed to 19 columns with no table-level update, and 23 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, project_assignments, site_devices, site_location_consents, site_material_receipts, site_notes, site_photos, site_visits, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
   If that second line is replaced by a problem list naming a policy the
@@ -3454,7 +3456,7 @@ that the command failed). Expected:
   `assert-schema-applied: OK — 65 declared table(s), every column present.`,
   then `assert-schema-applied: indexes — 147 declared, all present.`,
   `assert-schema-applied: constraints — 399 declared, all present.`,
-  `assert-schema-applied: functions — 58 declared, all present.`,
+  `assert-schema-applied: functions — 59 declared, all present.`,
   `assert-schema-applied: orphaned org rows — 57 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
   and `assert-schema-applied: composite set-null FKs — 16 found (16 declared in src/schema/), every one narrowed to a single non-org_id column.`
   (The middle four are report only and do not fail it.)
@@ -3544,10 +3546,10 @@ lock race is tried again (above).
 (a) again.
 
 (b) Step 2 (b) again: now `pin_columns` 5, `contract_project_key` 1,
-`site_tables` 7, `site_types` 5, `site_functions` 12 and `pin_trigger` 1.
+`site_tables` 7, `site_types` 5, `site_functions` 13 and `pin_trigger` 1.
 
 (c) 7 rows, every one with `rls` true, `forced` true, `app_privileges`
-exactly `S,I,U` and `api_roles_read` false; `policies` 1 and `triggers` 1 on
+exactly `S,I,U` and `api_roles_read` false; `policies` 4 and `triggers` 1 on
 `site_devices`; `policies` 3 and `triggers` 0 on `site_location_consents`;
 `policies` 3 and `triggers` 1 on `project_assignments`,
 `site_material_receipts` and `site_notes`; `policies` 3 and `triggers` 2 on
@@ -3571,7 +3573,7 @@ where n.nspname = 'public'
 order by 1;
 ```
 
-(d) Step 2 (d) again: now `policies` 77 and `restrictive` 12.
+(d) Step 2 (d) again: now `policies` 80 and `restrictive` 15.
 
 (e) Step 2 (c) again: the same two numbers as before.
 
@@ -3605,7 +3607,7 @@ select (select count(*) from public.project_assignments) + (select count(*) from
 (h) Step 2 (e) again: about the same size as before (the new tables are
 empty; the rehearsal grew by about 1 MB, 50 MB to 51 MB, for the new unique key on `contracts`). Put the number in the
 release note. **The size to watch:** Supabase Free stops writes at 500 MB, and
-the site diary is the first thing that will fill it (about 0.28 MB a month
+the site diary is the first thing that will fill it (about 0.19 MB a month
 per active site, measured: see *Database size* below). **If this reads 400 MB
 or more, tell the lead before PR S4 ships**; that 400 MB alarm is a later PR's
 job, this line is the check until then.
@@ -3663,7 +3665,7 @@ git switch --detach origin/main
 before the merge the log shows a `42501`). Step 3 changed no existing policy,
 function or grant, and added one trigger on `projects` that the current code
 never fires (rehearsed: identical catalogues otherwise), so this is a
-precaution, not a repair. It takes the nineteen new site policies away (the
+precaution, not a repair. It takes the twenty-two new site policies away (the
 seven tables stay forced, so with no policy `metra_app` reads and writes
 nothing in them), drops the pin trigger, and runs the PREVIOUS `main`'s own
 `db:apply-rls` (the code at `0f9cb2db`, the one the site runs now), which
@@ -3679,7 +3681,7 @@ First, in the Supabase SQL editor, on its own. Expected: one row,
 `site_policies` 0 and `pin_trigger` 0.
 
 ```sql
--- Site diary step S undo (0): take the nineteen site policies and the pin trigger away so the
+-- Site diary step S undo (0): take the twenty-two site policies and the pin trigger away so the
 -- previous main's apply-rls (which does not declare them) exits 0. Run this one alone.
 begin;
 drop policy if exists org_isolation on public.project_assignments;
@@ -3689,6 +3691,9 @@ drop policy if exists org_isolation on public.site_location_consents;
 drop policy if exists site_consent_self_insert on public.site_location_consents;
 drop policy if exists site_consent_self_update on public.site_location_consents;
 drop policy if exists org_isolation on public.site_devices;
+drop policy if exists site_device_self_insert on public.site_devices;
+drop policy if exists site_device_self_or_manager_select on public.site_devices;
+drop policy if exists site_device_self_or_manager_update on public.site_devices;
 drop policy if exists org_isolation on public.site_visits;
 drop policy if exists site_write_assigned on public.site_visits;
 drop policy if exists site_update_assigned on public.site_visits;
@@ -3749,9 +3754,9 @@ was not the cause: tell the lead at once and run nothing else.
 
 To go forward again later, only when the lead says so: step 1 again, then
 from step 3 only `npm run db:apply-rls` (0064 is still applied, so
-`db:migrate` is not needed). Expected: the first four notices of step 3, then the pin trigger's and the nineteen policy notices (the eight site trigger notices do not come back: those triggers were never removed) and the same two
-verified lines; then step 4 (b) `pin_trigger` 1, step 4 (d) `policies` 77 and
-`restrictive` 12, then step 5 and on.
+`db:migrate` is not needed). Expected: the first four notices of step 3, then the pin trigger's and the twenty-two policy notices (the eight site trigger notices do not come back: those triggers were never removed) and the same two
+verified lines; then step 4 (b) `pin_trigger` 1, step 4 (d) `policies` 80 and
+`restrictive` 15, then step 5 and on.
 
 **(1) The code** (a page fails after the deploy): from
 `C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
@@ -3792,12 +3797,16 @@ step 3 for every object that existed before it, and an md5 of every existing
 project and contract row was unchanged. The lock races, on purpose:
 
 - a reader holding `projects` for 10 s against `db:migrate`: the two 55P03
-  lines after 5.4 s, `migrations` still 64, step 2 (b) still all 0, and the
+  lines after 5.2 s, `migrations` still 64, step 2 (b) still all 0, and the
   re-run after the reader finished applied 0064;
 - a reader holding `site_notes` for 25 s against `db:apply-rls`: two retries,
-  then the two `apply-rls failed:` lines after 17.6 s; in between, the seven
+  then the two `apply-rls failed:` lines after 17.2 s; in between, the seven
   tables were forced with no policy and an insert by `metra_app` was refused
   (42501); the re-run exited 0;
+- the traffic runs below were measured on the code before the S2 re-check
+  round; 0064 and the apply-rls retry are byte-identical since, and that round
+  changed only the new site tables' policies and guards, which no studio
+  request touches;
 - 30 migration runs (rolled back) beside studio traffic at about 13 requests a
   second, the contracts list among them: 30 of 30 clean, 0 deadlocks, the
   slowest studio request 220 ms (the earlier one-lock-at-a-time version
@@ -3818,9 +3827,11 @@ todo): the other two only count schema objects (the set-null foreign keys and
 the token functions in the database) and count the ones 0064 adds on any 0064
 database. Undo (0) printed exactly the lines above and exited 0; the
 fingerprint then matched the database before step 3 for every object the
-previous `main` declares, plus the 27 objects of 0064 it keeps (twelve
+previous `main` declares, plus the 28 objects of 0064 it keeps (thirteen
 functions, the seven tables, the eight triggers on them), and matched step 3's
-database minus the nineteen policies and the pin trigger. This branch's
+database minus the twenty-two policies and the pin trigger. Without the SQL
+block first, the previous `main`'s `db:apply-rls` exits 1 and lists 22
+problems, each a site policy "declared by NO rls/ file". This branch's
 `db:apply-rls` afterwards printed the lines of *To go forward again* and gave
 a database identical to the first run's.
 
