@@ -4112,12 +4112,15 @@ database, and usually not a long transaction either:
 
 Either way: **run `npm run db:apply-rls` again, and keep re-running it until it
 exits 0** (wait a minute between runs; it is safe, every statement is
-idempotent). The run that exits 0 prints the notices of the files the failed
-run did not get past (the first four and all eight trigger notices if it
-failed at `policies/35-execution.sql`) and the two lines above. In between, step 2 (b) may show
-`step_b_functions` 9 and `step_b_triggers` 0 (the functions files ran, a
-policy file rolled back); the current site works on that too. Rehearsed: see
-*Rehearsed* below. Any other code: tell the lead before running anything else.
+idempotent). The failed run prints only the first four notices before its
+two failure lines; the run that exits 0 prints the notices of the files the
+failed run did not get past (the first four and all eight trigger notices if
+it failed at `policies/35-execution.sql`) and the two lines above. In between,
+step 2 (b) may show `step_b_functions` 9 and `step_b_triggers` 0, and step 2
+(d) the new privileges and updatable columns with the old trigger counts (the
+functions files and `roles.sql` ran, a policy file rolled back); the current
+site works on that too. Rehearsed: see *Rehearsed* below. Any other code: tell
+the lead before running anything else.
 
 **Safe to re-run.** Every statement under `rls/` is idempotent: a second
 `db:apply-rls` prints only the first four notices and the same two lines.
@@ -4329,12 +4332,72 @@ Leave the database alone: the older Worker runs on it (see THE ORDER).
 
 **Rehearsed** (B4 release, Oct 25) on a local PostgreSQL 17 database (UTF8)
 built to production's shape: Supabase's API roles and default grants
-simulated first, then `main`'s database code (`0f9cb2db`, 0063), 5,003
-projects, 5,003 contracts and 50,542 contract lines in 22 studios, a delivery
-at execution with a signed execution contract of 121 sections (one of 300
-lines), a part-paid payment request, a cost entry and an approved change order
-of 15 days; then DB step S from `992bca1e` (`db:migrate`, `db:apply-rls`).
-Results are below.
+simulated first; then `main`'s database code (`0f9cb2db`, 0063: `db:migrate`,
+`db:apply-rls`, `seed`); 5,003 projects, 5,003 contracts and 50,542 contract
+lines in 22 studios, a delivery at execution with a signed execution contract
+of 121 sections (one of 300 lines), a part-paid payment request, a cost entry
+and an approved change order of 15 days (no client claim, as in production);
+then DB step S from `992bca1e` (`db:migrate`, `db:apply-rls`,
+`assert-schema-applied`: 65 migrations, 80 policies). Every command and SQL
+block above was then run as written, from a separate clone standing in for
+`merta-main` (its own `npm ci`, `origin` on GitHub, `origin/main` at
+`0f9cb2db`): the PowerShell from scripts made of this section's blocks with
+three substitutions only (the checkout path, the Desktop path, and the
+connection set in the session in place of `.env`), the SQL from the saved
+copy.
+
+- Steps 1 to 4 printed exactly what they say. Step 1's three guards printed
+  nothing and the A3 line printed; step 3 printed the four notices, the eight
+  trigger notices in the order listed, the two lines and the six
+  `assert-schema-applied` lines; the second run printed only the four. An md5
+  of every row of fifteen tables (projects, contracts with their sections and
+  lines, the six execution tables, change orders, deliveries, notifications,
+  members, studios) was identical before and after.
+- A catalogue comparison (every policy, function body with its settings and
+  grants, trigger, table and column grant, and the role) before and after step
+  3 found exactly the changes under *What it changes*: 9 functions and 8
+  triggers added; the contract link, the change-order link and the
+  change-order answer replaced; the cost entries' UPDATE turned into 15 column
+  grants and the claims' INSERT and UPDATE into 5; nothing else, so no site
+  diary object changed.
+- **The lock race, on purpose.** A reader holding `contract_cost_entries` for
+  30 s while step 3 ran on the step B database: `policies/35-execution.sql`
+  lost three times (55P03), and `apply-rls` exited 1 with the two failure lines
+  after 19 s; the re-run after the reader ended exited 0, the catalogue
+  unchanged.
+- **Undo (0)**, from the saved copy: `992bca1e`'s `db:apply-rls` printed the
+  four notices and the two lines quoted there and exited 0; the SQL block
+  returned no rows; step 2 (b), (d) and (e) read as before step 3; and the
+  catalogue was identical to the one before step 3 (zero differences).
+- **Forward again**, with the same 30 s reader: the first run exited 1 as
+  above, printing only the four notices before the failure lines; in between,
+  step 2 (b) read 9, 0 and 0 and step 2 (d) the new privileges and columns with
+  the old trigger counts; the re-run after the reader ended exited 0 with the
+  four and the eight notices, and the catalogue was identical to the first
+  forward's.
+- The 40P01 figures under step 3 and *Locks* (3 or more studio saves a second;
+  saves waiting about 1.4 s) come from the B4 fix round's rehearsal (Oct 20);
+  the `apply-rls` retry is byte-identical since.
+- **The current code on the step B database**, each run on a freshly applied
+  step B (one action test file, `execution-schema.dbtest.ts`, re-runs its own
+  checkout's `roles.sql` and so puts the old grants back for the files after
+  it; it was run on its own). `main` plus the site diary (`992bca1e`, what
+  `main` is once the site diary is merged): isolation gate 60 of 60, action
+  tests 1,571 of 1,584 passed (one is a todo). `main` alone (`0f9cb2db`):
+  isolation gate 59 of 59, action tests 1,458 of 1,472 passed (one todo). The
+  12 failures common to both test what step B changes on purpose, and no app
+  path: 4 test the uncapped contract link of step A (the visible difference
+  under THE ORDER); 1 pins the list of client functions; 1 pins step A's
+  grants on the six execution tables; 1 inserts a claim as `metra_app` (now
+  only the client's link function may); 4 write site readings as `metra_app`
+  that the new measurement guard refuses (dated before their test contract was
+  issued, as the measurement screen already refuses them); and 1 fails the same
+  way on the database before step 3 (it checks a Supabase default grant that
+  this rehearsal's simulated roles add and `roles.sql` does not manage).
+  `main` alone has one more, which counts the composite set-null foreign keys
+  and fails on any database with 0064 (step S's runbook says so). No cost
+  entry, payment, payment request, final account or measurement-screen test of
+  the shipped code failed under the new guards and grants.
 
 ## Monthly market bulletin
 
