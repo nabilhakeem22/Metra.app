@@ -61,9 +61,24 @@ export async function appQuery<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  return appQueryInSession<T>(orgId, userId, '', text, params);
+}
+
+/**
+ * appQuery from one auth session: also sets `app.current_session_id` (the JWT
+ * `session_id` claim the site device policies read; '' is no session).
+ */
+export async function appQueryInSession<T = Record<string, unknown>>(
+  orgId: string,
+  userId: string,
+  sessionId: string,
+  text: string,
+  params: unknown[] = [],
+): Promise<T[]> {
   return (await pg.begin(async (tx) => {
     await tx`select set_config('app.current_org_id', ${orgId}, true)`;
     await tx`select set_config('app.current_user_id', ${userId}, true)`;
+    await tx`select set_config('app.current_session_id', ${sessionId}, true)`;
     await tx.unsafe('set local role metra_app');
     return tx.unsafe(text, params as never[]);
   })) as unknown as T[];

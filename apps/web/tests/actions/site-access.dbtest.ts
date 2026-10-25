@@ -80,18 +80,19 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
     }
   });
 
-  it('lets metra_app, and nobody else, execute the two gates, the session org list and the photo key', async () => {
+  it('lets metra_app, and nobody else, execute the two gates, the own-row rule, the session org list and the photo key', async () => {
     const rows = await ownerQuery<{ proname: string; app: boolean; public_execute: boolean; secdef: boolean }>(
       `select p.proname, has_function_privilege('metra_app', p.oid, 'execute') as app,
               exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_execute,
               p.prosecdef as secdef
          from pg_proc p
         where p.pronamespace = 'public'::regnamespace
-          and p.proname in ('app_may_write_site_project', 'app_may_manage_site_project', 'app_current_user_orgs_for_session', 'site_photo_object_key')
+          and p.proname in ('app_may_write_site_project', 'app_may_manage_site_project', 'app_is_self_or_site_manager', 'app_current_user_orgs_for_session', 'site_photo_object_key')
         order by 1`,
     );
     expect(rows).toEqual([
       { proname: 'app_current_user_orgs_for_session', app: true, public_execute: false, secdef: true },
+      { proname: 'app_is_self_or_site_manager', app: true, public_execute: false, secdef: false },
       { proname: 'app_may_manage_site_project', app: true, public_execute: false, secdef: true },
       { proname: 'app_may_write_site_project', app: true, public_execute: false, secdef: true },
       { proname: 'site_photo_object_key', app: true, public_execute: false, secdef: false },
@@ -100,7 +101,7 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
 });
 
 describe('the restrictive insert policy site_write_assigned (AC5)', () => {
-  it('declares exactly the twelve RESTRICTIVE site policies, each for one command', async () => {
+  it('declares exactly the fifteen RESTRICTIVE site policies, each for one command', async () => {
     const rows = await ownerQuery<{ policy: string; cmd: string }>(
       `select tablename || '.' || policyname as policy, cmd from pg_policies
         where schemaname = 'public' and permissive = 'RESTRICTIVE' and tablename = any($1::text[]) order by 1`,
@@ -111,6 +112,9 @@ describe('the restrictive insert policy site_write_assigned (AC5)', () => {
       [
         { policy: 'project_assignments.site_managers_insert', cmd: 'INSERT' },
         { policy: 'project_assignments.site_managers_update', cmd: 'UPDATE' },
+        { policy: 'site_devices.site_device_self_insert', cmd: 'INSERT' },
+        { policy: 'site_devices.site_device_self_or_manager_select', cmd: 'SELECT' },
+        { policy: 'site_devices.site_device_self_or_manager_update', cmd: 'UPDATE' },
         { policy: 'site_location_consents.site_consent_self_insert', cmd: 'INSERT' },
         { policy: 'site_location_consents.site_consent_self_update', cmd: 'UPDATE' },
         ...diary.flatMap((table) => [

@@ -378,7 +378,8 @@ grant execute on function public.enforce_contract_payment_fits() to metra_app;
 revoke execute on function public.enforce_contract_payment_fits() from public;
 -- Stage 3, the site diary (0064). The write gate and the manager gate are
 -- SECURITY DEFINER and called by the restrictive policies and the guards AS
--- the caller, so metra_app keeps EXECUTE and nobody else has it; so does the
+-- the caller, so metra_app keeps EXECUTE and nobody else has it; so do the
+-- "own row or a manager" rule (an invoker that calls the manager gate) and the
 -- pure photo object key. The guards are plain trigger functions, granted for
 -- symmetry with the guards above. The gates and the key are also locked down
 -- in place, right after their CREATE (functions/80-site.sql).
@@ -386,6 +387,8 @@ grant execute on function public.app_may_write_site_project(uuid) to metra_app;
 revoke execute on function public.app_may_write_site_project(uuid) from public;
 grant execute on function public.app_may_manage_site_project() to metra_app;
 revoke execute on function public.app_may_manage_site_project() from public;
+grant execute on function public.app_is_self_or_site_manager(uuid) to metra_app;
+revoke execute on function public.app_is_self_or_site_manager(uuid) from public;
 grant execute on function public.site_photo_object_key(uuid, uuid, uuid, text) to metra_app;
 revoke execute on function public.site_photo_object_key(uuid, uuid, uuid, text) from public;
 grant execute on function public.enforce_site_entry_guard() to metra_app;
@@ -701,6 +704,10 @@ begin
       );
       execute format(
         'revoke execute on function public.app_may_manage_site_project() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_is_self_or_site_manager(uuid) from %I',
         r
       );
       execute format(

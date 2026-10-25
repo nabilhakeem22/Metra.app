@@ -32,13 +32,26 @@
 --                              engineer update nothing.
 --   project_assignments        `site_managers_insert` / `site_managers_update`:
 --                              only a manager assigns or revokes
---                              (app_may_manage_site_project), and `assigned_by`
---                              is the current user (S2 security S1).
+--                              (app_may_manage_site_project), `assigned_by`
+--                              is the current user (S2 security S1), and an
+--                              assignment is born live (no revoke at insert).
 --   site_location_consents     `site_consent_self_insert` / `_update`: a
 --                              consent is recorded or withdrawn only by the
 --                              person it is about (PDPL; S2 security S1).
--- The write gate takes the row's project, so it is per ROW and not wrapped;
--- the GUC comparisons and the no-argument manager gate are wrapped.
+--   site_devices               `site_device_self_insert`: a phone registers
+--                              only itself, for the current user and the
+--                              current auth session (`app.current_session_id`,
+--                              the JWT `session_id` claim the S8 register path
+--                              sets; unset, no metra_app insert passes), born
+--                              live. `site_device_self_or_manager_select` /
+--                              `_update`: a member reads and revokes only his
+--                              own phones, a manager every phone of the
+--                              studio (app_is_self_or_site_manager), so no
+--                              member reads another's auth_session_id (S2
+--                              re-check N3).
+-- The write gate and the own-row rule take the row's project or person, so
+-- they are per ROW and not wrapped; the GUC comparisons and the no-argument
+-- manager gate are wrapped.
 --
 -- LOCKS. Every table here is new in 0064, so the ACCESS EXCLUSIVE each
 -- `alter table`, `create policy` and `create trigger` takes is on a relation no
@@ -47,23 +60,33 @@
 --
 -- WHAT GUARDS WHAT (beside the grants in roles.sql, none of which is DELETE):
 --   site_visits                trg_site_visits_guard: only the check-out
---                              (once), the publication (a manager's, stamped
---                              with the current user) and the coordinate
---                              purge (to null) may change (MT100);
+--                              (once, the engineer's own or a manager's), the
+--                              publication (a manager's, stamped with the
+--                              current user) and the coordinate purge (to
+--                              null; before 90 days a manager's) may change
+--                              (MT100); an INSERT is checked as the update
+--                              from the unpublished row, so only a manager
+--                              inserts a published or captioned visit;
 --                              trg_site_visits_date: the visit's date is the
 --                              Cairo day of its check-in
 --   site_photos                trg_site_photos_guard: only status,
 --                              client_visible, caption and the void (once,
---                              stamped with the current user; a voided photo
---                              is frozen whole); trg_site_photos_state: status
---                              only pending -> stored, and only a manager
---                              changes client_visible or caption
+--                              the uploader's or a manager's, stamped with
+--                              the current user; a voided photo is frozen
+--                              whole); trg_site_photos_state: status only
+--                              pending -> stored (the uploader's or a
+--                              manager's), and only a manager changes
+--                              client_visible or caption; an INSERT is
+--                              pending, live, and captioned only by a manager
 --   site_material_receipts,
---   site_notes                 trg_site_*_guard: only the void (once, stamped
---                              with the current user; then frozen whole)
+--   site_notes                 trg_site_*_guard: only the void (once, the
+--                              author's or a manager's, stamped with the
+--                              current user; then frozen whole); an INSERT
+--                              is live
 --   project_assignments,
 --   site_devices               trg_*_revoke_final: a revoke is final, stamped
---                              with the current user
+--                              with the current user; the identity columns
+--                              never change
 --   site_location_consents     mutable lifecycle (the withdraw stamp)
 
 -- project_assignments
@@ -84,7 +107,11 @@ drop policy if exists site_managers_insert on public.project_assignments;
 create policy site_managers_insert on public.project_assignments
   as restrictive
   for insert
-  with check ((select public.app_may_manage_site_project()) and assigned_by = (select nullif(current_setting('app.current_user_id', true), '')::uuid));
+  with check (
+    (select public.app_may_manage_site_project())
+    and assigned_by = (select nullif(current_setting('app.current_user_id', true), '')::uuid)
+    and revoked_at is null
+  );
 drop policy if exists site_managers_update on public.project_assignments;
 create policy site_managers_update on public.project_assignments
   as restrictive
@@ -130,6 +157,26 @@ create policy org_isolation on public.site_devices
     org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
     and (select public.app_is_current_org_member())
   );
+
+drop policy if exists site_device_self_insert on public.site_devices;
+create policy site_device_self_insert on public.site_devices
+  as restrictive
+  for insert
+  with check (
+    user_id = (select nullif(current_setting('app.current_user_id', true), '')::uuid)
+    and auth_session_id = (select nullif(current_setting('app.current_session_id', true), '')::uuid)
+    and revoked_at is null
+  );
+drop policy if exists site_device_self_or_manager_select on public.site_devices;
+create policy site_device_self_or_manager_select on public.site_devices
+  as restrictive
+  for select
+  using (public.app_is_self_or_site_manager(user_id));
+drop policy if exists site_device_self_or_manager_update on public.site_devices;
+create policy site_device_self_or_manager_update on public.site_devices
+  as restrictive
+  for update
+  using (public.app_is_self_or_site_manager(user_id));
 
 -- site_visits
 alter table public.site_visits enable row level security;
@@ -227,23 +274,26 @@ create policy site_update_assigned on public.site_notes
   for update
   using (public.app_may_write_site_project(project_id));
 
--- The guards (functions/80-site.sql). The entry guard's arguments are the
--- ONLY columns an UPDATE may change on that table.
+-- The guards (functions/80-site.sql). The revoke guard's arguments are the
+-- identity columns no UPDATE changes. The entry guard's FIRST argument is the
+-- table's author column and the rest are the ONLY columns an UPDATE may
+-- change. The visit, entry and photo-state guards also run on INSERT (S2
+-- re-check N1): an insert is asked what the update is.
 drop trigger if exists trg_project_assignments_revoke_final on public.project_assignments;
 create trigger trg_project_assignments_revoke_final
   before update on public.project_assignments
   for each row
-  execute function public.enforce_site_revoke_final();
+  execute function public.enforce_site_revoke_final('project_id', 'user_id', 'assigned_by');
 
 drop trigger if exists trg_site_devices_revoke_final on public.site_devices;
 create trigger trg_site_devices_revoke_final
   before update on public.site_devices
   for each row
-  execute function public.enforce_site_revoke_final();
+  execute function public.enforce_site_revoke_final('user_id', 'auth_session_id');
 
 drop trigger if exists trg_site_visits_guard on public.site_visits;
 create trigger trg_site_visits_guard
-  before update or delete on public.site_visits
+  before insert or update or delete on public.site_visits
   for each row
   execute function public.enforce_site_visit_guard();
 
@@ -255,26 +305,27 @@ create trigger trg_site_visits_date
 
 drop trigger if exists trg_site_photos_guard on public.site_photos;
 create trigger trg_site_photos_guard
-  before update or delete on public.site_photos
+  before insert or update or delete on public.site_photos
   for each row
   execute function public.enforce_site_entry_guard(
+    'uploaded_by',
     'status', 'client_visible', 'caption', 'voided_at', 'voided_by', 'updated_at'
   );
 
 drop trigger if exists trg_site_photos_state on public.site_photos;
 create trigger trg_site_photos_state
-  before update on public.site_photos
+  before insert or update on public.site_photos
   for each row
   execute function public.enforce_site_photo_state();
 
 drop trigger if exists trg_site_material_receipts_guard on public.site_material_receipts;
 create trigger trg_site_material_receipts_guard
-  before update or delete on public.site_material_receipts
+  before insert or update or delete on public.site_material_receipts
   for each row
-  execute function public.enforce_site_entry_guard('voided_at', 'voided_by', 'updated_at');
+  execute function public.enforce_site_entry_guard('recorded_by', 'voided_at', 'voided_by', 'updated_at');
 
 drop trigger if exists trg_site_notes_guard on public.site_notes;
 create trigger trg_site_notes_guard
-  before update or delete on public.site_notes
+  before insert or update or delete on public.site_notes
   for each row
-  execute function public.enforce_site_entry_guard('voided_at', 'voided_by', 'updated_at');
+  execute function public.enforce_site_entry_guard('author_id', 'voided_at', 'voided_by', 'updated_at');

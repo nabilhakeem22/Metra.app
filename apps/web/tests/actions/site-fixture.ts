@@ -6,7 +6,7 @@
 // carries the seven site tables).
 import { randomUUID } from 'node:crypto';
 import type { MemberRole } from '@metra/db';
-import { appQuery, ownerQuery } from './execution-fixture';
+import { appQuery, appQueryInSession, ownerQuery } from './execution-fixture';
 
 /** A new member of `orgId` with `role`, over the BYPASSRLS connection. */
 export async function seedMember(orgId: string, role: MemberRole): Promise<string> {
@@ -120,5 +120,18 @@ export async function ownerInsert(table: string, row: Row): Promise<string> {
 export async function appInsert(orgId: string, userId: string, table: string, row: Row): Promise<string> {
   const { text, params } = insertSql(table, row);
   const [inserted] = await appQuery<{ id: string }>(orgId, userId, text, params);
+  return inserted.id;
+}
+
+/** appInsert from the auth session `sessionId` (the site device policies read it). */
+export async function appInsertInSession(
+  orgId: string,
+  userId: string,
+  sessionId: string,
+  table: string,
+  row: Row,
+): Promise<string> {
+  const { text, params } = insertSql(table, row);
+  const [inserted] = await appQueryInSession<{ id: string }>(orgId, userId, sessionId, text, params);
   return inserted.id;
 }

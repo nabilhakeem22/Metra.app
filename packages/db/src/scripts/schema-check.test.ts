@@ -190,7 +190,7 @@ describe('runSchemaCheck', () => {
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 147 declared, 147 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: constraints — 399 declared, 399 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 58 declared, 58 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 59 declared, 59 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 58 declared, 58 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 59 declared, 59 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 58 RLS functions', () => {
+  it('declares 59 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -233,8 +233,9 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // round's manager gate app_may_manage_site_project, the photo key
     // site_photo_object_key and the trigger fns enforce_site_photo_state,
     // enforce_site_visit_date, enforce_site_revoke_final and
-    // enforce_site_pin_writer.
-    expect(declaredFunctions().size).toBe(58);
+    // enforce_site_pin_writer. 59 with the S2 re-check's own-row rule
+    // app_is_self_or_site_manager.
+    expect(declaredFunctions().size).toBe(59);
   });
 });
 

@@ -25,9 +25,11 @@ import {
 // write runs as metra_app inside an owner's org context (the owner passes the
 // restrictive insert policy on any project), so what is refused here is
 // refused by the SCHEMA, not by a policy; a row about another person (a
-// consent) is seeded over the owner connection. The guards, the grants and the
-// policies are site-guards.dbtest.ts, site-writers.dbtest.ts and
-// site-access.dbtest.ts.
+// consent) is seeded over the owner connection, and so is a row metra_app may
+// not insert at all (a device, which only its own session registers; a photo
+// already stored or voided, which the insert guards refuse first, MT100). The
+// guards, the grants and the policies are site-guards.dbtest.ts,
+// site-writers.dbtest.ts and site-access.dbtest.ts.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -147,7 +149,7 @@ describe('site_location_consents and site_devices', () => {
   it('holds one device row per (studio, auth session) with a 1..80 character label', async () => {
     const sessionId = randomUUID();
     const device = (fields: Row) =>
-      insert('site_devices', { org_id: orgId, user_id: ownerId, auth_session_id: randomUUID(), label: 'Android · Chrome', ...fields });
+      ownerInsert('site_devices', { org_id: orgId, user_id: ownerId, auth_session_id: randomUUID(), label: 'Android · Chrome', ...fields });
     await device({ auth_session_id: sessionId });
     expect(await refusal(device({ auth_session_id: sessionId }))).toMatchObject({
       code: '23505',
@@ -284,10 +286,11 @@ describe('site_photos', () => {
 
   it('shows the client only a stored photo that is not void', async () => {
     expect(await refusal(photo({ client_visible: true }))).toMatchObject({ constraint_name: 'site_photos_visible_is_stored' });
+    const ownerPhoto = (fields: Row) => ownerInsert('site_photos', photoRow(orgId, projectId, visitId, ownerId, fields));
     expect(
-      await refusal(photo({ client_visible: true, status: 'stored', voided_at: new Date().toISOString(), voided_by: ownerId })),
+      await refusal(ownerPhoto({ client_visible: true, status: 'stored', voided_at: new Date().toISOString(), voided_by: ownerId })),
     ).toMatchObject({ constraint_name: 'site_photos_visible_not_void' });
-    expect(await refusal(photo({ voided_at: new Date().toISOString() }))).toMatchObject({ constraint_name: 'site_photos_void_pair' });
+    expect(await refusal(ownerPhoto({ voided_at: new Date().toISOString() }))).toMatchObject({ constraint_name: 'site_photos_void_pair' });
   });
 
   it('names only a visit of its OWN project (the 3-column FK, 23503)', async () => {

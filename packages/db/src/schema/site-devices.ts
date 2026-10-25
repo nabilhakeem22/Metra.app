@@ -18,6 +18,13 @@ import { orgScoped } from './org-scoped';
  * device stamps `revoked_at` / `revoked_by`: that session then loses THIS
  * studio on its next request, in the app and in the studio pages
  * (`app_current_user_orgs_for_session` leaves the org out). Never deleted.
+ *
+ * WHO (rls/policies/70-site.sql): only the phone itself registers, for the
+ * current user and the auth session the request names in the GUC
+ * `app.current_session_id` (the register path sets it from the verified JWT;
+ * unset, no app insert passes), born live; a member reads and revokes only his
+ * own phones, a manager every phone of the studio; `user_id` and
+ * `auth_session_id` never change.
  */
 export const siteDevices = pgTable(
   'site_devices',
