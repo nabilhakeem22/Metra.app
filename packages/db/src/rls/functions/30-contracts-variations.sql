@@ -809,6 +809,15 @@ $$;
 -- is gone; one that commits first is approved before the termination, which
 -- then finds the order decided. Two client decisions share the lock and meet
 -- on the order row, as before.
+--
+-- LOCK TIMEOUT (B4 re-check S4), as its sibling client writes
+-- (app_contract_ack_by_token above, the /d claim): the contract lock above
+-- waits at most 4 s on a studio transaction holding the contract row (a
+-- termination, an issue, a paper signature), and so does the order's flip;
+-- then the call fails with 55P03 and rolls back whole, which the /v action
+-- answers `uncertain` (refresh and check). The order of the two locks
+-- (contract FOR SHARE, then the order) is unchanged. The setting holds only
+-- inside this function; the caller's own lock_timeout is restored on exit.
 create or replace function public.app_variation_respond_by_token(
   p_hash text,
   p_decision text,
@@ -821,6 +830,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   target text;

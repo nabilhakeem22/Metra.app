@@ -1,5 +1,7 @@
 import { createSql } from '@metra/db';
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { isAmbiguousDbOutcome } from '@/lib/actions/db-failure';
 import { mintShareToken } from '@/lib/share/token';
 import { respondToVariationByToken } from '@/lib/variations/public';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedVariation } from './execution-fixture';
@@ -12,7 +14,8 @@ import { closeFixture, seedOrg, teardown } from './fixture';
 // it FOR SHARE before it touches the order and reads its status again. So an
 // approval that arrives while a termination is in flight waits for it and
 // answers `contract_inactive`: no change order is ever approved on a contract
-// that is gone.
+// that is gone. It waits at most 4 s (the function's own lock_timeout, as its
+// sibling client writes), then gives up with 55P03, which /v answers `uncertain`.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -73,6 +76,42 @@ describe('/v approve versus termination', () => {
     expect(await statusOf('contracts', contract.contractId)).toBe('terminated');
     expect(await statusOf('variation_orders', order.id)).toBe('rejected');
   });
+
+  it('an approval held past 4 s by a studio transaction on the contract gives up with 55P03 and changes nothing (B4 re-check S4)', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    const token = mintShareToken();
+    const order = await seedVariation(orgId, contract, 'issued', { tokenHash: token.hash });
+
+    let held!: () => void;
+    const contractHeld = new Promise<void>((done) => (held = done));
+    let release!: () => void;
+    const released = new Promise<void>((done) => (release = done));
+    const studioWrite = studio.begin(async (tx) => {
+      await tx`select id from public.contracts where id = ${contract.contractId} for update`;
+      held();
+      await released;
+    });
+    await contractHeld;
+
+    const started = Date.now();
+    try {
+      const failure = await respondToVariationByToken(token.raw, { decision: 'approve', actorName: 'Client' }).then(
+        () => 'answered',
+        (error: unknown) => error,
+      );
+      expect(sqlstateOf(failure)).toBe('55P03');
+      // What the /v action's `answered` reads to answer `uncertain` (portal-act-failure.ts).
+      expect(isAmbiguousDbOutcome(failure)).toBe(true);
+      const waited = Date.now() - started;
+      expect(waited).toBeGreaterThanOrEqual(3_900);
+      expect(waited).toBeLessThan(6_000);
+    } finally {
+      release();
+      await studioWrite;
+    }
+    expect(await statusOf('variation_orders', order.id)).toBe('issued');
+    expect(await statusOf('contracts', contract.contractId)).toBe('signed');
+  }, 15_000);
 
   it('an approval that commits first stays approved, and the termination after it finds the order decided', async () => {
     const contract = await seedExecutionContract(orgId, { state: 'signed' });
