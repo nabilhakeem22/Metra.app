@@ -9,7 +9,7 @@ import { EngagementCommandCard } from './engagement-command-card';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { EngagementPanels } from './engagement-panels';
 import { EngagementTabStrip } from './engagement-tab-strip';
-import type { EngagementTab } from './tabs';
+import { ENGAGEMENT_TAB_STRIP_ID, type EngagementTab } from './tabs';
 import { useEngagementAction } from './use-engagement-action';
 
 // The cockpit's single-column body: the COMMAND CARD (what's next) on top, then
@@ -47,11 +47,16 @@ export function EngagementDetailClient(props: EngagementDetailProps) {
   // Derived from data the page already holds; the rule itself lives in
   // lib/engagements/budget-badge.ts, where it can be tested.
   const budgetBadge = resolveBudgetBadge(header, events);
+  // The card points at a tab (the design line's links): switch to it and bring it into view.
+  const openTab = (next: EngagementTab) => {
+    setTab(next);
+    document.getElementById(ENGAGEMENT_TAB_STRIP_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="space-y-4">
       <EngagementCommandCard
-        {...commandCardPropsOf(props, { pending, runAction, actionError: error })}
+        {...commandCardPropsOf(props, { pending, runAction, actionError: error }, openTab)}
       />
 
       <EngagementTabStrip

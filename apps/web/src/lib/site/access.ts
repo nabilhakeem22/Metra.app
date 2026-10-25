@@ -21,6 +21,16 @@ export function mayWriteSiteDiary(role: MemberRole): boolean {
   return role !== 'client' && can(role, 'site_diary', 'create');
 }
 
+/**
+ * May this member be put on a project's site team (an assignment)? Every
+ * internal role that reads the diary: the app lists only assigned projects, for
+ * every role (plan A1; a PM who wants the app assigns himself). The client role
+ * holds no internal membership, so it is never assignable.
+ */
+export function mayJoinSiteTeam(role: MemberRole): boolean {
+  return role !== 'client' && can(role, 'site_diary', 'read');
+}
+
 /** Publish a visit's chosen photos to the client. */
 export function mayPublishSiteDiary(role: MemberRole): boolean {
   return role !== 'client' && can(role, 'site_diary', 'approve');

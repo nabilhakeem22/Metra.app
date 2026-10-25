@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseOtpSendRequest, parseOtpVerifyRequest } from './otp-contract';
+import { loginReturnOf, parseOtpSendRequest, parseOtpVerifyRequest } from './otp-contract';
 
 // The sign-in endpoints' request shapes: null means 400 malformed. The parsers
 // check shape only; the rules a person can fix (an empty box, a bad address, a
@@ -40,12 +40,30 @@ describe('parseOtpVerifyRequest', () => {
     });
   });
 
+  it("keeps a return of 'site', the site app's login link", () => {
+    expect(parseOtpVerifyRequest({ channel: 'phone', identifier: '+201001234567', token: '123456', return: 'site' })).toEqual({
+      channel: 'phone',
+      identifier: '+201001234567',
+      token: '123456',
+      return: 'site',
+    });
+  });
+
   it.each([
+    ['an unknown return', { channel: 'email', identifier: 'x', token: '123456', return: 'dashboard' }],
+    ['a null return', { channel: 'email', identifier: 'x', token: '123456', return: null }],
     ['a missing token', { channel: 'email', identifier: 'x' }],
     ['a numeric token', { channel: 'email', identifier: 'x', token: 123456 }],
     ['a token of 17 characters', { channel: 'email', identifier: 'x', token: '1'.repeat(17) }],
     ['a bad send part', { channel: 'fax', identifier: 'x', token: '123456' }],
   ])('refuses %s', (_case, body) => {
     expect(parseOtpVerifyRequest(body)).toBeNull();
+  });
+});
+
+describe('loginReturnOf', () => {
+  it("is 'site' for 'site' only", () => {
+    expect(loginReturnOf('site')).toBe('site');
+    for (const value of [null, undefined, '', 'SITE', 'dashboard', ['site']]) expect(loginReturnOf(value), String(value)).toBeUndefined();
   });
 });

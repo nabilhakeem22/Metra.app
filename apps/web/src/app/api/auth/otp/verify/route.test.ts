@@ -11,6 +11,13 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/headers', async () => ({ cookies: async () => (await import('@/test/otp-route-doubles')).cookieStore }));
 vi.mock('@supabase/ssr', async () => ({ createServerClient: (await import('@/test/otp-route-doubles')).createServerClient }));
 vi.mock('@/lib/db/context', async () => ({ withUserContext: (await import('@/test/otp-route-doubles')).withUserContext }));
+// The site app ships in PR S4; a test switches its landing on to prove the rule (AC8).
+const siteApp = vi.hoisted(() => ({ live: false }));
+vi.mock('@/lib/site/app-live', () => ({
+  get SITE_APP_LIVE() {
+    return siteApp.live;
+  },
+}));
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ref.supabase.test');
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fake-anon-key');
 
@@ -29,6 +36,7 @@ async function verify(body: string, headers?: Record<string, string | undefined>
 let logged: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   doubles.resetOtpRouteDoubles();
+  siteApp.live = false;
   logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => logged.mockRestore());
@@ -62,6 +70,44 @@ describe('POST /api/auth/otp/verify', () => {
     expect(await verify(EMAIL_CODE)).toEqual({ status: 200, body: { ok: true, next: '/dashboard' } });
     expect(doubles.withUserContext).not.toHaveBeenCalled();
     expect(logged).toHaveBeenCalledWith('verifyOtp returned no user');
+  });
+
+  describe('the site app landing (AC8)', () => {
+    const FROM_SITE_APP = JSON.stringify({ channel: 'phone', identifier: '+201001234567', token: '654321', return: 'site' });
+
+    it('is off until the site app ships: return=site and an engineer land as before', async () => {
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/dashboard' });
+      doubles.withUserContext.mockResolvedValueOnce([{ role: 'site_engineer' }]);
+      expect((await verify(EMAIL_CODE)).body).toEqual({ ok: true, next: '/dashboard' });
+    });
+
+    it('with the app live, return=site answers /site', async () => {
+      siteApp.live = true;
+      expect(await verify(FROM_SITE_APP)).toEqual({ status: 200, body: { ok: true, next: '/site' } });
+    });
+
+    it('with the app live, a person who is only a site engineer gets /site without it, and an owner the dashboard', async () => {
+      siteApp.live = true;
+      doubles.withUserContext.mockResolvedValueOnce([{ role: 'site_engineer' }, { role: 'client' }]);
+      expect((await verify(EMAIL_CODE)).body).toEqual({ ok: true, next: '/site' });
+      doubles.withUserContext.mockResolvedValueOnce([{ role: 'site_engineer' }, { role: 'owner' }]);
+      expect((await verify(EMAIL_CODE)).body).toEqual({ ok: true, next: '/dashboard' });
+      expect((await verify(EMAIL_CODE)).body).toEqual({ ok: true, next: '/dashboard' });
+    });
+
+    it('with the app live, return=site with no internal membership takes the normal path (F5)', async () => {
+      siteApp.live = true;
+      doubles.withUserContext.mockResolvedValueOnce([]);
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/onboarding' });
+      doubles.withUserContext.mockResolvedValueOnce([{ role: 'client' }]);
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/dashboard' });
+    });
+
+    it('with the app live, a failed probe takes the normal path even with return=site', async () => {
+      siteApp.live = true;
+      doubles.withUserContext.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+      expect((await verify(FROM_SITE_APP)).body).toEqual({ ok: true, next: '/dashboard' });
+    });
   });
 
   it('checks a phone code as an SMS code', async () => {
@@ -100,6 +146,7 @@ describe('POST /api/auth/otp/verify', () => {
     ['a missing token', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example' })],
     ['a token that is not a string', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: 123456 })],
     ['a token over 16 characters', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '1'.repeat(17) })],
+    ['a return other than site', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '123456', return: '/admin' })],
     ['a well-formed body over 4 KiB', JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '123456', padding: 'x'.repeat(5000) })],
   ])('answers %s 400 malformed', async (_case, body) => {
     expect(await verify(body)).toEqual({ status: 400, body: { ok: false, error: 'malformed' } });

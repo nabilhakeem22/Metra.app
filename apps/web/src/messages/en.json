@@ -524,7 +524,8 @@
       "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
       "not_whole_number": "Enter a whole number, without a fraction.",
       "in_future": "This time is later than now. Check the clock on your phone, then try again.",
-      "too_old": "This is from more than 30 days ago, too long ago to record. Check the clock on your phone."
+      "too_old": "This is from more than 30 days ago, too long ago to record. Check the clock on your phone.",
+      "not_internal_member": "This person is no longer an internal member of the studio, so we took them off the list. Pick someone else."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -1288,9 +1289,31 @@
         "costHidden": "Job cost and margin are not shown to your role."
       },
       "team": {
-        "title": "Team",
-        "lockedTitle": "Project roles not enabled",
-        "lockedBody": "Assigning a project team activates with project roles."
+        "title": "Site team",
+        "description": "This project shows in the site app only for the people on its site team. A site engineer records on a site only when he is on its team.",
+        "empty": "Nobody is on this site team yet.",
+        "memberLabel": "Team member",
+        "memberPlaceholder": "Choose a team member",
+        "memberHint": "Every member of the studio can be added, except clients. Invite new people from the Team page.",
+        "assign": "Add to the site team",
+        "assigned": "Added to the site team",
+        "alreadyAssigned": "Already on the site team",
+        "remove": "Remove from the site team",
+        "removed": "Removed from the site team",
+        "confirmRemoveTitle": "Remove from the site team?",
+        "confirmRemoveDesc": "{name} will no longer see this project in the site app, and a site engineer can no longer record on it. What was already recorded stays as it is.",
+        "assignedOn": "On the team since {date}",
+        "noCandidates": "Everyone in the studio is already on this site team.",
+        "readonly": "Only the owner, an admin or a project manager can change the site team.",
+        "noAccess": "Your role does not show the site team.",
+        "findLabel": "Find a member",
+        "findHint": "Type the start of a name or an email. The list shows 20 members at a time.",
+        "candidatesLoading": "Loading members",
+        "noMatches": "No member here matches that name or email.",
+        "moreCandidates": "More members",
+        "notShown": "{count, plural, one {Plus {countText} more member on the team, not shown here.} other {Plus {countText} more members on the team, not shown here.}}",
+        "alreadyRemoved": "They were already off the site team. The list is up to date now.",
+        "candidatesFailed": "We could not load the members. Try again."
       },
       "proposals": {
         "title": "Proposals",
@@ -2448,10 +2471,6 @@
         "recorded": "Payment recorded"
       },
       "closed": {
-        "execution": {
-          "headline": "Closed: the client is building with you",
-          "hint": "The design is done. The build runs on the execution contract below."
-        },
         "closed_design_only": {
           "headline": "Closed: design-only handover complete",
           "hint": "The client confirmed receipt of the handover pack."
@@ -2855,7 +2874,8 @@
       "waitingClient": "Waiting on client",
       "stalled": "Stalled",
       "delivered": "Delivered",
-      "abandoned": "Abandoned"
+      "abandoned": "Abandoned",
+      "terminated": "Terminated"
     },
     "offlineApproval": {
       "open": "Client approved offline",
@@ -2916,6 +2936,37 @@
       "showing": "Client sees: expected by {date}",
       "stale": "The date passed, set a new one.",
       "moved": "The delivery moved to a new stage, so the client no longer sees this date. Set a date for this stage."
+    },
+    "flow": {
+      "execution": {
+        "contract": "Contract",
+        "signature": "Signature",
+        "works": "Works and payments",
+        "final_account": "Final account",
+        "settled": "Settled"
+      },
+      "who": {
+        "done": "Done",
+        "now": {
+          "studio": "Your move",
+          "client": "Waiting on the client",
+          "site": "On site"
+        },
+        "later": {
+          "studio": "Yours",
+          "client": "The client's",
+          "site": "The site team's"
+        }
+      }
+    },
+    "designSummary": {
+      "complete": "Design: complete",
+      "openInstalments": "{count, plural, one {{n} payment open} other {{n} payments open}}",
+      "pendingClaims": "{count, plural, one {{n} payment to confirm} other {{n} payments to confirm}}",
+      "awaitingReply": "{count, plural, one {{n} question awaiting a reply} other {{n} questions awaiting a reply}}",
+      "show": "Show",
+      "hide": "Hide",
+      "detailsIn": "Details in"
     }
   },
   "delivery": {
@@ -3327,7 +3378,8 @@
         "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
         "not_whole_number": "Please enter a whole number, without a fraction.",
         "in_future": "This time is later than now. Please check the clock on your device and try again.",
-        "too_old": "This is from more than 30 days ago, too long ago to record. Please check the clock on your device."
+        "too_old": "This is from more than 30 days ago, too long ago to record. Please check the clock on your device.",
+        "not_internal_member": "This person is no longer an internal member of the studio, so they were taken off the list. Choose someone else."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
@@ -3470,7 +3522,21 @@
         "prepare_final_account": "Prepare the final account",
         "review_final_account": "Review the final account"
       },
-      "recordMeasurements": "Record measurements"
+      "recordMeasurements": "Record measurements",
+      "studioTakesBack": {
+        "signing_closed": {
+          "headline": "The online signing window has closed: record the paper signature",
+          "hint": "The client can no longer sign on their link. If they signed on paper, record it here."
+        },
+        "change_order_not_issued": {
+          "headline": "Issue the change order to the client",
+          "hint": "It is approved inside the studio and not sent yet, so the client cannot see it."
+        },
+        "change_order_link_expired": {
+          "headline": "The change order link has expired: contact the client",
+          "hint": "The client can no longer answer this change order on their link. Contact them about it."
+        }
+      }
     }
   },
   "site": {
@@ -3526,6 +3592,7 @@
     "update": {
       "available": "A new version is available",
       "reload": "Reload"
-    }
+    },
+    "backToApp": "Back to the site app"
   }
 }

@@ -33,6 +33,7 @@ import { ProfileTabs } from './profile-tabs';
 import { ProposalsTab } from './proposals-tab';
 import { PROJECT_TABS, type ProjectTab } from './tabs';
 import { TeamTab } from './team-tab';
+import { loadTeamTab } from './team-tab-data';
 
 export default async function ProjectProfilePage({
   params,
@@ -151,7 +152,7 @@ export default async function ProjectProfilePage({
             }
           />
         )}
-        {tab === 'team' && <TeamTab />}
+        {tab === 'team' && <TeamTab projectId={id} data={await loadTeamTab(ctx, id)} />}
         {tab === 'proposals' && (
           <ProposalsTab
             projectId={id}

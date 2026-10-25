@@ -2,7 +2,7 @@ import 'server-only';
 import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { ok, type ActionResult } from '@/lib/actions/result';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { OtpSendRequest, OtpVerifyRequest, OtpVerifyResult, PostLoginPath } from './otp-contract';
+import type { OtpSendRequest, OtpVerifyRequest, OtpVerifyResult } from './otp-contract';
 import { otpSendFailure, otpVerifyFailure } from './otp-failure';
 import { otpCodeErrors, otpIdentifierErrors, type OtpChannel } from './otp-field-rules';
 import { postLoginPathFor } from './post-login-path';
@@ -43,9 +43,10 @@ export async function sendOtpCore({ channel, identifier }: OtpSendRequest): Prom
 
 /**
  * Check a typed code. On success Supabase writes the session cookies, and the
- * answer names where to go next, so the form needs no second round trip.
+ * answer names where to go next (the site app when the sign-in began there),
+ * so the form needs no second round trip.
  */
-export async function verifyOtpCore({ channel, identifier, token }: OtpVerifyRequest): Promise<OtpVerifyResult> {
+export async function verifyOtpCore({ channel, identifier, token, return: returnTo }: OtpVerifyRequest): Promise<OtpVerifyResult> {
   const refused = codeRefusal(token);
   if (refused) return refused;
   const supabase = await createSupabaseServerClient();
@@ -54,13 +55,5 @@ export async function verifyOtpCore({ channel, identifier, token }: OtpVerifyReq
       ? await supabase.auth.verifyOtp({ email: identifier, token, type: 'email' })
       : await supabase.auth.verifyOtp({ phone: identifier, token, type: 'sms' });
   if (error) return otpVerifyFailure(channel === 'email' ? 'verifyEmailOtp failed' : 'verifyPhoneOtp failed', error);
-  return { ok: true, next: await nextPathFor(data.user?.id) };
-}
-
-async function nextPathFor(userId: string | undefined): Promise<PostLoginPath> {
-  if (userId) return postLoginPathFor(userId);
-  // Like a failed membership probe, this must never block the sign-in:
-  // requireOrg on /dashboard re-resolves the real destination.
-  console.error('verifyOtp returned no user');
-  return '/dashboard';
+  return { ok: true, next: await postLoginPathFor(data.user?.id, returnTo) };
 }

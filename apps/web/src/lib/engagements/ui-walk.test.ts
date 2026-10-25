@@ -37,6 +37,9 @@ import {
   type ExecutionFacts,
   type ExecutionStage,
 } from '@/lib/execution/stage';
+import { buildPhaseView } from '@/lib/flow/build-view';
+import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
 import ar from '@/messages/ar-EG.json';
 import en from '@/messages/en.json';
 
@@ -567,4 +570,31 @@ describe('the execution card offers an action it can take, at every derived stag
     expect(target).toEqual({ kind: 'link', page: 'project_boq' });
     expect(executionCardHref('project_boq', { projectId: 'p-1', contractId: null })).toBe('/projects/p-1?tab=boq');
   });
+});
+
+// The cockpit's execution step card (client home H2): every derived stage sits
+// on exactly one step of the execution rail, and that step says whose move it
+// is in both languages. A new stage or action fails here until the rail can say it.
+describe('the execution rail places every derived stage and says whose move it is', () => {
+  type Catalog = typeof en;
+  for (const stage of EXECUTION_STAGES) {
+    it(`${stage}: one step on the rail, named, with its whose-move words`, () => {
+      const facts = EXECUTION_WALK[stage];
+      const location = locateExecutionForStudio({
+        stage: facts,
+        signingOpen: facts.contract?.status === 'issued',
+        issuedChangeOrderCount: facts.contract?.openVariationCount ?? 0,
+        expiredChangeOrderCount: 0,
+        unclaimedDueRequestCount: facts.contract?.unpaidRequestCount ?? 0,
+      });
+      const view = buildPhaseView(EXECUTION_PHASE, location, 'studio');
+      const current = view.steps.filter((step) => step.status === 'current');
+      expect(current, `"${stage}" is live but no step is current`).toHaveLength(EXECUTION_STAGES_WITHOUT_ACTION.has(stage) ? 0 : 1);
+      for (const catalog of Object.values(messageCatalogs) as Catalog[]) {
+        const flow = catalog.engagements.flow;
+        for (const step of view.steps) expect(flow.execution[step.key as keyof Catalog['engagements']['flow']['execution']]).toBeTruthy();
+        for (const step of current) expect(flow.who.now[step.actor]).toBeTruthy();
+      }
+    });
+  }
 });

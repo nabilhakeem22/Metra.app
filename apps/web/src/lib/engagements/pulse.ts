@@ -79,7 +79,7 @@ function gateUnlocksPhase(gate: GateKind): PhaseKey | null {
 }
 
 /** Σ of the payment ledger's cleared amounts of one kind (scale-4 BigInt). */
-function paidForKind(
+export function paidForKind(
   payments: EngagementPayment[],
   kind: MilestoneKind,
 ): bigint {

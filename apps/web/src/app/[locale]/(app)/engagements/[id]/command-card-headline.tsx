@@ -9,10 +9,11 @@ import type { DesignState } from '@/lib/engagements/states';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import type { CommandCardCopy } from './command-card-copy';
+import { StepHeadline } from '@/components/flow/step-card';
 import { SectionLabel } from '@/components/ui/section-label';
 
 /**
- * The client's own words — a QUIET callout under the headline, never a second CTA.
+ * The client's own words: a QUIET callout under the headline, never a second CTA.
  * Plain text: React escapes it, so client-authored input can never inject markup.
  * Logical CSS only, so it mirrors in ar-EG.
  */
@@ -37,7 +38,7 @@ function ClientNoteCallout({
     <div className="mb-4 rounded-panel border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
       <SectionLabel>{tcmd('clientNote')}</SectionLabel>
       {/* Clamped to 4 lines: a long client note must never push the primary
-          Advance CTA below the fold — the whole point of this card is one
+          Advance CTA below the fold; the whole point of this card is one
           unmissable next action. The full text is always in the Timeline. */}
       <p className="mt-1 line-clamp-4 whitespace-pre-line break-words text-small text-[color:var(--text)]">
         {t('noteQuote', { note: clientNote.note })}
@@ -59,7 +60,7 @@ function ClientNoteCallout({
   );
 }
 
-/** 2. THE ONE ACTION — its eyebrow, headline and hint, and the two quiet lines. */
+/** 2. THE ONE ACTION: its eyebrow, headline and hint (the shared step headline), and the two quiet lines. */
 export function CommandCardHeadline({
   closed,
   copy,
@@ -80,22 +81,17 @@ export function CommandCardHeadline({
     review.clientDecision?.kind === 'concept_approval'
       ? conceptLetter(review.clientDecision.chosenPosition)
       : null;
+  const actorLabel = copy.actor === 'client' ? tcmd('pill.waitingClient') : tcmd('nextAction');
   return (
     <>
       {/* The eyebrow carries the ACTOR. A client-actor stage is not a MISSING next
-          action — it is a different, healthy one — so it gets its own label rather
+          action, it is a different, healthy one, so it gets its own label rather
           than no label at all, which left the headline floating. */}
-      {!closed && (
-        <SectionLabel className="mb-1.5">
-          {copy.actor === 'client' ? tcmd('pill.waitingClient') : tcmd('nextAction')}
-        </SectionLabel>
-      )}
-      <h2 className="mb-1 text-heading font-semibold leading-tight text-balance">
-        {copy.headline}
-      </h2>
-      {copy.hint && (
-        <p className="mb-4 text-small text-[color:var(--text-muted)]">{copy.hint}</p>
-      )}
+      <StepHeadline
+        eyebrow={closed ? null : actorLabel}
+        headline={copy.headline}
+        hint={copy.hint}
+      />
       {chosenLetter && (
         <p data-client-choice={chosenLetter} className="mb-4 text-small font-semibold">
           {tcmd('clientChoseOption', { letter: bidiIsolate(chosenLetter) })}
@@ -104,7 +100,7 @@ export function CommandCardHeadline({
 
       <ClientNoteCallout clientActivity={clientActivity} review={review} />
 
-      {/* Client questions waiting on an answer. ONE line, no button — the reply
+      {/* Client questions waiting on an answer. ONE line, no button: the reply
           lives on the document itself, in Files. Advisory: it never blocks the
           advance, so it must never look like it does. */}
       {!closed && awaitingReplyCount > 0 && (

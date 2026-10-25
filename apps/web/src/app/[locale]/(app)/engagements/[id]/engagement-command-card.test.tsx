@@ -111,6 +111,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     onNudge: () => {},
     clientExpected: null,
     execution: null,
+    onOpenTab: () => {},
     ...overrides,
   };
 }
@@ -292,10 +293,17 @@ describe('a closed delivery', () => {
     props({ state, preview: closedPreview, secondaryTriggers: [], ...extra });
   const link = (key: string) => screen.queryByRole('link', { name: ar(key) });
 
-  test('at execution: its own headline and the execution card with its one next action, no nudge footer', () => {
-    const execution: ExecutionCardView = {
+  test('at execution: the execution step card, with its one next action and no nudge footer', () => {
+    const view: ExecutionCardView = {
       stage: 'no_boq',
       next: { kind: 'open_boq' },
+      flow: {
+        stage: { hasIssuedBoq: false, contract: null },
+        signingOpen: false,
+        issuedChangeOrderCount: 0,
+        expiredChangeOrderCount: 0,
+        unclaimedDueRequestCount: 0,
+      },
       projectId: 'p-1',
       boqId: null,
       contract: null,
@@ -310,8 +318,10 @@ describe('a closed delivery', () => {
         recordMeasurements: false,
       },
     };
+    const execution = { view, designSummary: { openInstalments: 0, pendingClaims: 0, awaitingReply: 0 } };
     renderWithIntl(<EngagementCommandCard {...closedProps('execution', { execution })} />);
-    expect(screen.getByText(ar('engagements.command.closed.execution.headline'))).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(ar('execution.card.next.open_boq'));
+    expect(screen.getByText(ar('engagements.designSummary.complete'))).toBeTruthy();
     expect(link('execution.card.next.open_boq')?.getAttribute('href')).toContain('/projects/p-1?tab=boq');
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: ar('engagements.command.nudge') })).toBeNull();
@@ -372,7 +382,7 @@ describe('a closed delivery', () => {
   test('a role that cannot resolve claims does not get the Dismiss', () => {
     renderWithIntl(
       <EngagementCommandCard
-        {...closedProps('execution', { paymentClaims: [pendingClaim], canResolveClaims: false })}
+        {...closedProps('closed_design_only', { paymentClaims: [pendingClaim], canResolveClaims: false })}
       />,
     );
     expect(button('engagements.paymentClaims.dismiss')).toBeNull();

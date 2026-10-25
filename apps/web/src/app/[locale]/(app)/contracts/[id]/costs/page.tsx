@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { BackToSiteAppLink } from '@/components/site/back-to-site-app-link';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { costEntriesScopeFor, mayReadCostEntries, mayRecordCostEntries } from '@/lib/execution/costs/access';
@@ -20,7 +21,13 @@ import { CostsPageClient } from './costs-page-client';
  * contract holds. A member who may not see margin lists only the costs it
  * recorded, with no total (owner ruling, Oct 21), and the subtitle says so.
  */
-export default async function ContractCostsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContractCostsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
   const ctx = await requireOrg();
   if (!mayReadCostEntries(ctx.role)) notFound();
   const { id } = await params;
@@ -32,6 +39,7 @@ export default async function ContractCostsPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
+      <BackToSiteAppLink from={(await searchParams).from} />
       <PageHeader title={t('page.title', { number: formatDocNumber('C', header.number, docYear(null, header.createdAt)) })} description={t(ownOnly ? 'page.subtitleOwn' : 'page.subtitle')} />
       <CostsPageClient
         header={header}

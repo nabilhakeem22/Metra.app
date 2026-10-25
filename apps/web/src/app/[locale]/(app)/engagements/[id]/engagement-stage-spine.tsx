@@ -9,25 +9,25 @@ import {
   PenTool,
   Ruler,
   Table2,
+  type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import {
-  SPINE_NODES,
-  SPINE_STAGES,
-  type SpineStageKey,
-  spinePosition,
-} from '@/lib/engagements/stage-spine';
+import { PhaseRail } from '@/components/flow/phase-rail';
+import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
+import { SPINE_NODES, type SpineStageKey } from '@/lib/engagements/stage-spine';
 import type { DesignState } from '@/lib/engagements/states';
+import { buildPhaseView } from '@/lib/flow/build-view';
+import { locateDesignForStudio } from '@/lib/flow/locate/design-studio';
+import { DESIGN_PHASE } from '@/lib/flow/phases/design';
 
 /**
  * One glyph per stage, in the app's existing Lucide vocabulary.
  *
  * It is DECORATION, never information: every icon sits beside its own text label
  * and is `aria-hidden`, so nothing here is conveyed by shape alone. What it buys
- * is recognition — a glyph reads identically in Arabic and English, which makes
- * it the one label on this band that needs no translation.
+ * is recognition: a glyph reads identically in Arabic and English.
  */
-const STAGE_ICON: Record<SpineStageKey, typeof FileText> = {
+const STAGE_ICON: Readonly<Record<SpineStageKey, LucideIcon>> = {
   proposal: FileText,
   survey: Ruler,
   layout: LayoutGrid,
@@ -38,139 +38,13 @@ const STAGE_ICON: Record<SpineStageKey, typeof FileText> = {
   handover: PackageCheck,
 };
 
-// The cockpit's STAGE SPINE — the studio's own stages, with the two gates drawn
-// where they actually sit. It replaces the five-milestone ribbon, which is the
-// CLIENT's journey map: that one collapses sixteen states into friendly
-// milestones and hides the gates on purpose, so a studio was looking at its own
-// engagement through the homeowner's simplification with Gate A and Gate B
-// nowhere on the page.
-//
-// Stages flex to share the row from their own content width; gate markers do
-// NOT: they are `flex: none` so they read as thin dividers between segments
-// rather than as stages of their own. From md up a stage never shrinks below
-// its one-line label (`min-w-max`): where the band is narrower than the labels
-// (Arabic needs about 870px) it scrolls sideways instead of letting the labels
-// run into each other.
-// The row scrolls horizontally on a narrow screen rather than crushing ten labels
-// into illegibility. Logical CSS only, so the whole spine mirrors in ar-EG RTL
-// without a second layout.
-
-type SegmentStatus = 'done' | 'current' | 'upcoming' | 'muted';
-
-function barClass(status: SegmentStatus): string {
-  switch (status) {
-    case 'done':
-      return 'bg-[color:var(--spine-done)]';
-    case 'current':
-      return 'bg-brand';
-    case 'muted':
-      return 'bg-[color:var(--rule)]';
-    default:
-      return 'bg-[color:var(--track)]';
-  }
-}
-
-// HIERARCHY BY WEIGHT, NOT BY FADING. Pushing `--text-faint` down until it was
-// legible on --track brought it close to --text-muted, which flattens a
-// colour-only hierarchy. Weight carries the difference instead -- and unlike
-// lightness it costs nothing in contrast, which is the whole point.
-function labelClass(status: SegmentStatus): string {
-  switch (status) {
-    case 'current':
-      return 'font-bold text-brand-ink';
-    case 'done':
-      return 'font-medium text-[color:var(--text-muted)]';
-    default:
-      return 'font-normal text-[color:var(--text-faint)]';
-  }
-}
-
-export function EngagementStageSpine({ state }: { state: DesignState }) {
+// The cockpit's STAGE SPINE: the studio's own design stages on the shared phase
+// rail, with the two gates drawn where they actually sit. It is not the client's
+// six-milestone journey, which hides the gates on purpose; a studio must see
+// Gate A and Gate B on its own engagement.
+export function EngagementStageSpine({ state, status }: { state: DesignState; status: DeliveryStatus }) {
   const t = useTranslations('engagements.spine');
-  const { index, allComplete, closed, atGate } = spinePosition(state);
-
-  return (
-    <ol className="flex items-stretch gap-1.5 overflow-x-auto pb-0.5">
-      {SPINE_NODES.map((node) => {
-        if (node.kind === 'gate') {
-          // The gate the engagement is AT gets the warn accent — that is the
-          // difference between "the 3D is in progress" and "the 3D is done and
-          // the client owes us an approval".
-          const here = atGate === node.key;
-          return (
-            <li
-              key={node.key}
-              className="flex flex-none flex-col gap-1.5"
-              aria-current={here ? 'step' : undefined}
-            >
-              <span
-                aria-hidden
-                className={`mx-auto h-1 w-[3px] rounded-full ${
-                  here ? 'bg-[color:var(--warn)]' : 'bg-[color:var(--rule)]'
-                }`}
-              />
-              <span
-                className={`whitespace-nowrap text-caption font-bold leading-tight ltr:font-mono ltr:uppercase ltr:tracking-[0.06em] ${
-                  here ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-faint)]'
-                }`}
-              >
-                {t(node.key)}
-              </span>
-            </li>
-          );
-        }
-
-        const position = SPINE_STAGES.indexOf(node.key);
-        const Icon = STAGE_ICON[node.key];
-        const status: SegmentStatus = closed
-          ? 'muted'
-          : allComplete || position < index
-            ? 'done'
-            : position === index
-              ? 'current'
-              : 'upcoming';
-
-        return (
-          <li
-            key={node.key}
-            data-spine-stage
-            className="flex min-w-[52px] flex-[1_1_auto] flex-col gap-1.5 md:min-w-max"
-            aria-current={status === 'current' ? 'step' : undefined}
-          >
-            <span className={`h-1 rounded-full ${barClass(status)}`} aria-hidden />
-            {/* ICONS WHERE THEY MEAN SOMETHING. A stage you have finished and the
-                one you are on carry their glyph; a stage you have not reached
-                carries a dot. The spine stops being a decorated list and becomes a
-                POSITION — the eye lands on where the icons stop, which is legible
-                without reading a single word. A muted (abandoned) engagement takes
-                dots throughout: none of it is "reached" any more. */}
-            <span
-              className={`flex min-w-0 items-start gap-1.5 ${labelClass(status)}`}
-            >
-              {status === 'done' || status === 'current' ? (
-                <Icon className="size-[13px] shrink-0" aria-hidden />
-              ) : (
-                <span
-                  className="size-[5px] shrink-0 rounded-full bg-current opacity-45"
-                  aria-hidden
-                />
-              )}
-              {/* One line from md up: each stage takes the width its own name
-                  needs (flex basis auto), so a long Arabic name is not squeezed
-                  into the same share as "BOQ". On a phone it may wrap to two
-                  lines rather than truncate: a clipped name is one nobody can
-                  read. The type size never shrinks to make it fit. */}
-              <span
-                data-spine-label
-                className="line-clamp-2 min-w-0 text-caption leading-tight md:line-clamp-none md:whitespace-nowrap"
-                title={t(node.key)}
-              >
-                {t(node.key)}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  const labels = Object.fromEntries(SPINE_NODES.map((node) => [node.key, t(node.key)]));
+  const view = buildPhaseView(DESIGN_PHASE, locateDesignForStudio(state, status), 'studio');
+  return <PhaseRail view={view} labels={labels} icons={STAGE_ICON} />;
 }

@@ -11,6 +11,7 @@ function useWaitedFor(status: DeliveryStatus): string | undefined {
   const t = useTranslations('engagements.age');
   const locale = useLocale();
   if (status.kind !== 'waitingClient' && status.kind !== 'stalled') return undefined;
+  if (status.days === null) return undefined;
   if (status.days === 0) return t('today');
   // The count drives the plural; the DISPLAYED number is pre-formatted so it
   // stays in Latin digits under the bare `ar-EG` locale (lib/format/number.ts).

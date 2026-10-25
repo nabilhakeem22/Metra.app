@@ -11,7 +11,15 @@ import { getContractPage } from '@/lib/contracts/queries';
 import { getContractPageExecution, getExecutionFacts } from '@/lib/execution/queries/facts';
 import { executionStage } from '@/lib/execution/stage';
 import { seedBoq, seedDelivery } from './contract-from-boq-fixture';
-import { closeExecutionFixture, ownerQuery, seedClientProject, seedExecutionContract, seedRequest } from './execution-fixture';
+import {
+  closeExecutionFixture,
+  ownerQuery,
+  seedClientProject,
+  seedExecutionContract,
+  seedRequest,
+  seedVariation,
+  tamper,
+} from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // PR A3.5, AC10 (the data half): the delivery's execution card derives one
@@ -38,7 +46,7 @@ afterAll(async () => {
 
 async function stageOf(engagementId: string) {
   const card = await getExecutionFacts(owner, engagementId);
-  return { ...executionStage(card.facts), card };
+  return { ...executionStage(card.flow.stage), card };
 }
 
 const SPLIT = [
@@ -83,12 +91,12 @@ describe('the execution card, stage by stage', () => {
       `select id from public.contract_payment_milestones where contract_id = $1 order by sort_order`,
       [contractId],
     );
-    expect(signed.card.facts.contract?.nextUnbilledMilestone).toEqual({ id: milestones[0].id, amount: '62000.0000' });
-    expect(signed.card.facts.contract).toMatchObject({ billingBalance: '124000.0000', finalAccountBalance: '124000.0000' });
+    expect(signed.card.flow.stage.contract?.nextUnbilledMilestone).toEqual({ id: milestones[0].id, amount: '62000.0000' });
+    expect(signed.card.flow.stage.contract).toMatchObject({ billingBalance: '124000.0000', finalAccountBalance: '124000.0000' });
 
     const first = await seedRequest(orgId, contractId, owner.userId, { milestoneId: milestones[0].id }, '62000');
     const billedOnce = await stageOf(engagementId);
-    expect(billedOnce.card.facts.contract).toMatchObject({
+    expect(billedOnce.card.flow.stage.contract).toMatchObject({
       nextUnbilledMilestone: { id: milestones[1].id, amount: '37200.0000' },
       unpaidRequestCount: 1,
       billingBalance: '62000.0000',
@@ -122,13 +130,13 @@ describe('the execution card, stage by stage', () => {
     );
     const measured = await stageOf(engagementId);
     // 10 more units at 100: 1,000 works + 14% VAT + 10% supervision = 1,240.
-    expect(measured.card.facts.contract).toMatchObject({ billingBalance: '0.0000', finalAccountBalance: '1240.0000' });
+    expect(measured.card.flow.stage.contract).toMatchObject({ billingBalance: '0.0000', finalAccountBalance: '1240.0000' });
     expect(measured).toMatchObject({ stage: 'in_progress', next: { kind: 'prepare_final_account' } });
 
     const finalRequest = await seedRequest(orgId, contractId, owner.userId, {}, '1240');
     const finalIssued = await stageOf(engagementId);
     expect(finalIssued).toMatchObject({ stage: 'final_account', next: { kind: 'record_payment' } });
-    expect(finalIssued.card.facts.contract).toMatchObject({ finalAccountOutstanding: '1240.0000', finalAccountBalance: '0.0000' });
+    expect(finalIssued.card.flow.stage.contract).toMatchObject({ finalAccountOutstanding: '1240.0000', finalAccountBalance: '0.0000' });
     await pay(contractId, finalRequest, '1240');
     expect(await stageOf(engagementId)).toMatchObject({ stage: 'settled', next: null });
 
@@ -159,6 +167,63 @@ describe('the execution card, stage by stage', () => {
 
     const elsewhere = await seedDelivery(orgId, ids, 'execution');
     expect(await stageOf(elsewhere)).toMatchObject({ stage: 'no_boq', card: { contract: null, boqId: null } });
+  });
+});
+
+// Client home H2: the three facts the execution locators read beyond the
+// stage, counted in the statements the card already makes.
+describe('the flow facts beside the stage', () => {
+  it('signing open while the issued contract link lives; change orders issued vs internal; due requests with no claim', async () => {
+    const ids = await seedClientProject(orgId);
+    const engagementId = await seedDelivery(orgId, ids, 'execution');
+    const boq = await seedBoq(orgId, { total: '100000', project: ids, engagementId, linesPerSection: [5] });
+    const contractId = (await generateExecutionContractCore(owner, { boqId: boq.boqId, taxRate: '14', supervisionPct: '10' })).data!;
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({ signingOpen: false, issuedChangeOrderCount: 0, unclaimedDueRequestCount: 0 });
+    await saveContractScheduleCore(owner, { contractId, milestones: SPLIT });
+    await issueContractCore(owner, { id: contractId });
+    expect((await stageOf(engagementId)).card.flow.signingOpen).toBe(true);
+    // The 30-day window passed (no app path moves it back, so the clock is moved by SQL).
+    await tamper(`update public.contracts set share_expires_at = now() - interval '1 minute' where id = $1`, [contractId]);
+    const closed = await stageOf(engagementId);
+    expect(closed).toMatchObject({ stage: 'awaiting_signature', card: { flow: { signingOpen: false } } });
+    await tamper(`update public.contracts set share_expires_at = null where id = $1`, [contractId]);
+    expect((await stageOf(engagementId)).card.flow.signingOpen).toBe(true);
+
+    await recordContractSignedOfflineCore(owner, { contractId, signedOn: todayInCairo(new Date()) });
+    expect((await stageOf(engagementId)).card.flow.signingOpen).toBe(false);
+
+    const milestones = await ownerQuery<{ id: string }>(
+      `select id from public.contract_payment_milestones where contract_id = $1 order by sort_order`,
+      [contractId],
+    );
+    const first = await seedRequest(orgId, contractId, owner.userId, { milestoneId: milestones[0].id }, '62000');
+    const second = await seedRequest(orgId, contractId, owner.userId, { milestoneId: milestones[1].id }, '37200');
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({ unclaimedDueRequestCount: 2, stage: { contract: { unpaidRequestCount: 2 } } });
+    await ownerQuery(
+      `insert into public.contract_payment_claims (org_id, contract_id, request_id, claimed_amount) values ($1, $2, $3, 62000)`,
+      [orgId, contractId, first],
+    );
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({ unclaimedDueRequestCount: 1, stage: { contract: { pendingClaimCount: 1 } } });
+    await pay(contractId, second, '37200');
+    expect((await stageOf(engagementId)).card.flow.unclaimedDueRequestCount).toBe(0);
+
+    const project = { contractId, projectId: ids.projectId };
+    await seedVariation(orgId, project, 'internal_approved');
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({ issuedChangeOrderCount: 0, stage: { contract: { openVariationCount: 1 } } });
+    const issued = await seedVariation(orgId, project, 'issued');
+    await seedVariation(orgId, project, 'approved');
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({
+      issuedChangeOrderCount: 1,
+      expiredChangeOrderCount: 0,
+      stage: { contract: { openVariationCount: 2 } },
+    });
+    // Its link expired (F1): still open, no longer answerable, so counted apart.
+    await tamper(`update public.variation_orders set share_expires_at = now() - interval '1 minute' where id = $1`, [issued.id]);
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({
+      issuedChangeOrderCount: 0,
+      expiredChangeOrderCount: 1,
+      stage: { contract: { openVariationCount: 2 } },
+    });
   });
 });
 
