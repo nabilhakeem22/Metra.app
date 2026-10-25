@@ -1,8 +1,9 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
+import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementHeader } from '@/lib/engagements/queries';
 import { openMenu } from '@/test/open-menu';
-import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { EngagementHeaderCard } from './engagement-header-card';
 
 vi.mock('@/i18n/routing', async (importOriginal) => ({
@@ -52,16 +53,21 @@ const header: EngagementHeader = {
   updatedAt: '2026-06-10T00:00:00.000Z',
 };
 
-function renderHeader(canShare: boolean, state: EngagementHeader['state'] = header.state) {
+function renderHeader(
+  canShare: boolean,
+  state: EngagementHeader['state'] = header.state,
+  status: DeliveryStatus = { kind: 'waitingClient', days: 3 },
+  locale: TestLocale = 'en',
+) {
   return renderWithIntl(
     <EngagementHeaderCard
       header={{ ...header, state }}
       shared={false}
-      status={{ kind: 'waitingClient', days: 3 }}
+      status={status}
       canShare={canShare}
       crumbs={{ clientId: 'c-1', clientName: 'Acme', projectId: 'p-1', projectName: 'Tower' }}
     />,
-    { locale: 'en' },
+    { locale },
   );
 }
 
@@ -79,6 +85,27 @@ describe('the delivery header chips speak the StatusChip tones', () => {
       /brand-tint|brand-ink/.test(chip.className),
     );
     expect(branded).toHaveLength(0);
+  });
+});
+
+describe('the status chip at execution (client home H2)', () => {
+  test('it follows whose move it is: the client move waits with no age, the studio move is yours', () => {
+    const { container, unmount } = renderHeader(false, 'execution', { kind: 'waitingClient', days: null });
+    const chip = container.querySelector('[data-tone="waiting"]');
+    expect(chip?.textContent).toBe(en('engagements.status.waitingClient'));
+    unmount();
+    const mine = renderHeader(false, 'execution', { kind: 'yourMove' });
+    expect(mine.container.querySelector('[data-tone="yourMove"]')?.textContent).toBe(en('engagements.status.yourMove'));
+  });
+
+  test('a terminated contract reads "Terminated" in a neutral chip, never "Delivered" (F2)', () => {
+    for (const locale of ['en', 'ar-EG'] as const) {
+      const { container, unmount } = renderHeader(false, 'execution', { kind: 'terminated' }, locale);
+      const neutral = [...container.querySelectorAll('[data-tone="neutral"]')].map((chip) => chip.textContent);
+      expect(neutral).toContain(messageAt(locale, 'engagements.status.terminated'));
+      expect(container.textContent).not.toContain(messageAt(locale, 'engagements.status.delivered'));
+      unmount();
+    }
   });
 });
 

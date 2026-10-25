@@ -4,16 +4,19 @@
 import type { ActionFailure } from './run-action';
 import { offlineConceptOptions } from '@/lib/engagements/concept-choice';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
+import { designSummary } from '@/lib/engagements/design-summary';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
 import type { EngagementCommandCardProps } from './command-card-props';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { openDeliveryReminder } from './share-anchor';
+import type { EngagementTab } from './tabs';
 import type { RunAction } from './use-engagement-action';
 
 export function commandCardPropsOf(
   detail: EngagementDetailProps,
   action: { pending: boolean; runAction: RunAction; actionError: ActionFailure | null },
+  onOpenTab: (tab: EngagementTab) => void,
 ): EngagementCommandCardProps {
   const { header } = detail;
   return {
@@ -65,6 +68,17 @@ export function commandCardPropsOf(
     // already hold (B11); the header's menu still opens the link itself.
     onNudge: openDeliveryReminder,
     clientExpected: detail.clientExpected,
-    execution: detail.execution,
+    // The design folds into one line at execution, counted from what the page
+    // already loaded (no extra read).
+    execution: detail.execution && {
+      view: detail.execution,
+      designSummary: designSummary({
+        feeSchedule: detail.feeSchedule,
+        payments: detail.payments,
+        paymentClaims: detail.paymentClaims,
+        awaitingReplyCount: detail.awaitingReplyCount,
+      }),
+    },
+    onOpenTab,
   };
 }

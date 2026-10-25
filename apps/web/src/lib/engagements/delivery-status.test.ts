@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryStatusTone, resolveDeliveryStatus, type DeliveryStatus } from './delivery-status';
+import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import { executionModels, flowFactsOf, model } from '@/test/execution-flow-model';
+import {
+  deliveryStatusTone,
+  executionDeliveryStatus,
+  resolveDeliveryStatus,
+  type DeliveryStatus,
+} from './delivery-status';
 import { DESIGN_STATES, type DesignState } from './states';
 import type { WhoseMove } from './whose-move';
 
@@ -61,5 +68,35 @@ describe('the rules the product reads', () => {
     expect(deliveryStatusTone({ kind: 'confirmPayment' })).toBe('yourMove');
     expect(deliveryStatusTone({ kind: 'waitingClient', days: 1 })).toBe('waiting');
     expect(deliveryStatusTone({ kind: 'stalled', days: 9 })).toBe('stalled');
+  });
+});
+
+describe('executionDeliveryStatus: at execution the header follows whose move it is', () => {
+  it('every reachable fact set: the studio move is yours, the client move waits unaged, settled is delivered, terminated is terminated', () => {
+    for (const m of executionModels(1)) {
+      const location = locateExecutionForStudio(flowFactsOf(m));
+      const status = executionDeliveryStatus(location);
+      if (location.status === 'closed') expect(status, JSON.stringify(m)).toEqual({ kind: 'terminated' });
+      else if (location.status === 'complete') expect(status, JSON.stringify(m)).toEqual({ kind: 'delivered' });
+      else if (location.whoseMove === 'client') expect(status, JSON.stringify(m)).toEqual({ kind: 'waitingClient', days: null });
+      else expect(status, JSON.stringify(m)).toEqual({ kind: 'yourMove' });
+    }
+  });
+
+  it('the readings the cockpit shows: an open signature waits on the client, a closed one and a draft are yours, settled is delivered', () => {
+    const statusOf = (overrides: Parameters<typeof model>[0]) => executionDeliveryStatus(locateExecutionForStudio(flowFactsOf(model(overrides))));
+    expect(statusOf({ contract: 'issued_open' })).toEqual({ kind: 'waitingClient', days: null });
+    expect(statusOf({ contract: 'issued_closed' })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ contract: 'draft' })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ internalChangeOrders: 1 })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({ issuedChangeOrders: 1 })).toEqual({ kind: 'waitingClient', days: null });
+    expect(statusOf({ expiredChangeOrders: 1 })).toEqual({ kind: 'yourMove' });
+    expect(statusOf({})).toEqual({ kind: 'delivered' });
+    expect(statusOf({ contract: 'terminated' })).toEqual({ kind: 'terminated' });
+    expect(deliveryStatusTone({ kind: 'terminated' })).toBe('neutral');
+  });
+
+  it("a move the site team holds is the studio's own", () => {
+    expect(executionDeliveryStatus({ step: 'works', whoseMove: 'site', status: 'active' })).toEqual({ kind: 'yourMove' });
   });
 });

@@ -1,37 +1,6 @@
 // PURE coachmark helpers (no DOM), so the RTL positioning + keyboard mapping are
 // unit-testable without a browser env.
-
-/**
- * The logical inset-inline-start offset for the anchor: distance from the
- * INLINE-START viewport edge. In LTR that's the physical near edge; in RTL it
- * flips to be measured from the physical far edge, so `insetInlineStart`
- * positions correctly in both. `nearEdge`/`farEdge` = rect.left / rect.right.
- */
-export function inlineStartOffset(
-  nearEdge: number,
-  farEdge: number,
-  rtl: boolean,
-  viewportWidth: number,
-): number {
-  return rtl ? viewportWidth - farEdge : nearEdge;
-}
-
-/**
- * Clamp a logical inset so a box of `boxSize` stays fully inside `viewportSize`
- * with `margin` on both edges. Operates in logical space (inset-inline-start),
- * so it is correct in LTR and RTL alike — the viewport width is direction-neutral.
- * When the box is wider than the space available it pins to the start margin
- * (the element's own max-width handles the overflow).
- */
-export function clampInset(
-  desiredInset: number,
-  boxSize: number,
-  viewportSize: number,
-  margin: number,
-): number {
-  const max = Math.max(margin, viewportSize - boxSize - margin);
-  return Math.min(Math.max(desiredInset, margin), max);
-}
+import { clampInset, inlineStartOffset, type AnchorBox } from '@/lib/ui/viewport-inset';
 
 /**
  * Choose the block-axis top for the card: below the anchor by `gap`, unless
@@ -79,21 +48,6 @@ export const ANCHOR_PADDING = 6;
 export const VIEWPORT_MARGIN = 16;
 /** Space between the anchor and the card. */
 export const ANCHOR_GAP = 10;
-
-/**
- * A measured box in LOGICAL terms. `nearEdge`/`farEdge` rather than left/right
- * for the same reason `inlineStartOffset` takes them that way: this module is the
- * one place RTL is reasoned about, and naming a physical side here would be the
- * first step back to a card that mirrors wrong.
- */
-export interface AnchorBox {
-  top: number;
-  bottom: number;
-  nearEdge: number;
-  farEdge: number;
-  width: number;
-  height: number;
-}
 
 export interface CoachmarkPlacement {
   /** The highlight ring's logical inset and box. */

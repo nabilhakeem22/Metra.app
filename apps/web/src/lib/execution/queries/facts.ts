@@ -10,8 +10,9 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { loadScheduleRows, scheduleView, type ContractScheduleView, type ScheduleRowView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 import { billingBalance, finalAccountBalance } from '../money/final-account';
-import { executionStage, type ExecutionContractFacts, type ExecutionFacts, type ExecutionStage } from '../stage';
+import { executionStage, type ExecutionContractFacts, type ExecutionStage } from '../stage';
 import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from './money-facts';
 
@@ -23,7 +24,8 @@ export interface ExecutionCardContract {
 }
 
 export interface ExecutionCardFacts {
-  facts: ExecutionFacts;
+  /** The one execution fact model both the cockpit and the client home read (lib/flow/locate/execution-facts.ts). */
+  flow: ExecutionFlowFacts;
   /** The delivery's issued BOQ: what "create contract" generates from. */
   boqId: string | null;
   contract: ExecutionCardContract | null;
@@ -37,6 +39,8 @@ async function loadDeliveryContract(tx: MetraDb, engagementId: string) {
     .select({
       id: contracts.id, number: contracts.number, createdAt: contracts.createdAt, status: contracts.status,
       sourceBoqId: contracts.sourceBoqId,
+      // The issued contract's online signing window (OD7) is still open: in this statement, no read of its own.
+      signingOpen: sql<boolean>`(${contracts.status} = 'issued' and (${contracts.shareExpiresAt} is null or ${contracts.shareExpiresAt} > now()))`,
       originalValue: contracts.originalValue, taxAmount: contracts.taxAmount, taxRate: contracts.taxRate,
       supervisionPct: contracts.supervisionPct, discountPct: contracts.discountPct,
     })
@@ -78,12 +82,22 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
   return formatMoney4(parseMoney4(money.finalAccount.finalValue) - parseMoney4(money.issuedRequestsTotal));
 }
 
+/** What a signed contract's change orders and requests add to the flow facts (zero before it is signed). */
+type ContractFlowCounts = Pick<ExecutionFlowFacts, 'issuedChangeOrderCount' | 'expiredChangeOrderCount' | 'unclaimedDueRequestCount'>;
+
+/** A contract that bills nothing yet changes nothing either. */
+const NO_FLOW_COUNTS: ContractFlowCounts = { issuedChangeOrderCount: 0, expiredChangeOrderCount: 0, unclaimedDueRequestCount: 0 };
+
 /** A signed contract's billing facts, and the row it bills next; a draft or an unsigned one bills nothing yet. */
 async function contractFacts(
   tx: MetraDb,
   contract: StagedContract,
   schedule: ContractScheduleView,
-): Promise<{ facts: ExecutionContractFacts; next: { labelAr: string | null; labelEn: string | null } | null }> {
+): Promise<{
+  facts: ExecutionContractFacts;
+  counts: ContractFlowCounts;
+  next: { labelAr: string | null; labelEn: string | null } | null;
+}> {
   const idle: ExecutionContractFacts = {
     status: contract.status,
     scheduleValid: schedule.valid,
@@ -96,7 +110,7 @@ async function contractFacts(
     billingBalance: '0',
     finalAccountBalance: '0',
   };
-  if (contract.status !== 'signed') return { facts: idle, next: null };
+  if (contract.status !== 'signed') return { facts: idle, counts: NO_FLOW_COUNTS, next: null };
 
   const money = await loadContractMoneyFacts(tx, contract.id);
   const billing = {
@@ -120,7 +134,15 @@ async function contractFacts(
     billingBalance: issued ?? billingBalance(billing),
     finalAccountBalance: full,
   };
-  return { facts, next: next && { labelAr: next.labelAr, labelEn: next.labelEn } };
+  return {
+    facts,
+    counts: {
+      issuedChangeOrderCount: money.issuedVariationCount,
+      expiredChangeOrderCount: money.expiredVariationCount,
+      unclaimedDueRequestCount: money.unclaimedDueRequestCount,
+    },
+    next: next && { labelAr: next.labelAr, labelEn: next.labelEn },
+  };
 }
 
 /** The execution card's facts for a delivery at `execution`. */
@@ -139,7 +161,11 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
         ? { id: contract.id, number: contract.number, createdAt: contract.createdAt.toISOString(), status: contract.status }
         : null,
       nextInstalment: billing?.next ?? null,
-      facts: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
+      flow: {
+        stage: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
+        signingOpen: contract?.signingOpen ?? false,
+        ...(billing?.counts ?? NO_FLOW_COUNTS),
+      },
     };
   });
 }

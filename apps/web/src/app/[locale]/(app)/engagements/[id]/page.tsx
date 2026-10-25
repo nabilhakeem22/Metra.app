@@ -56,10 +56,25 @@ export default async function EngagementDetailPage({
   const forwardMoves = forwardMovesOf(gatePreview);
   const canAdvance =
     forwardMoves.length > 0 && forwardMoves.every((trigger) => canRunTrigger(ctx.role, trigger));
+  const execution =
+    data.execution &&
+    executionCardView(data.execution, {
+      projectId: header.projectId,
+      may: {
+        generateContract: can(ctx.role, 'contracts_generate', 'create'),
+        signOffline: mayRecordSignedOffline(ctx.role),
+        openContract: can(ctx.role, 'contracts_generate', 'read'),
+        recordCosts: mayRecordCostEntries(ctx.role),
+        sendRequests: mayIssueRequests(ctx.role),
+        recordPayments: mayRecordPayments(ctx.role),
+        recordMeasurements: mayRecordMeasurements(ctx.role),
+      },
+    });
   const status = deliveryStatusOf({
     header,
     gatePreview,
     pendingClaimCount: paymentClaims.length,
+    execution: execution && execution.flow,
     now: new Date(),
   });
 
@@ -110,21 +125,7 @@ export default async function EngagementDetailPage({
         paymentClaims={paymentClaims}
         awaitingReplyCount={data.awaitingReplyCount}
         clientExpected={clientExpectedCardOf({ role: ctx.role, header, transitions, status, now: new Date() })}
-        execution={
-          data.execution &&
-          executionCardView(data.execution, {
-            projectId: header.projectId,
-            may: {
-              generateContract: can(ctx.role, 'contracts_generate', 'create'),
-              signOffline: mayRecordSignedOffline(ctx.role),
-              openContract: can(ctx.role, 'contracts_generate', 'read'),
-              recordCosts: mayRecordCostEntries(ctx.role),
-              sendRequests: mayIssueRequests(ctx.role),
-              recordPayments: mayRecordPayments(ctx.role),
-              recordMeasurements: mayRecordMeasurements(ctx.role),
-            },
-          })
-        }
+        execution={execution}
       />
     </div>
   );
