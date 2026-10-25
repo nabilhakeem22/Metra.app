@@ -18,7 +18,8 @@ import { siteVisits } from './site-visits';
 /**
  * A note from site to the studio (Stage 3, 0064): progress, an issue or a
  * request. Never shown to the client. EVIDENCE: `trg_site_notes_guard` lets an
- * UPDATE change only the void pair (once). No DELETE grant.
+ * UPDATE change only the void pair (once), and freezes a voided note whole. No
+ * DELETE grant.
  */
 export const siteNotes = pgTable(
   'site_notes',
@@ -39,10 +40,11 @@ export const siteNotes = pgTable(
   (t) => [
     unique('site_notes_org_id_id_unique').on(t.orgId, t.id),
     unique('site_notes_org_client_key_unique').on(t.orgId, t.clientKey),
-    // Present = at least one visible character (the contract_cost_entries rule).
+    // Present = at least one character that is neither white space nor an
+    // invisible format character (0064's text_has_visible_character).
     check(
       'site_notes_body_present',
-      sql`body ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(body) <= 2000`,
+      sql`public.text_has_visible_character(body) and char_length(body) <= 2000`,
     ),
     check('site_notes_void_pair', sql`(voided_at is null) = (voided_by is null)`),
     sameProjectFk(t, 'visit', siteVisits),

@@ -1,8 +1,9 @@
 -- 0064: Stage 3, the site diary (DB step S). SCHEMA ONLY and ADDITIVE: five
--- new enum types, seven new org-scoped tables, two existing tables altered. No
--- row is updated, nothing is backfilled, no policy, no grant, no trigger and no
--- apply-rls function is referenced (RLS, grants, the restrictive insert policy
--- and the guard triggers live in rls/policies/70-site.sql, rls/functions/
+-- new enum types, one pure text helper, seven new org-scoped tables, two
+-- existing tables altered. No row is updated, nothing is backfilled, no policy,
+-- no grant, no trigger and no apply-rls function is referenced (the policies,
+-- grants, the restrictive policies and the guard triggers live in
+-- rls/policies/70-site.sql, rls/policies/10-catalogue.sql, rls/functions/
 -- 80-site.sql, rls/functions/85-site-portal.sql, rls/functions/00-org-context.sql
 -- and rls/roles.sql, applied by `db:apply-rls` AFTER this file).
 --
@@ -14,19 +15,37 @@
 --   * contracts: unique (org_id, project_id, id), the target of the site
 --     diary's 3-column FK: a material delivery names an execution contract of
 --     ITS OWN project.
+--   * text_has_visible_character(text): the ONE "present text" rule of the
+--     diary's CHECKs (a material's description, a note's body): at least one
+--     character that is neither white space nor an invisible format character
+--     (the bidi marks RLM, LRM and ALM, the joiners, the word joiner, the soft
+--     hyphen, tatweel, NEL, the Mongolian vowel separator, the bidi embeddings
+--     and isolates, the invisible operators). An Arabic keyboard can type an
+--     entry of RLMs only, which reads as empty in the studio's feed.
 --   * project_assignments (who works on which site), site_location_consents
 --     (PDPL consent per studio and text version), site_devices (a phone's auth
 --     session per studio), site_visits (check-in, the one location reading,
---     the presence verdict, the client publication), site_photos (object keys
---     derived from the row by a CHECK, never by the client),
+--     the presence verdict, the client publication), site_photos,
 --     site_material_receipts and site_notes.
+--   * A PHOTO STORES NO OBJECT KEY. Its two keys, `{org_id}/site/{project_id}/
+--     {id}-d.jpg` and `-t.jpg`, are a pure function of the row
+--     (rls/functions/80-site.sql `site_photo_object_key`, and its TypeScript
+--     twin lib/site/photo-object-key.ts), so they cannot point outside the
+--     row's own studio and project, and cost no bytes: storing them, with their
+--     CHECK and a global unique index, was half of every photo row (S2
+--     reliability R1).
 --   * 3-COLUMN FKs make "of THIS project" a database fact: a photo's, a
---     material's and a note's visit (org_id, project_id, visit_id), and a
+--     material's and a note's visit (org_id, project_id, visit_id), a
 --     material's contract (org_id, project_id, contract_id) and line
---     (org_id, contract_id, contract_line_id).
+--     (org_id, contract_id, contract_line_id), and a material's photo
+--     (org_id, project_id, photo_id).
+--   * RLS IS ENABLED AND FORCED on the seven new tables HERE, in the batch that
+--     creates them (S2 security S5): with no policy yet, metra_app reads and
+--     writes nothing in them, so an apply-rls that stops half way leaves them
+--     closed, never open. apply-rls adds the policies and the grants.
 --
 -- THE ONE SET NULL FK IS BORN NARROWED (the 0052 rule):
--- `site_material_receipts_photo_same_org_fk` carries `ON DELETE SET NULL
+-- `site_material_receipts_photo_same_project_fk` carries `ON DELETE SET NULL
 -- (photo_id)`. The straggler check at the end of this file refuses the whole
 -- batch if any composite set-null FK in `public` still lacks its column list.
 --
@@ -34,12 +53,18 @@
 -- pattern: a violating row fails at VALIDATE with the constraint's name, and
 -- the batch rolls back whole.
 --
--- LOCKS. `db:migrate` runs the batch as ONE transaction. The first block takes
--- EVERY lock this file needs on an EXISTING table up front, in one fixed order,
--- inside ONE 3 s budget for all of them together (each LOCK TABLE gets what is
--- left of it as its lock_timeout): ACCESS EXCLUSIVE on projects and contracts,
--- then SHARE ROW EXCLUSIVE on contract_lines and organizations (the new tables'
--- FKs). Then, held to the commit:
+-- LOCKS, ALL OR NONE. `db:migrate` runs the batch as ONE transaction. The first
+-- block takes EVERY lock this file needs on an EXISTING table, ACCESS EXCLUSIVE
+-- on projects and contracts and SHARE ROW EXCLUSIVE on contract_lines and
+-- organizations (the new tables' FKs), as ONE attempt of four `LOCK TABLE ...
+-- NOWAIT` inside a subtransaction. An attempt that meets a busy table rolls
+-- back, which RELEASES the locks it already took, sleeps 10 to 40 ms and tries
+-- again, within ONE 3 s budget in all; a spent budget is 55P03 and the batch
+-- rolls back whole. So the migration never holds `projects` while it waits for
+-- `contracts`: a studio request that reads contracts and then projects (the
+-- contracts list) can no longer deadlock with it (40P01 in 3 to 10 % of runs at
+-- pilot traffic with the one-at-a-time waits, S2 reliability R2). Then, held
+-- to the commit:
 --   projects   five metadata-only ADD COLUMNs (no default) and two CHECK
 --              validations, each one scan of the table;
 --   contracts  one unique index build.
@@ -54,30 +79,34 @@
 -- Postgres keeps them (0053's header; migration-catalogue.test.ts).
 DO $$
 DECLARE
-  lock_started   timestamptz := clock_timestamp();
-  lock_target    text;
-  budget_left_ms integer;
-BEGIN
-  -- EVERY LOCK UP FRONT, in one fixed order, within ONE 3 s budget for all of
-  -- them together (not 3 s each), exactly as 0063. Out of budget = 55P03, and
-  -- the whole batch rolls back.
-  FOREACH lock_target IN ARRAY array[
+  lock_started constant timestamptz := clock_timestamp();
+  lock_targets constant text[] := array[
     'public.projects:ACCESS EXCLUSIVE',
     'public.contracts:ACCESS EXCLUSIVE',
     'public.contract_lines:SHARE ROW EXCLUSIVE',
     'public.organizations:SHARE ROW EXCLUSIVE'
-  ] LOOP
-    budget_left_ms := 3000 - floor(extract(epoch from clock_timestamp() - lock_started) * 1000)::integer;
-    IF budget_left_ms < 1 THEN
-      RAISE EXCEPTION '0064: could not take every lock within 3 s (stopped at %)', lock_target
-        USING ERRCODE = '55P03';
-    END IF;
-    PERFORM set_config('lock_timeout', budget_left_ms || 'ms', true);
-    EXECUTE format('LOCK TABLE %s IN %s MODE', split_part(lock_target, ':', 1), split_part(lock_target, ':', 2));
+  ];
+  lock_target  text;
+BEGIN
+  -- EVERY LOCK, ALL OR NONE, within ONE 3 s budget for all the attempts
+  -- together. The inner BEGIN ... EXCEPTION is a subtransaction: when one
+  -- NOWAIT finds its table busy, the locks this attempt already took are
+  -- released with it, so nothing is held between attempts.
+  LOOP
+    BEGIN
+      FOREACH lock_target IN ARRAY lock_targets LOOP
+        EXECUTE format('LOCK TABLE %s IN %s MODE NOWAIT', split_part(lock_target, ':', 1), split_part(lock_target, ':', 2));
+      END LOOP;
+      EXIT;
+    EXCEPTION WHEN lock_not_available THEN
+      IF clock_timestamp() - lock_started >= interval '3 seconds' THEN
+        RAISE EXCEPTION '0064: could not take every lock within 3 s (stopped at %)', lock_target
+          USING ERRCODE = '55P03';
+      END IF;
+      PERFORM pg_sleep(0.01 + random() * 0.03);
+    END;
   END LOOP;
-  -- Every lock is held now; the statements below wait on nothing. The 3 s
-  -- stays for the rest of the transaction (SET LOCAL semantics).
-  PERFORM set_config('lock_timeout', '3s', true);
+  -- Every lock is held now; the statements below wait on nothing.
 
   ALTER TABLE public.projects ADD COLUMN site_lat numeric(9, 6);
   ALTER TABLE public.projects ADD COLUMN site_lng numeric(9, 6);
@@ -102,6 +131,29 @@ CREATE TYPE "public"."site_presence" AS ENUM ('on_site', 'off_site', 'uncertain'
 CREATE TYPE "public"."site_photo_source" AS ENUM ('camera', 'gallery');
 CREATE TYPE "public"."site_photo_status" AS ENUM ('pending', 'stored');
 CREATE TYPE "public"."site_note_kind" AS ENUM ('progress', 'issue', 'request');
+
+-- The diary's "present text" rule (S2 functional F4), used by the CHECKs on
+-- site_material_receipts.description and site_notes.body. A pure function of
+-- its argument (IMMUTABLE), so a CHECK may call it; the SQL-standard body is
+-- bound when it is created, and the operator is schema-qualified, so no
+-- search_path can change what it answers. The bracket is written as \u escapes
+-- (the regex engine's own), so this file holds no invisible character:
+--   [:space:]            ASCII and Unicode white space
+--   00a0 1680 2000-200a  the no-break and typographic spaces
+--   202f 205f 3000       the narrow, medium and ideographic spaces
+--   200b-200f            zero width space, ZWNJ, ZWJ, LRM, RLM
+--   2028 2029            line and paragraph separators
+--   202a-202e 2066-2069  bidi embeddings, overrides and isolates
+--   2060-2064            word joiner and the invisible operators
+--   206a-206f            the deprecated format characters
+--   00ad 034f 061c 0640  soft hyphen, CGJ, ALM, tatweel
+--   0085 180e feff       NEL, Mongolian vowel separator, BOM
+CREATE FUNCTION public.text_has_visible_character(value text)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+RETURN value OPERATOR(pg_catalog.~) '[^[:space:]\u00a0\u00ad\u0085\u034f\u061c\u0640\u1680\u180e\u2000-\u200f\u2028-\u202f\u205f-\u2064\u2066-\u206f\u3000\ufeff]';
 
 CREATE TABLE "project_assignments" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -200,8 +252,6 @@ CREATE TABLE "site_photos" (
   "client_key" uuid NOT NULL,
   "uploaded_by" uuid NOT NULL,
   "storage_provider" text NOT NULL,
-  "display_key" text NOT NULL,
-  "thumb_key" text NOT NULL,
   "display_bytes" integer NOT NULL,
   "thumb_bytes" integer NOT NULL,
   "width" smallint NOT NULL,
@@ -216,9 +266,8 @@ CREATE TABLE "site_photos" (
   "voided_by" uuid,
   CONSTRAINT "site_photos_org_id_id_unique" UNIQUE ("org_id", "id"),
   CONSTRAINT "site_photos_org_client_key_unique" UNIQUE ("org_id", "client_key"),
-  CONSTRAINT "site_photos_display_key_unique" UNIQUE ("display_key"),
+  CONSTRAINT "site_photos_org_project_id_unique" UNIQUE ("org_id", "project_id", "id"),
   CONSTRAINT "site_photos_storage_provider" CHECK (storage_provider in ('r2', 'supabase')),
-  CONSTRAINT "site_photos_keys_derived" CHECK (display_key = org_id::text || '/site/' || project_id::text || '/' || id::text || '-d.jpg' and thumb_key = org_id::text || '/site/' || project_id::text || '/' || id::text || '-t.jpg'),
   CONSTRAINT "site_photos_display_bytes_range" CHECK (display_bytes between 1 and 1048576),
   CONSTRAINT "site_photos_thumb_bytes_range" CHECK (thumb_bytes between 1 and 131072),
   CONSTRAINT "site_photos_dimensions_range" CHECK (width between 1 and 4096 and height between 1 and 4096),
@@ -252,15 +301,15 @@ CREATE TABLE "site_material_receipts" (
   "voided_by" uuid,
   CONSTRAINT "site_material_receipts_org_id_id_unique" UNIQUE ("org_id", "id"),
   CONSTRAINT "site_material_receipts_org_client_key_unique" UNIQUE ("org_id", "client_key"),
-  CONSTRAINT "site_material_receipts_description_present" CHECK (description ~ '[^[:space:]   -​    　﻿]' and char_length(description) <= 200),
+  CONSTRAINT "site_material_receipts_description_present" CHECK (public.text_has_visible_character(description) and char_length(description) <= 200),
   CONSTRAINT "site_material_receipts_qty_positive" CHECK (qty > 0 and qty <> 'NaN'),
   CONSTRAINT "site_material_receipts_contract_pair" CHECK (num_nonnulls(contract_id, contract_line_id) in (0, 2)),
   CONSTRAINT "site_material_receipts_text_length" CHECK (char_length(supplier) <= 120 and char_length(note) <= 300),
   CONSTRAINT "site_material_receipts_void_pair" CHECK ((voided_at is null) = (voided_by is null))
 );
-CREATE INDEX "site_material_receipts_photo_idx" ON "site_material_receipts" USING btree ("org_id", "photo_id");
 CREATE INDEX "site_material_receipts_org_visit_idx" ON "site_material_receipts" USING btree ("org_id", "visit_id");
 CREATE INDEX "site_material_receipts_org_contract_line_idx" ON "site_material_receipts" USING btree ("org_id", "contract_id", "contract_line_id") WHERE contract_line_id is not null;
+CREATE INDEX "site_material_receipts_photo_idx" ON "site_material_receipts" USING btree ("org_id", "photo_id") WHERE photo_id is not null;
 
 CREATE TABLE "site_notes" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -277,15 +326,34 @@ CREATE TABLE "site_notes" (
   "voided_by" uuid,
   CONSTRAINT "site_notes_org_id_id_unique" UNIQUE ("org_id", "id"),
   CONSTRAINT "site_notes_org_client_key_unique" UNIQUE ("org_id", "client_key"),
-  CONSTRAINT "site_notes_body_present" CHECK (body ~ '[^[:space:]   -​    　﻿]' and char_length(body) <= 2000),
+  CONSTRAINT "site_notes_body_present" CHECK (public.text_has_visible_character(body) and char_length(body) <= 2000),
   CONSTRAINT "site_notes_void_pair" CHECK ((voided_at is null) = (voided_by is null))
 );
 CREATE INDEX "site_notes_org_visit_idx" ON "site_notes" USING btree ("org_id", "visit_id");
 
+-- Closed from birth (S2 security S5): RLS on, and forced, before the batch
+-- commits. No policy exists yet, so even the role that will hold the grants
+-- sees and writes no row here until apply-rls has written the policies.
+ALTER TABLE "project_assignments" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "project_assignments" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_location_consents" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_location_consents" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_devices" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_devices" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_visits" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_visits" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_photos" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_photos" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_material_receipts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_material_receipts" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "site_notes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "site_notes" FORCE ROW LEVEL SECURITY;
+
 -- Foreign keys, after every table exists. org_id -> organizations RESTRICT on
 -- each (the orgScoped convention), then the same-org, same-project and
--- same-contract edges. Every edge into a diary parent is RESTRICT: a diary row
--- is evidence and never disappears with its parent.
+-- same-contract edges. Every edge into a diary parent is RESTRICT, but for a
+-- material's optional photo: a diary row is evidence and never disappears with
+-- its parent.
 ALTER TABLE "project_assignments" ADD CONSTRAINT "project_assignments_org_id_organizations_id_fk"
   FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE RESTRICT;
 ALTER TABLE "project_assignments" ADD CONSTRAINT "project_assignments_project_same_org_fk"
@@ -315,8 +383,8 @@ ALTER TABLE "site_material_receipts" ADD CONSTRAINT "site_material_receipts_cont
   FOREIGN KEY ("org_id", "project_id", "contract_id") REFERENCES "public"."contracts"("org_id", "project_id", "id") ON DELETE RESTRICT;
 ALTER TABLE "site_material_receipts" ADD CONSTRAINT "site_material_receipts_contractLine_same_contract_fk"
   FOREIGN KEY ("org_id", "contract_id", "contract_line_id") REFERENCES "public"."contract_lines"("org_id", "contract_id", "id") ON DELETE RESTRICT;
-ALTER TABLE "site_material_receipts" ADD CONSTRAINT "site_material_receipts_photo_same_org_fk"
-  FOREIGN KEY ("org_id", "photo_id") REFERENCES "public"."site_photos"("org_id", "id") ON DELETE SET NULL ("photo_id");
+ALTER TABLE "site_material_receipts" ADD CONSTRAINT "site_material_receipts_photo_same_project_fk"
+  FOREIGN KEY ("org_id", "project_id", "photo_id") REFERENCES "public"."site_photos"("org_id", "project_id", "id") ON DELETE SET NULL ("photo_id");
 
 ALTER TABLE "site_notes" ADD CONSTRAINT "site_notes_org_id_organizations_id_fk"
   FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE RESTRICT;

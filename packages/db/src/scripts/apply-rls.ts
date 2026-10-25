@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { RLS_APPLY_ORDER } from '../rls/manifest';
+import { applyFileWithRetry } from './apply-rls-retry';
 import { MIGRATION_LOCK_TIMEOUT, applyRlsTimeouts } from './lock-timeout';
 import { schemaScriptFailureLines } from './script-failure';
 import { declaredCounts, verifiedGrantsSummary, verifyRlsApplied } from './verify-rls-applied';
@@ -51,11 +52,14 @@ async function main(): Promise<number> {
     // half-open Supavisor socket after a successful connect leaves `sql.unsafe`
     // waiting forever with no error. 60 s turns that into 57014.
     await applyRlsTimeouts(sql);
+    // A file that loses a lock race with live traffic (40P01, 55P03) rolled
+    // back whole and is tried again, a bounded number of times
+    // (./apply-rls-retry.ts); any other failure stops the run as before.
     for (const file of files) {
       const path = resolve(rlsDir, file);
       const content = readFileSync(path, 'utf8');
       console.log(`Applying ${file} ...`);
-      await sql.unsafe(content);
+      await applyFileWithRetry(file, () => sql.unsafe(content));
     }
     console.log('RLS, roles and functions applied.');
 

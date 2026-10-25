@@ -119,6 +119,13 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     grantsApp: true,
   },
   { file: 'functions/80-site.sql', signature: 'public.app_may_write_site_project(uuid)', grantsApp: true },
+  // ...and, from the S2 fix round, the manager gate and the photo object key.
+  { file: 'functions/80-site.sql', signature: 'public.app_may_manage_site_project()', grantsApp: true },
+  {
+    file: 'functions/80-site.sql',
+    signature: 'public.site_photo_object_key(uuid, uuid, uuid, text)',
+    grantsApp: true,
+  },
   {
     file: 'functions/85-site-portal.sql',
     signature: 'public.app_delivery_site_updates_by_token(text, date, integer)',

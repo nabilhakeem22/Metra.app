@@ -97,8 +97,10 @@ export interface SameProjectTarget {
  * a row of ITS OWN scope, as a database fact. Precondition: `target` has
  * unique(org_id, <scope>_id, id). NO index is emitted: every caller declares
  * the index its reads need. A nullable `<name>_id` is unchecked while null
- * (MATCH SIMPLE), which is what an optional target means. Never `set null`: it
- * would null the scope column too (the 0052 defect, one column wider).
+ * (MATCH SIMPLE), which is what an optional target means. A bare `set null`
+ * would null the scope column too (the 0052 defect, one column wider), so the
+ * one caller that asks for it is born NARROWED by its migration, exactly as
+ * `sameOrgFk`'s set-null edges are: `ON DELETE SET NULL (<name>_id)`.
  */
 function sameScopeFk(
   t: Record<string, AnyPgColumn>,
@@ -106,7 +108,7 @@ function sameScopeFk(
   name: string,
   targetScopeColumn: AnyPgColumn,
   target: { orgId: AnyPgColumn; id: AnyPgColumn },
-  onDelete: 'restrict' | 'cascade',
+  onDelete: 'restrict' | 'cascade' | 'set null',
 ) {
   const table = getTableName(
     (t.orgId as unknown as { table: Parameters<typeof getTableName>[0] }).table,
@@ -135,13 +137,16 @@ export function sameContractFk(
 
 /**
  * `(org_id, project_id, <name>_id) -> target(org_id, project_id, id)` (Stage 3,
- * 0064): a site visit, an execution contract of THIS project. Always RESTRICT:
- * a diary row is evidence and is never removed with its parent.
+ * 0064): a site visit, an execution contract, a photo of THIS project. RESTRICT
+ * by default: a diary row is evidence and is never removed with its parent.
+ * `set null` only for an optional link (a material's photo), and the migration
+ * narrows it to `SET NULL (<name>_id)` (see sameScopeFk).
  */
 export function sameProjectFk(
   t: Record<string, AnyPgColumn>,
   name: string,
   target: SameProjectTarget,
+  opts?: { onDelete?: 'restrict' | 'set null' },
 ) {
-  return sameScopeFk(t, 'project', name, target.projectId, target, 'restrict');
+  return sameScopeFk(t, 'project', name, target.projectId, target, opts?.onDelete ?? 'restrict');
 }

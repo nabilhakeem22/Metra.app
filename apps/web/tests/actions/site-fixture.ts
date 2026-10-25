@@ -62,22 +62,15 @@ export function visitRow(orgId: string, projectId: string, userId: string, field
   };
 }
 
-/**
- * A photo row whose object keys are the ones `site_photos_keys_derived`
- * demands: the id is chosen here so the keys can be derived from it.
- */
+/** A pending camera photo row (its object keys are derived, never stored). */
 export function photoRow(orgId: string, projectId: string, visitId: string, userId: string, fields: Row = {}): Row {
-  const id = (fields.id as string | undefined) ?? randomUUID();
   return {
-    id,
     org_id: orgId,
     project_id: projectId,
     visit_id: visitId,
     client_key: randomUUID(),
     uploaded_by: userId,
     storage_provider: 'r2',
-    display_key: `${orgId}/site/${projectId}/${id}-d.jpg`,
-    thumb_key: `${orgId}/site/${projectId}/${id}-t.jpg`,
     display_bytes: 300_000,
     thumb_bytes: 20_000,
     width: 1600,

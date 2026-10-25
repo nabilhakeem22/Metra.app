@@ -1,5 +1,5 @@
 {
-  "id": "56f529f4-1da8-4fd2-9f31-37ea32ba743e",
+  "id": "0162b17b-e3d3-46b7-956f-f5b345e1168f",
   "prevId": "470db401-d728-4b1d-bccd-3d8ba119de94",
   "version": "7",
   "dialect": "postgresql",
@@ -13249,18 +13249,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "display_key": {
-          "name": "display_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "thumb_key": {
-          "name": "thumb_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "display_bytes": {
           "name": "display_bytes",
           "type": "integer",
@@ -13438,11 +13426,13 @@
             "client_key"
           ]
         },
-        "site_photos_display_key_unique": {
-          "name": "site_photos_display_key_unique",
+        "site_photos_org_project_id_unique": {
+          "name": "site_photos_org_project_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "display_key"
+            "org_id",
+            "project_id",
+            "id"
           ]
         }
       },
@@ -13451,10 +13441,6 @@
         "site_photos_storage_provider": {
           "name": "site_photos_storage_provider",
           "value": "storage_provider in ('r2', 'supabase')"
-        },
-        "site_photos_keys_derived": {
-          "name": "site_photos_keys_derived",
-          "value": "display_key = org_id::text || '/site/' || project_id::text || '/' || id::text || '-d.jpg' and thumb_key = org_id::text || '/site/' || project_id::text || '/' || id::text || '-t.jpg'"
         },
         "site_photos_display_bytes_range": {
           "name": "site_photos_display_bytes_range",
@@ -13609,27 +13595,6 @@
         }
       },
       "indexes": {
-        "site_material_receipts_photo_idx": {
-          "name": "site_material_receipts_photo_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "photo_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "site_material_receipts_org_visit_idx": {
           "name": "site_material_receipts_org_visit_idx",
           "columns": [
@@ -13647,6 +13612,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "site_material_receipts_photo_idx": {
+          "name": "site_material_receipts_photo_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "photo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "photo_id is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -13745,16 +13732,18 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "site_material_receipts_photo_same_org_fk": {
-          "name": "site_material_receipts_photo_same_org_fk",
+        "site_material_receipts_photo_same_project_fk": {
+          "name": "site_material_receipts_photo_same_project_fk",
           "tableFrom": "site_material_receipts",
           "tableTo": "site_photos",
           "columnsFrom": [
             "org_id",
+            "project_id",
             "photo_id"
           ],
           "columnsTo": [
             "org_id",
+            "project_id",
             "id"
           ],
           "onDelete": "set null",
@@ -13784,7 +13773,7 @@
       "checkConstraints": {
         "site_material_receipts_description_present": {
           "name": "site_material_receipts_description_present",
-          "value": "description ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(description) <= 200"
+          "value": "public.text_has_visible_character(description) and char_length(description) <= 200"
         },
         "site_material_receipts_qty_positive": {
           "name": "site_material_receipts_qty_positive",
@@ -13964,7 +13953,7 @@
       "checkConstraints": {
         "site_notes_body_present": {
           "name": "site_notes_body_present",
-          "value": "body ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(body) <= 2000"
+          "value": "public.text_has_visible_character(body) and char_length(body) <= 2000"
         },
         "site_notes_void_pair": {
           "name": "site_notes_void_pair",

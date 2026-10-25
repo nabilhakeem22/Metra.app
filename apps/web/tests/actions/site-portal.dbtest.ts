@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mintShareToken } from '@/lib/share/token';
+import { sitePhotoObjectKey } from '@/lib/site/photo-object-key';
 import { closeExecutionFixture, ownerQuery, seedClientProject } from './execution-fixture';
 import { closeFixture, seedOrg, teardown } from './fixture';
 import { ownerInsert, photoRow, visitRow } from './site-fixture';
@@ -221,12 +222,14 @@ describe('never a location, a verdict, a person, a note or a delivery (AC31)', (
     expect(source.prosrc.match(FORBIDDEN)).toBeNull();
   });
 
-  it('never returns a key outside the studio and project prefix the row derives', async () => {
+  it("answers the keys the row derives, the same strings as the S5 photo store's TypeScript twin", async () => {
     const delivery = await seedDelivery();
     await seedVisit(delivery.projectId, '2026-10-23', { photos: [visible] });
     const [photo] = (await updatesFor(delivery.hash))?.updates[0].photos ?? [];
+    const ids = { orgId, projectId: delivery.projectId, photoId: photo.id };
     expect(photo.display_key).toBe(`${orgId}/site/${delivery.projectId}/${photo.id}-d.jpg`);
-    expect(photo.thumb_key).toBe(`${orgId}/site/${delivery.projectId}/${photo.id}-t.jpg`);
+    expect(photo.display_key).toBe(sitePhotoObjectKey(ids, 'display'));
+    expect(photo.thumb_key).toBe(sitePhotoObjectKey(ids, 'thumb'));
   });
 
   it('is callable by metra_app and by no API role or PUBLIC', async () => {

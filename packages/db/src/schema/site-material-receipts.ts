@@ -15,7 +15,7 @@ import { contracts } from './contracts';
 import { marketUnit } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
-import { sameContractFk, sameOrgFk, sameProjectFk } from './org-ref';
+import { sameContractFk, sameProjectFk } from './org-ref';
 import { sitePhotos } from './site-photos';
 import { siteVisits } from './site-visits';
 
@@ -30,9 +30,11 @@ import { siteVisits } from './site-visits';
  * `contract_line_id` a line of THAT contract (org_id, contract_id,
  * contract_line_id). Both or neither (`site_material_receipts_contract_pair`).
  *
- * `photo_id` is `ON DELETE SET NULL (photo_id)` in the database (0064, the 0052
+ * THE PHOTO is a photo of the receipt's OWN project (org_id, project_id,
+ * photo_id), `ON DELETE SET NULL (photo_id)` in the database (0064, the 0052
  * rule). EVIDENCE: `trg_site_material_receipts_guard` lets an UPDATE change
- * only the void pair (once). No DELETE grant.
+ * only the void pair (once), and freezes a voided receipt whole. No DELETE
+ * grant.
  */
 export const siteMaterialReceipts = pgTable(
   'site_material_receipts',
@@ -59,10 +61,11 @@ export const siteMaterialReceipts = pgTable(
   (t) => [
     unique('site_material_receipts_org_id_id_unique').on(t.orgId, t.id),
     unique('site_material_receipts_org_client_key_unique').on(t.orgId, t.clientKey),
-    // Present = at least one visible character (the contract_cost_entries rule).
+    // Present = at least one character that is neither white space nor an
+    // invisible format character (0064's text_has_visible_character).
     check(
       'site_material_receipts_description_present',
-      sql`description ~ '[^[:space:]\\u00a0\\u1680\\u2000-\\u200b\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' and char_length(description) <= 200`,
+      sql`public.text_has_visible_character(description) and char_length(description) <= 200`,
     ),
     check('site_material_receipts_qty_positive', sql`qty > 0 and qty <> 'NaN'`),
     check(
@@ -77,8 +80,11 @@ export const siteMaterialReceipts = pgTable(
     sameProjectFk(t, 'visit', siteVisits),
     sameProjectFk(t, 'contract', contracts),
     sameContractFk(t, 'contractLine', contractLines),
-    ...sameOrgFk(t, 'photo', sitePhotos, { onDelete: 'set null' }),
+    sameProjectFk(t, 'photo', sitePhotos, { onDelete: 'set null' }),
     index('site_material_receipts_org_visit_idx').on(t.orgId, t.visitId),
+    // The photo FK's lookup on a photo delete (none happens: no DELETE grant,
+    // and the guard). Few receipts carry a photo, so only those are indexed.
+    index('site_material_receipts_photo_idx').on(t.orgId, t.photoId).where(sql`photo_id is not null`),
     // A contract line delete (draft contracts only) checks the line FK; few rows link.
     index('site_material_receipts_org_contract_line_idx')
       .on(t.orgId, t.contractId, t.contractLineId)

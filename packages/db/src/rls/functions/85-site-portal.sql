@@ -22,8 +22,10 @@
 --
 -- CLIENT-SAFE BY CONSTRUCTION (owner decision O4). Per visit: id, date,
 -- published_at and the studio's two captions. Per photo (at most 20 per visit,
--- in the order taken): id, the two object keys, width and height, and only for
--- a photo the studio made client-visible, that is stored and not void. The
+-- in the order taken): id, the two object keys (derived from the row by
+-- site_photo_object_key, functions/80-site.sql; no key is stored), width and
+-- height, and only for a photo the studio made client-visible, that is stored
+-- and not void. The
 -- engineer, the check-in reading and its verdict, the notes and the deliveries
 -- are never referenced (omission, not a filter); site-portal.dbtest.ts greps
 -- this function's source and its output for them. The caller signs the object
@@ -94,15 +96,15 @@ as $$
                    select jsonb_agg(
                             jsonb_build_object(
                               'id', ph.id,
-                              'display_key', ph.display_key,
-                              'thumb_key', ph.thumb_key,
+                              'display_key', public.site_photo_object_key(sv.org_id, ph.project_id, ph.id, 'display'),
+                              'thumb_key', public.site_photo_object_key(sv.org_id, ph.project_id, ph.id, 'thumb'),
                               'width', ph.width,
                               'height', ph.height
                             )
                             order by ph.taken_at, ph.id
                           )
                      from (
-                       select p.id, p.display_key, p.thumb_key, p.width, p.height, p.taken_at
+                       select p.id, p.project_id, p.width, p.height, p.taken_at
                          from public.site_photos p
                         where p.org_id = sv.org_id
                           and p.visit_id = sv.id

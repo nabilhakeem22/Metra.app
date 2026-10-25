@@ -100,16 +100,24 @@ export function declaredConstraints(): Map<string, string> {
 
 /**
  * One composite `on delete set null` foreign key as `src/schema/` declares it:
- * the table it is on, and the referencing columns that are NOT `org_id`.
+ * the table it is on, the referencing columns that are NOT `org_id`, and the
+ * ONE column its narrowed form nulls.
  *
  * The columns are carried because a CONSTRAINT NAME is not a durable identity
  * here — 0053 renamed ten of them and 0052 still spells six in the pre-rename
  * form — while `(table, column)` is the same edge whatever anyone calls it. That
  * is what `migration-catalogue.test.ts` compares 0052's narrowing table against.
+ *
+ * `nulled` is the LAST referencing column, the `<name>_id` the helpers put
+ * last: `(org_id, photo_id)` nulls `photo_id`, and the 3-column
+ * `(org_id, project_id, photo_id)` of 0064 nulls `photo_id` too, never its
+ * scope column. Drizzle records no column list, so this is the rule every
+ * born-narrowed migration follows, written down once.
  */
 export interface CompositeSetNullFk {
   table: string;
   columns: string[];
+  nulled: string;
 }
 
 /**
@@ -144,10 +152,8 @@ export function declaredCompositeSetNullFks(): Map<string, CompositeSetNullFk> {
       if (fk.onDelete !== 'set null') continue;
       const referencing = fk.reference().columns;
       if (referencing.length < 2) continue;
-      declared.set(fk.getName(), {
-        table: config.name,
-        columns: referencing.map((column) => column.name).filter((name) => name !== 'org_id'),
-      });
+      const columns = referencing.map((column) => column.name).filter((name) => name !== 'org_id');
+      declared.set(fk.getName(), { table: config.name, columns, nulled: columns[columns.length - 1] });
     }
   }
   return declared;

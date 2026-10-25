@@ -24,8 +24,10 @@ import {
 // 3-column same-project / same-contract FKs. Every write that stands for an app
 // write runs as metra_app inside an owner's org context (the owner passes the
 // restrictive insert policy on any project), so what is refused here is
-// refused by the SCHEMA, not by a policy. The guards, the grants and the
-// policies are site-guards.dbtest.ts and site-access.dbtest.ts.
+// refused by the SCHEMA, not by a policy; a row about another person (a
+// consent) is seeded over the owner connection. The guards, the grants and the
+// policies are site-guards.dbtest.ts, site-writers.dbtest.ts and
+// site-access.dbtest.ts.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -130,12 +132,13 @@ describe('project_assignments', () => {
 describe('site_location_consents and site_devices', () => {
   it('holds one live consent per user, and a version above 0', async () => {
     const userId = randomUUID();
-    await insert('site_location_consents', { org_id: orgId, user_id: userId, policy_version: 1 });
-    expect(await refusal(insert('site_location_consents', { org_id: orgId, user_id: userId, policy_version: 1 }))).toMatchObject({
+    const consent = (fields: Row) => ownerInsert('site_location_consents', { org_id: orgId, ...fields });
+    await consent({ user_id: userId, policy_version: 1 });
+    expect(await refusal(consent({ user_id: userId, policy_version: 1 }))).toMatchObject({
       code: '23505',
       constraint_name: 'site_location_consents_one_live',
     });
-    expect(await refusal(insert('site_location_consents', { org_id: orgId, user_id: randomUUID(), policy_version: 0 }))).toMatchObject({
+    expect(await refusal(consent({ user_id: randomUUID(), policy_version: 0 }))).toMatchObject({
       code: '23514',
       constraint_name: 'site_location_consents_policy_version_positive',
     });
@@ -246,24 +249,20 @@ describe('site_visits', () => {
 describe('site_photos', () => {
   const photo = (fields: Row = {}) => insert('site_photos', photoRow(orgId, projectId, visitId, ownerId, fields));
 
-  it('stores a pending camera photo with derived keys', async () => {
+  it('stores a pending camera photo', async () => {
     await expect(photo()).resolves.toBeDefined();
   });
 
-  it('refuses any object key the row does not derive (site_photos_keys_derived)', async () => {
-    const id = randomUUID();
-    const foreignProject = await seedClientProject(otherOrgId);
-    for (const bad of [
-      { id, display_key: `${orgId}/site/${projectId}/${randomUUID()}-d.jpg` },
-      { id, thumb_key: `${orgId}/site/${projectId}/${id}-d.jpg` },
-      { id, display_key: `${otherOrgId}/site/${foreignProject.projectId}/${id}-d.jpg` },
-      { id, display_key: `${orgId}/site/${projectId}/../${id}-d.jpg` },
-    ]) {
-      expect(await refusal(photo(bad)), JSON.stringify(bad)).toMatchObject({
-        code: '23514',
-        constraint_name: 'site_photos_keys_derived',
-      });
-    }
+  it('stores NO object key: no key column, no key CHECK, no key index (S2 reliability R1)', async () => {
+    const [shape] = await ownerQuery<{ key_columns: number; key_constraints: number; key_indexes: number }>(
+      `select (select count(*) from information_schema.columns
+                where table_schema = 'public' and table_name = 'site_photos' and column_name like '%key%' and column_name <> 'client_key')::int as key_columns,
+              (select count(*) from pg_constraint where conrelid = 'public.site_photos'::regclass
+                and conname in ('site_photos_keys_derived', 'site_photos_display_key_unique'))::int as key_constraints,
+              (select count(*) from pg_indexes where schemaname = 'public' and tablename = 'site_photos'
+                and indexdef ilike '%display%')::int as key_indexes`,
+    );
+    expect(shape).toEqual({ key_columns: 0, key_constraints: 0, key_indexes: 0 });
   });
 
   it('bounds the bytes, the dimensions, the type, the provider and the caption', async () => {
@@ -351,6 +350,18 @@ describe('site_material_receipts', () => {
     }
   });
 
+  it("names only a photo of its OWN project (Sec-S6: the 3-column photo FK, 23503)", async () => {
+    const sibling = await seedClientProject(orgId);
+    const siblingVisit = await ownerInsert('site_visits', visitRow(orgId, sibling.projectId, ownerId));
+    const siblingPhoto = await ownerInsert('site_photos', photoRow(orgId, sibling.projectId, siblingVisit, ownerId));
+    const ownPhoto = await ownerInsert('site_photos', photoRow(orgId, projectId, visitId, ownerId));
+    expect(await refusal(material({ photo_id: siblingPhoto }))).toMatchObject({
+      code: '23503',
+      constraint_name: 'site_material_receipts_photo_same_project_fk',
+    });
+    await expect(material({ photo_id: ownPhoto })).resolves.toBeDefined();
+  });
+
   it('refuses a blank, whitespace-only or 201-character description, and a zero or NaN quantity', async () => {
     for (const description of ['', ' \t\n', ' ​', 'x'.repeat(201)]) {
       expect(await refusal(material({ description })), JSON.stringify(description)).toMatchObject({
@@ -365,13 +376,15 @@ describe('site_material_receipts', () => {
     expect(await sqlstate(material({ unit: 'sack' }))).toBe('22P02');
   });
 
-  it('narrows its one set-null FK to photo_id (the 0052 rule)', async () => {
-    const [fk] = await ownerQuery<{ columns: string[] }>(
-      `select array(select a.attname::text from unnest(c.confdelsetcols) as k(n)
-                     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.n) as columns
-         from pg_constraint c where c.conname = 'site_material_receipts_photo_same_org_fk'`,
+  it('narrows its one set-null FK to photo_id, never org_id or project_id (the 0052 rule)', async () => {
+    const [fk] = await ownerQuery<{ columns: string[]; nulled: string[] }>(
+      `select array(select a.attname::text from unnest(c.conkey) with ordinality as k(n, o)
+                     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.n order by k.o) as columns,
+              array(select a.attname::text from unnest(c.confdelsetcols) as k(n)
+                     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.n) as nulled
+         from pg_constraint c where c.conname = 'site_material_receipts_photo_same_project_fk'`,
     );
-    expect(fk.columns).toEqual(['photo_id']);
+    expect(fk).toEqual({ columns: ['org_id', 'project_id', 'photo_id'], nulled: ['photo_id'] });
   });
 });
 
@@ -388,5 +401,57 @@ describe('site_notes', () => {
       expect(await refusal(note({ body }))).toMatchObject({ code: '23514', constraint_name: 'site_notes_body_present' });
     }
     await expect(note({ body: 'x'.repeat(2000) })).resolves.toBeDefined();
+  });
+});
+
+describe('"present" text refuses an entry of invisible characters only (S2 functional F4)', () => {
+  /** What an Arabic keyboard or a paste can produce that reads as empty: bidi marks, joiners, fillers. */
+  const INVISIBLE = {
+    RLM: 0x200f,
+    LRM: 0x200e,
+    ALM: 0x061c,
+    ZWJ: 0x200d,
+    ZWNJ: 0x200c,
+    WJ: 0x2060,
+    'soft hyphen': 0x00ad,
+    tatweel: 0x0640,
+    NEL: 0x0085,
+    MVS: 0x180e,
+    RLE: 0x202b,
+    RLI: 0x2067,
+    CGJ: 0x034f,
+  };
+  const only = (codePoint: number) => String.fromCodePoint(codePoint).repeat(3);
+  const material = (description: string) =>
+    insert('site_material_receipts', materialRow(orgId, projectId, visitId, ownerId, { description }));
+  const note = (body: string) => insert('site_notes', noteRow(orgId, projectId, visitId, ownerId, { body }));
+
+  it('on a delivery description and a note body (23514), with every character named', async () => {
+    for (const [name, codePoint] of Object.entries(INVISIBLE)) {
+      expect(await refusal(material(only(codePoint))), name).toMatchObject({
+        code: '23514',
+        constraint_name: 'site_material_receipts_description_present',
+      });
+      expect(await refusal(note(only(codePoint))), name).toMatchObject({ code: '23514', constraint_name: 'site_notes_body_present' });
+    }
+    const mixed = Object.values(INVISIBLE).map((codePoint) => String.fromCodePoint(codePoint)).join(' ');
+    expect(await refusal(material(mixed))).toMatchObject({ constraint_name: 'site_material_receipts_description_present' });
+  });
+
+  it('still takes a real Arabic or English entry that carries a bidi mark', async () => {
+    const rlm = String.fromCodePoint(INVISIBLE.RLM);
+    await expect(material(`${rlm}أسمنت${rlm}`)).resolves.toBeDefined();
+    await expect(note(`${rlm}Tiling 50%${rlm}`)).resolves.toBeDefined();
+  });
+
+  it('is ONE shared helper in the database, a pure function both CHECKs call', async () => {
+    const [helper] = await ownerQuery<{ volatile: string; checks: number }>(
+      `select p.provolatile as volatile,
+              (select count(*) from pg_constraint c
+                where c.conname in ('site_material_receipts_description_present', 'site_notes_body_present')
+                  and pg_get_constraintdef(c.oid) like '%text_has_visible_character%')::int as checks
+         from pg_proc p where p.oid = 'public.text_has_visible_character(text)'::regprocedure`,
+    );
+    expect(helper).toEqual({ volatile: 'i', checks: 2 });
   });
 });

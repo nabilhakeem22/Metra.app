@@ -16,11 +16,11 @@ import {
 
 // Site diary DB step S: who may do what to the seven site tables, at the
 // database. The grants (SELECT, INSERT, UPDATE, never DELETE); the RESTRICTIVE
-// `site_write_assigned` insert policy (AC5: a site engineer writes only on a
-// project with his live assignment, and accountants and viewers write
-// nothing); org isolation with REAL rows (AC25; the isolation gate's seed has
-// none in these tables); and the session-scoped org list behind a device
-// revoke (AC37's database half).
+// policies (AC5: a site engineer writes only on a project with his live
+// assignment, and accountants and viewers write nothing; the S2 security
+// round's fences are site-writers.dbtest.ts); org isolation with REAL rows
+// (AC25; the isolation gate's seed has none in these tables); and the
+// session-scoped org list behind a device revoke (AC37's database half).
 
 const SITE_TABLES = [
   'project_assignments',
@@ -80,35 +80,44 @@ describe('grants: exactly what roles.sql leaves metra_app with', () => {
     }
   });
 
-  it('lets metra_app, and nobody else, execute the write gate and the session org list', async () => {
+  it('lets metra_app, and nobody else, execute the two gates, the session org list and the photo key', async () => {
     const rows = await ownerQuery<{ proname: string; app: boolean; public_execute: boolean; secdef: boolean }>(
       `select p.proname, has_function_privilege('metra_app', p.oid, 'execute') as app,
               exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_execute,
               p.prosecdef as secdef
          from pg_proc p
         where p.pronamespace = 'public'::regnamespace
-          and p.proname in ('app_may_write_site_project', 'app_current_user_orgs_for_session')
+          and p.proname in ('app_may_write_site_project', 'app_may_manage_site_project', 'app_current_user_orgs_for_session', 'site_photo_object_key')
         order by 1`,
     );
     expect(rows).toEqual([
       { proname: 'app_current_user_orgs_for_session', app: true, public_execute: false, secdef: true },
+      { proname: 'app_may_manage_site_project', app: true, public_execute: false, secdef: true },
       { proname: 'app_may_write_site_project', app: true, public_execute: false, secdef: true },
+      { proname: 'site_photo_object_key', app: true, public_execute: false, secdef: false },
     ]);
   });
 });
 
 describe('the restrictive insert policy site_write_assigned (AC5)', () => {
-  it('is RESTRICTIVE, FOR INSERT, on exactly the four diary tables', async () => {
-    const rows = await ownerQuery<{ tablename: string; permissive: string; cmd: string }>(
-      `select tablename, permissive, cmd from pg_policies
-        where schemaname = 'public' and policyname = 'site_write_assigned' order by 1`,
+  it('declares exactly the twelve RESTRICTIVE site policies, each for one command', async () => {
+    const rows = await ownerQuery<{ policy: string; cmd: string }>(
+      `select tablename || '.' || policyname as policy, cmd from pg_policies
+        where schemaname = 'public' and permissive = 'RESTRICTIVE' and tablename = any($1::text[]) order by 1`,
+      [SITE_TABLES],
     );
+    const diary = ['site_material_receipts', 'site_notes', 'site_photos', 'site_visits'];
     expect(rows).toEqual(
-      ['site_material_receipts', 'site_notes', 'site_photos', 'site_visits'].map((tablename) => ({
-        tablename,
-        permissive: 'RESTRICTIVE',
-        cmd: 'INSERT',
-      })),
+      [
+        { policy: 'project_assignments.site_managers_insert', cmd: 'INSERT' },
+        { policy: 'project_assignments.site_managers_update', cmd: 'UPDATE' },
+        { policy: 'site_location_consents.site_consent_self_insert', cmd: 'INSERT' },
+        { policy: 'site_location_consents.site_consent_self_update', cmd: 'UPDATE' },
+        ...diary.flatMap((table) => [
+          { policy: `${table}.site_update_assigned`, cmd: 'UPDATE' },
+          { policy: `${table}.site_write_assigned`, cmd: 'INSERT' },
+        ]),
+      ].sort((a, b) => (a.policy < b.policy ? -1 : 1)),
     );
   });
 

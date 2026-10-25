@@ -376,16 +376,24 @@ grant execute on function public.enforce_payment_request_frozen() to metra_app;
 -- right after its CREATE (functions/35-execution.sql).
 grant execute on function public.enforce_contract_payment_fits() to metra_app;
 revoke execute on function public.enforce_contract_payment_fits() from public;
--- Stage 3, the site diary (0064). The assignment write gate is SECURITY
--- DEFINER and called by the restrictive insert policy AS the caller, so
--- metra_app keeps EXECUTE and nobody else has it. The two evidence guards are
--- plain trigger functions, granted for symmetry with the guards above. The
--- gate is also locked down in place, right after its CREATE
--- (functions/80-site.sql).
+-- Stage 3, the site diary (0064). The write gate and the manager gate are
+-- SECURITY DEFINER and called by the restrictive policies and the guards AS
+-- the caller, so metra_app keeps EXECUTE and nobody else has it; so does the
+-- pure photo object key. The guards are plain trigger functions, granted for
+-- symmetry with the guards above. The gates and the key are also locked down
+-- in place, right after their CREATE (functions/80-site.sql).
 grant execute on function public.app_may_write_site_project(uuid) to metra_app;
 revoke execute on function public.app_may_write_site_project(uuid) from public;
+grant execute on function public.app_may_manage_site_project() to metra_app;
+revoke execute on function public.app_may_manage_site_project() from public;
+grant execute on function public.site_photo_object_key(uuid, uuid, uuid, text) to metra_app;
+revoke execute on function public.site_photo_object_key(uuid, uuid, uuid, text) from public;
 grant execute on function public.enforce_site_entry_guard() to metra_app;
+grant execute on function public.enforce_site_photo_state() to metra_app;
 grant execute on function public.enforce_site_visit_guard() to metra_app;
+grant execute on function public.enforce_site_visit_date() to metra_app;
+grant execute on function public.enforce_site_revoke_final() to metra_app;
+grant execute on function public.enforce_site_pin_writer() to metra_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -689,6 +697,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_may_write_site_project(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_may_manage_site_project() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.site_photo_object_key(uuid, uuid, uuid, text) from %I',
         r
       );
       execute format(
