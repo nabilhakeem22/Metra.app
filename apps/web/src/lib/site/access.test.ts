@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/roles';
-import { mayPublishSiteDiary, mayReadSiteLocation, mayWriteSiteDiary } from './access';
+import { mayJoinSiteTeam, mayPublishSiteDiary, mayReadSiteLocation, mayWriteSiteDiary } from './access';
 
 const RUN_THE_JOB: readonly MemberRole[] = ['owner', 'admin', 'project_manager'];
 
@@ -17,6 +17,10 @@ describe('site diary access gates', () => {
 
   it('publishing to the client: owner, admin and PM only', () => {
     for (const role of MEMBER_ROLES) expect(mayPublishSiteDiary(role), role).toBe(RUN_THE_JOB.includes(role));
+  });
+
+  it('joining a site team: every internal role, never the client', () => {
+    for (const role of MEMBER_ROLES) expect(mayJoinSiteTeam(role), role).toBe(role !== 'client');
   });
 
   it('the accountant and the viewer get none of them', () => {

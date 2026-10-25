@@ -13,6 +13,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import { recordAudit } from '@/lib/audit';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { closeSiteAccessOfRemovedMember } from '@/lib/site/member-removal';
 
 function isMemberRole(role: string): role is MemberRole {
   return (MEMBER_ROLES as readonly string[]).includes(role);
@@ -61,6 +62,11 @@ export async function changeMemberRoleCore(
   );
 }
 
+/**
+ * Remove a member from the studio. In the same transaction his live site
+ * assignments and signed-in phones here are revoked (lib/site/member-removal.ts),
+ * so nothing on the site side outlives the membership.
+ */
 export async function removeMemberCore(
   ctx: OrgContext,
   userId: string,
@@ -86,6 +92,7 @@ export async function removeMemberCore(
         await ensureNotLastOwner(tx);
       }
 
+      await closeSiteAccessOfRemovedMember(tx, audit, { memberId: userId, removedBy: ctx.userId });
       await tx.delete(memberships).where(eq(memberships.id, target.id));
       await audit({
         entity: 'membership',

@@ -34,11 +34,13 @@ describe('otp-client', () => {
     await sendPhoneOtp('+201001234567');
     await verifyEmailOtp('mona@firm.example', '123456');
     await verifyPhoneOtp('+201001234567', '654321');
+    await verifyPhoneOtp('+201001234567', '654321', 'site');
     const sent = fetchMock.mock.calls.map(([path, init]) => [path, JSON.parse(init.body as string)]);
     expect(sent).toEqual([
       ['/api/auth/otp/send', { channel: 'phone', identifier: '+201001234567' }],
       ['/api/auth/otp/verify', { channel: 'email', identifier: 'mona@firm.example', token: '123456' }],
       ['/api/auth/otp/verify', { channel: 'phone', identifier: '+201001234567', token: '654321' }],
+      ['/api/auth/otp/verify', { channel: 'phone', identifier: '+201001234567', token: '654321', return: 'site' }],
     ]);
   });
 

@@ -13,6 +13,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import {
   OTP_SEND_PATH,
   OTP_VERIFY_PATH,
+  type LoginReturn,
   type OtpSendRequest,
   type OtpVerifyRequest,
   type OtpVerifyResult,
@@ -45,10 +46,11 @@ export function sendPhoneOtp(phone: string): Promise<ActionResult> {
   return postOtp(OTP_SEND_PATH, { channel: 'phone', identifier: phone });
 }
 
-export function verifyEmailOtp(email: string, token: string): Promise<OtpVerifyResult> {
-  return postOtp(OTP_VERIFY_PATH, { channel: 'email', identifier: email, token });
+/** `returnTo` is set when the sign-in began in the site app; undefined leaves `return` out of the body. */
+export function verifyEmailOtp(email: string, token: string, returnTo?: LoginReturn): Promise<OtpVerifyResult> {
+  return postOtp(OTP_VERIFY_PATH, { channel: 'email', identifier: email, token, return: returnTo });
 }
 
-export function verifyPhoneOtp(phone: string, token: string): Promise<OtpVerifyResult> {
-  return postOtp(OTP_VERIFY_PATH, { channel: 'phone', identifier: phone, token });
+export function verifyPhoneOtp(phone: string, token: string, returnTo?: LoginReturn): Promise<OtpVerifyResult> {
+  return postOtp(OTP_VERIFY_PATH, { channel: 'phone', identifier: phone, token, return: returnTo });
 }

@@ -7,6 +7,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
 import type { ActionResult } from '@/lib/actions/result';
 import { sendEmailOtp, sendPhoneOtp, verifyEmailOtp, verifyPhoneOtp } from '@/lib/auth/otp-client';
+import { loginReturnOf } from '@/lib/auth/otp-contract';
 import {
   otpCodeErrors,
   otpIdentifierErrors,
@@ -73,13 +74,15 @@ export function useOtpFlow() {
     const value = fullCode ?? code;
     if (errors.applyLocal(otpCodeErrors(value))) return;
     setStatus('verifying');
+    // The site app's login link says `?return=site`; the static page reads it here, in the browser.
+    const returnTo = loginReturnOf(new URLSearchParams(window.location.search).get('return'));
     startTransition(async () => {
       const verified = await attempt(() =>
-        channel === 'email' ? verifyEmailOtp(identifier, value) : verifyPhoneOtp(identifier, value),
+        channel === 'email' ? verifyEmailOtp(identifier, value, returnTo) : verifyPhoneOtp(identifier, value, returnTo),
       );
       if (!verified) return;
       setStatus('success');
-      // The verify answer names the destination by membership: the dashboard
+      // The verify answer names the destination: the site app, the dashboard
       // when they already have an org, else onboarding.
       router.push(verified.next ?? '/dashboard');
     });

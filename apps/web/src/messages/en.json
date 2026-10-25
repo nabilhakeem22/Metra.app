@@ -1288,9 +1288,23 @@
         "costHidden": "Job cost and margin are not shown to your role."
       },
       "team": {
-        "title": "Team",
-        "lockedTitle": "Project roles not enabled",
-        "lockedBody": "Assigning a project team activates with project roles."
+        "title": "Site team",
+        "description": "This project shows in the site app only for the people on its site team. A site engineer records on a site only when he is on its team.",
+        "empty": "Nobody is on this site team yet.",
+        "memberLabel": "Team member",
+        "memberPlaceholder": "Choose a team member",
+        "memberHint": "Every member of the studio can be added, except clients. Invite new people from the Team page.",
+        "assign": "Add to the site team",
+        "assigned": "Added to the site team",
+        "alreadyAssigned": "Already on the site team",
+        "remove": "Remove from the site team",
+        "removed": "Removed from the site team",
+        "confirmRemoveTitle": "Remove from the site team?",
+        "confirmRemoveDesc": "{name} will no longer see this project in the site app, and a site engineer can no longer record on it. What was already recorded stays as it is.",
+        "assignedOn": "On the team since {date}",
+        "noCandidates": "Everyone in the studio is already on this site team.",
+        "readonly": "Only the owner, an admin or a project manager can change the site team.",
+        "noAccess": "Your role does not show the site team."
       },
       "proposals": {
         "title": "Proposals",
@@ -3461,6 +3475,7 @@
     "update": {
       "available": "A new version is available",
       "reload": "Reload"
-    }
+    },
+    "backToApp": "Back to the site app"
   }
 }

@@ -36,15 +36,15 @@ export const createServerClient = vi.fn((_url: string, _key: string, options: { 
   },
 }));
 
-/** The membership probe: rows, or a throw. */
-export const withUserContext = vi.fn(async (_userId: string, _fn: unknown): Promise<unknown[]> => [{ '?column?': 1 }]);
+/** The membership probe: one row per membership (its role), or a throw. */
+export const withUserContext = vi.fn(async (_userId: string, _fn: unknown): Promise<unknown[]> => [{ role: 'owner' }]);
 
 export function resetOtpRouteDoubles(): void {
   writtenCookies.length = 0;
   supabaseAuth.signInWithOtp.mockReset().mockResolvedValue({ data: {}, error: null });
   supabaseAuth.verifyOtp.mockReset().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
   createServerClient.mockClear();
-  withUserContext.mockReset().mockResolvedValue([{ '?column?': 1 }]);
+  withUserContext.mockReset().mockResolvedValue([{ role: 'owner' }]);
 }
 
 export const SITE = 'https://metra.app';

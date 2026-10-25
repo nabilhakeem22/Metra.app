@@ -229,8 +229,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
     await act(async () => {
       fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
     });
-    expect(actions.verifyEmailOtp).toHaveBeenCalledWith('mona@firm.example', '123456');
+    expect(actions.verifyEmailOtp).toHaveBeenCalledWith('mona@firm.example', '123456', undefined);
     expect(router.push).toHaveBeenCalledWith(next);
+  });
+
+  test('a sign-in from the site app login link (?return=site) asks to return there', async () => {
+    replaceAddress(null, '', '/en/login?return=site');
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    actions.verifyEmailOtp.mockResolvedValue({ ok: true, next: '/site' });
+    renderLogin();
+    await sendTo('mona@firm.example');
+    await act(async () => {
+      fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
+    });
+    expect(actions.verifyEmailOtp).toHaveBeenCalledWith('mona@firm.example', '123456', 'site');
+    expect(router.push).toHaveBeenCalledWith('/site');
   });
 
   test('pressing Verify on a short code says how many digits, without sending', async () => {

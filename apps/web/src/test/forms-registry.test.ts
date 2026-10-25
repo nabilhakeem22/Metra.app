@@ -72,6 +72,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/projects/[id]/details-type-field.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/use-add-project-type.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/use-project-details-form.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
+  'app/[locale]/(app)/projects/[id]/team-assign-form.tsx': 'app/[locale]/(app)/projects/[id]/team-tab.test.tsx',
+  'app/[locale]/(app)/projects/[id]/use-team-assign-form.ts': 'app/[locale]/(app)/projects/[id]/team-tab.test.tsx',
   'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
