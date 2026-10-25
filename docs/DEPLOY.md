@@ -4105,15 +4105,19 @@ database, and usually not a long transaction either:
   the other way round (members first, for the "is this a member" check, then
   the studio, for the row's studio link). Two sub-second transactions in
   opposite orders are a deadlock, and Postgres ends one of them, sometimes the
-  app's (a studio member may see one save fail and try it again). Measured: 3
-  or more studio saves a second are enough.
+  app's (a studio member may see one save fail and try it again; rarely a
+  client's link fails to load once, and a refresh fixes it). Measured: 3 or
+  more studio saves a second are enough, and at about 11 a second the three
+  attempts can all lose, so the run fails and the next run lands it.
 - **55P03, usually at `Applying policies/35-execution.sql ...`:** a long
   studio transaction or report held a table for more than 3 s.
 
 Either way: **run `npm run db:apply-rls` again, and keep re-running it until it
 exits 0** (wait a minute between runs; it is safe, every statement is
-idempotent). The failed run prints only the first four notices before its
-two failure lines; the run that exits 0 prints the notices of the files the
+idempotent). A run that fails at `policies/00-core.sql` prints three notices
+before its two failure lines (the `self_memberships` notice comes from that
+file itself); a run that lands a file on a later attempt prints that file's
+notices after its `(attempt 2 of 3)` line. The run that exits 0 prints the notices of the files the
 failed run did not get past (the first four and all eight trigger notices if
 it failed at `policies/35-execution.sql`) and the two lines above. In between,
 step 2 (b) may show `step_b_functions` 9 and `step_b_triggers` 0, and step 2
@@ -4294,6 +4298,7 @@ Then, in the Supabase SQL editor, this block, on its own:
 
 ```sql
 -- Step B undo (0), part 2: the objects the step S code does not know. Run this one alone.
+set lock_timeout = '3s';
 drop trigger if exists trg_payment_requests_actor on public.payment_requests;
 drop trigger if exists trg_contract_payments_actor on public.contract_payments;
 drop trigger if exists trg_contract_cost_entries_actor on public.contract_cost_entries;
@@ -4313,7 +4318,12 @@ drop function if exists public.enforce_contract_payment_claim_guarded();
 drop function if exists public.enforce_contract_line_measurement_guarded();
 ```
 
-Expected: `Success. No rows returned`. Then, read-only, each block ON ITS OWN:
+Expected: `Success. No rows returned`. Run it at the same quiet hour: each
+`drop trigger` locks its table, and the first line makes the block give up
+after 3 s instead of holding the money tables while a long report finishes.
+If it fails with `canceling statement due to lock timeout`, nothing was
+dropped (the editor runs the block as one transaction): run the same block
+again a minute later, until it succeeds. Then, read-only, each block ON ITS OWN:
 step 2 (b) again (`step_b_functions` 0, `step_b_triggers` 0), step 2 (d)
 again (exactly what step 2 (d) expects) and step 2 (e) again (80 and 15).
 Then step 5 again: everything works as it did before step 3. Put the checkout
