@@ -3,17 +3,23 @@
 import { Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AnchoredLayer } from '@/components/ui/anchored-layer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ListboxOption } from '@/components/ui/listbox-option';
+import { useOutsidePointerDown } from '@/hooks/use-outside-pointer-down';
 import { cn } from '@/lib/utils';
 import type { CostItemOption } from './builder-model';
 import { pickerList } from './price-book-picker-model';
-import { PriceBookPickerOption } from './price-book-picker-option';
 import { PriceBookPickerStatus } from './price-book-picker-status';
 import type { SectionOption } from './section-combobox';
 import { usePriceBookSearch } from './use-price-book-search';
 
 const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}`;
+/** The panel's width (w-96), less on a narrow screen. */
+const PANEL_WIDTH = 384;
+/** The tallest the whole panel gets (search box, list, status line) before it scrolls. */
+const PANEL_MAX_HEIGHT = 420;
 
 /**
  * "From price book": a light searchable list (no new dependency, like
@@ -22,7 +28,9 @@ const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}
  * page's language, the code beside it; grouped by price-book section; type to
  * narrow by name or code (every word, any order). Keyboard: the input keeps
  * focus and names the active option (aria-activedescendant), which scrolls into
- * view; Enter picks; Escape closes and returns focus to the button.
+ * view; Enter picks; Escape closes and returns focus to the button, and so
+ * does Tab, which then moves on from the button. The panel is an AnchoredLayer,
+ * so the next card can never cover it.
  */
 export function PriceBookPicker({
   sections,
@@ -38,6 +46,7 @@ export function PriceBookPicker({
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const answer = usePriceBookSearch(open, query, locale);
   const list = useMemo(
@@ -46,14 +55,7 @@ export function PriceBookPicker({
   );
   const flat = useMemo(() => list.groups.flatMap((group) => group.entries), [list]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
-  }, [open]);
+  useOutsidePointerDown(open, [rootRef, layerRef], () => setOpen(false));
 
   useEffect(() => {
     if (open) document.getElementById(optionIdOf(listId, active))?.scrollIntoView?.({ block: 'nearest' });
@@ -84,12 +86,17 @@ export function PriceBookPicker({
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
+    } else if (e.key === 'Tab') {
+      // The panel lives at the end of the page: leave from the button, so Tab
+      // reaches the control after it and Shift+Tab lands on the button itself.
+      if (e.shiftKey) e.preventDefault();
+      close();
     }
   }
 
   let position = -1;
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef}>
       <Button
         ref={triggerRef}
         variant="secondary"
@@ -105,7 +112,13 @@ export function PriceBookPicker({
         {t('fromPriceBook')}
       </Button>
       {open && (
-        <div className="absolute start-0 z-20 mt-1 w-96 max-w-[90vw] border border-border bg-popover p-2 text-body shadow-card">
+        <AnchoredLayer
+          anchorRef={triggerRef}
+          layerRef={layerRef}
+          width={PANEL_WIDTH}
+          maxHeight={PANEL_MAX_HEIGHT}
+          className="border border-border bg-popover p-2 text-body shadow-card"
+        >
           <Input
             autoFocus
             role="combobox"
@@ -137,15 +150,19 @@ export function PriceBookPicker({
                     position += 1;
                     const index = position;
                     return (
-                      <PriceBookPickerOption
+                      <ListboxOption
                         key={entry.item.id}
                         id={optionIdOf(listId, index)}
-                        name={entry.name}
-                        code={entry.item.code}
                         active={index === active}
+                        className="items-baseline justify-between gap-3 px-2"
                         onPick={() => pick(entry.item)}
                         onHover={() => setActive(index)}
-                      />
+                      >
+                        <span>{entry.name}</span>
+                        <span className="shrink-0 text-caption text-muted-foreground" dir="ltr">
+                          {entry.item.code}
+                        </span>
+                      </ListboxOption>
                     );
                   })}
                 </ul>
@@ -153,7 +170,7 @@ export function PriceBookPicker({
             ))}
           </ul>
           <PriceBookPickerStatus answer={answer} matched={list.matched} hidden={list.hidden} />
-        </div>
+        </AnchoredLayer>
       )}
     </div>
   );

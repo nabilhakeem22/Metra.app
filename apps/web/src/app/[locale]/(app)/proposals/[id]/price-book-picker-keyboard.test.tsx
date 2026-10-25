@@ -1,7 +1,8 @@
 // The "From price book" picker driven by keyboard, pointer and screen reader:
 // the active row is announced and scrolled to, Escape gives focus back, a
-// reopened list starts at the top, a pointer picks on click only, and the
-// list id is React's (stable on the server and the client).
+// reopened list starts at the top, a pointer picks on click only, the list id
+// is React's (stable on the server and the client), and the panel is a layer
+// on <body> that Tab leaves through the button.
 import { fireEvent, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { renderToString } from 'react-dom/server';
@@ -120,5 +121,39 @@ describe('PriceBookPicker list id (P4)', () => {
     const first = controls(renderToString(picker()));
     expect(first).toBeTruthy();
     expect(controls(renderToString(picker()))).toBe(first);
+  });
+});
+
+describe('PriceBookPicker layer (P5)', () => {
+  it('the panel is drawn on <body>, outside the card the button sits in', async () => {
+    await open();
+    const layer = screen.getByRole('listbox').closest('[data-anchored-layer]') as HTMLElement;
+    expect(trigger().parentElement?.contains(layer)).toBe(false);
+    expect(layer.parentElement).toBe(document.body);
+    expect(layer.contains(combobox())).toBe(true);
+  });
+
+  it('a press in the panel keeps it open; a press outside closes it', async () => {
+    await open();
+    fireEvent.pointerDown(combobox());
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('Tab closes the panel from the button and is not swallowed, so focus moves on past it', async () => {
+    await open();
+    const notPrevented = fireEvent.keyDown(combobox(), { key: 'Tab' });
+    expect(notPrevented).toBe(true);
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('Shift+Tab closes the panel and lands on the button', async () => {
+    await open();
+    const notPrevented = fireEvent.keyDown(combobox(), { key: 'Tab', shiftKey: true });
+    expect(notPrevented).toBe(false);
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(document.activeElement).toBe(trigger());
   });
 });
