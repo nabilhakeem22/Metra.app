@@ -2810,7 +2810,8 @@
       "waitingClient": "مستنيين العميل",
       "stalled": "واقف",
       "delivered": "اتسلّم",
-      "abandoned": "اتلغى"
+      "abandoned": "اتلغى",
+      "terminated": "العقد اتنهى"
     },
     "offlineApproval": {
       "open": "العميل وافق من غير اللينك",
@@ -3412,13 +3413,17 @@
       },
       "recordMeasurements": "سجّل الحصر",
       "studioTakesBack": {
-        "record_signed_offline": {
+        "signing_closed": {
           "headline": "مهلة التوقيع الأونلاين خلصت: سجّل التوقيع الورقي",
           "hint": "العميل مش هيقدر يوقّع من الرابط بتاعه خلاص. لو وقّع على ورق، سجّل التوقيع هنا."
         },
-        "await_variation_answer": {
+        "change_order_not_issued": {
           "headline": "ابعت أمر التغيير للعميل",
           "hint": "أمر التغيير اتعمد جوه الاستوديو ولسه ماتبعتش، فالعميل مش شايفه."
+        },
+        "change_order_link_expired": {
+          "headline": "رابط أمر التغيير خلص: كلّم العميل",
+          "hint": "العميل مش هيقدر يرد على أمر التغيير ده من الرابط بتاعه خلاص. كلّمه بخصوصه."
         }
       }
     }

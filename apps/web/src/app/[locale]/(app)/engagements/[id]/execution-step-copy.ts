@@ -3,8 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
 import { STAGES_WAITING_ON_CLIENT } from '@/lib/execution/next-action-target';
-import type { ExecutionNextActionKind } from '@/lib/execution/stage';
-import type { StepLocation } from '@/lib/flow/types';
+import type { StudioExecutionLocation } from '@/lib/flow/locate/execution-studio';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 
@@ -20,24 +19,14 @@ export interface ExecutionStepCopy {
 }
 
 /**
- * The client waits the studio takes back (lib/flow/locate/execution-studio.ts):
- * a contract whose online signing window closed can only be signed on paper,
- * and a change order approved inside the studio has to be issued before the
- * client can answer it. While the studio holds one, the card says the studio's
- * act (`execution.card.studioTakesBack.*`), not the client's wait.
- */
-export const STUDIO_TAKES_BACK: ReadonlySet<ExecutionNextActionKind> = new Set<ExecutionNextActionKind>([
-  'record_signed_offline',
-  'await_variation_answer',
-]);
-
-/**
  * The headline is the next action itself (`execution.card.next.*`), the hint
  * where the contract stands. While the job waits on the client the eyebrow says
  * so, as it does on the design card; once settled or terminated the stage is
- * the headline and there is no action to name.
+ * the headline and there is no action to name. A client wait the studio has
+ * taken back (lib/flow/locate/execution-studio.ts) says the studio's act
+ * instead (`execution.card.studioTakesBack.*`), keyed by why it was taken back.
  */
-export function useExecutionStepCopy(options: { view: ExecutionCardView; location: StepLocation }): ExecutionStepCopy {
+export function useExecutionStepCopy(options: { view: ExecutionCardView; location: StudioExecutionLocation }): ExecutionStepCopy {
   const t = useTranslations('execution.card');
   const tcmd = useTranslations('engagements.command');
   const locale = useLocale();
@@ -48,13 +37,12 @@ export function useExecutionStepCopy(options: { view: ExecutionCardView; locatio
   const stage = t(`stage.${view.stage}`);
   if (!view.next) return { eyebrow, headline: stage, hint: null, actionLabel: null };
 
-  const { kind } = view.next;
-  if (location.whoseMove === 'studio' && STUDIO_TAKES_BACK.has(kind)) {
-    const actionLabel = t(`studioTakesBack.${kind}.headline`);
-    return { eyebrow, headline: actionLabel, hint: t(`studioTakesBack.${kind}.hint`), actionLabel };
+  if (location.takenBack) {
+    const actionLabel = t(`studioTakesBack.${location.takenBack}.headline`);
+    return { eyebrow, headline: actionLabel, hint: t(`studioTakesBack.${location.takenBack}.hint`), actionLabel };
   }
   const instalment = view.nextInstalment && pickLocale(view.nextInstalment, 'label', locale).value;
-  const actionLabel = t(`next.${kind}`, { instalment: instalment || t('anInstalment') });
+  const actionLabel = t(`next.${view.next.kind}`, { instalment: instalment || t('anInstalment') });
   const waiting = location.whoseMove === 'client' && STAGES_WAITING_ON_CLIENT.has(view.stage);
   return { eyebrow, headline: actionLabel, hint: waiting ? t('waitingOnClient') : stage, actionLabel };
 }

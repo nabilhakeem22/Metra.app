@@ -21,7 +21,9 @@ export type DeliveryStatus =
   | { kind: 'waitingClient'; days: number | null }
   | { kind: 'stalled'; days: number }
   | { kind: 'delivered' }
-  | { kind: 'abandoned' };
+  | { kind: 'abandoned' }
+  /** The execution contract was terminated: the job closed without being delivered (the header at `execution` only). */
+  | { kind: 'terminated' };
 
 export type DeliveryStatusKind = DeliveryStatus['kind'];
 
@@ -76,13 +78,14 @@ const EXECUTION_ACTOR_STATUS: Readonly<Record<Actor, DeliveryStatus>> = {
 /**
  * The status of a delivery at `execution`, from where its execution phase is
  * (lib/flow/locate/execution-studio.ts): whose move it is while the works run,
- * delivered once nobody holds one (settled, or a terminated contract). The
- * client's wait is not aged, so never stalled: the delivery row's `updatedAt`
- * does not move with the contract, and counting from it would date the wrong
- * thing.
+ * delivered once settled, terminated once the contract was (closed, never
+ * delivered). The client's wait is not aged, so never stalled: the delivery
+ * row's `updatedAt` does not move with the contract, and counting from it would
+ * date the wrong thing.
  */
 export function executionDeliveryStatus(location: StepLocation): DeliveryStatus {
-  if (location.status !== 'active' || location.whoseMove === null) return { kind: 'delivered' };
+  if (location.status === 'closed') return { kind: 'terminated' };
+  if (location.status === 'complete' || location.whoseMove === null) return { kind: 'delivered' };
   return EXECUTION_ACTOR_STATUS[location.whoseMove];
 }
 
@@ -93,6 +96,7 @@ const KIND_TONE: Record<DeliveryStatusKind, StatusTone> = {
   stalled: 'stalled',
   delivered: 'done',
   abandoned: 'neutral',
+  terminated: 'neutral',
 };
 
 export function deliveryStatusTone(status: DeliveryStatus): StatusTone {

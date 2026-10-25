@@ -584,6 +584,7 @@ describe('the execution rail places every derived stage and says whose move it i
         stage: facts,
         signingOpen: facts.contract?.status === 'issued',
         issuedChangeOrderCount: facts.contract?.openVariationCount ?? 0,
+        expiredChangeOrderCount: 0,
         unclaimedDueRequestCount: facts.contract?.unpaidRequestCount ?? 0,
       });
       const view = buildPhaseView(EXECUTION_PHASE, location, 'studio');

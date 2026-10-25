@@ -210,9 +210,20 @@ describe('the flow facts beside the stage', () => {
     const project = { contractId, projectId: ids.projectId };
     await seedVariation(orgId, project, 'internal_approved');
     expect((await stageOf(engagementId)).card.flow).toMatchObject({ issuedChangeOrderCount: 0, stage: { contract: { openVariationCount: 1 } } });
-    await seedVariation(orgId, project, 'issued');
+    const issued = await seedVariation(orgId, project, 'issued');
     await seedVariation(orgId, project, 'approved');
-    expect((await stageOf(engagementId)).card.flow).toMatchObject({ issuedChangeOrderCount: 1, stage: { contract: { openVariationCount: 2 } } });
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({
+      issuedChangeOrderCount: 1,
+      expiredChangeOrderCount: 0,
+      stage: { contract: { openVariationCount: 2 } },
+    });
+    // Its link expired (F1): still open, no longer answerable, so counted apart.
+    await tamper(`update public.variation_orders set share_expires_at = now() - interval '1 minute' where id = $1`, [issued.id]);
+    expect((await stageOf(engagementId)).card.flow).toMatchObject({
+      issuedChangeOrderCount: 0,
+      expiredChangeOrderCount: 1,
+      stage: { contract: { openVariationCount: 2 } },
+    });
   });
 });
 

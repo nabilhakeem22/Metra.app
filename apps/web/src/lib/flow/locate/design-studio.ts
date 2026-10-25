@@ -17,6 +17,8 @@ const STATUS_ACTOR: Readonly<Record<DeliveryStatusKind, Actor | null>> = {
   stalled: 'client',
   delivered: null,
   abandoned: null,
+  // An execution contract's ending: the design phase never reads it, and nobody holds a move.
+  terminated: null,
 };
 
 export function locateDesignForStudio(state: DesignState, deliveryStatus: DeliveryStatus): StepLocation<SpineStageKey> {

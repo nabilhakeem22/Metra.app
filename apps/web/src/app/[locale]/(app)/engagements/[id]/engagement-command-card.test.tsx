@@ -301,6 +301,7 @@ describe('a closed delivery', () => {
         stage: { hasIssuedBoq: false, contract: null },
         signingOpen: false,
         issuedChangeOrderCount: 0,
+        expiredChangeOrderCount: 0,
         unclaimedDueRequestCount: 0,
       },
       projectId: 'p-1',

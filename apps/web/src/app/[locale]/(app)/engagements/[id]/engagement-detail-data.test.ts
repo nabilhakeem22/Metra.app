@@ -26,7 +26,7 @@ const reads = vi.hoisted(() => {
     countAwaitingReplyCore: read(0),
     loadBoqStep: read({}),
     getExecutionFacts: read({
-      flow: { stage: { hasIssuedBoq: false, contract: null }, signingOpen: false, issuedChangeOrderCount: 0, unclaimedDueRequestCount: 0 },
+      flow: { stage: { hasIssuedBoq: false, contract: null }, signingOpen: false, issuedChangeOrderCount: 0, expiredChangeOrderCount: 0, unclaimedDueRequestCount: 0 },
       boqId: null,
       contract: null,
       nextInstalment: null,

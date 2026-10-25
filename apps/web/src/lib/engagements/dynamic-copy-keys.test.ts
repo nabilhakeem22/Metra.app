@@ -45,6 +45,7 @@ const DELIVERY_STATUSES: Record<DeliveryStatusKind, true> = {
   stalled: true,
   delivered: true,
   abandoned: true,
+  terminated: true,
 };
 
 /** Total over the client page's timeline words (Round C). */

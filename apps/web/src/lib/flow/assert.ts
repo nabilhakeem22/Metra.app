@@ -15,6 +15,21 @@ export function entryOf<K extends string, V>(table: Readonly<Record<K, V>>, key:
   return table[key];
 }
 
+/** A flag is a boolean: the string 'false' is truthy, so it is refused rather than read as true. */
+export function assertBoolean(value: boolean, what: string): void {
+  // developer-only: the message names a fact's field, a constant; its value is never in it.
+  if (typeof value !== 'boolean') throw new Error(`${what} is not a boolean`);
+}
+
+/** A decimal as Postgres renders a numeric: an optional minus, digits, an optional fraction. */
+const MONEY_FIGURE = /^-?\d+(\.\d+)?$/;
+
+/** A money figure is a decimal string: `parseMoney4` would read 'abc' as zero, and a contract as settled. */
+export function assertMoney(value: string, what: string): void {
+  // developer-only: the message names a fact's field, a constant; its value is never in it.
+  if (typeof value !== 'string' || !MONEY_FIGURE.test(value)) throw new Error(`${what} is not a money figure`);
+}
+
 /** A count is a whole number, zero or more. */
 export function assertCount(value: number, what: string): void {
   // developer-only: the message names a fact's field, a constant; its value is never in it.

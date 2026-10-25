@@ -30,15 +30,21 @@ describe('locateExecutionForStudio', () => {
       expect(at.step, label).toBe(EXPECTED_STEP[stage]);
       if (next === null) expect(at.whoseMove, label).toBeNull();
       else if (!WAITS_ON_CLIENT.has(next.kind)) expect(at.whoseMove, label).toBe('studio');
+      // A wait is taken back only from the client, so only by the studio, and only on a client wait.
+      if (at.takenBack !== null) {
+        expect(at.whoseMove, label).toBe('studio');
+        expect(next !== null && WAITS_ON_CLIENT.has(next.kind), label).toBe(true);
+      }
     }
   });
 
   it('completes the phase once settled and closes it once terminated', () => {
-    expect(locateExecutionForStudio(flowFactsOf(model()))).toEqual({ step: 'settled', whoseMove: null, status: 'complete' });
+    expect(locateExecutionForStudio(flowFactsOf(model()))).toEqual({ step: 'settled', whoseMove: null, status: 'complete', takenBack: null });
     expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'terminated' })))).toEqual({
       step: null,
       whoseMove: null,
       status: 'closed',
+      takenBack: null,
     });
   });
 
@@ -47,16 +53,28 @@ describe('locateExecutionForStudio', () => {
       step: 'signature',
       whoseMove: 'client',
       status: 'active',
+      takenBack: null,
     });
-    expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'issued_closed' }))).whoseMove).toBe('studio');
+    expect(locateExecutionForStudio(flowFactsOf(model({ contract: 'issued_closed' })))).toMatchObject({
+      whoseMove: 'studio',
+      takenBack: 'signing_closed',
+    });
   });
 
   it('waits on the client for a change order issued to them, and on the studio for one it has not issued (F6)', () => {
-    expect(locateExecutionForStudio(flowFactsOf(model({ issuedChangeOrders: 1 }))).whoseMove).toBe('client');
-    expect(locateExecutionForStudio(flowFactsOf(model({ internalChangeOrders: 1 }))).whoseMove).toBe('studio');
-    expect(locateExecutionForStudio(flowFactsOf(model({ issuedChangeOrders: 1, internalChangeOrders: 1 }))).whoseMove).toBe(
-      'studio',
-    );
+    const at = (overrides: Parameters<typeof model>[0]) => locateExecutionForStudio(flowFactsOf(model(overrides)));
+    expect(at({ issuedChangeOrders: 1 })).toMatchObject({ whoseMove: 'client', takenBack: null });
+    expect(at({ internalChangeOrders: 1 })).toMatchObject({ whoseMove: 'studio', takenBack: 'change_order_not_issued' });
+    expect(at({ issuedChangeOrders: 1, internalChangeOrders: 1 })).toMatchObject({ whoseMove: 'studio', takenBack: 'change_order_not_issued' });
+  });
+
+  it('takes back a change order whose link expired: the client can no longer answer it (F1)', () => {
+    const at = (overrides: Parameters<typeof model>[0]) => locateExecutionForStudio(flowFactsOf(model(overrides)));
+    expect(at({ expiredChangeOrders: 1 })).toMatchObject({ step: 'works', whoseMove: 'studio', takenBack: 'change_order_link_expired' });
+    // Beside a live one too: the expired one still needs the studio.
+    expect(at({ issuedChangeOrders: 1, expiredChangeOrders: 1 })).toMatchObject({ whoseMove: 'studio', takenBack: 'change_order_link_expired' });
+    // One still to issue comes first: issuing is the act the studio can take in the app.
+    expect(at({ internalChangeOrders: 1, expiredChangeOrders: 1 })).toMatchObject({ takenBack: 'change_order_not_issued' });
   });
 
   it('waits on the client for a payment with no claim, and gives the studio a claim to review', () => {
@@ -72,6 +90,7 @@ describe('locateExecutionForStudio', () => {
         step: 'contract',
         whoseMove: 'studio',
         status: 'active',
+        takenBack: null,
       });
     }
     expect(locateExecutionForStudio(flowFactsOf(model({ nextMilestone: true, balanceLeft: true }))).whoseMove).toBe('studio');

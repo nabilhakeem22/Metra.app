@@ -4,17 +4,22 @@
 // (`executionStage()`, lib/execution/stage.ts), so the two rails can never show
 // different steps or a different end. Only whose move it is and the reason
 // differ by audience (./execution-studio.ts, ./execution-client.ts).
-import { executionStage, type ExecutionFacts, type ExecutionStage, type ExecutionStageResult } from '@/lib/execution/stage';
-import { assertCount } from '../assert';
+import {
+  executionStage,
+  type ExecutionContractFacts,
+  type ExecutionFacts,
+  type ExecutionStage,
+  type ExecutionStageResult,
+} from '@/lib/execution/stage';
+import { assertBoolean, assertCount, assertMoney } from '../assert';
 import type { ExecutionStepKey } from '../phases/execution';
 import type { PhaseStatus } from '../types';
 
 /**
- * What both sides know about a delivery's execution. The studio builds it from
- * `getExecutionFacts` (lib/execution/queries/facts.ts) plus the three fields
- * after `stage`, which that query does not read yet; the client home's SDF
- * computes every field in SQL (client home H4), so neither side counts from a
- * capped list.
+ * What both sides know about a delivery's execution. The studio reads it with
+ * `getExecutionFacts` (lib/execution/queries/facts.ts); the client home's SDF
+ * computes every field in SQL (client home H4). Each count is taken in SQL over
+ * every row, so neither side counts from a capped list.
  */
 export interface ExecutionFlowFacts {
   /** `executionStage()`'s input: the stage, and so the step, on both sides. */
@@ -26,11 +31,19 @@ export interface ExecutionFlowFacts {
   signingOpen: boolean;
   /**
    * Of `stage.contract.openVariationCount` (change orders awaiting a decision),
-   * the ones ISSUED to the client. The rest are approved internally and not
-   * issued yet: the client cannot see them, so they are the studio's to issue.
-   * Zero when there is no contract.
+   * the ones ISSUED to the client whose link is still live, so the client can
+   * answer them online. Zero when there is no contract.
    */
   issuedChangeOrderCount: number;
+  /**
+   * Of the open change orders, the ones issued to the client whose link has
+   * EXPIRED: the client can no longer answer them online, so they are the
+   * studio's (the signing-window rule, F4, applied to change orders). The open
+   * ones in neither count are approved internally and not issued yet: the
+   * client cannot see them, so they are the studio's to issue. Zero when there
+   * is no contract.
+   */
+  expiredChangeOrderCount: number;
   /**
    * Issued payment requests with something still due and no unanswered "I paid"
    * claim, counted over ALL of them in SQL (never from a capped request list).
@@ -63,21 +76,53 @@ const STAGE_PLACE: Readonly<Record<ExecutionStage, Omit<ExecutionPosition, 'resu
 
 /** Change orders the studio approved and has not issued to the client yet. */
 export function internalChangeOrderCount(facts: ExecutionFlowFacts): number {
-  return (facts.stage.contract?.openVariationCount ?? 0) - facts.issuedChangeOrderCount;
+  return (facts.stage.contract?.openVariationCount ?? 0) - facts.issuedChangeOrderCount - facts.expiredChangeOrderCount;
 }
 
-/** Refuse facts no query can produce: a count that is not one, or counts that contradict each other. */
+/** The contract's own counts, by its field's name. */
+function contractCounts(contract: ExecutionContractFacts): Record<string, number> {
+  return {
+    openVariationCount: contract.openVariationCount,
+    unbilledVariationCount: contract.unbilledVariationCount,
+    unpaidRequestCount: contract.unpaidRequestCount,
+    pendingClaimCount: contract.pendingClaimCount,
+  };
+}
+
+/** Every money figure the stage reads off a contract is a decimal, as Postgres renders a numeric. */
+function assertContractMoney(contract: ExecutionContractFacts): void {
+  assertMoney(contract.billingBalance, 'billingBalance');
+  assertMoney(contract.finalAccountBalance, 'finalAccountBalance');
+  if (contract.finalAccountOutstanding !== null) assertMoney(contract.finalAccountOutstanding, 'finalAccountOutstanding');
+  if (contract.nextUnbilledMilestone !== null) assertMoney(contract.nextUnbilledMilestone.amount, 'nextUnbilledMilestone.amount');
+}
+
+/** A contract's counts are counts, its figures numbers, and a draft (neither issued nor signed) has none yet. */
+function assertContract(facts: ExecutionFlowFacts, contract: ExecutionContractFacts): void {
+  const counts = contractCounts(contract);
+  for (const [field, count] of Object.entries(counts)) assertCount(count, field);
+  assertContractMoney(contract);
+  const flowCounts = [facts.issuedChangeOrderCount, facts.expiredChangeOrderCount, facts.unclaimedDueRequestCount];
+  if (contract.status === 'draft' && [...Object.values(counts), ...flowCounts].some((count) => count > 0)) {
+    throw new Error('a draft contract carries billing or change-order counts');
+  }
+}
+
+/**
+ * Refuse facts no query can produce: a count that is not one, a flag that is
+ * not a boolean, a figure that is not a number, or counts that contradict
+ * each other.
+ */
 function assertFacts(facts: ExecutionFlowFacts): void {
   const contract = facts.stage.contract;
+  assertBoolean(facts.signingOpen, 'signingOpen');
   assertCount(facts.issuedChangeOrderCount, 'issuedChangeOrderCount');
+  assertCount(facts.expiredChangeOrderCount, 'expiredChangeOrderCount');
   assertCount(facts.unclaimedDueRequestCount, 'unclaimedDueRequestCount');
-  if (contract) {
-    assertCount(contract.openVariationCount, 'openVariationCount');
-    assertCount(contract.unbilledVariationCount, 'unbilledVariationCount');
-    assertCount(contract.unpaidRequestCount, 'unpaidRequestCount');
-    assertCount(contract.pendingClaimCount, 'pendingClaimCount');
+  if (contract) assertContract(facts, contract);
+  if (internalChangeOrderCount(facts) < 0) {
+    throw new Error('issuedChangeOrderCount and expiredChangeOrderCount exceed openVariationCount');
   }
-  if (internalChangeOrderCount(facts) < 0) throw new Error('issuedChangeOrderCount exceeds openVariationCount');
   // Every unpaid request is either unclaimed or carries one of the pending claims
   // (at most one per request), so the unclaimed ones lie between those bounds.
   const unpaid = contract?.unpaidRequestCount ?? 0;

@@ -28,7 +28,10 @@ export type ModelContract =
 export interface ExecutionModel {
   contract: ModelContract;
   requests: readonly ModelRequest[];
+  /** Issued to the client, with a live link. */
   issuedChangeOrders: number;
+  /** Issued to the client, with an expired link. */
+  expiredChangeOrders: number;
   internalChangeOrders: number;
   unbilledChangeOrders: number;
   /** A schedule row is left to bill, and it fits in the balance. */
@@ -59,6 +62,9 @@ const OUTSTANDING: Readonly<Record<ModelRequestState, bigint>> = {
   partialClaimed: 4_000_000n,
 };
 
+/** Change orders awaiting a decision: issued (with a live or an expired link) or approved internally. */
+const openChangeOrders = (m: ExecutionModel) => m.issuedChangeOrders + m.expiredChangeOrders + m.internalChangeOrders;
+
 const isLive = (request: ModelRequest) => request.state !== 'void';
 const isUnpaid = (request: ModelRequest) => isLive(request) && OUTSTANDING[request.state] > 0n;
 const isClaimed = (request: ModelRequest) => request.state === 'claimed' || request.state === 'partialClaimed';
@@ -67,6 +73,7 @@ const EMPTY_MODEL: ExecutionModel = {
   contract: 'signed',
   requests: [],
   issuedChangeOrders: 0,
+  expiredChangeOrders: 0,
   internalChangeOrders: 0,
   unbilledChangeOrders: 0,
   nextMilestone: false,
@@ -112,7 +119,7 @@ function contractFacts(m: ExecutionModel, status: ExecutionContractFacts['status
     unbilledVariationCount: m.unbilledChangeOrders,
     finalAccountOutstanding: finalAccount ? formatMoney4(OUTSTANDING[finalAccount.state]) : null,
     unpaidRequestCount: unpaid.length,
-    openVariationCount: m.issuedChangeOrders + m.internalChangeOrders,
+    openVariationCount: openChangeOrders(m),
     billingBalance: balance,
     finalAccountBalance: balance,
   };
@@ -125,6 +132,7 @@ export function flowFactsOf(m: ExecutionModel): ExecutionFlowFacts {
       stage: { hasIssuedBoq: m.contract === 'no_contract', contract: null },
       signingOpen: false,
       issuedChangeOrderCount: 0,
+      expiredChangeOrderCount: 0,
       unclaimedDueRequestCount: 0,
     };
   }
@@ -134,6 +142,7 @@ export function flowFactsOf(m: ExecutionModel): ExecutionFlowFacts {
     stage: { hasIssuedBoq: true, contract },
     signingOpen: m.contract === 'issued_open',
     issuedChangeOrderCount: signed ? m.issuedChangeOrders : 0,
+    expiredChangeOrderCount: signed ? m.expiredChangeOrders : 0,
     unclaimedDueRequestCount: signed ? m.requests.filter((request) => isUnpaid(request) && !isClaimed(request)).length : 0,
   };
 }
@@ -159,11 +168,11 @@ function requestLists(max: number): ModelRequest[][] {
 function isReachable(m: ExecutionModel): boolean {
   if (m.nextMilestone && !m.balanceLeft) return false;
   const billing = m.contract === 'signed' || m.contract === 'terminated';
-  const changes = m.issuedChangeOrders + m.internalChangeOrders + m.unbilledChangeOrders;
+  const changes = openChangeOrders(m) + m.unbilledChangeOrders;
   if (!billing && (m.requests.length > 0 || changes > 0 || m.nextMilestone || m.balanceLeft)) return false;
   const finalAccounts = m.requests.filter((request) => isLive(request) && request.kind === 'final_account').length;
   if (finalAccounts > 1) return false;
-  return finalAccounts === 0 || (!m.nextMilestone && m.issuedChangeOrders + m.internalChangeOrders === 0);
+  return finalAccounts === 0 || (!m.nextMilestone && openChangeOrders(m) === 0);
 }
 
 /** Every reachable model with up to `maxRequests` requests. */
@@ -173,12 +182,23 @@ export function* executionModels(maxRequests: number): Generator<ExecutionModel>
     const billing = contract === 'signed' || contract === 'terminated';
     for (const requests of billing ? lists : [[]]) {
       for (const issuedChangeOrders of [0, 1, 2]) {
-        for (const internalChangeOrders of [0, 1]) {
-          for (const unbilledChangeOrders of [0, 1]) {
-            for (const nextMilestone of [false, true]) {
-              for (const balanceLeft of [false, true]) {
-                const m = { contract, requests, issuedChangeOrders, internalChangeOrders, unbilledChangeOrders, nextMilestone, balanceLeft };
-                if (isReachable(m)) yield m;
+        for (const expiredChangeOrders of [0, 1]) {
+          for (const internalChangeOrders of [0, 1]) {
+            for (const unbilledChangeOrders of [0, 1]) {
+              for (const nextMilestone of [false, true]) {
+                for (const balanceLeft of [false, true]) {
+                  const m = {
+                    contract,
+                    requests,
+                    issuedChangeOrders,
+                    expiredChangeOrders,
+                    internalChangeOrders,
+                    unbilledChangeOrders,
+                    nextMilestone,
+                    balanceLeft,
+                  };
+                  if (isReachable(m)) yield m;
+                }
               }
             }
           }

@@ -7,14 +7,13 @@ import { executionCardView, type ExecutionCardView } from '@/lib/execution/card-
 import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS } from '@/lib/execution/next-action-target';
 import { EXECUTION_NEXT_ACTION_KINDS, EXECUTION_STAGES, type ExecutionNextActionKind, type ExecutionStage } from '@/lib/execution/stage';
 import { executionPosition, type ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
-import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
+import { locateExecutionForStudio, STUDIO_TAKE_BACKS, type StudioTakeBack } from '@/lib/flow/locate/execution-studio';
 import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
 import type { Actor } from '@/lib/flow/types';
 import { executionModels, flowFactsOf } from '@/test/execution-flow-model';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import type { ExecutionCockpit } from './command-card-props';
 import { ExecutionStepCard, type ExecutionStepCardProps } from './execution-step-card';
-import { STUDIO_TAKES_BACK } from './execution-step-copy';
 
 // The cockpit at `execution` (client home H2, AC 22 to 25): the design folds
 // into one line above the five-step execution rail, and the card names ONE next
@@ -64,14 +63,23 @@ const NOTHING_OPEN: DesignSummary = { openInstalments: 0, pendingClaims: 0, awai
 /** Every fact set a real contract can be in (lib/flow's shared model), with where it locates. */
 const FLOWS = [...executionModels(1)].map((m) => {
   const flow = flowFactsOf(m);
-  return { flow, result: executionPosition(flow).result, whoseMove: locateExecutionForStudio(flow).whoseMove };
+  const { whoseMove, takenBack } = locateExecutionForStudio(flow);
+  return { flow, result: executionPosition(flow).result, whoseMove, takenBack };
 });
 
-/** The first real fact set showing `kind`; the two waits the studio can take back default to the client holding them. */
+/** The first real fact set showing `kind` held by `holder`; by default one the studio has not taken back from the client. */
 function flowFor(kind: ExecutionNextActionKind, holder?: Actor): ExecutionFlowFacts {
-  const wanted = holder ?? (STUDIO_TAKES_BACK.has(kind) ? 'client' : undefined);
-  const found = FLOWS.find(({ result, whoseMove }) => result.next?.kind === kind && (wanted === undefined || whoseMove === wanted));
-  if (!found) throw new Error(`no model shows ${kind} held by ${String(wanted)}`);
+  const found = FLOWS.find(
+    ({ result, whoseMove, takenBack }) => result.next?.kind === kind && (holder === undefined ? takenBack === null : whoseMove === holder),
+  );
+  if (!found) throw new Error(`no model shows ${kind} held by ${String(holder)}`);
+  return found.flow;
+}
+
+/** The first real fact set where the studio has taken a client wait back, for `why`. */
+function flowTakenBack(why: StudioTakeBack): ExecutionFlowFacts {
+  const found = FLOWS.find(({ takenBack }) => takenBack === why);
+  if (!found) throw new Error(`no model is taken back for ${why}`);
   return found.flow;
 }
 
@@ -297,9 +305,9 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution step card (%s)', (loca
   });
 
   test('a closed signing window is the studio move: the card says so and offers the paper signature', () => {
-    const { container, body } = renderCard(viewOf(flowFor('record_signed_offline', 'studio')), { locale });
-    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.studioTakesBack.record_signed_offline.headline'));
-    expect(body.getByText(at('execution.card.studioTakesBack.record_signed_offline.hint'))).toBeTruthy();
+    const { container, body } = renderCard(viewOf(flowTakenBack('signing_closed')), { locale });
+    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.studioTakesBack.signing_closed.headline'));
+    expect(body.getByText(at('execution.card.studioTakesBack.signing_closed.hint'))).toBeTruthy();
     expect(body.getByText(`${at('engagements.command.nextAction')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
     expect(body.getByRole('button', { name: at('contracts.execution.signOffline.open') })).toBeTruthy();
     expect(body.queryByText(at('execution.card.waitingOnClient'))).toBeNull();
@@ -307,30 +315,47 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution step card (%s)', (loca
   });
 
   test('a change order approved inside the studio is the studio move: issue it', () => {
-    const { body, unmount } = renderCard(viewOf(flowFor('await_variation_answer', 'studio')), { locale });
-    const issue = at('execution.card.studioTakesBack.await_variation_answer.headline');
+    const { body, unmount } = renderCard(viewOf(flowTakenBack('change_order_not_issued')), { locale });
+    const issue = at('execution.card.studioTakesBack.change_order_not_issued.headline');
     expect(body.getByRole('heading', { level: 2 }).textContent).toBe(issue);
-    expect(body.getByText(at('execution.card.studioTakesBack.await_variation_answer.hint'))).toBeTruthy();
+    expect(body.getByText(at('execution.card.studioTakesBack.change_order_not_issued.hint'))).toBeTruthy();
     expect(body.getByRole('link', { name: issue }).getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=variations$/);
     unmount();
     // Issued to the client and waiting on their answer: the client's wait, in the old words.
     const waiting = renderCard(viewOf(flowFor('await_variation_answer', 'client')), { locale });
     expect(waiting.body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.next.await_variation_answer'));
+    expect(waiting.body.getByText(`${at('engagements.command.pill.waitingClient')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
+  });
+
+  test('a change order whose link expired is the studio move: the card says the link expired and to contact the client (F1)', () => {
+    const { container, body } = renderCard(viewOf(flowTakenBack('change_order_link_expired')), { locale });
+    const expired = at('execution.card.studioTakesBack.change_order_link_expired.headline');
+    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(expired);
+    expect(body.getByText(at('execution.card.studioTakesBack.change_order_link_expired.hint'))).toBeTruthy();
+    expect(body.getByText(`${at('engagements.command.nextAction')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
+    expect(body.getByRole('link', { name: expired }).getAttribute('href')).toMatch(/\/contracts\/c-1\?tab=variations$/);
+    expect(body.queryByText(at('execution.card.next.await_variation_answer'))).toBeNull();
+    expect(container.querySelector('[data-rail-step][aria-current="step"] [data-rail-who]')?.textContent).toBe(at('engagements.flow.who.now.studio'));
   });
 });
 
 describe('the waits the studio can take back', () => {
-  test('every next action whose holder depends on the facts has the studio wording in both languages', () => {
+  test('the locator names why for every studio-held wait whose holder depends on the facts, and each has its words in both languages', () => {
     const holders = new Map<ExecutionNextActionKind, Set<Actor | null>>();
     for (const { result, whoseMove } of FLOWS) {
       if (!result.next) continue;
       holders.set(result.next.kind, (holders.get(result.next.kind) ?? new Set<Actor | null>()).add(whoseMove));
     }
-    const shifting = [...holders].filter(([, actors]) => actors.size > 1).map(([kind]) => kind);
-    expect(new Set(shifting)).toEqual(STUDIO_TAKES_BACK);
-    for (const kind of STUDIO_TAKES_BACK) {
+    const shifting = new Set([...holders].filter(([, actors]) => actors.size > 1).map(([kind]) => kind));
+    for (const { result, whoseMove, takenBack } of FLOWS) {
+      const label = `${result.next?.kind} ${String(whoseMove)} ${String(takenBack)}`;
+      const shifted = result.next !== null && shifting.has(result.next.kind) && whoseMove === 'studio';
+      expect(takenBack !== null, label).toBe(shifted);
+    }
+    expect(new Set(FLOWS.map(({ takenBack }) => takenBack).filter((why) => why !== null))).toEqual(new Set(STUDIO_TAKE_BACKS));
+    for (const why of STUDIO_TAKE_BACKS) {
       for (const locale of ['en', 'ar-EG'] as const) {
-        for (const field of ['headline', 'hint']) expect(messageAt(locale, `execution.card.studioTakesBack.${kind}.${field}`)).toBeTruthy();
+        for (const field of ['headline', 'hint']) expect(messageAt(locale, `execution.card.studioTakesBack.${why}.${field}`)).toBeTruthy();
       }
     }
   });
@@ -390,12 +415,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the design summary line (%s)', (loca
 });
 
 describe('the card at execution', () => {
-  test('wears the colour of whose move it is: brand for the studio, neutral while it waits on the client, done once settled', () => {
+  test('wears the colour of whose move it is: brand for the studio, neutral while it waits on the client, done once settled, neutral once terminated (F2)', () => {
     const borderOf = (cardView: ExecutionCardView, status: DeliveryStatus) =>
       renderCard(cardView, { extra: { status } }).container.querySelector('section')!.className;
     expect(borderOf(view('send_contract'), { kind: 'yourMove' })).toContain('border-[color:var(--brand-tint-border)]');
     expect(borderOf(view('record_signed_offline'), { kind: 'waitingClient', days: null })).toContain('border-[color:var(--rule)]');
     expect(borderOf(view(null, EVERYTHING, 'settled'), { kind: 'delivered' })).toContain('border-[color:var(--success-tint)]');
+    const terminated = view(null, EVERYTHING, 'terminated');
+    const status = executionDeliveryStatus(locateExecutionForStudio(terminated.flow));
+    expect(status).toEqual({ kind: 'terminated' });
+    const stripe = renderCard(terminated, { extra: { status } }).container.querySelector('section')!;
+    expect(stripe.className).toContain('border-[color:var(--rule)]');
+    expect(stripe.innerHTML).not.toContain('bg-[color:var(--success)]');
   });
 
   test('a client payment claim left on the finished design can still be dismissed, by a role that resolves claims', () => {

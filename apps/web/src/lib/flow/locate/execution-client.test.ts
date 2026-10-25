@@ -77,6 +77,13 @@ describe('locateExecutionForClient', () => {
     expect(locate({ internalChangeOrders: 1 })).toMatchObject({ reason: 'works_in_progress', whoseMove: 'site' });
   });
 
+  it('never asks the client to decide a change order whose link has expired: the studio holds it (F1)', () => {
+    const facts = flowFactsOf(model({ expiredChangeOrders: 1 }));
+    expect(locateExecutionForClient(facts)).toMatchObject({ reason: 'works_in_progress', whoseMove: 'site' });
+    expect(locateExecutionForStudio(facts)).toMatchObject({ whoseMove: 'studio', takenBack: 'change_order_link_expired' });
+    expect(locate({ expiredChangeOrders: 1, issuedChangeOrders: 1 }).reason).toBe('decide_change_order');
+  });
+
   it('gives the studio the move on both sides once the signing window has closed (F4)', () => {
     const facts = flowFactsOf(model({ contract: 'issued_closed' }));
     expect(locateExecutionForClient(facts).whoseMove).toBe('studio');

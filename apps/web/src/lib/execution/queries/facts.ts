@@ -83,7 +83,10 @@ function issuedFinalBalance(money: ContractMoneyFacts): string | null {
 }
 
 /** What a signed contract's change orders and requests add to the flow facts (zero before it is signed). */
-type ContractFlowCounts = Pick<ExecutionFlowFacts, 'issuedChangeOrderCount' | 'unclaimedDueRequestCount'>;
+type ContractFlowCounts = Pick<ExecutionFlowFacts, 'issuedChangeOrderCount' | 'expiredChangeOrderCount' | 'unclaimedDueRequestCount'>;
+
+/** A contract that bills nothing yet changes nothing either. */
+const NO_FLOW_COUNTS: ContractFlowCounts = { issuedChangeOrderCount: 0, expiredChangeOrderCount: 0, unclaimedDueRequestCount: 0 };
 
 /** A signed contract's billing facts, and the row it bills next; a draft or an unsigned one bills nothing yet. */
 async function contractFacts(
@@ -107,7 +110,7 @@ async function contractFacts(
     billingBalance: '0',
     finalAccountBalance: '0',
   };
-  if (contract.status !== 'signed') return { facts: idle, counts: { issuedChangeOrderCount: 0, unclaimedDueRequestCount: 0 }, next: null };
+  if (contract.status !== 'signed') return { facts: idle, counts: NO_FLOW_COUNTS, next: null };
 
   const money = await loadContractMoneyFacts(tx, contract.id);
   const billing = {
@@ -133,7 +136,11 @@ async function contractFacts(
   };
   return {
     facts,
-    counts: { issuedChangeOrderCount: money.issuedVariationCount, unclaimedDueRequestCount: money.unclaimedDueRequestCount },
+    counts: {
+      issuedChangeOrderCount: money.issuedVariationCount,
+      expiredChangeOrderCount: money.expiredVariationCount,
+      unclaimedDueRequestCount: money.unclaimedDueRequestCount,
+    },
     next: next && { labelAr: next.labelAr, labelEn: next.labelEn },
   };
 }
@@ -157,8 +164,7 @@ export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promis
       flow: {
         stage: { hasIssuedBoq: boqId !== null, contract: billing?.facts ?? null },
         signingOpen: contract?.signingOpen ?? false,
-        issuedChangeOrderCount: billing?.counts.issuedChangeOrderCount ?? 0,
-        unclaimedDueRequestCount: billing?.counts.unclaimedDueRequestCount ?? 0,
+        ...(billing?.counts ?? NO_FLOW_COUNTS),
       },
     };
   });

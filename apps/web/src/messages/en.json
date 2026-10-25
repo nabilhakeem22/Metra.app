@@ -2810,7 +2810,8 @@
       "waitingClient": "Waiting on client",
       "stalled": "Stalled",
       "delivered": "Delivered",
-      "abandoned": "Abandoned"
+      "abandoned": "Abandoned",
+      "terminated": "Terminated"
     },
     "offlineApproval": {
       "open": "Client approved offline",
@@ -3412,13 +3413,17 @@
       },
       "recordMeasurements": "Record measurements",
       "studioTakesBack": {
-        "record_signed_offline": {
+        "signing_closed": {
           "headline": "The online signing window has closed: record the paper signature",
           "hint": "The client can no longer sign on their link. If they signed on paper, record it here."
         },
-        "await_variation_answer": {
+        "change_order_not_issued": {
           "headline": "Issue the change order to the client",
           "hint": "It is approved inside the studio and not sent yet, so the client cannot see it."
+        },
+        "change_order_link_expired": {
+          "headline": "The change order link has expired: contact the client",
+          "hint": "The client can no longer answer this change order on their link. Contact them about it."
         }
       }
     }

@@ -72,11 +72,12 @@ describe('the rules the product reads', () => {
 });
 
 describe('executionDeliveryStatus: at execution the header follows whose move it is', () => {
-  it('every reachable fact set: the studio move is yours, the client move waits unaged, no move is delivered', () => {
+  it('every reachable fact set: the studio move is yours, the client move waits unaged, settled is delivered, terminated is terminated', () => {
     for (const m of executionModels(1)) {
       const location = locateExecutionForStudio(flowFactsOf(m));
       const status = executionDeliveryStatus(location);
-      if (location.status !== 'active' || location.whoseMove === null) expect(status, JSON.stringify(m)).toEqual({ kind: 'delivered' });
+      if (location.status === 'closed') expect(status, JSON.stringify(m)).toEqual({ kind: 'terminated' });
+      else if (location.status === 'complete') expect(status, JSON.stringify(m)).toEqual({ kind: 'delivered' });
       else if (location.whoseMove === 'client') expect(status, JSON.stringify(m)).toEqual({ kind: 'waitingClient', days: null });
       else expect(status, JSON.stringify(m)).toEqual({ kind: 'yourMove' });
     }
@@ -89,8 +90,10 @@ describe('executionDeliveryStatus: at execution the header follows whose move it
     expect(statusOf({ contract: 'draft' })).toEqual({ kind: 'yourMove' });
     expect(statusOf({ internalChangeOrders: 1 })).toEqual({ kind: 'yourMove' });
     expect(statusOf({ issuedChangeOrders: 1 })).toEqual({ kind: 'waitingClient', days: null });
+    expect(statusOf({ expiredChangeOrders: 1 })).toEqual({ kind: 'yourMove' });
     expect(statusOf({})).toEqual({ kind: 'delivered' });
-    expect(statusOf({ contract: 'terminated' })).toEqual({ kind: 'delivered' });
+    expect(statusOf({ contract: 'terminated' })).toEqual({ kind: 'terminated' });
+    expect(deliveryStatusTone({ kind: 'terminated' })).toBe('neutral');
   });
 
   it("a move the site team holds is the studio's own", () => {
