@@ -4,7 +4,7 @@ import { DashboardBarChart } from '@/components/dashboard/dashboard-bar-chart';
 import { RescueFigureCard } from '@/components/dashboard/rescue-figure-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { collectedColumns, RESCUE_SERIES_KEYS, stagesMovedColumns } from '@/lib/dashboard/rescue-ledger/chart-columns';
-import { pluralParams } from '@/lib/dashboard/rescue-ledger/plural-params';
+import { pluralParams } from '@/lib/format/plural-params';
 import type { RescueLedger, RescueMoneyFigure } from '@/lib/dashboard/rescue-ledger/types';
 import { cachedDateTimeFormat } from '@/lib/format/intl-cache';
 import { formatMoney } from '@/lib/format/money';

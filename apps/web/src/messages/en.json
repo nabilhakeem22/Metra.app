@@ -522,7 +522,9 @@
       "date_in_past": "That day has already passed. Pick today or a later day.",
       "too_many_decimals": "Use at most {max} decimal places.",
       "date_before_issue": "The contract was issued on {date}. Pick that day or a later one.",
-      "not_whole_number": "Enter a whole number, without a fraction."
+      "not_whole_number": "Enter a whole number, without a fraction.",
+      "in_future": "This time is later than now. Check the clock on your phone, then try again.",
+      "too_old": "This is from more than 30 days ago, too long ago to record. Check the clock on your phone."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -684,7 +686,25 @@
     "market_unit_incompatible": "The units don't match, so this market item can't be added or linked here.",
     "market_item_already_added": "This market item is already in your price book. Refresh the page and open it from there instead of adding it again.",
     "market_item_unpriced": "This market item has never had an official price, so it can't be added to your price book.",
-    "name_taken": "Your own item {code} already has this name. Type a different name."
+    "name_taken": "Your own item {code} already has this name. Type a different name.",
+    "unauthorized": "You are signed out. Sign in again, then try once more.",
+    "device_revoked": "An owner or admin signed this phone out of this workspace. Ask them if you need it back.",
+    "not_member": "This account is not a member of this workspace. Ask an owner or admin to add it.",
+    "not_assigned": "You are not assigned to this project. Ask the project manager to add you to its team.",
+    "project_not_found": "This project no longer exists, or it belongs to another workspace.",
+    "visit_not_found": "We could not find this visit. Check in again, then add this to the new visit.",
+    "visit_too_old": "This visit is more than 2 days old, so nothing more can be added to it. Check in again to start a new visit.",
+    "visit_photo_limit": "This visit already has 20 photos, the most one visit can hold. Void one, or check in again.",
+    "photo_not_uploaded": "The photo has not reached storage yet. It will be sent again by itself.",
+    "photo_too_large": "This photo is still too large after compressing it. Take it again.",
+    "site_storage_full": "This workspace has no photo storage left. Ask the owner to add more.",
+    "site_pin_exists": "This project already has a site location. Only the owner, an admin or the project manager can move it.",
+    "entry_not_found": "We could not find this; it may already have been removed. Refresh the page.",
+    "entry_already_void": "This diary entry was already voided.",
+    "entry_published": "This photo is shown to the client, so it cannot be voided. Stop showing the visit to the client first.",
+    "location_consent_required": "This check-in was not saved: you have not agreed to share your location with this workspace. Agree in Settings, or check in without a location.",
+    "outbox_full": "200 photos are waiting to upload from this phone. Connect to the internet and let them upload before you take more.",
+    "photo_unreadable": "We could not read this photo. Take it again."
   },
   "common": {
     "untranslated": "untranslated",
@@ -3305,7 +3325,9 @@
         "date_in_past": "That day has already passed. Please choose today or a later day.",
         "too_many_decimals": "Please use at most {max} decimal places.",
         "date_before_issue": "The contract was issued on {date}. Please choose that day or a later one.",
-        "not_whole_number": "Please enter a whole number, without a fraction."
+        "not_whole_number": "Please enter a whole number, without a fraction.",
+        "in_future": "This time is later than now. Please check the clock on your device and try again.",
+        "too_old": "This is from more than 30 days ago, too long ago to record. Please check the clock on your device."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
@@ -3449,6 +3471,61 @@
         "review_final_account": "Review the final account"
       },
       "recordMeasurements": "Record measurements"
+    }
+  },
+  "site": {
+    "checkIn": {
+      "button": "Check me in"
+    },
+    "consent": {
+      "body": "The company needs to know you have reached the site. When you tap \"Check me in\", the app takes your location once, at that moment only. We do not follow you as you move, and we do not take your location while the app is closed. Only the company owner, the admins and the project manager see your location, and the client never does. Coordinates are deleted after 90 days; only whether you were on site or not is kept. You can turn this off at any time in Settings. You will then check in as usual without a location, and the company will see that it has no location.",
+      "accept": "I agree",
+      "decline": "Not now"
+    },
+    "presence": {
+      "on_site": "On site",
+      "off_site": "Away from the site",
+      "uncertain": "Location uncertain",
+      "no_location": "No location",
+      "no_site_pin": "No site location set"
+    },
+    "location": {
+      "blocked": "Location is turned off in Settings",
+      "entranceTip": "Check in at the entrance before you go down"
+    },
+    "noteKind": {
+      "progress": "Progress",
+      "issue": "Issue",
+      "request": "Request"
+    },
+    "photo": {
+      "fromGallery": "From photos",
+      "galleryBadge": "From the gallery"
+    },
+    "outbox": {
+      "state": {
+        "queued": "Waiting for the internet",
+        "needs_attention": "Needs your attention",
+        "paused_auth": "Sign in again to carry on uploading"
+      },
+      "unsent": "{count, plural, one {{countText} item has not uploaded yet} other {{countText} items have not uploaded yet}}"
+    },
+    "signOut": {
+      "button": "Sign out",
+      "confirmUnsent": "{count, plural, one {Delete {countText} item that has not uploaded yet} other {Delete {countText} items that have not uploaded yet}}"
+    },
+    "settings": {
+      "signOutOthers": "Sign out of all other devices"
+    },
+    "install": {
+      "android": "Add the app to your home screen",
+      "iosSteps": "Tap Share, then \"Add to Home Screen\"",
+      "iosSignInAfter": "Sign in after you add the app, not before.",
+      "inAppBrowser": "Open the link in Chrome or Safari"
+    },
+    "update": {
+      "available": "A new version is available",
+      "reload": "Reload"
     }
   }
 }

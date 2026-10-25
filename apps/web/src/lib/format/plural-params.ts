@@ -1,4 +1,4 @@
-// The ICU values for a count in the rescue ledger's copy. PURE and CLIENT-SAFE.
+// The ICU values for a count in plural copy (the rescue ledger, the site app). PURE and CLIENT-SAFE.
 //
 // Two values per count, because one cannot do both jobs: the NUMBER selects the
 // plural form (one / two / few / many in Arabic), and the Latin digit TEXT is

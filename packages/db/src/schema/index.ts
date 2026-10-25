@@ -62,6 +62,13 @@ export * from './automation-settings';
 export * from './automation-run-log';
 export * from './api-keys';
 export * from './workspace-entitlements';
+export * from './project-assignments';
+export * from './site-location-consents';
+export * from './site-devices';
+export * from './site-visits';
+export * from './site-photos';
+export * from './site-material-receipts';
+export * from './site-notes';
 
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';
@@ -112,6 +119,13 @@ import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
 import { apiKeys } from './api-keys';
 import { workspaceEntitlements } from './workspace-entitlements';
+import { projectAssignments } from './project-assignments';
+import { siteLocationConsents } from './site-location-consents';
+import { siteDevices } from './site-devices';
+import { siteVisits } from './site-visits';
+import { sitePhotos } from './site-photos';
+import { siteMaterialReceipts } from './site-material-receipts';
+import { siteNotes } from './site-notes';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -165,4 +179,11 @@ export const orgScopedTables = {
   automationRunLog,
   apiKeys,
   workspaceEntitlements,
+  projectAssignments,
+  siteLocationConsents,
+  siteDevices,
+  siteVisits,
+  sitePhotos,
+  siteMaterialReceipts,
+  siteNotes,
 } as const;

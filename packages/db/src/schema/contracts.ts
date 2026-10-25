@@ -96,6 +96,10 @@ export const contracts = pgTable(
   },
   (t) => [
     unique('contracts_org_id_id_unique').on(t.orgId, t.id),
+    // Stage 3 (0064): the target of the site diary's 3-column FK
+    // (org_id, project_id, contract_id), so a material delivery can only name
+    // an execution contract of ITS OWN project.
+    unique('contracts_org_project_id_unique').on(t.orgId, t.projectId, t.id),
     unique('contracts_org_id_number_unique').on(t.orgId, t.number),
     // One contract per source proposal, per org.
     unique('contracts_org_id_source_proposal_unique').on(

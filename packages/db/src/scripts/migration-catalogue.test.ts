@@ -185,8 +185,10 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
     const journal = JSON.parse(
       readFileSync(resolve(migrationsFolder, 'meta/_journal.json'), 'utf8'),
     ) as { entries: Array<{ idx: number; tag: string }> };
+    // `(org_id, <x>_id)`, or the 3-column `(org_id, <scope>_id, <x>_id)` of a
+    // same-project FK (0064), nulling only `<x>_id`, its LAST column.
     const bornNarrowed =
-      /alter\s+table\s+"?(\w+)"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
+      /alter\s+table\s+"?(\w+)"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*(?:"?\w+"?\s*,\s*)?"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
     return journal.entries
       .filter((entry) => entry.idx > 52)
       .flatMap((entry) => [
@@ -198,11 +200,9 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
       .map((match) => `${match[1]}.${match[2]}`);
   }
 
-  /** The same edges, as `src/schema/` declares them. */
+  /** The same edges, as `src/schema/` declares them: the table and the column it nulls. */
   function declaredEdges(): string[] {
-    return [...declaredCompositeSetNullFks().values()]
-      .map((fk) => `${fk.table}.${fk.columns.join('+')}`)
-      .sort();
+    return [...declaredCompositeSetNullFks().values()].map((fk) => `${fk.table}.${fk.nulled}`).sort();
   }
 
   it('narrows exactly the edges the schema declares — 0052 plus the ones born narrowed', () => {
@@ -211,8 +211,9 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
       'boqs.source_proposal_id',
       'contract_payment_claims.confirmed_payment_id',
       'contract_cost_entries.cost_item_id',
+      'site_material_receipts.photo_id',
     ]);
-    expect(declaredCompositeSetNullFks().size).toBe(15);
+    expect(declaredCompositeSetNullFks().size).toBe(16);
     expect([...narrowedBy0052(), ...narrowedAtCreation()].sort()).toEqual(declaredEdges());
   });
 
@@ -224,6 +225,7 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
     expect(declaredCompositeSetNullFks().get('files_category_same_org_fk')).toEqual({
       table: 'files',
       columns: ['category_id'],
+      nulled: 'category_id',
     });
   });
 });

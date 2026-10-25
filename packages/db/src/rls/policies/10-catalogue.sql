@@ -117,6 +117,17 @@ create policy org_isolation on public.projects
     org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
     and (select public.app_is_current_org_member())
   );
+-- Stage 3 (0064): who may set the SITE PIN (functions/80-site.sql). A manager
+-- sets, moves and clears it; an assigned site engineer only sets a missing
+-- one; site_pin_set_by is the current user. It fires only on an UPDATE that
+-- names a pin column, and lets one that changes none of them through. This
+-- file already holds projects ACCESS EXCLUSIVE for its policy, so the trigger
+-- adds no lock.
+drop trigger if exists trg_projects_site_pin_writer on public.projects;
+create trigger trg_projects_site_pin_writer
+  before update of site_lat, site_lng, site_radius_m, site_pin_set_by, site_pin_set_at on public.projects
+  for each row
+  execute function public.enforce_site_pin_writer();
 
 -- project_types (P1 Slice 5; editable classifications)
 alter table public.project_types enable row level security;

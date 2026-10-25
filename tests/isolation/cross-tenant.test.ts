@@ -117,6 +117,23 @@ describe('cross-tenant isolation', () => {
     }
   });
 
+  it('discovers the seven Stage 3 site tables (0064)', () => {
+    // As above: named so a narrowing discovery query fails here. Their
+    // cross-org reads and writes with REAL rows, and the restrictive insert
+    // policy, are proven in apps/web/tests/actions/site-schema.dbtest.ts.
+    for (const table of [
+      'project_assignments',
+      'site_location_consents',
+      'site_devices',
+      'site_visits',
+      'site_photos',
+      'site_material_receipts',
+      'site_notes',
+    ]) {
+      expect(orgIdTables, `${table} was not discovered`).toContain(table);
+    }
+  });
+
   it('every org_id table has FORCE row-level security enabled', async () => {
     const rows = await pg<{ relname: string; rls: boolean; forced: boolean }[]>`
       select c.relname,

@@ -52,6 +52,7 @@ describe('org policies evaluate the membership helper once per query', () => {
     'clients',
     'memberships',
     'notifications',
+    'site_visits',
   ]) {
     it(`${table}: the helper is an InitPlan, never a per-row call`, async () => {
       const plan = await planOf(`select count(*) from public.${table}`);

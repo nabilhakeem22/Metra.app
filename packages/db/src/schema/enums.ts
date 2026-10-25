@@ -436,6 +436,44 @@ export const marketObservationStatus = pgEnum(
   MARKET_OBSERVATION_STATUSES,
 );
 
+/**
+ * The site diary (Stage 3, migration 0064). What the phone could say about
+ * its location at a tapped check-in: `fixed` is a reading; every other label
+ * is why there is none (`declined` = no live consent, or the engineer chose
+ * not to share). Mirrors `LocationStatus` in @metra/web lib/site/presence.ts.
+ * Order is a contract; append only.
+ */
+export const SITE_LOCATION_STATUSES = [
+  'fixed',
+  'denied',
+  'unavailable',
+  'timeout',
+  'unsupported',
+  'declined',
+] as const;
+export const siteLocationStatus = pgEnum('site_location_status', SITE_LOCATION_STATUSES);
+
+/** The server's verdict on a check-in against the project's site pin. */
+export const SITE_PRESENCES = [
+  'on_site',
+  'off_site',
+  'uncertain',
+  'no_location',
+  'no_site_pin',
+] as const;
+export const sitePresence = pgEnum('site_presence', SITE_PRESENCES);
+
+/** `gallery` is shown to the studio with a «من الاستوديو» badge. */
+export const SITE_PHOTO_SOURCES = ['camera', 'gallery'] as const;
+export const sitePhotoSource = pgEnum('site_photo_source', SITE_PHOTO_SOURCES);
+
+/** `pending` until the server has seen both uploaded objects. */
+export const SITE_PHOTO_STATUSES = ['pending', 'stored'] as const;
+export const sitePhotoStatus = pgEnum('site_photo_status', SITE_PHOTO_STATUSES);
+
+export const SITE_NOTE_KINDS = ['progress', 'issue', 'request'] as const;
+export const siteNoteKind = pgEnum('site_note_kind', SITE_NOTE_KINDS);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -469,3 +507,8 @@ export type MarketObservationStatus = (typeof MARKET_OBSERVATION_STATUSES)[numbe
 export type PaymentRequestKind = (typeof PAYMENT_REQUEST_KINDS)[number];
 export type PaymentRequestStatus = (typeof PAYMENT_REQUEST_STATUSES)[number];
 export type CostCategory = (typeof COST_CATEGORIES)[number];
+export type SiteLocationStatus = (typeof SITE_LOCATION_STATUSES)[number];
+export type SitePresence = (typeof SITE_PRESENCES)[number];
+export type SitePhotoSource = (typeof SITE_PHOTO_SOURCES)[number];
+export type SitePhotoStatus = (typeof SITE_PHOTO_STATUSES)[number];
+export type SiteNoteKind = (typeof SITE_NOTE_KINDS)[number];

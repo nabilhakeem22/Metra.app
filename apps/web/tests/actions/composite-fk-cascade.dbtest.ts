@@ -211,8 +211,10 @@ function narrowedByMigration0052(): number {
  */
 function bornNarrowedAfter0052(): number {
   const folder = dirname(MIGRATION_0052);
+  // `(org_id, <x>_id)`, or the 3-column `(org_id, <scope>_id, <x>_id)` of a
+  // same-project FK (0064), nulling only `<x>_id`, its LAST column.
   const bornNarrowed =
-    /alter\s+table\s+"?\w+"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
+    /alter\s+table\s+"?\w+"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*(?:"?\w+"?\s*,\s*)?"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
   return readdirSync(folder)
     .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) > 52)
     .flatMap((name) => {

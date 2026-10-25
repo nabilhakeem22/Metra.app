@@ -27,6 +27,8 @@ export type Capability =
   | 'tasks_schedule'
   | 'cost_entries'
   | 'site_measurements'
+  | 'site_diary'
+  | 'site_assignments'
   | 'cost_entry_approval'
   | 'custody_issue'
   | 'custody_settle'

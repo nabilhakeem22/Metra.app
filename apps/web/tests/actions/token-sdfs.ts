@@ -71,6 +71,9 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // writes studio notifications.
   { name: 'app_delivery_execution_by_token', args: 'text' },
   { name: 'app_delivery_claim_request_by_token', args: 'text, uuid, text, text, text, text' },
+  // Stage 3 (0064): the studio-published site updates of the delivery's
+  // project. It returns object keys inside the studio's storage prefix.
+  { name: 'app_delivery_site_updates_by_token', args: 'text, date, integer' },
 ];
 
 /** The regprocedure text of one listed function. */

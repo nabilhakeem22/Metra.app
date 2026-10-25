@@ -27,6 +27,17 @@
 // it can't globally disable prod immutability or serialize concurrent test runs
 // (the bug of the old `ALTER TABLE ... DISABLE TRIGGER`, which is global).
 export const TEARDOWN_TABLES_IN_FK_ORDER = [
+  // Stage 3 site diary (0064) before everything on a project or a contract:
+  // notes, materials and photos point at a visit (3-column restrict), a
+  // material at a photo (set null), a contract and a contract line; a visit
+  // and an assignment at the project. Consents and devices point only at the org.
+  'site_notes',
+  'site_material_receipts',
+  'site_photos',
+  'site_visits',
+  'site_location_consents',
+  'site_devices',
+  'project_assignments',
   // Stage 2 execution (0063) before everything on a contract: a claim points at
   // a payment (set null) and a request; a payment at a request; a request at a
   // schedule milestone and a variation order (restrict). Measurements and cost
