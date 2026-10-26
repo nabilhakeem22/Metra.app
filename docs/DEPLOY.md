@@ -5058,7 +5058,8 @@ revert of `rls/` and a new migration, never a hand edit here.
 
 **Rehearsed** (client home H3 and its fix round, Oct 26). After the fix
 round, every command and SQL block above was run again as written, at
-`25378108`, on a local PostgreSQL 17 database (UTF8) built in production's
+`25378108` (the change to `e2557546`, one light delivery per project and
+client, was re-rehearsed in the last bullet below), on a local PostgreSQL 17 database (UTF8) built in production's
 own order: Supabase's API roles and default grants simulated first; then
 `main`'s database code at `0f9cb2db` (`db:migrate`, `db:apply-rls`, `seed`);
 DB step S from `992bca1e`; DB step B's `db:apply-rls` from `65c78473` (`65
@@ -5133,6 +5134,20 @@ block on its own.
   comment) and the 36 `db:apply-rls` runs beside studio traffic (the fix round
   changed function bodies and grants, which every run re-creates, and no policy
   file but a comment).
+- **At `e2557546`** (the light-delivery index on project and client), on a
+  new database built the same way: the lines that index can change, run as
+  written. Step 1 listed only `docs/DEPLOY.md`; step 2 (b) read all 0; step 3
+  printed the eight notices and the verified lines and exited 0; step 4 (b)
+  read 1, 2, 32, 1 and 1, (h) 0, 2 and 1, (d) the same 32 rows, with the same
+  four fingerprints before and after; the catalogue from step B to step C
+  differed exactly as above, with
+  `design_engagements_one_light_per_project_client` on (org_id, project_id,
+  client_id). Undo (0): part 2 run too early gave 2BP01 and dropped nothing;
+  then part 1, `65c78473`'s `db:apply-rls` (exit 0) and part 2 left step 2 (b)
+  at 1, 2, 0, 0 and 0 and a catalogue equal to step B's but for the 0065
+  objects (the new index among them). Forward again: the four and the two
+  notices, exit 0, step 4 (h) 0, 2 and 1, and a catalogue identical to the
+  first forward's.
 - **This branch's own tests** on a fresh database replayed as CI does: the
   isolation gate 60 of 60, the action tests 1,767 of 1,768 on a database with
   Supabase's default grants simulated; the one left is that same default-grant
