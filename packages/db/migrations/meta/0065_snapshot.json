@@ -1,5 +1,5 @@
 {
-  "id": "4fa4f0fa-ec60-434d-860c-8d796a765ddf",
+  "id": "a8a0263d-a294-4373-9929-7918cfe6a2a1",
   "prevId": "0162b17b-e3d3-46b7-956f-f5b345e1168f",
   "version": "7",
   "dialect": "postgresql",
@@ -9719,8 +9719,8 @@
           "method": "btree",
           "with": {}
         },
-        "design_engagements_one_light_per_project": {
-          "name": "design_engagements_one_light_per_project",
+        "design_engagements_one_light_per_project_client": {
+          "name": "design_engagements_one_light_per_project_client",
           "columns": [
             {
               "expression": "org_id",
@@ -9730,6 +9730,12 @@
             },
             {
               "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -291,7 +291,7 @@ describe('ONE fact source for the cockpit and the home (the parity ruling)', () 
 });
 
 describe('the light delivery (0065): its CHECKs (AC6)', () => {
-  it('is born at execution only, once per project, and metra_app cannot change its entry phase', async () => {
+  it('is born at execution only, once per project and client, and metra_app cannot change its entry phase', async () => {
     const { clientId, projectId } = await seedClientProject(orgId);
     const insert = (state: string, entry: string) =>
       ownerQuery(
@@ -309,6 +309,26 @@ describe('the light delivery (0065): its CHECKs (AC6)', () => {
     const appWrite = appQuery(orgId, ownerId, `update public.design_engagements set entry_phase = 'design' where id = $1`, [light.id]);
     expect(await sqlstate(appWrite)).toBe('42501');
     expect(await sqlstate(insert('execution', 'design'))).toBeNull();
+  });
+
+  it('two clients of one project each get their own; a second one for the same client is refused (23505)', async () => {
+    const { clientId, projectId } = await seedClientProject(orgId);
+    const [other] = await ownerQuery<{ id: string }>(`insert into public.clients (org_id, name_en) values ($1, 'Client B') returning id`, [orgId]);
+    const insertLight = (client: string) =>
+      ownerQuery(
+        `insert into public.design_engagements (org_id, number, client_id, project_id, state, entry_phase, title_en)
+         values ($1, (select coalesce(max(number), 0) + 1 from public.design_engagements where org_id = $1), $2, $3, 'execution', 'execution', 'Light')`,
+        [orgId, client, projectId],
+      );
+    expect(await sqlstate(insertLight(clientId))).toBeNull();
+    expect(await sqlstate(insertLight(other.id))).toBeNull();
+    expect(await sqlstate(insertLight(clientId))).toBe('23505');
+    expect(await sqlstate(insertLight(other.id))).toBe('23505');
+    const lights = await ownerQuery<{ client_id: string }>(
+      `select client_id from public.design_engagements where project_id = $1 and entry_phase = 'execution' order by client_id`,
+      [projectId],
+    );
+    expect(lights.map((light) => light.client_id)).toEqual([clientId, other.id].sort());
   });
 });
 
