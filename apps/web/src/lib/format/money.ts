@@ -40,6 +40,16 @@ function isWholeAtTwoDecimals(n: number): boolean {
 }
 
 /**
+ * Whether a money value prints with no fraction under `trimWholeDecimals`: a
+ * list that shows several amounts asks it of every one, so the whole list keeps
+ * ONE decimals rule. Absent or invalid input prints nothing and is whole.
+ */
+export function isWholeMoney(value: number | string | null | undefined): boolean {
+  const n = readMoneyNumber(value);
+  return n === null || isWholeAtTwoDecimals(n);
+}
+
+/**
  * The figure formatMoney prints WITHOUT the currency label, for a layout that
  * shows the label once beside several figures (the portal's budget range). Same
  * 2 decimals, same Latin digits, same '' for absent/invalid input.

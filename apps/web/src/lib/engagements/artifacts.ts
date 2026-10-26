@@ -25,7 +25,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { artifactRecordingFile, assertConceptOptionSlot } from './artifact-fences';
-import { isTerminal } from './states';
+import { takesDesignFiles } from './states';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { isUuid } from '@/lib/uuid';
 import { readFields, readOptionalText } from '@/lib/validation/field-rules';
@@ -88,7 +88,7 @@ export async function recordArtifactCore(
         'engagement_not_found',
       );
       // No recording an artifact against a finished engagement (abandoned / closed).
-      if (isTerminal(engagement.state)) fail('engagement_not_active');
+      if (!takesDesignFiles(engagement.state)) fail('engagement_not_active');
       // A retried attach of the SAME upload (its first answer lost in transport)
       // is the artifact already recorded, never a second one.
       if (fileId !== null) {

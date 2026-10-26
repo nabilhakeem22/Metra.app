@@ -6,7 +6,6 @@ import 'server-only';
 // base-connection surface: NO withOrgContext, NO org GUCs. The token IS the
 // auth, and the raw token is hashed here and never logged.
 import { sql } from 'drizzle-orm';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
@@ -26,20 +25,6 @@ export async function getDeliveryExecutionByToken(rawToken: string): Promise<Por
     sql`select public.app_delivery_execution_by_token(${hashShareToken(token)}) as data`,
   );
   return snapshot === null ? null : shapeExecution(snapshot);
-}
-
-/**
- * The card the delivery page opens with. A database failure is logged once
- * (redacted: never the token hash) and shows no card, so the rest of the page
- * still renders; the client's link is not called dead for it.
- */
-export async function executionCardForPage(rawToken: string): Promise<PortalExecution | null> {
-  try {
-    return await getDeliveryExecutionByToken(rawToken);
-  } catch (error) {
-    console.error('delivery execution read failed', { error: loggableFailure(error) });
-    return null;
-  }
 }
 
 /**

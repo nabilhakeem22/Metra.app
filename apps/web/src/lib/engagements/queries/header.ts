@@ -2,7 +2,9 @@ import 'server-only';
 import { clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { EntryPhase } from '@/lib/flow/types';
 import type { ClientExpectedRecord } from '../client-expected-view';
+import { entryPhaseOf } from './entry-phase';
 
 /**
  * The engagement header for the detail surface. All money is returned as scale-4
@@ -24,6 +26,8 @@ export interface EngagementHeader {
   projectNameEn: string | null;
   projectNameAr: string | null;
   state: DesignEngagementState;
+  /** 'execution' for a LIGHT delivery: the client page of an execution contract, with no design behind it (ruling D14). */
+  entryPhase: EntryPhase;
   designFee: string | null;
   offPlan: boolean;
   asBuiltDue: boolean;
@@ -67,6 +71,7 @@ export function getEngagementHeader(
         projectNameEn: projects.nameEn,
         projectNameAr: projects.nameAr,
         state: designEngagements.state,
+        entryPhase: designEngagements.entryPhase,
         designFee: designEngagements.designFee,
         offPlan: designEngagements.offPlan,
         asBuiltDue: designEngagements.asBuiltDue,
@@ -96,6 +101,7 @@ export function getEngagementHeader(
     const { clientExpectedOn, clientExpectedState, clientExpectedSetAt, ...header } = row;
     return {
       ...header,
+      entryPhase: entryPhaseOf(row.entryPhase),
       // All three or none (0058's CHECK); read as one record or null.
       clientExpected:
         clientExpectedOn && clientExpectedState && clientExpectedSetAt

@@ -69,15 +69,18 @@ export function commandCardPropsOf(
     onNudge: openDeliveryReminder,
     clientExpected: detail.clientExpected,
     // The design folds into one line at execution, counted from what the page
-    // already loaded (no extra read).
+    // already loaded (no extra read). A light delivery had no design to fold.
     execution: detail.execution && {
       view: detail.execution,
-      designSummary: designSummary({
-        feeSchedule: detail.feeSchedule,
-        payments: detail.payments,
-        paymentClaims: detail.paymentClaims,
-        awaitingReplyCount: detail.awaitingReplyCount,
-      }),
+      designSummary:
+        header.entryPhase === 'design'
+          ? designSummary({
+              feeSchedule: detail.feeSchedule,
+              payments: detail.payments,
+              paymentClaims: detail.paymentClaims,
+              awaitingReplyCount: detail.awaitingReplyCount,
+            })
+          : null,
     },
     onOpenTab,
   };

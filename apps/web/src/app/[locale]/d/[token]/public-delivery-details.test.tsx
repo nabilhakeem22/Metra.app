@@ -43,15 +43,15 @@ describe('the studio bar (AC 45, 46)', () => {
 
   it('WhatsApp and Call carry only the studio number and the delivery reference', () => {
     renderPage('ar-EG');
-    const whatsapp = screen.getByRole('link', { name: messageAt('ar-EG', 'delivery.studioBar.whatsapp') });
+    const whatsapp = screen.getByRole('link', { name: messageAt('ar-EG', 'delivery.studioBar.design.whatsapp') });
     const href = whatsapp.getAttribute('href')!;
     expect(href.startsWith('https://wa.me/201112345678?text=')).toBe(true);
     expect(decodeURIComponent(href.split('text=')[1]!)).toBe(
-      messageAt('ar-EG', 'delivery.studioBar.whatsappText').replace('{ref}', 'DE-2026-0007'),
+      messageAt('ar-EG', 'delivery.studioBar.design.whatsappText').replace('{ref}', 'DE-2026-0007'),
     );
     expect(href).not.toContain(encodeURIComponent('أحمد'));
     expect(whatsapp.getAttribute('rel')).toBe('noopener noreferrer');
-    const call = screen.getByRole('link', { name: messageAt('ar-EG', 'delivery.studioBar.call') });
+    const call = screen.getByRole('link', { name: messageAt('ar-EG', 'delivery.studioBar.design.call') });
     expect(call.getAttribute('href')).toBe('tel:+201012345678');
   });
 
@@ -64,8 +64,8 @@ describe('the studio bar (AC 45, 46)', () => {
   it('no logo, no numbers: the initial and no contact buttons', () => {
     renderPage('en', { firm: { ...STUDIO, hasLogo: false, phone: null, whatsappDigits: null } });
     expect(screen.getByRole('banner').querySelector('img')).toBeNull();
-    expect(screen.queryByRole('link', { name: messageAt('en', 'delivery.studioBar.whatsapp') })).toBeNull();
-    expect(screen.queryByRole('link', { name: messageAt('en', 'delivery.studioBar.call') })).toBeNull();
+    expect(screen.queryByRole('link', { name: messageAt('en', 'delivery.studioBar.design.whatsapp') })).toBeNull();
+    expect(screen.queryByRole('link', { name: messageAt('en', 'delivery.studioBar.design.call') })).toBeNull();
   });
 });
 

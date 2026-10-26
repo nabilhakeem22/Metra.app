@@ -19,6 +19,8 @@ const contracts = vi.hoisted(() => ({
   issueContract: vi.fn(),
   terminateContract: vi.fn(),
 }));
+// The contract overview's "Client page" control: never pressed here, mocked so the page loads.
+vi.mock('@/lib/client-home/actions', () => ({ openClientHome: vi.fn() }));
 vi.mock('@/lib/contracts/actions', () => contracts);
 const lineReads = vi.hoisted(() => ({
   loadSectionLines: vi.fn(),

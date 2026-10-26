@@ -3,6 +3,7 @@
 import { MessageCircle, Phone } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { whatsappUrl } from '@/lib/engagements/reminder/whatsapp';
+import type { PhaseKey } from '@/lib/flow/types';
 
 const BUTTON_CLASS =
   'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-pill border bg-background text-foreground outline-none focus-ring-brand hover:bg-muted';
@@ -12,18 +13,22 @@ const BUTTON_CLASS =
  * only when the studio set a usable number (normalised server-side: B11's
  * WhatsApp digits, the CHECKed phone). The WhatsApp message names only the
  * delivery's reference (DE-YYYY-NNNN), never the client's name or anything else
- * of theirs. 44 x 44 px, icon-only with an accessible name.
+ * of theirs, in the words of the phase the page shows (the design team on a
+ * design page, the studio on the Execution tab). 44 x 44 px, icon-only with an
+ * accessible name.
  */
 export function StudioContact({
   phone,
   whatsappDigits,
   deliveryRef,
+  phase,
 }: {
   phone: string | null;
   whatsappDigits: string | null;
   deliveryRef: string;
+  phase: PhaseKey;
 }) {
-  const t = useTranslations('delivery.studioBar');
+  const t = useTranslations(`delivery.studioBar.${phase}`);
   return (
     <>
       {whatsappDigits && (

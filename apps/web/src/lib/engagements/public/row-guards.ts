@@ -22,6 +22,8 @@ export interface DeliverySnapshot {
   id?: string | null;
   number?: number | null;
   state?: string | null;
+  /** 0065: 'design', or 'execution' for a light delivery (H3 round 2). */
+  entry_phase?: string | null;
   off_plan?: boolean | null;
   title_ar?: string | null;
   title_en?: string | null;

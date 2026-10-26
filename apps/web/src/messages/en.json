@@ -651,6 +651,8 @@
     "client_page_details_stale": "Someone else changed these details while you were editing. Reload to see them, then make your change again.",
     "expected_date_out_of_range": "That date is too far away or already past. Pick a date from today to a year from now.",
     "contract_not_execution": "This works only for a contract generated from a BOQ. This contract came from a proposal.",
+    "client_home_unavailable": "This contract has no client page to open: its delivery is not in execution, or it shows a newer contract.",
+    "contract_terminated": "This contract was terminated, so it has no client page to open. Refresh the page to see its current state.",
     "boq_not_issued": "This BOQ is not issued, or a newer version replaced it. Issue the BOQ first, then generate the contract.",
     "boq_has_contract": "A contract stands on the issued BOQ, so it cannot be replaced. Record later changes as change orders.",
     "delivery_not_in_execution": "The delivery has not reached execution yet. Choose execution as its ending first, then generate the contract.",
@@ -2111,6 +2113,16 @@
         },
         "costHidden": "Cost and margin are not shown to your role."
       }
+    },
+    "clientPage": {
+      "title": "Client page",
+      "body": "The client follows this contract, its payments and its change orders on their own page.",
+      "open": "Get the client page link",
+      "copy": "Copy link",
+      "reason": {
+        "delivery_links_not_configured": "Client page links are not set up on the server yet. Contact support.",
+        "delivery_link_unrecoverable": "The current client page link cannot be shown again. Replace it from the delivery page."
+      }
     }
   },
   "variations": {
@@ -2216,6 +2228,7 @@
     },
     "projectPanel": {
       "heading": "Design delivery",
+      "lightHeading": "Client page of the execution contract",
       "open": "Open delivery",
       "extend": "Start extension",
       "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
@@ -2877,14 +2890,17 @@
     },
     "notFound": {
       "title": "This link is no longer available",
-      "body": "The link may have expired or been turned off. Please contact your design team for an up-to-date link."
+      "body": "The link may have expired or been turned off. Please contact the studio for an up-to-date link."
     },
     "readFailed": {
       "title": "We could not load this page",
       "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
     },
     "meta": {
-      "description": "Your design project with {firm}: where it stands, your payments and your files."
+      "description": {
+        "design": "Your design project with {firm}: where it stands, your payments and your files.",
+        "execution": "Your project with {firm}: where it stands, your contract and your payments."
+      }
     },
     "greeting": "Hello, {name} 👋",
     "loading": "Loading your project…",
@@ -3094,7 +3110,10 @@
       "claimedOn": "Thanks, we are confirming your payment. Sent on {date}. It is usually confirmed within one working day.",
       "instructions": {
         "title": "How to pay",
-        "body": "Pay using one of these, then tell your designer with \"I've made this payment\".",
+        "body": {
+          "design": "Pay using one of these, then tell your designer with \"I've made this payment\".",
+          "execution": "Pay using one of these, then tell the studio with \"I've made this payment\"."
+        },
         "instapay": "InstaPay",
         "bankName": "Bank",
         "accountHolder": "Account name",
@@ -3112,14 +3131,7 @@
       }
     },
     "execution": {
-      "title": "Construction contract",
-      "contract": "Contract {number}",
-      "contractValue": "Contract value {amount}",
-      "status": {
-        "issued": "Waiting for your signature",
-        "signed": "Signed",
-        "terminated": "Ended"
-      },
+      "paymentsTitle": "Payments",
       "requests": {
         "title": "Payment requests",
         "empty": "No payment request has been sent yet.",
@@ -3129,7 +3141,7 @@
         "paidOf": "{paid} of {amount} paid",
         "outstanding": "{amount} still due",
         "paid": "Paid",
-        "void": "Withdrawn by your designer",
+        "void": "Withdrawn by the studio",
         "finalAccount": "Final account",
         "variation": "Change order {number}",
         "variationUnnumbered": "A change order",
@@ -3137,17 +3149,17 @@
       },
       "claim": "I've made this payment",
       "confirmTitle": "Did you make this payment?",
-      "confirmBody": "{request}: {amount}. Your designer confirms it once it arrives.",
+      "confirmBody": "{request}: {amount}. The studio confirms it once it arrives.",
       "claimedOn": "Thank you, we are checking your payment. Sent on {date}.",
-      "claimNotified": "Your designer has been told.",
+      "claimNotified": "The studio has been told.",
       "error": {
         "wrong_state": "This request cannot take a payment notice now. The page now shows where it stands.",
-        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact your designer.",
+        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact the studio.",
         "not_received": "Your notice does not show as received. You can send it again; it is never counted twice."
       },
       "earlierClaims": {
         "title": "Payment notices on an earlier contract",
-        "row": "{amount} on <num>{request}</num>, sent on {date}. Your designer is checking it."
+        "row": "{amount} on <num>{request}</num>, sent on {date}. The studio is checking it."
       },
       "receipts": {
         "title": "Payments received",
@@ -3207,9 +3219,16 @@
       "message": "Hello {client}, a reminder from {studio} about your design project. You can see the latest updates and anything that needs you here:\n{link}"
     },
     "studioBar": {
-      "whatsapp": "Message your design team on WhatsApp",
-      "call": "Call your design team",
-      "whatsappText": "Hello, I am writing about my design project {ref}."
+      "design": {
+        "whatsapp": "Message your design team on WhatsApp",
+        "call": "Call your design team",
+        "whatsappText": "Hello, I am writing about my design project {ref}."
+      },
+      "execution": {
+        "whatsapp": "Message the studio on WhatsApp",
+        "call": "Call the studio",
+        "whatsappText": "Hello, I am writing about my project {ref}."
+      }
     },
     "timeline": {
       "title": "What happened",
@@ -3236,6 +3255,88 @@
       "next": "Next image",
       "close": "Close",
       "position": "{current} of {total}"
+    },
+    "home": {
+      "tabs": {
+        "label": "Your project phases",
+        "execution": "Execution",
+        "executionNote": "Current phase",
+        "design": "Design record",
+        "designNote": "Complete"
+      },
+      "record": {
+        "title": "The design phase is complete",
+        "body": "This page is a record of the design you approved, with your files and design payments."
+      },
+      "move": {
+        "client": "Needs you now",
+        "studio": "With {studio}",
+        "site": "Works on site",
+        "done": "Complete",
+        "closed": "Ended"
+      },
+      "hero": {
+        "preparing_contract": "{studio} is preparing your execution contract. You will find it here when it is ready for your signature.",
+        "sign_contract": "Execution contract <num>{number}</num> is ready for your signature",
+        "signing_closed": "The online signing period for this contract has ended. Please contact {studio}.",
+        "decide_change_order": "{count, plural, one {A change order is waiting for your decision} other {{countText} change orders are waiting for your decision}}",
+        "pay_request": "Payment request <num>{number}</num> is due: {amount}",
+        "pay_request_unnamed": "A payment request is due",
+        "payment_being_confirmed": "You reported paying <num>{number}</num>. {studio} is confirming receipt.",
+        "payment_being_confirmed_unnamed": "You reported a payment. {studio} is confirming receipt.",
+        "works_in_progress": "Works are under way. Expected completion: {date}.",
+        "works_in_progress_undated": "Works are under way.",
+        "final_account_due": "The final account has been issued. Remaining: {amount}",
+        "final_account_due_unnamed": "The final account has been issued, and an amount remains due",
+        "final_account_in_review": "The final account has been issued, and {studio} is reviewing it now.",
+        "settled": "The works are complete and the account is settled.",
+        "terminated": "The execution contract was ended on {date}.",
+        "terminated_undated": "The execution contract was ended."
+      },
+      "act": {
+        "reviewContract": "Review and sign the contract",
+        "reviewChangeOrder": "Review the change order",
+        "howToPay": "How to pay",
+        "whatsapp": "Message {studio} on WhatsApp"
+      },
+      "lapsedChangeOrders": "{count, plural, one {The reply period for a change order has passed. {studio} will contact you about it.} other {The reply period for {countText} change orders has passed. {studio} will contact you about them.}}"
+    },
+    "flow": {
+      "execution": {
+        "contract": "Contract",
+        "signature": "Signature",
+        "works": "Works and payments",
+        "final_account": "Final account",
+        "settled": "Settled"
+      }
+    },
+    "contract": {
+      "title": "Contract",
+      "status": {
+        "issued": "Awaiting your signature",
+        "signingClosed": "Signing closed",
+        "signed": "Signed",
+        "terminated": "Ended"
+      },
+      "value": "Contract value",
+      "signedOn": "Signed",
+      "signedVia": {
+        "online": "{date}, online",
+        "paper": "{date}, on paper with {studio}"
+      },
+      "expectedFinish": "Expected completion",
+      "terminatedOn": "Ended on",
+      "signWithLink": "To sign the contract, open the contract link {studio} sent you.",
+      "signingClosed": "The online signing period has ended. Contact {studio} to sign.",
+      "none": "{studio} has not issued the execution contract yet.",
+      "previousTerminated": "An earlier contract for this project was ended on {date}.",
+      "designRecord": "See the design record"
+    },
+    "changeOrders": {
+      "title": "Change orders",
+      "awaiting": "Awaiting your decision",
+      "open": "{count, plural, one {One change order is waiting for your decision.} other {{countText} change orders are waiting for your decision.}}",
+      "answerWithLink": "Open the change order link {studio} sent you to review it and reply."
     }
   },
   "portal": {
@@ -3263,10 +3364,10 @@
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
-      "not_active": "This delivery is closed. Please contact your design team.",
-      "reference": "If it happens again, send this code to your design team: {reference}.",
-      "token_expired": "This link has expired. Please contact your design team.",
-      "token_invalid": "This link is no longer available. Please contact your design team.",
+      "not_active": "This delivery is closed. Please contact the studio.",
+      "reference": "If it happens again, send this code to the studio: {reference}.",
+      "token_expired": "This link has expired. Please contact the studio.",
+      "token_invalid": "This link is no longer available. Please contact the studio.",
       "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
       "uncertain": "We could not confirm your answer was received. Refresh the page to check before sending it again."
     },

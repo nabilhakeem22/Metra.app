@@ -71,12 +71,15 @@ describe('getDeliveryByToken hardening', () => {
     expect(result?.clientActions).toEqual(['approve_concept', 'request_concept_changes']);
   });
 
-  it('maps a snapshot carrying entry_phase (H3 round 2) exactly as one without it: a key it does not read is dropped', async () => {
+  it('maps entry_phase (H3 round 2): a light delivery says execution; design, a missing key (an SDF from before 0065) or junk is design', async () => {
+    setSnapshot({ ...validSnapshot(), entry_phase: 'execution' });
+    expect((await readDelivery('raw-token'))?.entryPhase).toBe('execution');
     setSnapshot(validSnapshot());
-    const without = await readDelivery('raw-token');
-    for (const entryPhase of ['design', 'execution']) {
+    const design = await readDelivery('raw-token');
+    expect(design?.entryPhase).toBe('design');
+    for (const entryPhase of ['design', 'EXECUTION', 7, null]) {
       setSnapshot({ ...validSnapshot(), entry_phase: entryPhase });
-      expect(await readDelivery('raw-token')).toEqual(without);
+      expect(await readDelivery('raw-token')).toEqual(design);
     }
   });
 

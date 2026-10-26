@@ -85,3 +85,14 @@ export const ACTIVE_STATES = new Set<DesignState>(
 export function isTerminal(state: DesignState): boolean {
   return TERMINAL_STATES.has(state);
 }
+
+/**
+ * Whether a delivery in this state still takes design files: an upload, a
+ * recorded deliverable, a client-visibility flip. The server guards refuse with
+ * `engagement_not_active` and the studio page offers the controls by this one
+ * answer, so the two cannot disagree. `execution` is terminal here: the design
+ * is finished, the delivery lives on in its execution contract.
+ */
+export function takesDesignFiles(state: DesignState): boolean {
+  return !isTerminal(state);
+}

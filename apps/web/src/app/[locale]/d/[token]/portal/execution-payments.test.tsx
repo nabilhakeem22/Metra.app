@@ -2,9 +2,10 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalExecution, PortalExecutionRequest } from '@/lib/engagements/public/execution-types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
-import { ExecutionCard } from './execution-card';
+import { ExecutionPayments } from './execution-payments';
 
-// PR B4.3: the client's execution card on /d. "I've made this payment" asks
+// PR B4.3, moved into the client home's Execution tab (H4.2): the payments.
+// "I've made this payment" asks
 // first, naming the request and what is still due; Confirm claims once; a
 // claim that landed shows the card the answer carried; a lost answer, or one
 // the request moved past, re-reads the card, and after a lost answer the read
@@ -52,7 +53,9 @@ async function answerDialog(locale: TestLocale, button: 'confirm' | 'cancel') {
   fireEvent.click(within(await confirmDialog()).getByRole('button', { name: messageAt(locale, `delivery.actions.${button}`) }));
 }
 
-const show = (locale: TestLocale, card: PortalExecution = CARD) => renderWithIntl(<ExecutionCard token="tok" initial={card} />, { locale });
+const onClaimed = vi.fn();
+const show = (locale: TestLocale, card: PortalExecution = CARD) =>
+  renderWithIntl(<ExecutionPayments token="tok" initial={card} onClaimed={onClaimed} />, { locale });
 const claimButtons = (locale: TestLocale) => screen.queryAllByRole('button', { name: messageAt(locale, 'delivery.execution.claim') });
 
 async function claimAndConfirm(locale: TestLocale) {
@@ -64,21 +67,23 @@ async function claimAndConfirm(locale: TestLocale) {
 beforeEach(() => {
   actions.claimExecutionRequest.mockReset();
   actions.loadDeliveryExecution.mockReset();
+  onClaimed.mockReset();
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('"how to pay" quotes the buttons it names (%s, B4 F4)', (locale) => {
   it("names the label of the execution card's button and the design fee's, which are the same", () => {
     const label = messageAt(locale, 'delivery.execution.claim');
     expect(messageAt(locale, 'delivery.payments.claim')).toBe(label);
-    expect(messageAt(locale, 'delivery.payments.instructions.body')).toContain(label);
+    expect(messageAt(locale, 'delivery.payments.instructions.body.design')).toContain(label);
+    expect(messageAt(locale, 'delivery.payments.instructions.body.execution')).toContain(label);
   });
 });
 
-describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) => {
-  it('shows the contract, every request with what is due, how to pay and the receipts, in Latin digits', () => {
+describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%s)', (locale) => {
+  it('shows every request with what is due, how to pay and the receipts, in Latin digits', () => {
     const { container } = show(locale);
     const text = container.textContent ?? '';
-    expect(text).toContain('C-2026-0007');
+    expect(screen.getByRole('heading', { name: messageAt(locale, 'delivery.execution.paymentsTitle') })).toBeTruthy();
     expect(text).toContain(messageAt(locale, 'delivery.execution.requests.finalAccount'));
     expect(text).toContain(messageAt(locale, 'delivery.execution.requests.void'));
     expect(text).toContain(messageAt(locale, 'delivery.execution.requests.paid'));
@@ -109,6 +114,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     expect(claimButtons(locale)).toHaveLength(0);
     expect(screen.getByText(messageAt(locale, 'delivery.execution.claimNotified'))).toBeTruthy();
     expect(actions.loadDeliveryExecution).not.toHaveBeenCalled();
+    expect(onClaimed).toHaveBeenCalledTimes(1);
   });
 
   it('a request the studio moved past says so and re-reads the card', async () => {
@@ -184,5 +190,50 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution card (%s)', (locale) =
     show(locale, CLAIMED);
     expect(claimButtons(locale)).toHaveLength(0);
     expect(screen.getByRole('status').textContent).toContain('05/11/2026');
+  });
+});
+
+describe('the two B4 /d defects fixed in the payments (AC18)', () => {
+  const DETAILS = {
+    instapay: 'noon.studio@instapay',
+    bankName: 'البنك الأهلي المصري',
+    bankAccountHolder: 'استوديو نون للتصميم',
+    bankAccountNumber: '1903 0710 0045 2816',
+    bankIban: 'EG380019000500000000263180002',
+  };
+  const MIXED: PortalExecution = {
+    ...CARD,
+    requests: [
+      request('5', { amount: '307625.4000', outstanding: '307625.4000' }),
+      request('4', { amount: '512709.0000', paid: '512709.0000', outstanding: '0.0000' }),
+    ],
+    receipts: [{ amount: '512709.0000', receivedOn: '2026-10-27', requestNumber: 'PR-2026-0004' }],
+    paymentDetails: DETAILS,
+  };
+
+  it('sets the bank name and the account holder in the page face, and only the figures in the mono face (ar-EG)', () => {
+    show('ar-EG', MIXED);
+    const instructions = screen.getByRole('region', { name: messageAt('ar-EG', 'delivery.payments.instructions.title') });
+    const valueOf = (text: string) => within(instructions).getByText(text);
+    for (const name of [DETAILS.bankName, DETAILS.bankAccountHolder]) {
+      expect(valueOf(name).className).not.toContain('font-mono');
+      expect(valueOf(name).getAttribute('dir')).toBeNull();
+    }
+    for (const figure of [DETAILS.instapay, DETAILS.bankAccountNumber, DETAILS.bankIban]) {
+      expect(valueOf(figure).className).toContain('font-mono');
+      expect(valueOf(figure).getAttribute('dir')).toBe('ltr');
+    }
+  });
+
+  it.each<TestLocale>(['ar-EG', 'en'])('gives every amount of the list one decimals rule (%s)', (locale) => {
+    const { container, unmount } = show(locale, MIXED);
+    const text = container.textContent ?? '';
+    expect(text).toContain('307,625.40');
+    expect(text).toContain('512,709.00');
+    expect(text).not.toMatch(/512,709(?![.,\d])/);
+    unmount();
+    const whole = show(locale, { ...MIXED, requests: [request('5', { amount: '300000.0000', outstanding: '300000.0000' })] });
+    expect(whole.container.textContent).toContain('300,000');
+    expect(whole.container.textContent).not.toContain('300,000.00');
   });
 });

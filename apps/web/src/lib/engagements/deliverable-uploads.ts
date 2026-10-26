@@ -19,7 +19,7 @@ import {
   CATEGORY_WRITE_KIND,
   validateDeliverableFile,
 } from './deliverable-files';
-import { isTerminal } from './states';
+import { takesDesignFiles } from './states';
 import type { WorkingFileCategory } from './working-files';
 import { isUuid } from '@/lib/uuid';
 
@@ -71,7 +71,7 @@ export async function createDeliverableUploadCore(
       .limit(1),
   );
   if (!engagement) return err('engagement_not_found');
-  if (isTerminal(engagement.state)) return err('engagement_not_active');
+  if (!takesDesignFiles(engagement.state)) return err('engagement_not_active');
 
   const validation = validateDeliverableFile(
     input.category,

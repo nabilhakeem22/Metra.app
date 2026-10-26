@@ -6,15 +6,15 @@ import type { PortalEarlierClaim } from '@/lib/engagements/public/execution-type
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { DocumentNumber } from './document-number';
-import { formatPortalMoney } from './portal-money';
+import type { PortalListMoney } from './portal-money';
 
 /**
  * The client's "I paid" notices still waiting on an EARLIER contract of the
  * delivery (B4 F6). The card shows one contract, the live one first; a newer
  * contract must not hide a notice the studio has not answered yet. Nothing when
- * there is none.
+ * there is none. Amounts keep the decimals rule of the payments (`money`).
  */
-export function ExecutionEarlierClaims({ claims }: { claims: readonly PortalEarlierClaim[] }) {
+export function ExecutionEarlierClaims({ claims, money }: { claims: readonly PortalEarlierClaim[]; money: PortalListMoney }) {
   const t = useTranslations('delivery.execution.earlierClaims');
   const locale = useLocale();
   if (claims.length === 0) return null;
@@ -33,7 +33,7 @@ export function ExecutionEarlierClaims({ claims }: { claims: readonly PortalEarl
             <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <p className="min-w-0">
               {t.rich('row', {
-                amount: bidiIsolate(formatPortalMoney(claim.amount, locale)),
+                amount: bidiIsolate(money(claim.amount)),
                 request: claim.requestNumber,
                 date: bidiIsolate(formatDate(claim.claimedAt, locale)),
                 num: (chunks) => <DocumentNumber>{chunks}</DocumentNumber>,

@@ -23,10 +23,10 @@ import { requestProvenance } from '@/lib/share/request-provenance';
 // through `answered`, so a failure underneath is `uncertain` (the claim may
 // still commit) or `generic` with its reference.
 //
-// NO router.refresh() after a claim (the A4 reliability R1 lesson): a claim
-// that landed answers with the card as it is now, read once on this request,
-// and the card shows it; re-rendering the whole delivery page to change one
-// row would cost the delivery snapshot again.
+// A claim that landed answers with the card as it is now, read once on this
+// request, and the card shows it at once. The Execution tab then refreshes so
+// its hero follows (./execution-tab.tsx): that re-render reads the home, one
+// light SDF, and never the design snapshot (the A4 reliability R1 lesson).
 
 /** A claim that never reached the database, or failed underneath. */
 type UnansweredClaim = { ok: false; error: 'too_many' } | ({ ok: false } & PortalFailure);

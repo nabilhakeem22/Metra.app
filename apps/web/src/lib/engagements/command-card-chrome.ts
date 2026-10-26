@@ -29,6 +29,11 @@ const CHROME_BY_TONE: Record<StatusTone, CommandCardChrome> = {
   },
 };
 
+/** The chrome a status tone wears: the client home's step card reads it from the client's own move. */
+export function commandCardChromeForTone(tone: StatusTone): CommandCardChrome {
+  return CHROME_BY_TONE[tone];
+}
+
 export function resolveCommandCardChrome(status: DeliveryStatus): CommandCardChrome {
-  return CHROME_BY_TONE[deliveryStatusTone(status)];
+  return commandCardChromeForTone(deliveryStatusTone(status));
 }

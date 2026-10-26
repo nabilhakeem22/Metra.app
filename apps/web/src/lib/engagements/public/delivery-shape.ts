@@ -111,6 +111,8 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
     stageKey: PORTAL_STAGE_KEY[state],
     milestone: stateMilestone(state),
     hero: deriveHero(clientActions, state),
+    // Only a light delivery says 'execution'; a snapshot from before 0065 has no key and was a design delivery.
+    entryPhase: snapshot.entry_phase === 'execution' ? 'execution' : 'design',
     offPlan: snapshot.off_plan === true,
     titleAr: snapshot.title_ar ?? null,
     titleEn: snapshot.title_en ?? null,

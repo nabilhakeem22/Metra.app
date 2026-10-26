@@ -7,7 +7,7 @@ import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { renewSignedUploadUrl } from '@/lib/storage/uploads';
 import { isUuid } from '@/lib/uuid';
-import { isTerminal } from './states';
+import { takesDesignFiles } from './states';
 
 export interface RenewDeliverableUploadInput {
   engagementId: string;
@@ -50,7 +50,7 @@ export async function renewDeliverableUploadCore(
   );
   // Gone, another engagement's, or already attached: there is no upload to renew.
   if (!upload || upload.artifactId !== null) return err('record_not_found');
-  if (isTerminal(upload.state)) return err('engagement_not_active');
+  if (!takesDesignFiles(upload.state)) return err('engagement_not_active');
   try {
     return { fileId: input.fileId, ...(await renewSignedUploadUrl(upload.objectKey)) };
   } catch (error) {

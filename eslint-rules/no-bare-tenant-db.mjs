@@ -322,6 +322,9 @@ const SDF_CALLER_ALLOWLIST = [
   // on a payment request (app_delivery_execution_by_token,
   // app_delivery_claim_request_by_token): the same delivery token, no session.
   'apps/web/src/lib/engagements/public/execution.ts',
+  // Client home DB step C: the home's Execution tab (app_home_by_token), by the
+  // same delivery token, no session; it embeds the execution card above.
+  'apps/web/src/lib/client-home/read.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

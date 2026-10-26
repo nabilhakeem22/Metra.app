@@ -34,6 +34,7 @@ import {
   type EngagementHeader,
 } from '@/lib/engagements/queries';
 import { mayRecordHandoverConfirmation } from '@/lib/engagements/handover-recorders';
+import { takesDesignFiles, type DesignState } from '@/lib/engagements/states';
 import { getExecutionFacts } from '@/lib/execution/queries/facts';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
@@ -114,16 +115,27 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
 }
 
 /**
+ * Whether the design-upload controls (a working-file upload, "Add a deliverable",
+ * the client-visibility flip) are offered: the role may create design records AND
+ * the delivery's state still takes them, by the very predicate the server's
+ * guards refuse on. An execution delivery, light or design-origin, is not offered
+ * what every upload would answer "closed" to. Its files stay downloadable.
+ */
+export function mayUploadDesignFiles(role: MemberRole, state: DesignState): boolean {
+  return can(role, 'engagements_design', 'create') && takesDesignFiles(state);
+}
+
+/**
  * Which cockpit controls this role is even OFFERED. Every one of these is
  * re-checked by the server action it guards; this decides what is on screen.
  */
 export function engagementCapabilities(
   role: MemberRole,
-  state: string,
+  state: DesignState,
 ): PanelCapabilities {
   return {
     recordPayment: can(role, 'engagements_finance', 'create'),
-    recordArtifact: can(role, 'engagements_design', 'create'),
+    recordArtifact: mayUploadDesignFiles(role, state),
     setRom: can(role, 'engagements_design', 'update'),
     // Issuing the band is OWNER/ADMIN only, deliberately narrower than setting
     // it: typing a working range is routine studio work, putting a cost figure

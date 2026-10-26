@@ -6,21 +6,24 @@ import { EXECUTION_LIST_CAP, type PortalExecutionReceipt } from '@/lib/engagemen
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { DocumentNumber } from './document-number';
-import { formatPortalMoney } from './portal-money';
+import type { PortalListMoney } from './portal-money';
 
 /**
  * The money the studio recorded as received on the execution contract, newest
  * first (same-day payments by when the studio recorded them): on which day,
  * for which payment request, and how much. The request's number never breaks
  * across lines, in either direction (B4 F5). Only the newest 60 travel; when
- * there are more, a note says so. Nothing when nothing was received.
+ * there are more, a note says so. Nothing when nothing was received. Amounts
+ * keep the decimals rule of the payments they are listed with (`money`).
  */
 export function ExecutionReceipts({
   receipts,
   truncated,
+  money,
 }: {
   receipts: readonly PortalExecutionReceipt[];
   truncated: boolean;
+  money: PortalListMoney;
 }) {
   const t = useTranslations('delivery.execution.receipts');
   const locale = useLocale();
@@ -46,7 +49,7 @@ export function ExecutionReceipts({
               })}
             </p>
             <span dir="ltr" className="text-end font-mono text-body font-semibold tabular-nums">
-              {formatPortalMoney(receipt.amount, locale)}
+              {money(receipt.amount)}
             </span>
           </li>
         ))}

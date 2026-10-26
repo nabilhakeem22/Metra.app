@@ -124,9 +124,9 @@ function cardProps(cockpit: ExecutionCockpit, extra: Partial<ExecutionStepCardPr
 
 function renderCard(
   cardView: ExecutionCardView,
-  options: { locale?: TestLocale; summary?: DesignSummary; extra?: Partial<ExecutionStepCardProps> } = {},
+  options: { locale?: TestLocale; summary?: DesignSummary | null; extra?: Partial<ExecutionStepCardProps> } = {},
 ) {
-  const cockpit = { view: cardView, designSummary: options.summary ?? NOTHING_OPEN };
+  const cockpit = { view: cardView, designSummary: options.summary === undefined ? NOTHING_OPEN : options.summary };
   const props = cardProps(cockpit, options.extra);
   const rendered = renderWithIntl(
     <div dir={options.locale === 'en' ? 'ltr' : 'rtl'}>
@@ -375,6 +375,13 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the design summary line (%s)', (loca
     expect(nothing.container.querySelector('[data-design-summary] button')!.textContent).toBe(
       `${at('engagements.designSummary.complete')}${at('engagements.designSummary.show')}`,
     );
+  });
+
+  test('a light delivery had no design: no summary line, the execution rail alone (H4 follow-up F2)', () => {
+    const { container } = renderCard(view('record_payment'), { locale, summary: null });
+    expect(container.querySelector('[data-design-summary]')).toBeNull();
+    expect(container.querySelectorAll('[data-rail-step]')).toHaveLength(EXECUTION_PHASE.steps.length);
+    expect(container.textContent).not.toContain(at('engagements.designSummary.complete'));
   });
 
   test('the design rail appears only once the line is expanded, with every step done (AC22)', () => {

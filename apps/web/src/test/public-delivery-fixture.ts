@@ -12,6 +12,7 @@ export function publicDeliveryFixture(overrides: Partial<PublicDelivery> = {}): 
     stageKey: 'finalApproval',
     milestone: { index: 3, allComplete: false, closed: false },
     hero: { kind: 'action', group: 'design', showRomAck: false },
+    entryPhase: 'design',
     offPlan: false,
     titleAr: 'شقة الزمالك',
     titleEn: 'Zamalek flat',

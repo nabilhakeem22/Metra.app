@@ -1,6 +1,5 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { PortalExecution } from '@/lib/engagements/public/execution-types';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { DOCUMENT_ID, publicDeliveryFixture as delivery } from '@/test/public-delivery-fixture';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
@@ -12,7 +11,6 @@ import { PublicDeliveryView } from './public-delivery';
 
 vi.mock('./actions', () => ({}));
 vi.mock('./review-actions', () => ({}));
-vi.mock('./execution-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),
@@ -108,26 +106,31 @@ describe('the page', () => {
   });
 });
 
-describe('the execution card (Stage 2, D1a)', () => {
-  const EXECUTION: PortalExecution = {
-    contract: { documentNumber: 'C-2026-0007', status: 'signed', titleAr: null, titleEn: 'Villa', originalValue: '124000.0000' },
-    requests: [],
-    requestsTruncated: false,
-    receipts: [],
-    receiptsTruncated: false,
-    earlierClaims: [],
-    paymentDetails: null,
+describe('the design record, once the delivery is at execution', () => {
+  const AT_EXECUTION: Partial<PublicDelivery> = {
+    stageKey: 'construction',
+    milestone: { index: 6, allComplete: true, closed: false },
+    hero: { kind: 'delivered', showRomAck: false },
   };
 
-  it('renders below the payments card when the page read one, and not otherwise', () => {
-    const first = renderWithIntl(
-      <PublicDeliveryView token="tok-1" read={{ status: 'ok', delivery: delivery() }} execution={EXECUTION} />,
-      { locale: 'en' },
+  it.each<TestLocale>(['en', 'ar-EG'])('shows the tab strip and the record banner where the command card was (%s)', (locale) => {
+    renderPage(locale, AT_EXECUTION);
+    const tabs = screen.getByRole('navigation', { name: messageAt(locale, 'delivery.home.tabs.label') });
+    const design = within(tabs).getByRole('link', { name: new RegExp(messageAt(locale, 'delivery.home.tabs.design')) });
+    expect(design.getAttribute('aria-current')).toBe('page');
+    expect(within(tabs).getByRole('link', { name: new RegExp(messageAt(locale, 'delivery.home.tabs.execution')) }).getAttribute('href')).toBe(
+      `/${locale}/d/tok-1?tab=execution`,
     );
-    const heading = screen.getByRole('heading', { name: messageAt('en', 'delivery.execution.title') });
-    expect(heading.textContent).toBe(messageAt('en', 'delivery.execution.title'));
-    first.unmount();
+    expect(screen.getByRole('heading', { name: messageAt(locale, 'delivery.home.record.title') })).toBeTruthy();
+    // The B4 defect: no "delivered" tag above "in construction" any more.
+    expect(screen.queryByText(messageAt(locale, 'delivery.hero.deliveredTag'))).toBeNull();
+    expect(screen.queryByText(messageAt(locale, 'delivery.stage.construction.label'))).toBeNull();
+    expect(switchLink(locale).getAttribute('href')).toMatch(/\?tab=design$/);
+  });
+
+  it('the design phase itself keeps its command card and shows no tab strip', () => {
     renderPage('en');
-    expect(screen.queryByRole('heading', { name: messageAt('en', 'delivery.execution.title') })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: messageAt('en', 'delivery.home.tabs.label') })).toBeNull();
+    expect(screen.queryByRole('heading', { name: messageAt('en', 'delivery.home.record.title') })).toBeNull();
   });
 });

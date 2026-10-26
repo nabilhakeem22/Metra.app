@@ -15,7 +15,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { restampRoundAwaitingDecision } from './render-round-restamp';
-import { isTerminal } from './states';
+import { takesDesignFiles } from './states';
 import { isUuid } from '@/lib/uuid';
 
 /**
@@ -86,7 +86,7 @@ export async function setArtifactClientVisibilityCore(
         { id: designEngagements.id, state: designEngagements.state },
         'engagement_not_found',
       );
-      if (isTerminal(engagement.state)) fail('engagement_not_active');
+      if (!takesDesignFiles(engagement.state)) fail('engagement_not_active');
 
       await tx
         .update(engagementArtifacts)

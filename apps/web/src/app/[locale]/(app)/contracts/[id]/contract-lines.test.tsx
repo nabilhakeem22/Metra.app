@@ -25,6 +25,8 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 }));
 const lineReads = vi.hoisted(() => ({ loadSectionLines: vi.fn(), loadContractSections: vi.fn(), searchBaselineLines: vi.fn() }));
 vi.mock('@/lib/contracts/lines-actions', () => lineReads);
+// The contract overview's "Client page" control: never pressed here, mocked so the page loads.
+vi.mock('@/lib/client-home/actions', () => ({ openClientHome: vi.fn() }));
 vi.mock('@/lib/contracts/actions', () => ({ issueContract: vi.fn(), terminateContract: vi.fn(), saveContractDraft: vi.fn() }));
 vi.mock('@/lib/variations/actions', () => ({ createVariationDraft: vi.fn(), saveVariationDraft: vi.fn() }));
 // The Costs tab's server actions: never reached here (no execution contract), but loaded with the page.
