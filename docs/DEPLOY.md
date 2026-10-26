@@ -4417,9 +4417,10 @@ The client home's database step: migration `0065_client_home.sql` plus
 runs AFTER Stage 2 DB step B (the section above): production then holds 65
 migrations and 80 policies, 15 of them restrictive; step C leaves it at 66
 and 81. It is validated on branch `validate/home-h3-sql`, whose code is
-pinned at **`d8de264b`**: the branch's last code commit (every commit after it
+pinned at **`25378108`**: the branch's last code commit (every commit after it
 changes only `docs/DEPLOY.md`). That branch is `main` (`65c78473`: Stage 2,
-the site diary and step B) plus PR H3.
+the site diary and step B) plus PR H3, its fix round and the code cleanup of
+`validate/cleanup-oct26` (`6ed20154`, no database change).
 
 **Step C is not the last client home step.** DB step C2 (apply-rls only)
 comes later, with the next scheduled database step after PR H7 is live: the
@@ -4458,7 +4459,12 @@ Why this order, one sentence each:
   contract link, change-order link, delivery link and execution card document
   identical before and after); the change-order guard admits everything the old
   one did; a delivery's execution contract is now also found by its project
-  for a "light" delivery, of which none exists until PR H4. Rehearsed: the
+  for a "light" delivery, of which none exists until PR H4. One rule moves for
+  the execution card and the "I paid" behind it: they now stand on the
+  delivery's contract by the rule the studio's cockpit uses, so a delivery
+  whose terminated contract a newer issued BOQ replaced, or whose BOQ was made
+  for another client of the project, shows what its cockpit shows. Step 2 (g)
+  counts those deliveries; production should have none. Rehearsed: the
   current `main`'s own isolation gate and action tests on the step C database
   (see *Rehearsed*).
 - **No client sees anything new** until PR H4: the new client functions have no
@@ -4470,10 +4476,10 @@ Why this order, one sentence each:
 |---|---|
 | `design_engagements` | one new column, `entry_phase` (`design` for every delivery, the default; `execution` for a LIGHT delivery, the client page of an execution contract with no design delivery behind it, created from PR H4), two checks (only those two values; a light delivery is at `execution` and stays there), and one unique index (at most one light delivery per project) |
 | `client_verification_codes` (new, empty) | one row per one-time code a client asks for (from PR H5): which delivery, which act and which document, the HASH of the code (never the code), where it was sent (a hash and a hint of the address), the client's ip and browser, and what it was used for. Ten minutes of life and five tries, by check. RLS enabled and forced from the moment it exists |
-| `rls/functions/65-execution-facts.sql` (new) | the execution facts, ONE source for the studio's cockpit and the client's page: which BOQs and contracts a delivery owns (a light delivery's by its project), a contract's money facts, its measured lines and works, and everything the execution card is derived from. The studio reads them as itself, under its own RLS |
-| `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, 10 an hour and 20 a day per delivery, 80 a day across the platform), the four acts that will need a code, and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
-| `rls/functions/30-contracts-variations.sql`, `50-delivery-write.sql`, `70-execution-portal.sql` | the contract and change-order links, the two "I paid" functions and the execution card share four new helpers (how a contract was signed, the days approved change orders add, what is still due on a request, on a design instalment), with the same answers; the execution card finds a light delivery's contract by its project; the change-order guard is now its own function: everything it admitted before, plus issue restarting the link's 30 days |
-| `rls/policies/36-client-home.sql` (new), `policies/30-contracts-boqs-variations.sql` | the codes table's org isolation policy and guard trigger (a code changes only by one wrong try or its one use; it is deleted only with its delivery); the change-order trigger points at the new guard |
+| `rls/functions/65-execution-facts.sql` (new) | the execution facts, ONE source for the studio's cockpit and the client's page: which BOQs a delivery owns (only its own client's; a light delivery's by its project), THE contract it stands on (one rule for the studio and the client), a contract's money facts, its measured lines and works, and everything the execution card is derived from. The studio reads them as itself, under its own RLS |
+| `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, 15 wrong tries on it a day, 10 an hour and 20 a day per delivery, 25 a day per studio, 80 a day across the platform; it also removes codes 90 days after they expired), the four acts that will need a code, and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
+| `rls/functions/30-contracts-variations.sql`, `50-delivery-write.sql`, `70-execution-portal.sql` | the contract and change-order links, the two "I paid" functions and the execution card share four new helpers (how a contract was signed, the days approved change orders add, what is still due on a request, on a design instalment), with the same answers; the execution card stands on the delivery's contract by the cockpit's rule (a light delivery's found by its project; see step 2 (g)); the change-order guard is now its own function: everything it admitted before, plus issue restarting the link's 30 days |
+| `rls/policies/36-client-home.sql` (new), `policies/30-contracts-boqs-variations.sql` | the codes table's org isolation policy and guard trigger (a code changes only by one wrong try or its one use; it is deleted only with its delivery, or 90 days after it expired); the change-order trigger points at the new guard |
 | `rls/roles.sql` | `metra_app` may read every column of the codes table but the code's hash, and write none of it (only the client home's own functions do); the new functions are callable by `metra_app` only, the helpers that take bare ids by nobody |
 
 **1. Put the step C code in the production checkout.** This step adds no
@@ -4487,7 +4493,7 @@ git fetch origin
 git switch --detach origin/validate/home-h3-sql
 Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-c.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat d8de264b HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (d8de264b)
+git diff --stat 25378108 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (25378108)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 65c78473 HEAD -- packages/db/migrations    # MUST print exactly the three 0065 files below
 ```
@@ -4504,7 +4510,7 @@ The `Copy-Item` line saves this runbook (the branch's, which has this section)
 to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
 STOPs, tell the lead in each case:
 
-- The `git diff --stat d8de264b HEAD` lists any file other than
+- The `git diff --stat 25378108 HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
 - The `git log ... -- packages/db` prints any line: database code reached
   `main` after this branch was last brought up to date, and this branch's
@@ -4537,11 +4543,12 @@ select
     where n.nspname = 'public' and c.relname in ('client_verification_codes', 'design_engagements_one_light_per_project')) as step_c_relations,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname in ('app_delivery_boqs', 'app_contract_measured_lines', 'app_contract_measured_works',
-                        'app_contract_money_facts', 'app_execution_flow_source', 'app_payment_request_due',
-                        'app_engagement_milestone_due', 'app_contract_signed', 'app_contract_time_extension_days',
-                        'enforce_variation_order_frozen', 'enforce_client_code_guarded', 'app_home_delivery',
-                        'app_home_contract', 'app_client_code_destination', 'app_email_hint', 'app_client_code_check',
+      and p.proname in ('app_delivery_boqs', 'app_delivery_current_contract', 'app_contract_measured_lines',
+                        'app_contract_measured_works', 'app_contract_money_facts', 'app_execution_flow_source',
+                        'app_payment_request_due', 'app_engagement_milestone_due', 'app_contract_signed',
+                        'app_contract_time_extension_days', 'app_contract_terminated_at', 'enforce_variation_order_frozen',
+                        'enforce_client_code_guarded', 'app_home_delivery', 'app_home_contract', 'app_home_flow_source',
+                        'app_client_code_destination', 'app_email_hint', 'app_client_code_check',
                         'app_client_code_refusal', 'app_client_code_consume', 'app_home_by_token',
                         'app_home_contract_by_token', 'app_home_contract_sections_by_token',
                         'app_home_contract_section_lines_by_token', 'app_home_variations_by_token',
@@ -4603,6 +4610,44 @@ from pg_policies where schemaname = 'public';
 select pg_size_pretty(pg_database_size(current_database())) as db_size;
 ```
 
+(g) **The execution cards step C changes. Expect one row, `cards_changed` 0.**
+It counts the deliveries at execution whose execution card (and the "I
+paid" behind it) step C points at another contract, or at none: a
+terminated contract that a newer issued BOQ replaced, or a BOQ made for
+another client of the project. Anything else: STOP before step 3 and tell
+the lead the number.
+
+```sql
+-- Step C step 2 (g): the execution cards step C changes. Run this one alone.
+select count(*) as cards_changed
+from public.design_engagements de
+left join lateral (
+  select c.id from public.boqs b
+    join public.contracts c on c.org_id = b.org_id and c.source_boq_id = b.id
+   where b.org_id = de.org_id and b.engagement_id = de.id and c.status in ('issued', 'signed', 'terminated')
+   order by (c.status = 'terminated'), c.created_at desc, c.id desc
+   limit 1
+) shown_now on true
+left join lateral (
+  select c.id, c.status, c.source_boq_id from public.boqs b
+    join public.contracts c on c.org_id = b.org_id and c.source_boq_id = b.id
+   where b.org_id = de.org_id and b.engagement_id = de.id and b.client_id = de.client_id
+   order by (c.status = 'terminated'), c.created_at desc, c.id desc
+   limit 1
+) newest on true
+left join lateral (
+  select b.id from public.boqs b
+   where b.org_id = de.org_id and b.engagement_id = de.id and b.client_id = de.client_id and b.status = 'issued'
+   order by b.created_at desc, b.id desc
+   limit 1
+) issued_boq on true
+where de.state = 'execution'
+  and shown_now.id is distinct from (
+    case when newest.status = 'draft' or (newest.status = 'terminated' and issued_boq.id <> newest.source_boq_id)
+         then null else newest.id end
+  );
+```
+
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
 `C:\Users\HP\merta-main` (its `.env` is the production connection), **at a
 quiet hour** (late evening, when no studio is working; see *Locks*). Each
@@ -4641,7 +4686,7 @@ that the command failed). Expected:
   count, so run step 4 (a): `migrations` is exactly one higher (66).
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
   `apply-rls: verified in the catalogues` and goes on
-  `66 tables, 81 policies, 36 triggers, 97 functions, RLS forced on all of them, role metra_app present.`;
+  `66 tables, 81 policies, 36 triggers, 100 functions, RLS forced on all of them, role metra_app present.`;
   the second starts `apply-rls: grants verified` and goes on
   `design_engagements update narrowed to 19 columns with no table-level update, and 24 narrowed table(s) (boqs, client_verification_codes, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, project_assignments, site_devices, site_location_consents, site_material_receipts, site_notes, site_photos, site_visits, workspace_entitlements) holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every column but seq; contract_cost_entries updatable on its 15 entry and void columns only; contract_payment_claims updatable on its 5 answer columns only; client_verification_codes readable on every column but code_hash; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`
   If that second line is replaced by a problem list, it exits 1: something
@@ -4649,7 +4694,7 @@ that the command failed). Expected:
 - `assert-schema-applied` exits 0 and prints six lines, each starting
   `assert-schema-applied:`, in this order: `OK` then `66 declared table(s), every column present.`;
   `indexes` then `150 declared, all present.`; `constraints` then
-  `413 declared, all present.`; `functions` then `97 declared, all present.`;
+  `413 declared, all present.`; `functions` then `100 declared, all present.`;
   `orphaned org rows` then
   `58 org-scoped table(s) answered, none holds a row whose org_id names no organization.`;
   and `composite set-null FKs` then
@@ -4696,7 +4741,7 @@ is NOT a failure: that one file rolled back whole and is being applied again
   yet: the current site works on that (it calls none of the new functions,
   and the old trigger is what it was written for), `metra_app` reads nothing
   in the forced codes table, and nothing writes it. In between, step 2 (b) may
-  show `step_c_functions` 29 with `code_trigger` 0 and `change_order_guard` 0.
+  show `step_c_functions` 32 with `code_trigger` 0 and `change_order_guard` 0.
   Rehearsed: see *Rehearsed* below.
 - `Migration failed: SQLSTATE 42701: column "entry_phase" of relation "design_engagements" already exists`
   (or `42P07` or `42710`, "already exists", for a table, an index or a
@@ -4744,7 +4789,7 @@ race is tried again (above).
 stamp).
 
 (b) Step 2 (b) again: now `entry_phase_column` 1, `step_c_relations` 2,
-`step_c_functions` 29, `code_trigger` 1 and `change_order_guard` 1.
+`step_c_functions` 32, `code_trigger` 1 and `change_order_guard` 1.
 
 (c) The codes table: one row, with `rls` true, `forced` true, `policies` 1,
 `app_reads` true, `app_reads_code_hash` false, `app_writes` false,
@@ -4766,16 +4811,17 @@ from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relname = 'client_verification_codes';
 ```
 
-(d) Who may call the step C functions: 29 rows. `public_execute` false and
-`api_roles_execute` false on all 29. `definer` true on eleven: the ten
+(d) Who may call the step C functions: 32 rows. `public_execute` false and
+`api_roles_execute` false on all 32. `definer` true on eleven: the ten
 `app_home_..._by_token` functions (`app_home_by_token` among them) and
-`app_client_home_target_by_token`; false on the other eighteen. `app_execute`
-true on those eleven, on the five
-fact functions (`app_delivery_boqs`, `app_contract_measured_lines`,
-`app_contract_measured_works`, `app_contract_money_facts`,
-`app_execution_flow_source`) and on the two trigger functions
-(`enforce_client_code_guarded`, `enforce_variation_order_frozen`); false on
-the other eleven (internal: nobody calls them but the functions beside them).
+`app_client_home_target_by_token`; false on the other twenty-one.
+`app_execute` true on those eleven, on the six fact functions
+(`app_delivery_boqs`, `app_delivery_current_contract`,
+`app_contract_measured_lines`, `app_contract_measured_works`,
+`app_contract_money_facts`, `app_execution_flow_source`) and on the two
+trigger functions (`enforce_client_code_guarded`,
+`enforce_variation_order_frozen`); false on the other thirteen (internal:
+nobody calls them but the functions beside them).
 
 ```sql
 -- Step C step 4 (d): who may call the step C functions. Run this one alone.
@@ -4786,11 +4832,12 @@ select p.proname, p.prosecdef as definer,
                   where r.rolname in ('anon', 'authenticated', 'service_role')), false) as api_roles_execute
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname in ('app_delivery_boqs', 'app_contract_measured_lines', 'app_contract_measured_works',
-                    'app_contract_money_facts', 'app_execution_flow_source', 'app_payment_request_due',
-                    'app_engagement_milestone_due', 'app_contract_signed', 'app_contract_time_extension_days',
-                    'enforce_variation_order_frozen', 'enforce_client_code_guarded', 'app_home_delivery',
-                    'app_home_contract', 'app_client_code_destination', 'app_email_hint', 'app_client_code_check',
+  and p.proname in ('app_delivery_boqs', 'app_delivery_current_contract', 'app_contract_measured_lines',
+                    'app_contract_measured_works', 'app_contract_money_facts', 'app_execution_flow_source',
+                    'app_payment_request_due', 'app_engagement_milestone_due', 'app_contract_signed',
+                    'app_contract_time_extension_days', 'app_contract_terminated_at', 'enforce_variation_order_frozen',
+                    'enforce_client_code_guarded', 'app_home_delivery', 'app_home_contract', 'app_home_flow_source',
+                    'app_client_code_destination', 'app_email_hint', 'app_client_code_check',
                     'app_client_code_refusal', 'app_client_code_consume', 'app_home_by_token',
                     'app_home_contract_by_token', 'app_home_contract_sections_by_token',
                     'app_home_contract_section_lines_by_token', 'app_home_variations_by_token',
@@ -4803,7 +4850,7 @@ order by 1;
 (e) Step 2 (c) again: the same five numbers as before.
 
 (f) Step 2 (d) again: the same four fingerprints as before (every client link
-shows exactly what it showed).
+shows exactly what it showed; step 2 (g) was 0).
 
 (g) Step 2 (e) again: now `policies` 81 and `restrictive` 15.
 
@@ -4883,7 +4930,7 @@ declare); the `db:apply-rls` of `main` (`65c78473`, the database code
 production ran on just before step 3: step B's), which puts back the five
 rewritten functions, the execution card without the light scope and the old
 change-order trigger; then one SQL block that removes what that code does not
-know (the codes table's trigger and the 29 functions). It leaves 0065 itself
+know (the codes table's trigger and the 32 functions). It leaves 0065 itself
 alone: the new column, the checks, the index and the empty codes table stay
 (forced, with no policy, so `metra_app` reads nothing in it; the current site
 never touches it). Afterwards the database is exactly as it was before step 3,
@@ -4930,10 +4977,12 @@ in step 3 (that code retries a file for you too, the same 3 attempts): **run
 `npm run db:apply-rls` again from this checkout, and keep re-running it until it
 exits 0.** Any other code: stop and tell the lead.
 
-**Do not run the SQL block below until this `db:apply-rls` has exited 0.** The
-block drops the new change-order guard; run before that code has put the old
-trigger back, it would leave change orders with a trigger whose function is
-gone.
+**Do not run the SQL block below until this `db:apply-rls` has exited 0.** Run
+before it (part 1 run or not), the block fails with `cannot drop function
+enforce_variation_order_frozen() because other objects depend on it`
+(SQLSTATE `2BP01`: the change-order trigger still uses the new guard) and
+drops nothing, as the editor runs it as one transaction. The fix is the order
+above: part 1, then this `db:apply-rls` until it exits 0, then the block.
 
 Then, in the Supabase SQL editor, this block, on its own:
 
@@ -4952,6 +5001,7 @@ drop function if exists public.app_home_variation_respond_by_token(text, uuid, t
 drop function if exists public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text);
 drop function if exists public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text);
 drop function if exists public.app_client_home_target_by_token(text, text);
+drop function if exists public.app_home_flow_source(uuid);
 drop function if exists public.app_home_contract(text);
 drop function if exists public.app_home_delivery(text);
 drop function if exists public.app_client_code_destination(uuid, uuid);
@@ -4965,10 +5015,12 @@ drop function if exists public.app_execution_flow_source(uuid);
 drop function if exists public.app_contract_money_facts(uuid);
 drop function if exists public.app_contract_measured_works(uuid);
 drop function if exists public.app_contract_measured_lines(uuid);
+drop function if exists public.app_delivery_current_contract(uuid, uuid);
 drop function if exists public.app_delivery_boqs(uuid, uuid);
 drop function if exists public.app_payment_request_due(uuid, uuid);
 drop function if exists public.app_engagement_milestone_due(uuid, text);
 drop function if exists public.app_contract_signed(uuid, uuid);
+drop function if exists public.app_contract_terminated_at(uuid, uuid);
 drop function if exists public.app_contract_time_extension_days(uuid, uuid);
 ```
 
