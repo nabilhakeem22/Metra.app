@@ -4417,7 +4417,7 @@ The client home's database step: migration `0065_client_home.sql` plus
 runs AFTER Stage 2 DB step B (the section above): production then holds 65
 migrations and 80 policies, 15 of them restrictive; step C leaves it at 66
 and 81. It is validated on branch `validate/home-h3-sql`, whose code is
-pinned at **`25378108`**: the branch's last code commit (every commit after it
+pinned at **`e2557546`**: the branch's last code commit (every commit after it
 changes only `docs/DEPLOY.md`). That branch is `main` (`65c78473`: Stage 2,
 the site diary and step B) plus PR H3, its fix round and the code cleanup of
 `validate/cleanup-oct26` (`6ed20154`, no database change).
@@ -4474,7 +4474,7 @@ Why this order, one sentence each:
 
 | Object | Change |
 |---|---|
-| `design_engagements` | one new column, `entry_phase` (`design` for every delivery, the default; `execution` for a LIGHT delivery, the client page of an execution contract with no design delivery behind it, created from PR H4), two checks (only those two values; a light delivery is at `execution` and stays there), and one unique index (at most one light delivery per project) |
+| `design_engagements` | one new column, `entry_phase` (`design` for every delivery, the default; `execution` for a LIGHT delivery, the client page of an execution contract with no design delivery behind it, created from PR H4), two checks (only those two values; a light delivery is at `execution` and stays there), and one unique index (at most one light delivery per project and client) |
 | `client_verification_codes` (new, empty) | one row per one-time code a client asks for (from PR H5): which delivery, which act and which document, the HASH of the code (never the code), where it was sent (a hash and a hint of the address), the client's ip and browser, and what it was used for. Ten minutes of life and five tries, by check. RLS enabled and forced from the moment it exists |
 | `rls/functions/65-execution-facts.sql` (new) | the execution facts, ONE source for the studio's cockpit and the client's page: which BOQs a delivery owns (only its own client's; a light delivery's by its project), THE contract it stands on (one rule for the studio and the client), a contract's money facts, its measured lines and works, and everything the execution card is derived from. The studio reads them as itself, under its own RLS |
 | `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, 15 wrong tries on it a day, 10 an hour and 20 a day per delivery, 25 a day per studio, 80 a day across the platform; it also removes codes 90 days after they expired), the four acts that will need a code, and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
@@ -4493,7 +4493,7 @@ git fetch origin
 git switch --detach origin/validate/home-h3-sql
 Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-c.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 25378108 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (25378108)
+git diff --stat e2557546 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (e2557546)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 65c78473 HEAD -- packages/db/migrations    # MUST print exactly the three 0065 files below
 ```
@@ -4510,7 +4510,7 @@ The `Copy-Item` line saves this runbook (the branch's, which has this section)
 to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
 STOPs, tell the lead in each case:
 
-- The `git diff --stat 25378108 HEAD` lists any file other than
+- The `git diff --stat e2557546 HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
 - The `git log ... -- packages/db` prints any line: database code reached
   `main` after this branch was last brought up to date, and this branch's
@@ -4540,7 +4540,7 @@ select
   (select count(*) from information_schema.columns
     where table_schema = 'public' and table_name = 'design_engagements' and column_name = 'entry_phase') as entry_phase_column,
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relname in ('client_verification_codes', 'design_engagements_one_light_per_project')) as step_c_relations,
+    where n.nspname = 'public' and c.relname in ('client_verification_codes', 'design_engagements_one_light_per_project_client')) as step_c_relations,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and p.proname in ('app_delivery_boqs', 'app_delivery_current_contract', 'app_contract_measured_lines',
@@ -4864,7 +4864,7 @@ select (select count(*) from public.design_engagements where entry_phase <> 'des
          where conname in ('design_engagements_entry_phase_known', 'design_engagements_light_is_execution')
            and convalidated) as valid_checks,
        (select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid
-         where c.relname = 'design_engagements_one_light_per_project' and i.indisvalid) as valid_light_index;
+         where c.relname = 'design_engagements_one_light_per_project_client' and i.indisvalid) as valid_light_index;
 ```
 
 (i) Step 2 (f) again: about the same size as before (the new table is empty;

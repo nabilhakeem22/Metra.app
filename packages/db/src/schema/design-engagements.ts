@@ -133,10 +133,11 @@ export const designEngagements = pgTable(
       ),
     check('design_engagements_entry_phase_known', sql`entry_phase in ('design', 'execution')`),
     check('design_engagements_light_is_execution', sql`entry_phase = 'design' or state = 'execution'`),
-    // At most one light delivery per project: the arbiter of two concurrent
-    // creates (0065).
-    uniqueIndex('design_engagements_one_light_per_project')
-      .on(t.orgId, t.projectId)
+    // At most one light delivery per project and client (a project's client
+    // can change; each client keeps its own page): the arbiter of two
+    // concurrent creates (0065).
+    uniqueIndex('design_engagements_one_light_per_project_client')
+      .on(t.orgId, t.projectId, t.clientId)
       .where(sql`entry_phase = 'execution'`),
   ],
 );

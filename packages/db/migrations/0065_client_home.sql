@@ -15,8 +15,10 @@
 --     - design_engagements_entry_phase_known: the two values only;
 --     - design_engagements_light_is_execution: a light delivery is at
 --       `execution`, and stays there (the design machine never runs on it);
---     - design_engagements_one_light_per_project: at most one light delivery
---       per project, the arbiter a concurrent second create meets (23505).
+--     - design_engagements_one_light_per_project_client: at most one light
+--       delivery per project and client (a project's client can change, and
+--       each client keeps its own page), the arbiter a concurrent second
+--       create meets (23505).
 --   * client_verification_codes: one row per one-time code a client asked for,
 --     bound to (delivery, purpose, target). It stores the code's HASH only
 --     (sha256 of `challengeId:code`, made by the app), the hash and a hint of
@@ -88,8 +90,8 @@ BEGIN
     ADD CONSTRAINT design_engagements_light_is_execution
     CHECK (entry_phase = 'design' or state = 'execution') NOT VALID;
   ALTER TABLE public.design_engagements VALIDATE CONSTRAINT design_engagements_light_is_execution;
-  CREATE UNIQUE INDEX design_engagements_one_light_per_project
-    ON public.design_engagements USING btree (org_id, project_id) WHERE entry_phase = 'execution';
+  CREATE UNIQUE INDEX design_engagements_one_light_per_project_client
+    ON public.design_engagements USING btree (org_id, project_id, client_id) WHERE entry_phase = 'execution';
 END $$;
 
 CREATE TABLE "client_verification_codes" (
