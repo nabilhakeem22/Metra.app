@@ -4776,7 +4776,7 @@ runs clean, 0 deadlocks, 0 failed requests, the slowest request 183 ms.
 Supabase is slower than a local server (a window measured there earlier was
 0.5 to 1.9 s), so a delivery page can wait about 1 s; none fails because of it.
 Estimates from a local server, not a production measurement; step 2 (c) gives
-the size to compare with (the rehearsal had 61 deliveries, production fewer).
+the size to compare with (the H3 build's rehearsal, where these figures come from, had 61 deliveries; production has fewer).
 `db:apply-rls` adds one policy file on the new table (nothing waits on it),
 re-creates the change-order trigger in `policies/30-contracts-boqs-variations.sql`
 exactly as every run already does, and runs every other file as it always does
@@ -4868,7 +4868,7 @@ select (select count(*) from public.design_engagements where entry_phase <> 'des
 ```
 
 (i) Step 2 (f) again: about the same size as before (the new table is empty;
-the rehearsal went from 53 MB to 54 MB). Put the number in the release note.
+the rehearsal went from 34 MB to 35 MB). Put the number in the release note.
 
 **Stop and do not go on** if any output in steps 3 or 4 differs from what is
 written there. Tell the lead what you saw instead.
@@ -5056,89 +5056,88 @@ where entry_phase = 'execution'` and `select count(*) from
 public.client_verification_codes`, both 0). Tell the lead first: it is a
 revert of `rls/` and a new migration, never a hand edit here.
 
-**Rehearsed** (client home H3, Oct 26) on a local PostgreSQL 17 database
-(UTF8) built to production's shape, in production's own order: Supabase's API
-roles and default grants simulated first; then `main`'s database code at
-`0f9cb2db` (0063: `db:migrate`, `db:apply-rls`, `seed`); 5,005 projects, 5,005
-contracts (503 of them with a client link) and 50,582 contract lines in 22
-studios, 61 deliveries at execution, one of them with a signed execution
-contract of 121 sections (one of 300 lines), a part-paid payment request, a
-cost entry, an approved change order of 15 days and a change order approved
-inside the studio whose link had expired, and two execution contracts no
-delivery stands behind (one issued, one signed); then DB step S from
-`992bca1e` and DB step B's `db:apply-rls` from `main` (`65c78473`), which
-printed exactly the lines step B's step 3 quotes. Every command and SQL block
-above was then run as written, from a separate clone standing in for
-`merta-main` (its own `npm ci`, `origin` on GitHub, `origin/main` at
-`65c78473`): the PowerShell from scripts made of this section's blocks with
-three substitutions only (the checkout path, the Desktop path, and the
-connection set in the session in place of `.env`), the SQL from the saved
-copy.
+**Rehearsed** (client home H3 and its fix round, Oct 26). After the fix
+round, every command and SQL block above was run again as written, at
+`25378108`, on a local PostgreSQL 17 database (UTF8) built in production's
+own order: Supabase's API roles and default grants simulated first; then
+`main`'s database code at `0f9cb2db` (`db:migrate`, `db:apply-rls`, `seed`);
+DB step S from `992bca1e`; DB step B's `db:apply-rls` from `65c78473` (`65
+tables, 80 policies, 35 triggers, 68 functions`) and `assert-schema-applied`;
+then data written by `main`'s own cores (three studios: deliveries at every
+execution stage, a client's claim, change orders approved, internal and
+expired, a final account, a termination, contracts no delivery stands behind)
+and a bulk of ten studios: 2,023 contracts (1,015 with a client link), 20,170
+contract lines, 21 deliveries, 18 of them at execution. The runs used a fresh
+clone standing in for `merta-main` (its own `npm ci`, `origin` on GitHub,
+`origin/main` at `65c78473`): the PowerShell cut from this section with three
+substitutions only (the checkout path, the Desktop path, and the connection
+set in the session in place of `.env`), the SQL from the saved copy, each
+block on its own.
 
-- Steps 1 to 4 printed exactly what they say (step 4 (d)'s 29 rows checked one
-  by one). Step 1's guards printed nothing and the three 0065 files; step 3
-  printed the two migrate notices, the four
-  and the two apply-rls notices, the two verified lines and the six
-  `assert-schema-applied` lines; the second run of each printed only what
-  *Safe to re-run* says. Step 2 (d)'s four fingerprints (503 contract links,
-  the change-order link, 61 delivery links and execution cards) were identical
-  before and after, and so was an md5 of every delivery row without the new
-  column.
-- A catalogue comparison (every policy, function body with its settings and
-  grants, trigger, table and column grant, and the role) before and after step
-  3 found exactly the changes under *What it changes*: 29 functions, 1 policy,
-  1 trigger and the codes table (with its 16 column grants) added; the
-  change-order trigger re-pointed; six functions replaced (the contract and
-  change-order links, the two "I paid" functions, the execution card and its
-  contract helper); nothing else.
+- Steps 1 to 4 printed exactly what they say. Step 1's guards printed only the
+  `docs/DEPLOY.md` line and the three 0065 files, and the saved copy equals the
+  branch's runbook. Step 2 read 65 and 1792880198159; all 0; 21, 18, 6, 3 and
+  1,015; four fingerprints; 80 and 15; 34 MB; `cards_changed` 0. Step 3 printed
+  the two migrate notices, the four and the two apply-rls notices, the two
+  verified lines (compared character for character) and the six
+  `assert-schema-applied` lines, and exited 0. Step 4 read 66 and
+  1792976742588; 1, 2, 32, 1 and 1; the codes table row as written; 32 rows in
+  (d) (eleven definers, nineteen callable by `metra_app`, thirteen internal);
+  the same five numbers and four fingerprints; 81 and 15; 0, 2 and 1; 35 MB.
+  A second step 3 printed only what *Safe to re-run* says and changed nothing
+  in the catalogue.
+- A catalogue comparison (every function body with its settings and grants,
+  policy, trigger, table and column grant, constraint, index and RLS flag) from
+  step B to step C found exactly the changes under *What it changes*: 32
+  functions added; six replaced (the contract and change-order links, the two
+  "I paid" functions, the execution card and its contract helper); 1 policy;
+  the codes table's trigger and the re-pointed change-order trigger; the codes
+  table with its grants, constraints and indexes; nothing else.
 - **The migration's lock race, on purpose.** A reader holding
-  `design_engagements` for 10 s against `db:migrate`: the two 55P03 lines of
-  step 3 after 5.4 s and the block ran nothing after it, `migrations` still 65,
-  step 2 (b) still all 0; the block run again after the reader finished applied
-  0065 and printed every step 3 line. The lock window figures under
-  *Locks* are 20 quiet runs and 30 runs beside traffic of the batch in a
-  transaction then rolled back; a real `db:migrate` beside the same traffic
-  applied 0065 in 3.0 s (the command, Node's start included) with 0 failed
-  requests.
+  `design_engagements` for 10 s against step 3: the two 55P03 lines, exit 1,
+  nothing run after them, `migrations` still 65, step 2 (b) all 0.
 - **apply-rls's lock race, on purpose.** A reader holding `variation_orders`
-  for 30 s while step 3's `db:apply-rls` ran: `policies/30-contracts-boqs-variations.sql`
-  lost three times (55P03) and `apply-rls` exited 1 with the two failure lines
-  after 17 s, and the block skipped `assert-schema-applied`; in between, step
-  2 (b) read 1, 2, 29, 0 and 0, as step 3 says. `db:apply-rls` run again after
-  the reader ended exited 0 with the four and the two notices,
-  `assert-schema-applied` printed its six lines, and the catalogue was
-  identical to a clean run's.
-- **Beside studio traffic** (about 215 requests a second: delivery and
-  execution-card links, a client's "I paid", delivery saves, client saves, the
-  contracts list), 18 runs of this branch's `db:apply-rls` and 18 of `main`'s:
-  all 36 exited 0, eight after a retried 40P01 (five of `main`'s, three of
-  this branch's, at `policies/00-core.sql`, `policies/40-engagements.sql` and,
-  once in `main`'s, `policies/30-contracts-boqs-variations.sql`). The same
-  deadlock sometimes ends a request instead: 9 requests in `main`'s 18
-  runs, 16 in this branch's (12 of them in one batch of 6; the other two
-  batches 1 and 3), mostly a studio save, sometimes a client's delivery link
-  (a refresh loads it). That is step B's race, unchanged in kind; hence the
-  quiet hour.
-- **Undo (0)**, from the saved copy: part 1 returned 0; `65c78473`'s
-  `db:apply-rls` printed the four notices and the two lines quoted there and
-  exited 0; part 2 returned no rows; and the catalogue was identical to the one
-  before step 3 but for the 0065 objects it keeps (the codes table with its
-  column grants). Without part 1, that `db:apply-rls` exits 1 with one problem,
-  the codes table's policy "declared by NO rls/ file".
-- **Forward again** (this branch's `db:apply-rls` only): the four and the two
-  notices, the two verified lines, exit 0, and a catalogue identical to the
-  first forward's.
+  for 30 s while step 3 ran (0065 then applied): `policies/30-contracts-boqs-variations.sql`
+  lost three times (55P03), the two failure lines, exit 1, and
+  `assert-schema-applied` skipped; in between, step 2 (b) read 1, 2, 32, 0 and
+  0. Step 3 run again after the reader ended exited 0 with the four and the two
+  notices, and the catalogue was identical to a clean run's.
+- **Undo (0)**, from the saved copy. Part 2 run first, and again after part 1
+  but before `main`'s `db:apply-rls`: both times `cannot drop function
+  enforce_variation_order_frozen() because other objects depend on it`
+  (2BP01), and step 2 (b) still read 1, 2, 32, 1 and 1: nothing dropped. Then,
+  in order: part 1 returned 0; `65c78473`'s `db:apply-rls` printed the four
+  notices and the two lines quoted there (the grants line exactly as derived)
+  and exited 0; part 2 returned no rows; step 2 (b) read 1, 2, 0, 0 and 0, step
+  2 (d) the same four fingerprints and step 2 (e) 80 and 15; and the catalogue
+  equalled step B's but for the 0065 objects it keeps.
+- **Forward again** (step 1, then this branch's `db:apply-rls` only): the four and
+  the two notices, the two verified lines, exit 0; step 2 (b) 1, 2, 32, 1 and
+  1, the same four fingerprints, 81 and 15; and a catalogue identical to the
+  first forward's. Step 6 (3) then put the checkout back on `main`.
+- **Step 2 (g) itself**, on a copy of the database at step B with two
+  deliveries planted (one whose signed contract was terminated and replaced by
+  a newer issued BOQ, one with a newer BOQ made for another client of the
+  project): `cards_changed` 2, and after step C's `db:apply-rls` the execution
+  card changed for exactly those two of the 21 deliveries.
 - **The current code on the step C database:** `main`'s (`65c78473`) own
   isolation gate passed 60 of 60, and its action tests 1,699 of 1,701. The two
   failures test schema objects, not an app path: one pins the list of token
   functions in the database, which step C extends; the other fails the same
-  way on the step B database (it checks a Supabase default grant that this
-  rehearsal's simulated roles add and `roles.sql` does not manage). No
-  contract, change order, delivery, payment, claim, final account or
-  measurement test of the shipped code failed on the step C database.
-- **This branch's own tests** on a fresh database replayed as CI does (every
-  step of `ci.yml` but the OpenNext build): isolation gate passed, action
-  tests 1,744 of 1,744.
+  way on the step B database (it checks a Supabase default grant that the
+  simulated roles add and `roles.sql` does not manage). No contract, change
+  order, delivery, payment, claim, final account or measurement test of the
+  shipped code failed on the step C database.
+- **Carried over from the H3 build's rehearsal**, which the fix round does not
+  change: the migration's lock window under *Locks* (0065 changed by one
+  comment) and the 36 `db:apply-rls` runs beside studio traffic (the fix round
+  changed function bodies and grants, which every run re-creates, and no policy
+  file but a comment).
+- **This branch's own tests** on a fresh database replayed as CI does: the
+  isolation gate 60 of 60, the action tests 1,767 of 1,768 on a database with
+  Supabase's default grants simulated; the one left is that same default-grant
+  test, which fails the same way on the code before the fix round and passes
+  on a database built as CI builds it.
 
 ## Monthly market bulletin
 
