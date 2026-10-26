@@ -4681,15 +4681,18 @@ is NOT a failure: that one file rolled back whole and is being applied again
   `apply-rls failed: lock wait or deadlock, safe to re-run at a quieter moment (this file rolled back; the files before it stay applied).`
   That means the same file lost three times in a row. The cause is NOT a
   broken database (the block skipped `assert-schema-applied`): a 55P03 is a
-  studio transaction or report that held a
-  table for more than 3 s (step C's own files touch `variation_orders` in
+  studio transaction or report that held a table for more than 3 s (step C's
+  own files touch `variation_orders` in
   `policies/30-contracts-boqs-variations.sql` and the new codes table, as well
   as the tables every run touches); a 40P01, almost always at
   `Applying policies/00-core.sql ...`, is ordinary studio traffic (step B's
   runbook says why). **Run `npm run db:apply-rls` again, and keep re-running it
   until it exits 0** (wait a minute between runs; it is safe, every statement is
-  idempotent), then `npm run assert-schema-applied -w @metra/db`. Until it does, the new functions may exist while the
-  change-order trigger is still the old one and the codes table has no policy
+  idempotent), then `npm run assert-schema-applied -w @metra/db`. The run
+  that exits 0 prints the two new notices of step 3 if the failed run did not
+  get past `policies/36-client-home.sql`. Until a run exits 0, the new
+  functions may exist while the change-order trigger is still the old one and
+  the codes table has no policy
   yet: the current site works on that (it calls none of the new functions,
   and the old trigger is what it was written for), `metra_app` reads nothing
   in the forced codes table, and nothing writes it. In between, step 2 (b) may
@@ -4764,9 +4767,10 @@ where n.nspname = 'public' and c.relname = 'client_verification_codes';
 ```
 
 (d) Who may call the step C functions: 29 rows. `public_execute` false and
-`api_roles_execute` false on all 29. `definer` true on the eleven
-`app_home_..._by_token` and `app_client_home_target_by_token` functions and
-false on the other eighteen. `app_execute` true on those eleven, on the five
+`api_roles_execute` false on all 29. `definer` true on eleven: the ten
+`app_home_..._by_token` functions (`app_home_by_token` among them) and
+`app_client_home_target_by_token`; false on the other eighteen. `app_execute`
+true on those eleven, on the five
 fact functions (`app_delivery_boqs`, `app_contract_measured_lines`,
 `app_contract_measured_works`, `app_contract_money_facts`,
 `app_execution_flow_source`) and on the two trigger functions
@@ -4817,7 +4821,7 @@ select (select count(*) from public.design_engagements where entry_phase <> 'des
 ```
 
 (i) Step 2 (f) again: about the same size as before (the new table is empty;
-the rehearsal stayed at 53 MB). Put the number in the release note.
+the rehearsal went from 53 MB to 54 MB). Put the number in the release note.
 
 **Stop and do not go on** if any output in steps 3 or 4 differs from what is
 written there. Tell the lead what you saw instead.
@@ -5019,8 +5023,9 @@ three substitutions only (the checkout path, the Desktop path, and the
 connection set in the session in place of `.env`), the SQL from the saved
 copy.
 
-- Steps 1 to 4 printed exactly what they say. Step 1's guards printed nothing
-  and the three 0065 files; step 3 printed the two migrate notices, the four
+- Steps 1 to 4 printed exactly what they say (step 4 (d)'s 29 rows checked one
+  by one). Step 1's guards printed nothing and the three 0065 files; step 3
+  printed the two migrate notices, the four
   and the two apply-rls notices, the two verified lines and the six
   `assert-schema-applied` lines; the second run of each printed only what
   *Safe to re-run* says. Step 2 (d)'s four fingerprints (503 contract links,
@@ -5036,8 +5041,9 @@ copy.
   contract helper); nothing else.
 - **The migration's lock race, on purpose.** A reader holding
   `design_engagements` for 10 s against `db:migrate`: the two 55P03 lines of
-  step 3 after 5.4 s, `migrations` still 65, step 2 (b) still all 0; the re-run
-  after the reader finished applied 0065. The lock window figures under
+  step 3 after 5.4 s and the block ran nothing after it, `migrations` still 65,
+  step 2 (b) still all 0; the block run again after the reader finished applied
+  0065 and printed every step 3 line. The lock window figures under
   *Locks* are 20 quiet runs and 30 runs beside traffic of the batch in a
   transaction then rolled back; a real `db:migrate` beside the same traffic
   applied 0065 in 3.0 s (the command, Node's start included) with 0 failed
@@ -5045,10 +5051,11 @@ copy.
 - **apply-rls's lock race, on purpose.** A reader holding `variation_orders`
   for 30 s while step 3's `db:apply-rls` ran: `policies/30-contracts-boqs-variations.sql`
   lost three times (55P03) and `apply-rls` exited 1 with the two failure lines
-  after 17 s; in between, the 29 functions existed, the change-order trigger
-  was still the old one and the codes table had no policy, as step 3 says. The
-  re-run after the reader ended exited 0 with the four and the two notices, and
-  the catalogue was identical to a clean run's.
+  after 17 s, and the block skipped `assert-schema-applied`; in between, step
+  2 (b) read 1, 2, 29, 0 and 0, as step 3 says. `db:apply-rls` run again after
+  the reader ended exited 0 with the four and the two notices,
+  `assert-schema-applied` printed its six lines, and the catalogue was
+  identical to a clean run's.
 - **Beside studio traffic** (about 215 requests a second: delivery and
   execution-card links, a client's "I paid", delivery saves, client saves, the
   contracts list), 18 runs of this branch's `db:apply-rls` and 18 of `main`'s:
@@ -5070,7 +5077,13 @@ copy.
   notices, the two verified lines, exit 0, and a catalogue identical to the
   first forward's.
 - **The current code on the step C database:** `main`'s (`65c78473`) own
-  isolation gate and action tests. MAINTESTS_PLACEHOLDER
+  isolation gate passed 60 of 60, and its action tests 1,699 of 1,701. The two
+  failures test schema objects, not an app path: one pins the list of token
+  functions in the database, which step C extends; the other fails the same
+  way on the step B database (it checks a Supabase default grant that this
+  rehearsal's simulated roles add and `roles.sql` does not manage). No
+  contract, change order, delivery, payment, claim, final account or
+  measurement test of the shipped code failed on the step C database.
 - **This branch's own tests** on a fresh database replayed as CI does (every
   step of `ci.yml` but the OpenNext build): isolation gate passed, action
   tests 1,744 of 1,744.
