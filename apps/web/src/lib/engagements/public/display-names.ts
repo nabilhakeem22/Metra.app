@@ -12,11 +12,11 @@ export interface DeliveryDisplayNames {
   clientName: string;
 }
 
+/** What the names are read from: the design snapshot's delivery, or the client home's (lib/client-home/names.ts). */
+export type DeliveryNamesSource = Pick<PublicDelivery, 'firm' | 'client' | 'titleAr' | 'titleEn'>;
+
 /** Arabic first on an Arabic page and English first otherwise, each falling back to the other. */
-export function deliveryDisplayNames(
-  delivery: Pick<PublicDelivery, 'firm' | 'client' | 'titleAr' | 'titleEn'>,
-  locale: string,
-): DeliveryDisplayNames {
+export function deliveryDisplayNames(delivery: DeliveryNamesSource, locale: string): DeliveryDisplayNames {
   const wantArabic = locale.startsWith('ar');
   const pick = (arabic: string | null, english: string | null) =>
     (wantArabic ? arabic || english : english || arabic) ?? '';

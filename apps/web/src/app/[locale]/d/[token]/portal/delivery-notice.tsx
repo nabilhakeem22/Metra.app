@@ -31,7 +31,7 @@ export function DeliveryNotice({
           <h1 className="text-title font-semibold">{t('title')}</h1>
           <p className="text-body text-muted-foreground">{t('body')}</p>
         </div>
-        <LanguageSwitch token={token} locale={locale} />
+        <LanguageSwitch token={token} locale={locale} tab={null} />
       </section>
     </div>
   );

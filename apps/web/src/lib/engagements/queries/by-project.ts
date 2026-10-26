@@ -1,7 +1,8 @@
 import 'server-only';
 import { designEngagements, type DesignEngagementState } from '@metra/db';
-import { and, asc, count, desc, eq, inArray, ne } from 'drizzle-orm';
+import { asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { deliveriesCountedTowardCap } from '../delivery-slot';
 import { TERMINAL_STATES } from '../states';
 
 /**
@@ -116,10 +117,10 @@ export function getDeliveriesByProjects(
 
 /**
  * How many deliveries count toward a project's lifetime cap (Slice C2-hardening):
- * the number of NON-abandoned deliveries. Predicate is `state <> 'abandoned'`
- * (owner decision) — abandoned deliveries never count, so a project with 1 real +
- * N abandoned rows still reads 1 and can start its extension. The create-time cap
- * check (`createEngagementCore`) inlines the same predicate inside its own tx to
+ * abandoned deliveries never count (owner decision), so a project with 1 real +
+ * N abandoned rows still reads 1 and can start its extension, and neither does a
+ * light delivery (ruling D14). The create-time cap check (`createEngagementCore`)
+ * runs the same predicate (deliveriesCountedTowardCap) inside its own tx to
  * avoid a second round-trip; this query feeds the project delivery panel. RLS
  * scopes the read to the caller's org (a foreign project reads as 0). The CALLER
  * gates the read on the `engagements_design` read capability.
@@ -132,12 +133,7 @@ export function countProjectDeliveries(
     const [{ value }] = await tx
       .select({ value: count() })
       .from(designEngagements)
-      .where(
-        and(
-          eq(designEngagements.projectId, projectId),
-          ne(designEngagements.state, 'abandoned'),
-        ),
-      );
+      .where(deliveriesCountedTowardCap(projectId));
     return value;
   });
 }

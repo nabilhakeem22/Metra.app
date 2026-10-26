@@ -4,7 +4,7 @@
 // RLS-scoped; the one-active-per-project unique index (0032) is the backstop
 // for the race between them and the insert, and stays in the core.
 import { designEngagements, type MetraDb } from '@metra/db';
-import { and, count, eq, inArray, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, ne, type SQL } from 'drizzle-orm';
 import { failFields } from '@/lib/actions/field-errors';
 import { ACTIVE_STATES } from './states';
 
@@ -19,6 +19,20 @@ const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
 // count (owner decision) — a project with 1 real + N abandoned rows can still
 // start its extension.
 const PROJECT_DELIVERY_CAP = 2;
+
+/**
+ * The deliveries a project's lifetime cap counts: not abandoned, and not a LIGHT
+ * delivery (entry_phase 'execution', ruling D14): a light delivery is the client
+ * page of an execution contract, not a sold design delivery. One predicate for
+ * the create guard below and the project panel's count (queries/by-project.ts).
+ */
+export function deliveriesCountedTowardCap(projectId: string): SQL | undefined {
+  return and(
+    eq(designEngagements.projectId, projectId),
+    ne(designEngagements.state, 'abandoned'),
+    eq(designEngagements.entryPhase, 'design'),
+  );
+}
 
 /**
  * Refuses under the project select: `project_delivery_exists` when the project
@@ -46,20 +60,14 @@ export async function assertProjectHasDeliverySlot(
     .limit(1);
   if (existing) failFields({ projectId: { code: 'project_delivery_exists' } });
 
-  // Lifetime cap (Slice C2-hardening): at most TWO NON-abandoned deliveries per
-  // project (original + one extension). Abandoned rows do NOT count toward the
-  // cap (owner decision — predicate `state <> 'abandoned'`), so a project with 1
-  // real + N abandoned deliveries can still start its extension. Checked BEFORE
-  // allocating a number so a rejected create writes nothing and spends none.
+  // Lifetime cap (Slice C2-hardening): at most TWO counted deliveries per project
+  // (original + one extension; deliveriesCountedTowardCap: abandoned and light
+  // ones do not count). Checked BEFORE allocating a number so a rejected create
+  // writes nothing and spends none.
   const [{ value: countedDeliveries }] = await tx
     .select({ value: count() })
     .from(designEngagements)
-    .where(
-      and(
-        eq(designEngagements.projectId, projectId),
-        ne(designEngagements.state, 'abandoned'),
-      ),
-    );
+    .where(deliveriesCountedTowardCap(projectId));
   if (countedDeliveries >= PROJECT_DELIVERY_CAP) {
     failFields({ projectId: { code: 'project_delivery_limit_reached' } });
   }

@@ -4,14 +4,18 @@ import { useTranslations } from 'next-intl';
 import type { PortalPaymentDetails } from '@/lib/engagements/public/types';
 import { CopyValueRow } from './copy-value-row';
 
-/** The rows in the order a client pays: the quick way first, then the bank's. */
+/**
+ * The rows in the order a client pays: the quick way first, then the bank's.
+ * The third column says whether the value is a figure (set in the mono face,
+ * left to right) or a name (set in the page's face, where Arabic letters join).
+ */
 const ROWS = [
-  ['instapay', 'instapay'],
-  ['bankName', 'bankName'],
-  ['bankAccountHolder', 'accountHolder'],
-  ['bankAccountNumber', 'accountNumber'],
-  ['bankIban', 'iban'],
-] as const satisfies ReadonlyArray<readonly [keyof PortalPaymentDetails, string]>;
+  ['instapay', 'instapay', true],
+  ['bankName', 'bankName', false],
+  ['bankAccountHolder', 'accountHolder', false],
+  ['bankAccountNumber', 'accountNumber', true],
+  ['bankIban', 'iban', true],
+] as const satisfies ReadonlyArray<readonly [keyof PortalPaymentDetails, string, boolean]>;
 
 /**
  * "How to pay": the studio's own InstaPay address and bank details, each as
@@ -28,9 +32,9 @@ export function PaymentInstructions({ details }: { details: PortalPaymentDetails
         {t('title')}
       </h3>
       <p className="mb-1 text-caption text-muted-foreground">{t('body')}</p>
-      {ROWS.map(([field, labelKey]) => {
+      {ROWS.map(([field, labelKey, figure]) => {
         const value = details[field];
-        return value ? <CopyValueRow key={field} label={t(labelKey)} value={value} /> : null;
+        return value ? <CopyValueRow key={field} label={t(labelKey)} value={value} figure={figure} /> : null;
       })}
     </section>
   );

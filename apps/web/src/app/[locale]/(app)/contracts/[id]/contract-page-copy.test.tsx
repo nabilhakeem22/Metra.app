@@ -29,6 +29,8 @@ vi.mock('@/lib/contracts/lines-actions', () => ({
   loadContractSections: vi.fn(),
   searchBaselineLines: vi.fn(async () => ({ ok: true, data: { lines: [], hasMore: false } })),
 }));
+// The contract overview's "Client page" control: never pressed here, mocked so the page loads.
+vi.mock('@/lib/client-home/actions', () => ({ openClientHome: vi.fn() }));
 vi.mock('@/lib/contracts/actions', () => ({
   saveContractDraft: vi.fn(),
   setContractCharges: vi.fn(),

@@ -2,44 +2,43 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
-import type { PortalExecution } from '@/lib/engagements/public/execution-types';
 import { deliveryDisplayNames, deliveryReference } from '@/lib/engagements/public/display-names';
+import { HomeTabs } from './home-tabs';
 import { BudgetCard } from './portal/budget-card';
 import { PortalCommandCard } from './portal/command-card';
 import { DeliveryNotice } from './portal/delivery-notice';
+import { DesignRecordBanner } from './portal/design-record-banner';
 import { DocumentsCard } from './portal/documents-card';
-import { ExecutionCard } from './portal/execution-card';
 import { Greeting } from './portal/greeting';
 import { PaymentsCard } from './portal/payments-card';
 import { StudioBar } from './portal/studio-bar';
 import { TimelineCard } from './portal/timeline-card';
 
 /**
- * The session-less, mobile-first, studio-branded client page — a guided single
- * column under a sticky studio bar (logo, name, WhatsApp, call, language):
- * greeting → the command card (journey, the ONE thing that needs the client
- * now, what's next) → the budget card whenever the studio has issued a range →
- * the payments card (a payment due is something the client acts on, so it sits
- * above the documents; how to pay and what was received live there too) → the
- * execution contract's card, at `execution` only (Stage 2: its payment
- * requests, "I made this payment", how to pay and the receipts) → the
- * released documents → what happened, dated → footer. Every derivation
- * (journey position, stage, hero, timeline words) is computed server-side and
- * carries NO raw machine state; every figure is a client-DUE or client-PAID
- * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe,
- * Western numerals, logical CSS only. A read that produced no delivery renders
- * a notice instead (./portal/delivery-notice.tsx).
+ * The client home's DESIGN tab: the session-less, mobile-first, studio-branded
+ * client page, a guided single column under a sticky studio bar (logo, name,
+ * WhatsApp, call, language): greeting → the command card (journey, the ONE
+ * thing that needs the client now, what's next) → the budget card whenever the
+ * studio has issued a range → the payments card (a payment due is something
+ * the client acts on, so it sits above the documents; how to pay and what was
+ * received live there too) → the released documents → what happened, dated →
+ * footer. Once the delivery is at `execution` it is the DESIGN RECORD: the tab
+ * strip above it, and the record banner (every step done) where the command
+ * card was; the execution contract lives in the Execution tab
+ * (./execution-tab.tsx), never here. Every derivation (journey position, stage,
+ * hero, timeline words) is computed server-side and carries NO raw machine
+ * state; every figure is a client-DUE or client-PAID amount (no cost/margin
+ * ever reaches this surface). Bilingual, RTL-safe, Western numerals, logical
+ * CSS only. A read that produced no delivery renders a notice instead
+ * (./portal/delivery-notice.tsx).
  */
 export function PublicDeliveryView({
   token,
   read,
-  execution = null,
   documentUnavailable = false,
 }: {
   token: string;
   read: DeliveryReadResult;
-  /** The execution contract's card, read only for a delivery at `execution`. */
-  execution?: PortalExecution | null;
   /** Set when the download route bounced back — the client asked for a document
    *  that is not (or is no longer) available to them. */
   documentUnavailable?: boolean;
@@ -53,6 +52,7 @@ export function PublicDeliveryView({
   }
 
   const { delivery } = read;
+  const record = delivery.stageKey === 'construction';
 
   const { firmName, title, clientName } = deliveryDisplayNames(delivery, locale);
   // A range with neither bound (a malformed snapshot) has nothing to show.
@@ -66,16 +66,24 @@ export function PublicDeliveryView({
         deliveryRef={deliveryReference(delivery)}
         token={token}
         locale={locale}
+        tab={record ? 'design' : null}
       />
       <div className="mx-auto flex max-w-md flex-col gap-4 p-4">
         <Greeting clientName={clientName} title={title} />
-        <PortalCommandCard
-          token={token}
-          hero={delivery.hero}
-          milestone={delivery.milestone}
-          stageKey={delivery.stageKey}
-          review={delivery}
-        />
+        {record ? (
+          <>
+            <HomeTabs token={token} current="design" />
+            <DesignRecordBanner milestone={delivery.milestone} />
+          </>
+        ) : (
+          <PortalCommandCard
+            token={token}
+            hero={delivery.hero}
+            milestone={delivery.milestone}
+            stageKey={delivery.stageKey}
+            review={delivery}
+          />
+        )}
         {rom && (
           <BudgetCard
             token={token}
@@ -93,7 +101,6 @@ export function PublicDeliveryView({
           receipts={delivery.receipts}
           receiptsTruncated={delivery.receiptsTruncated}
         />
-        {execution && <ExecutionCard token={token} initial={execution} />}
         <DocumentsCard
           token={token}
           documents={delivery.documents}

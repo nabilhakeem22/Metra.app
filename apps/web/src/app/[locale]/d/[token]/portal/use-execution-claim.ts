@@ -49,8 +49,11 @@ export interface ExecutionClaim {
  * landed (and told the studio in the same write): the failure is cleared. If
  * the read works and shows no claim, the row says it was not received and keeps
  * its button. Only when the read fails too does "refresh to check" stay.
+ *
+ * `onClaimed` runs once for every claim that landed, so the page around the
+ * card can follow it (the client home's hero).
  */
-export function useExecutionClaim(token: string, initial: PortalExecution): ExecutionClaim {
+export function useExecutionClaim(token: string, initial: PortalExecution, onClaimed: () => void): ExecutionClaim {
   const [execution, setExecution] = useState(initial);
   const [pending, startTransition] = useTransition();
   const [askingId, setAskingId] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export function useExecutionClaim(token: string, initial: PortalExecution): Exec
     const row = card.requests.find((request) => request.id === requestId);
     if (row?.claimedAt) {
       setNotifiedIds((previous) => new Set(previous).add(requestId));
+      onClaimed();
       return;
     }
     setFailure({ requestId, shown: { error: 'not_received' } });
@@ -97,6 +101,7 @@ export function useExecutionClaim(token: string, initial: PortalExecution): Exec
           if (!answer.already) setNotifiedIds((previous) => new Set(previous).add(requestId));
           if (answer.execution) setExecution(answer.execution);
           else await readAgain();
+          onClaimed();
           return;
         }
         if (answer.error === 'uncertain') {

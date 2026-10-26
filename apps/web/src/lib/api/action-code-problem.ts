@@ -171,6 +171,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   invalid_discount: 'bad-request',
   // Execution (Stage 2): BOQ contracts, payment requests, costs, measurements.
   contract_not_execution: 'bad-request',
+  client_home_unavailable: 'conflict',
   boq_not_issued: 'bad-request',
   // A live contract stands on the issued BOQ: a state conflict, not bad input.
   boq_has_contract: 'conflict',

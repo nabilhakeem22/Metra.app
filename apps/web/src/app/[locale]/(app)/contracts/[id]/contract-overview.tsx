@@ -11,6 +11,7 @@ import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { ChargesForm } from './charges-form';
+import { ClientPageControl } from './client-page-control';
 import { ContractFinishDate } from './contract-finish-date';
 import { ContractHeaderForm } from './contract-header-form';
 import { ContractSectionList } from './contract-section-list';
@@ -109,6 +110,10 @@ export function ContractOverview({
           </div>
         </CardContent>
       </Card>
+
+      {canIssue && execution && (detail.status === 'issued' || detail.status === 'signed') && (
+        <ClientPageControl contractId={detail.id} />
+      )}
 
       {canManage && detail.status === 'draft' && execution && <ChargesForm detail={detail} m={m} />}
 

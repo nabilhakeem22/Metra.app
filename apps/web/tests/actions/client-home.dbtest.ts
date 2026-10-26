@@ -375,6 +375,7 @@ describe('the light delivery: found by its project everywhere a delivery finds i
     expect(detail?.header.state).toBe('execution');
     expect(detail?.execution?.contract).toMatchObject({ id: light.contract.contractId, status: 'issued' });
     expect(await getEngagementByProject(owner, light.delivery.projectId)).toMatchObject({ id: light.delivery.id, state: 'execution' });
-    expect(await countProjectDeliveries(owner, light.delivery.projectId)).toBe(1);
+    // Ruling D14: a light delivery is not counted toward the project delivery cap.
+    expect(await countProjectDeliveries(owner, light.delivery.projectId)).toBe(0);
   });
 });

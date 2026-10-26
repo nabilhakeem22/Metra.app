@@ -139,6 +139,7 @@ const ALL_CODES: ActionCode[] = [
   'invalid_price',
   'invalid_discount',
   'contract_not_execution',
+  'client_home_unavailable',
   'boq_not_issued',
   'boq_has_contract',
   'delivery_not_in_execution',

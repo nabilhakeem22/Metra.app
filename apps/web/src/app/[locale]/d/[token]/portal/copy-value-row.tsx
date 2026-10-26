@@ -22,11 +22,14 @@ function selectText(element: HTMLElement | null): void {
 
 /**
  * One payment instruction: its label, its value as PLAIN TEXT (never a link,
- * whatever the studio typed; left-to-right, Latin digits as written) and a
- * 44 px Copy button. "Copied" shows for two seconds; when the browser refuses
- * the clipboard the value is selected instead and a line says so.
+ * whatever the studio typed; Latin digits as written) and a 44 px Copy button.
+ * A figure (an account number, an IBAN, an InstaPay address) is set
+ * left-to-right in the mono face; a name (the bank, the account holder) is set
+ * in the page's own face and direction, where Arabic letters join (the B4 /d
+ * defect: the mono face broke them). "Copied" shows for two seconds; when the
+ * browser refuses the clipboard the value is selected instead and a line says so.
  */
-export function CopyValueRow({ label, value }: { label: string; value: string }) {
+export function CopyValueRow({ label, value, figure }: { label: string; value: string; figure: boolean }) {
   const t = useTranslations('delivery.payments.instructions');
   const valueRef = useRef<HTMLSpanElement>(null);
   const [state, setState] = useState<CopyState>('idle');
@@ -52,9 +55,15 @@ export function CopyValueRow({ label, value }: { label: string; value: string })
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-caption text-muted-foreground">{label}</p>
-          <span ref={valueRef} dir="ltr" className="block break-all font-mono text-body font-semibold tabular-nums">
-            {value}
-          </span>
+          {figure ? (
+            <span ref={valueRef} dir="ltr" className="block break-all font-mono text-body font-semibold tabular-nums">
+              {value}
+            </span>
+          ) : (
+            <span ref={valueRef} className="block break-words text-body font-semibold">
+              {value}
+            </span>
+          )}
         </div>
         <button
           type="button"

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import type { DeliveryReadResult } from '@/lib/engagements/public/delivery';
-import { deliveryDisplayNames } from '@/lib/engagements/public/display-names';
+import { deliveryDisplayNames, type DeliveryNamesSource } from '@/lib/engagements/public/display-names';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 
 /** A `delivery.*` translator: the client page's own (فصحى / English) words. */
@@ -25,7 +24,10 @@ export type DeliveryTranslator = (key: string, values?: Record<string, string>) 
  * root layout falls back to. `absolute` keeps the layout's "· Metra" template
  * off. Never indexed (PRIVATE_METADATA).
  */
-export function deliveryMetadata(read: DeliveryReadResult, locale: string, t: DeliveryTranslator): Metadata {
+/** The read the page rendered, as far as its names go: the design tab's delivery or the Execution tab's home. */
+export type NamedRead = { status: 'ok'; delivery: DeliveryNamesSource } | { status: 'not_found' } | { status: 'read_failed' };
+
+export function deliveryMetadata(read: NamedRead, locale: string, t: DeliveryTranslator): Metadata {
   if (read.status !== 'ok') {
     const notice = read.status === 'read_failed' ? 'readFailed' : 'notFound';
     return { ...CLIENT_PAGE_METADATA, title: { absolute: t(`${notice}.title`) }, description: t(`${notice}.body`) };
