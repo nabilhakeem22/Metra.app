@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   pgTable,
   text,
@@ -47,6 +48,15 @@ export const variationOrderEvents = pgTable(
      * be a guess on an evidentiary record.
      */
     actorChannel: text('actor_channel'),
+    /**
+     * The CLIENT's decision, recorded by the studio from a paper document the
+     * client signed (0065, H7.3). Such an event is the studio's write
+     * (`actor_channel` 'staff') but the decision is the client's, so the
+     * change-order link reads a paper rejection as the client's refusal,
+     * never as the termination cascade's (`app_variation_by_token`'s
+     * `rejection_channel`). false for every other event.
+     */
+    recordedOnPaper: boolean('recorded_on_paper').notNull().default(false),
     decidedAt: timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

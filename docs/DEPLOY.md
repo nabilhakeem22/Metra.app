@@ -4417,7 +4417,7 @@ The client home's database step: migration `0065_client_home.sql` plus
 runs AFTER Stage 2 DB step B (the section above): production then holds 65
 migrations and 80 policies, 15 of them restrictive; step C leaves it at 66
 and 81. It is validated on branch `validate/home-h3-sql`, whose code is
-pinned at **`8221866b`**: the branch's last code commit (every commit after it
+pinned at **`31e21c8f`**: the branch's last code commit (every commit after it
 changes only `docs/DEPLOY.md`). That branch is `main` (`65c78473`: Stage 2,
 the site diary and step B) plus PR H3, its two fix rounds and the code cleanup of
 `validate/cleanup-oct26` (`6ed20154`, no database change).
@@ -4452,7 +4452,7 @@ Why this order, one sentence each:
   change-order guard refuses (MT100). On the old database those pages fail
   with 42883 and the issue with MT100.
 - **The current Worker is safe on the new database, with no visible
-  difference:** 0065 only adds (one column with a default, two checks, one
+  difference:** 0065 only adds (two columns with a default, two checks, one
   index, one empty table), and this `db:apply-rls` keeps every answer the
   current code gets. Five client functions are rewritten to share one helper
   each, and answer byte for byte what they did (rehearsed: an md5 of every
@@ -4479,11 +4479,12 @@ Why this order, one sentence each:
 | Object | Change |
 |---|---|
 | `design_engagements` | one new column, `entry_phase` (`design` for every delivery, the default; `execution` for a LIGHT delivery, the client page of an execution contract with no design delivery behind it, created from PR H4), two checks (only those two values; a light delivery is at `execution` and stays there), and one unique index (at most one light delivery per project and client) |
+| `variation_order_events` | one new column, `recorded_on_paper` (false for every event, the default; true, from PR H7, on a client's change-order decision the studio records from a paper document the client signed) |
 | `client_verification_codes` (new, empty) | one row per one-time code a client asks for (from PR H5): which delivery, which act and which document, the HASH of the code (never the code), where it was sent (a hash and a hint of the address), the client's ip and browser, and what it was used for. Ten minutes of life and five tries, by check. RLS enabled and forced from the moment it exists |
 | `rls/functions/65-execution-facts.sql` (new) | the execution facts, ONE source for the studio's cockpit and the client's page: which BOQs a delivery owns (only its own client's; a light delivery's by its project), THE contract it stands on (one rule for the studio and the client), a contract's money facts, its measured lines and works, and everything the execution card is derived from. The studio reads them as itself, under its own RLS |
 | `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, no new one for it after 15 wrong tries on its codes in an hour, 10 a day per delivery, 25 a day per studio, 80 a day across the platform; it also removes codes never used, 90 days after they expired, and keeps every used one), the four acts that will need a code (each answers `busy`, not an error, when a studio write holds what it needs), and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
 | `rls/functions/40-delivery-read.sql` | the delivery link's answer gains `entry_phase` (`design`, or `execution` for a light delivery, from PR H4), so the client page knows a light delivery from the read it already makes; every other key is unchanged |
-| `rls/functions/30-contracts-variations.sql`, `50-delivery-write.sql`, `70-execution-portal.sql` | the contract and change-order links, the two "I paid" functions and the execution card share four new helpers (how a contract was signed, the days approved change orders add, what is still due on a request, on a design instalment), with the same answers; the execution card stands on the delivery's contract by the cockpit's rule (a light delivery's found by its project; see step 2 (g)); the change-order guard is now its own function: everything it admitted before, plus issue restarting the link's 30 days |
+| `rls/functions/30-contracts-variations.sql`, `50-delivery-write.sql`, `70-execution-portal.sql` | the contract and change-order links, the two "I paid" functions and the execution card share four new helpers (how a contract was signed, the days approved change orders add, what is still due on a request, on a design instalment), with the same answers; the execution card stands on the delivery's contract by the cockpit's rule (a light delivery's found by its project; see step 2 (g)); the change-order guard is now its own function: everything it admitted before, plus issue restarting the link's 30 days; the change-order link reads a rejection recorded from the client's paper as the client's (none exists until PR H7) |
 | `rls/policies/36-client-home.sql` (new), `policies/30-contracts-boqs-variations.sql` | the codes table's org isolation policy and guard trigger (a code changes only by one wrong try or its one use; it is deleted only with its delivery, or, never used, 90 days after it expired); the change-order trigger points at the new guard |
 | `rls/roles.sql` | `metra_app` may read every column of the codes table but the code's hash, and write none of it (only the client home's own functions do); the new functions are callable by `metra_app` only, the helpers that take bare ids by nobody |
 
@@ -4498,7 +4499,7 @@ git fetch origin
 git switch --detach origin/validate/home-h3-sql
 Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-c.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 8221866b HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (8221866b)
+git diff --stat 31e21c8f HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (31e21c8f)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 65c78473 HEAD -- packages/db/migrations    # MUST print exactly the three 0065 files below
 ```
@@ -4515,7 +4516,7 @@ The `Copy-Item` line saves this runbook (the branch's, which has this section)
 to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
 STOPs, tell the lead in each case:
 
-- The `git diff --stat 8221866b HEAD` lists any file other than
+- The `git diff --stat 31e21c8f HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
 - The `git log ... -- packages/db` prints any line: database code reached
   `main` after this branch was last brought up to date, and this branch's
@@ -4543,7 +4544,9 @@ lead.
 -- Step C step 2 (b): the pre-check. Run this one alone.
 select
   (select count(*) from information_schema.columns
-    where table_schema = 'public' and table_name = 'design_engagements' and column_name = 'entry_phase') as entry_phase_column,
+    where table_schema = 'public'
+      and ((table_name = 'design_engagements' and column_name = 'entry_phase')
+        or (table_name = 'variation_order_events' and column_name = 'recorded_on_paper'))) as step_c_columns,
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relname in ('client_verification_codes', 'design_engagements_one_light_per_project_client')) as step_c_relations,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -4730,11 +4733,11 @@ is NOT a failure: that one file rolled back whole and is being applied again
 **If a command fails, it prints the SQLSTATE and what to do,** on two lines:
 
 - `Migration failed: SQLSTATE 55P03: 0065: could not take every lock within 3 s (stopped at public.design_engagements:ACCESS EXCLUSIVE)`
-  (the table named may be `organizations`) then
+  (the table named may be `organizations` or `variation_order_events`) then
   `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
-  The migration takes its two locks ALL OR NONE (see *Locks*): it tries for
-  both at once, lets go of the one it got when the other table is busy, and
-  tries again, for 3 s in all. This line means the named table never came
+  The migration takes its three locks ALL OR NONE (see *Locks*): it tries for
+  all three at once, lets go of the ones it got when another table is busy,
+  and tries again, for 3 s in all. This line means the named table never came
   free in those 3 s: a long query or transaction held it, or requests kept it
   busy without a gap. It held nothing while it tried, so no request waited on
   it, and the block ran nothing after it. Re-run the block a little later.
@@ -4781,19 +4784,24 @@ notices (rehearsed). `assert-schema-applied` only reads.
 
 **Locks.** `db:migrate` runs 0065 as ONE transaction. It first takes every lock
 it needs, ALL OR NONE, within ONE 3 s budget for all its attempts together:
-ACCESS EXCLUSIVE (no reads, no writes) on `design_engagements` and SHARE ROW
+ACCESS EXCLUSIVE (no reads, no writes) on `design_engagements`, SHARE ROW
 EXCLUSIVE (reads go on, writes wait) on `organizations` (the new table's
-foreign key). Each attempt asks for both without waiting; if one is busy it
-lets go of the other, sleeps 10 to 40 ms and tries again, so it never holds
-`design_engagements` while it waits for `organizations` (a studio save reads
-the membership, then the studio row). Then, holding them, it adds the column
-(no rewrite: a constant default), checks the two new checks over every
-delivery (one scan each), builds the light-delivery index, and creates the
-empty table. `design_engagements` is read by every delivery page, a client's
-link included, so those pages wait for this window, briefly: the whole
+foreign key) and ACCESS EXCLUSIVE on `variation_order_events` (its new
+column). Each attempt asks for all three without waiting; if one is busy it
+lets go of the others, sleeps 10 to 40 ms and tries again, so it never holds
+one of them while it waits for another (a studio save reads the membership,
+then the studio row). Then, holding them, it adds the two columns (no
+rewrite: a constant default), checks the two new checks over every delivery
+(one scan each), builds the light-delivery index, and creates the empty
+table. A change-order page waits for this window too. `design_engagements`
+is read by every delivery page, a client's link included, so those pages
+wait for this window, briefly: the whole
 migration took 22 to 128 ms (median 24) on a quiet local server and 22 to 110
 ms (median 52) beside about 220 studio and client requests a second, 30 of 30
 runs clean, 0 deadlocks, 0 failed requests, the slowest request 183 ms.
+With the change-order column and its third lock (H3 round 2), the file ran
+in 13 to 67 ms (median 14) on a quiet local server at this rehearsal's size
+(21 deliveries, 10 runs); the figures beside traffic were not measured again.
 Supabase is slower than a local server (a window measured there earlier was
 0.5 to 1.9 s), so a delivery page can wait about 1 s; none fails because of it.
 Estimates from a local server, not a production measurement; step 2 (c) gives
@@ -4809,7 +4817,7 @@ race is tried again (above).
 (a) Step 2 (a) again: `migrations` 66, `newest` 1792976742588 (0065's journal
 stamp).
 
-(b) Step 2 (b) again: now `entry_phase_column` 1, `step_c_relations` 2,
+(b) Step 2 (b) again: now `step_c_columns` 2, `step_c_relations` 2,
 `step_c_functions` 32, `code_trigger` 1 and `change_order_guard` 1.
 
 (c) The codes table: one row, with `rls` true, `forced` true, `policies` 1,
@@ -4877,8 +4885,9 @@ step 2 (g) was 0 and 0).
 (g) Step 2 (e) again: now `policies` 81 and `restrictive` 15.
 
 (h) Every delivery begins in design, the new checks and index are valid, and
-every live delivery link says its `entry_phase`: one row, `not_design` 0,
-`valid_checks` 2, `valid_light_index` 1, `links_phase_wrong` 0.
+every live delivery link says its `entry_phase`, and no change-order event
+is marked as recorded on paper: one row, `not_design` 0, `valid_checks` 2,
+`valid_light_index` 1, `links_phase_wrong` 0, `paper_decisions` 0.
 
 ```sql
 -- Step C step 4 (h): the new column, checks and index. Run this one alone.
@@ -4890,7 +4899,8 @@ select (select count(*) from public.design_engagements where entry_phase <> 'des
          where c.relname = 'design_engagements_one_light_per_project_client' and i.indisvalid) as valid_light_index,
        (select count(*) from public.design_engagements d
          cross join lateral (select public.app_delivery_by_token(d.token_hash) as link) l
-         where l.link is not null and l.link ->> 'entry_phase' is distinct from d.entry_phase) as links_phase_wrong;
+         where l.link is not null and l.link ->> 'entry_phase' is distinct from d.entry_phase) as links_phase_wrong,
+       (select count(*) from public.variation_order_events where recorded_on_paper) as paper_decisions;
 ```
 
 (i) Step 2 (f) again: about the same size as before (the new table is empty;
@@ -4958,7 +4968,7 @@ rewritten functions, the delivery link without `entry_phase`, the execution
 card without the light scope and the old change-order trigger; then one SQL
 block that removes what that code does not know (the codes table's trigger
 and the 32 functions). It leaves 0065 itself
-alone: the new column, the checks, the index and the empty codes table stay
+alone: the two new columns, the checks, the index and the empty codes table stay
 (forced, with no policy, so `metra_app` reads nothing in it; the current site
 never touches it). Afterwards the database is exactly as it was before step 3,
 but for those 0065 objects: rehearsed, a catalogue comparison found zero other
@@ -5056,7 +5066,7 @@ Expected: `Success. No rows returned`. Run it at the same quiet hour: the
 up after 3 s. If it fails with `canceling statement due to lock timeout`,
 nothing was dropped (the editor runs the block as one transaction): run the
 same block again a minute later, until it succeeds. Then, read-only, each
-block ON ITS OWN: step 2 (b) again (now `entry_phase_column` 1,
+block ON ITS OWN: step 2 (b) again (now `step_c_columns` 2,
 `step_c_relations` 2, and 0, 0, 0: the 0065 objects stay, the rest is gone),
 step 2 (d) again (the same four fingerprints) and step 2 (e) again (80 and 15).
 Then step 5 again: everything works as it did before step 3. Put the checkout
@@ -5076,12 +5086,14 @@ says); then step 4 and on.
 the version that served before the merge (`npx wrangler deployments list`).
 Leave the database alone: the older Worker runs on it (see THE ORDER).
 
-**(2) The schema** (the column, the index and the codes table): only if the
-client home is abandoned, and only while no light delivery and no code exists
-(step 2 (b)'s companions: `select count(*) from public.design_engagements
-where entry_phase = 'execution'` and `select count(*) from
-public.client_verification_codes`, both 0). Tell the lead first: it is a
-revert of `rls/` and a new migration, never a hand edit here.
+**(2) The schema** (the two columns, the index and the codes table): only if
+the client home is abandoned, and only while no light delivery, no code and
+no paper decision exists (step 2 (b)'s companions: `select count(*) from
+public.design_engagements where entry_phase = 'execution'`, `select count(*)
+from public.client_verification_codes` and `select count(*) from
+public.variation_order_events where recorded_on_paper`, all 0). Tell the
+lead first: it is a revert of `rls/` and a new migration, never a hand edit
+here.
 
 **Rehearsed** (client home H3 and its fix round, Oct 26). After the fix
 round, every command and SQL block above was run again as written, at

@@ -8,14 +8,15 @@ import { withoutSqlComments } from './rls-catalogue';
 // 0064 pattern it must keep, pinned so an edit cannot quietly undo them. The
 // rehearsal in docs/DEPLOY.md measures them live.
 //
-//   * ALL-OR-NONE LOCKS. design_engagements (the row every client act locks)
-//     and organizations are taken as ONE attempt of `LOCK TABLE ... NOWAIT` in
-//     a subtransaction, retried with a short sleep within one 3 s budget, so
-//     the migration never WAITS on one table while it holds the other.
+//   * ALL-OR-NONE LOCKS. design_engagements (the row every client act locks),
+//     organizations and variation_order_events are taken as ONE attempt of
+//     `LOCK TABLE ... NOWAIT` in a subtransaction, retried with a short sleep
+//     within one 3 s budget, so the migration never WAITS on one table while it
+//     holds another.
 //   * CLOSED FROM BIRTH. RLS is enabled and forced on client_verification_codes
 //     in the migration itself, so an apply-rls that stops before
 //     policies/36-client-home.sql leaves it denying everything, never open.
-//   * EXPAND ONLY. No row is updated: the new column arrives with a constant
+//   * EXPAND ONLY. No row is updated: the new columns arrive with a constant
 //     default, which is catalogue only.
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
@@ -24,9 +25,13 @@ const sql = withoutSqlComments(readFileSync(resolve(here, '../../migrations/0065
 describe('0065 takes its locks all or none', () => {
   const lockBlock = sql.slice(0, sql.indexOf('ALTER TABLE public.design_engagements ADD COLUMN entry_phase'));
 
-  it('names the two existing tables, in one fixed order, before any DDL', () => {
+  it('names the three existing tables, in one fixed order, before any DDL', () => {
     const targets = [...lockBlock.matchAll(/'public\.(\w+):([A-Z ]+)'/g)].map((match) => `${match[1]} ${match[2]}`);
-    expect(targets).toEqual(['design_engagements ACCESS EXCLUSIVE', 'organizations SHARE ROW EXCLUSIVE']);
+    expect(targets).toEqual([
+      'design_engagements ACCESS EXCLUSIVE',
+      'organizations SHARE ROW EXCLUSIVE',
+      'variation_order_events ACCESS EXCLUSIVE',
+    ]);
   });
 
   it('never waits for a lock: every LOCK TABLE is NOWAIT, and no lock_timeout is set for one', () => {
@@ -45,9 +50,10 @@ describe('0065 takes its locks all or none', () => {
     expect(attempt).toMatch(/PERFORM pg_sleep\(0\.01 \+ random\(\) \* 0\.03\)/);
   });
 
-  it('changes design_engagements only inside the locked block', () => {
+  it('changes design_engagements and variation_order_events only inside the locked block', () => {
     const afterBlock = sql.slice(sql.indexOf('END $$;'));
     expect(afterBlock).not.toMatch(/ALTER TABLE public\.design_engagements|ON public\.design_engagements/);
+    expect(afterBlock).not.toMatch(/variation_order_events/);
   });
 });
 
@@ -65,5 +71,6 @@ describe('0065 creates the codes table closed, and only expands', () => {
   it('updates no row and adds the column with a constant default', () => {
     expect(sql).not.toMatch(/\bUPDATE\s+public\./i);
     expect(sql).toContain("ADD COLUMN entry_phase text DEFAULT 'design' NOT NULL;");
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS recorded_on_paper boolean NOT NULL DEFAULT false;');
   });
 });

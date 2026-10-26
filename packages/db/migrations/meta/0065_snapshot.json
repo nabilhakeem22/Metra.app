@@ -1,5 +1,5 @@
 {
-  "id": "a8a0263d-a294-4373-9929-7918cfe6a2a1",
+  "id": "0d735a61-89a0-42fc-b1a2-3d3868aa7d9e",
   "prevId": "0162b17b-e3d3-46b7-956f-f5b345e1168f",
   "version": "7",
   "dialect": "postgresql",
@@ -7782,6 +7782,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "recorded_on_paper": {
+          "name": "recorded_on_paper",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "decided_at": {
           "name": "decided_at",
