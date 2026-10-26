@@ -1,0 +1,24 @@
+import { describe, expect, it } from 'vitest';
+import { totalIsQuantityTimesPrice } from './line-product';
+
+// H6-read F4: the narrow line's "×" claims quantity × unit price = total, so it
+// is shown only when that holds.
+
+describe('totalIsQuantityTimesPrice', () => {
+  it.each([
+    ['220.0000', '65.0000', '14300.0000'],
+    ['0.0001', '0.0000', '0.0000'],
+    ['1234.5678', '99.9900', '123444.4343'],
+    ['0.1250', '125000.2500', '15625.0313'],
+  ])('%s × %s is %s: true', (qty, unitPrice, lineTotal) => {
+    expect(totalIsQuantityTimesPrice({ qty, unit_price: unitPrice, line_total: lineTotal })).toBe(true);
+  });
+
+  it('a line with its own 10% discount: false (1,234.5678 × 99.99 is 123,444.4343, not 111,099.99)', () => {
+    expect(totalIsQuantityTimesPrice({ qty: '1234.5678', unit_price: '99.9900', line_total: '111099.9900' })).toBe(false);
+  });
+
+  it('reads the stored figures whatever their trailing zeros', () => {
+    expect(totalIsQuantityTimesPrice({ qty: '2', unit_price: '1500', line_total: '3000.0000' })).toBe(true);
+  });
+});

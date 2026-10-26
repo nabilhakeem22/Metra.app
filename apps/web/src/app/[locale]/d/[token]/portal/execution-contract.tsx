@@ -84,7 +84,8 @@ export function ExecutionContract({
             {contract.revisedFinish && contract.status !== 'terminated' && <Fact label={t('expectedFinish')}>{day(contract.revisedFinish)}</Fact>}
             {contract.terminatedAt && <Fact label={t('terminatedOn')}>{day(contract.terminatedAt)}</Fact>}
           </dl>
-          {contract.status !== 'terminated' && <ContractDocumentDisclosure token={token} contractId={contract.id} />}
+          {/* Keyed by the contract: a page read again naming another one never keeps the old document under it. */}
+          {contract.status !== 'terminated' && <ContractDocumentDisclosure key={contract.id} token={token} contractId={contract.id} />}
           {contract.status === 'issued' && (
             <p className="rounded-item bg-muted/50 p-3 text-caption text-muted-foreground">
               {t(contract.signingOpen ? 'signWithLink' : 'signingClosed', { studio: firmName })}

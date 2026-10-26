@@ -38,6 +38,8 @@ const SNAPSHOT = {
   terms_en: 'Terms',
   lines_digest: 'ab'.repeat(32),
   org: { name_ar: 'نون', name_en: 'Noon', logo_file_id: null },
+  discount_pct: '5.0000',
+  discount_amount: '52.6316',
   taxable_base: '1000.0000',
   tax_rate: '14.0000',
   tax_amount: '140.0000',
@@ -72,6 +74,8 @@ describe('opening the contract document', () => {
     if (!answer.ok) return;
     expect(answer.contract.id).toBe(CONTRACT_ID);
     expect(answer.contract.total).toBe('1240.0000');
+    // The BOQ's discount, so the figures add up to the works value (H6-read F3).
+    expect(answer.contract).toMatchObject({ discount_pct: '5.0000', discount_amount: '52.6316' });
     for (const kept of ['terms_ar', 'terms_en', 'lines_digest', 'org', 'number', 'status']) expect(answer.contract).not.toHaveProperty(kept);
   });
 

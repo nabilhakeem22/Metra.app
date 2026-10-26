@@ -79,4 +79,24 @@ describe('the 390 px layout', () => {
     expect(total.className).toContain('row-span-2');
     for (const figure of [quantity, unitPrice, total]) expect(figure.className).toContain('whitespace-nowrap');
   });
+
+  test('a long unbroken word breaks inside the description, the one cell that shrinks; the figures never break (H6-read F2)', () => {
+    renderRow({ ...LINE, description_en: `https://catalogue.example.test/${'X'.repeat(120)}` }, 'en');
+    const [description, ...figures] = screen.getAllByRole('cell');
+    expect(description.className.split(' ')).toContain('[overflow-wrap:anywhere]');
+    for (const figure of figures) expect(figure.className.split(' ')).not.toContain('[overflow-wrap:anywhere]');
+  });
+});
+
+describe('the narrow line "×" (H6-read F4)', () => {
+  test('shown when the total is quantity × unit price', () => {
+    renderRow({ ...LINE, qty: '220.0000', unit_price: '65.0000', line_total: '14300.0000' }, 'en');
+    expect(cells()[2]).toBe('× 65.00 EGP');
+  });
+
+  test('a line with its own discount shows its unit price without the "×" the figures would contradict', () => {
+    renderRow({ ...LINE, qty: '1234.5678', unit_price: '99.9900', discount_pct: '10.0000', line_total: '111099.9900' }, 'en');
+    expect(cells()[2]).toBe('99.99 EGP');
+    expect(cells()[3]).toBe('111,099.99 EGP');
+  });
 });

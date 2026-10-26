@@ -13,7 +13,8 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
  * client home, each row with what it bills: the SAME `milestoneAmounts` the
  * payment requests are issued with, on the contract value, the last row taking
  * the rounding remainder. A row's share keeps its distance from its amount,
- * and an amount never breaks from its currency. `flat` as for the section list.
+ * an amount never breaks from its currency, and a long unbroken label breaks
+ * rather than scroll the page sideways. `flat` as for the section list.
  */
 export function ContractScheduleCard({ contract, flat = false }: { contract: ContractDocument; flat?: boolean }) {
   const t = useTranslations('portal.contract.schedule');
@@ -36,7 +37,7 @@ export function ContractScheduleCard({ contract, flat = false }: { contract: Con
           <tbody>
             {rows.map((row, index) => (
               <tr key={row.sortOrder} className="border-b last:border-0">
-                <td className="py-2">{pickLocale(row, 'label', locale).value}</td>
+                <td className="py-2 [overflow-wrap:anywhere]">{pickLocale(row, 'label', locale).value}</td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" dir="ltr">
                   {row.basis === 'percent' ? formatPercent(row.value, locale) : null}
                 </td>

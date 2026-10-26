@@ -24,6 +24,8 @@ export function contractDocumentOf(contract: PublicContract): ContractDocument {
   return {
     id: contract.id,
     source: contract.source,
+    discount_pct: contract.discount_pct,
+    discount_amount: contract.discount_amount,
     taxable_base: contract.taxable_base,
     tax_rate: contract.tax_rate,
     tax_amount: contract.tax_amount,

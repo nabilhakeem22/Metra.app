@@ -105,6 +105,8 @@ export type ContractDocument = Pick<
   PublicContract,
   | 'id'
   | 'source'
+  | 'discount_pct'
+  | 'discount_amount'
   | 'taxable_base'
   | 'tax_rate'
   | 'tax_amount'

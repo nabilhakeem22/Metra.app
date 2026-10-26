@@ -16,10 +16,18 @@ import { ContractLineRow } from './line-row';
 type PageAnswer<P> = { ok: true; page: P } | { ok: false; error: string; reference?: string };
 
 /** What a "show more" left on screen: a shared portal failure, or the list's own sentence. */
-type LoadProblem = { failure: ShownPortalFailure } | { own: 'gone' | 'loadFailed' | 'loadSectionsFailed' };
+type LoadProblem = { failure: ShownPortalFailure } | { own: OwnSentence };
+
+/** The list's own sentences (portal.contract.lines). */
+type OwnSentence = 'gone' | 'loadFailed' | 'sectionsGone' | 'loadSectionsFailed';
 
 /** The key of the list's own ask; a section's lines are asked under the section's id. */
 const SECTIONS = 'sections';
+
+/** The list's own sentences for an ask under `key`: what it says when the read is gone, or failed on the way. */
+function ownSentencesOf(key: string): { gone: OwnSentence; failed: OwnSentence } {
+  return key === SECTIONS ? { gone: 'sectionsGone', failed: 'loadSectionsFailed' } : { gone: 'gone', failed: 'loadFailed' };
+}
 
 /**
  * A client's contract sections, as ONE list (A3 reliability R1), on /c and in
@@ -66,15 +74,16 @@ export function ContractSectionList({
     setAsking(key);
     setProblems(({ [key]: _cleared, ...rest }) => rest);
     const said = (problem: LoadProblem) => setProblems((current) => ({ ...current, [key]: problem }));
+    const sentences = ownSentencesOf(key);
     startTransition(async () => {
       try {
         const answer = await run();
         if (answer.ok) keep(answer.page);
-        else if (answer.error === 'gone') said({ own: 'gone' });
+        else if (answer.error === 'gone') said({ own: sentences.gone });
         // Anything but `gone` is a shared portal failure (too_many, uncertain, generic).
         else said({ failure: { error: answer.error, reference: answer.reference } as ShownPortalFailure });
       } catch {
-        said({ own: key === SECTIONS ? 'loadSectionsFailed' : 'loadFailed' });
+        said({ own: sentences.failed });
       } finally {
         inFlight.current.delete(key);
       }
@@ -114,7 +123,7 @@ export function ContractSectionList({
       <Card key={summary.id} flat={flat}>
         <CardContent className="p-0">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
-            <h2 className="text-body font-semibold">{text(summary.title_ar, summary.title_en)}</h2>
+            <h2 className="text-body font-semibold [overflow-wrap:anywhere]">{text(summary.title_ar, summary.title_en)}</h2>
             <span className="whitespace-nowrap font-mono tabular-nums text-body" dir="ltr">{formatMoney(summary.section_subtotal, locale)}</span>
           </div>
           {shown.length > 0 && (

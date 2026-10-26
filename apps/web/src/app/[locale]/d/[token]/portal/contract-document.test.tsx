@@ -1,6 +1,9 @@
 import { act, fireEvent, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { HomeExecution } from '@/lib/client-home/types';
 import type { PublicContract, PublicContractLine } from '@/lib/contracts/public-types';
+import { homePayload } from '@/test/client-home-payloads';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 
 // H6.2, the read: the Execution tab's contract opens in full on the client's
@@ -27,6 +30,8 @@ vi.mock('@/app/[locale]/c/[token]/actions', () => ({
 const { contractDocumentOf } = await import('@/lib/client-home/contract');
 const { PublicContractView } = await import('@/app/[locale]/c/[token]/public-contract');
 const { ContractDocumentDisclosure } = await import('./contract-document');
+const { ExecutionContract } = await import('./execution-contract');
+const { shapeHome } = await import('@/lib/client-home/shape');
 
 const CONTRACT_ID = '0b6f8e0c-2c1d-4c55-9c1a-6a1c8f0d0001';
 
@@ -77,6 +82,18 @@ const CONTRACT = {
   ],
 } as unknown as PublicContract;
 
+const REISSUED_ID = '0b6f8e0c-2c1d-4c55-9c1a-6a1c8f0d0009';
+
+/** The Execution tab's card naming an issued contract; `nameContract` re-reads the page with another id named (a refresh after a re-issue). */
+let nameContract: (contractId: string) => void = () => {};
+function RefreshedCard() {
+  const execution = shapeHome(homePayload('sign_contract'))?.execution as HomeExecution;
+  const [contractId, setContractId] = useState(CONTRACT_ID);
+  nameContract = setContractId;
+  const named = { ...execution, contract: execution.contract && { ...execution.contract, id: contractId } };
+  return <ExecutionContract token="tok" execution={named} firmName="Noon" showsDesignRecord={false} />;
+}
+
 const LATER_LINES = { section_id: 's-2', offset: 0, line_count: 2, lines: [line(4, 'pcs', '42.0000'), line(5, 'roll', '3.5000')] };
 
 /** The markup with every class dropped: /c draws glass cards, the home flat ones; nothing else may differ. */
@@ -115,6 +132,33 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the contract in the client home (%s)
     await tap(at('delivery.contract.document.show'));
     expect(document.getElementById('home-contract-document')?.hidden).toBe(false);
     expect(home.open).toHaveBeenCalledTimes(1);
+  });
+
+  test('two taps in the same tick read once (H6-read F6); a failed read can be asked again', async () => {
+    let answer: (value: unknown) => void = () => {};
+    home.open.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    renderWithIntl(<ContractDocumentDisclosure token="tok" contractId={CONTRACT_ID} />, { locale });
+    const toggle = screen.getByRole('button', { name: at('delivery.contract.document.show') });
+    await act(async () => {
+      toggle.click();
+      toggle.click();
+    });
+    await act(async () => answer({ ok: false, error: 'gone' }));
+    expect(home.open).toHaveBeenCalledTimes(1);
+    await tap(at('delivery.contract.document.show'));
+    expect(home.open).toHaveBeenCalledTimes(2);
+    expect(document.getElementById('home-contract-document')).not.toBeNull();
+  });
+
+  test('a card that comes to name another contract never keeps the old document under it (key={contract.id})', async () => {
+    renderWithIntl(<RefreshedCard />, { locale });
+    await tap(at('delivery.contract.document.show'));
+    expect(document.getElementById('home-contract-document')).not.toBeNull();
+    await act(async () => nameContract(REISSUED_ID));
+    expect(document.getElementById('home-contract-document')).toBeNull();
+    expect(screen.getByRole('button', { name: at('delivery.contract.document.show') }).getAttribute('aria-expanded')).toBe('false');
+    await tap(at('delivery.contract.document.show'));
+    expect(home.open).toHaveBeenLastCalledWith('tok', REISSUED_ID);
   });
 
   test('a collapsed section reads its lines once, through the home link, when expanded', async () => {

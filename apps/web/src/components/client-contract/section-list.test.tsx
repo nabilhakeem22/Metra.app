@@ -108,6 +108,17 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a client contract section (%s)', (lo
     expect(screen.getByRole('button', { name: at('portal.contract.lines.moreSections', 10) })).toBeTruthy();
   });
 
+  test('a "show more sections" that answers gone says the sections are gone, not lines, and keeps the list (H6-read F5)', async () => {
+    renderList(Array.from({ length: 50 }, (_, n) => collapsed(n)), 60, locale);
+    loaders.sections.mockResolvedValueOnce({ ok: false, error: 'gone' });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('portal.contract.lines.moreSections', 10) }));
+    });
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'portal.contract.lines.sectionsGone'));
+    expect(messageAt(locale, 'portal.contract.lines.sectionsGone')).not.toBe(messageAt(locale, 'portal.contract.lines.gone'));
+    expect(screen.getAllByRole('heading')).toHaveLength(50);
+  });
+
   test('"show more sections" asks from the sections shown, adds 50 collapsed, and goes when none remain (R1)', async () => {
     renderList(Array.from({ length: 50 }, (_, n) => collapsed(n)), 60, locale);
     expect(screen.getAllByRole('heading')).toHaveLength(50);
@@ -124,5 +135,12 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a client contract section (%s)', (lo
     });
     expect(loaders.lines).toHaveBeenLastCalledWith('s-55', 0);
     expect(screen.getAllByRole('row')).toHaveLength(3);
+  });
+});
+
+describe('a long unbroken section title (H6-read F2)', () => {
+  test('breaks rather than push its subtotal off the card', () => {
+    renderList([{ ...SECTION, title_en: 'X'.repeat(200) }], 1, 'en');
+    expect(screen.getByRole('heading').className.split(' ')).toContain('[overflow-wrap:anywhere]');
   });
 });

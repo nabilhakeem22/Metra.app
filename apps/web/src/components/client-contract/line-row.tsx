@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useClientUnitName } from '@/components/share/use-client-unit-name';
+import { totalIsQuantityTimesPrice } from '@/lib/contracts/line-product';
 import type { PublicContractLine } from '@/lib/contracts/public-types';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
@@ -29,7 +30,8 @@ export function ContractLineRow({ line }: { line: PublicContractLine }) {
 
   return (
     <tr className={ROW}>
-      <td className={`col-span-2 ${WIDE_CELL}`}>
+      {/* The one cell that shrinks: a long unbroken word (a pasted link, a code) breaks rather than widen the row past its card. */}
+      <td className={`col-span-2 [overflow-wrap:anywhere] ${WIDE_CELL}`}>
         {/* The code's own direction stays inside; the gap after it follows the page's. */}
         {line.item_code && (
           <span className="me-2 text-muted-foreground">
@@ -45,9 +47,9 @@ export function ContractLineRow({ line }: { line: PublicContractLine }) {
         </span>{' '}
         {unitName(line.unit)}
       </td>
-      {/* Stacked, the "×" leads in the page's direction; as a table cell, the figure sits as the total's does (LTR, at its end). */}
+      {/* Stacked, the "×" leads in the page's direction, and only when the total IS the product (no discount of the line's own); as a table cell, the figure sits as the total's does (LTR, at its end). */}
       <td className={`col-start-1 row-start-3 justify-self-start whitespace-nowrap text-end font-mono tabular-nums [@container(min-width:36rem)]:[direction:ltr] ${WIDE_CELL}`}>
-        <span aria-hidden className="text-muted-foreground [@container(min-width:36rem)]:hidden">× </span>
+        {totalIsQuantityTimesPrice(line) && <span aria-hidden className="text-muted-foreground [@container(min-width:36rem)]:hidden">× </span>}
         <span dir="ltr">{formatMoney(line.unit_price, locale)}</span>
       </td>
       <td className={`col-start-2 row-span-2 row-start-2 self-center whitespace-nowrap text-end font-mono tabular-nums ${WIDE_CELL}`} dir="ltr">
