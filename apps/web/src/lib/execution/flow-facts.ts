@@ -12,7 +12,7 @@ import type { ContractMoneyFacts, ExecutionFlowSource } from './flow-source';
 import { billingBalance, finalAccountBalance } from './money/final-account';
 import type { ExecutionContractFacts } from './stage';
 
-export interface ExecutionCardContract {
+interface ExecutionCardContract {
   id: string;
   number: number;
   createdAt: string;
@@ -68,7 +68,7 @@ function requiredMeasuredWorks(billing: SignedContractBilling): string {
 }
 
 /** What a signed contract's billing reads: its money facts, and its measured works until a final account is issued. */
-export interface SignedContractBilling {
+interface SignedContractBilling {
   money: ContractMoneyFacts;
   /** Null once a final account request is issued (its figures replace the measurement). */
   measuredWorks: string | null;

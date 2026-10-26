@@ -34,7 +34,7 @@ export interface ContractMoneyFacts {
 }
 
 /** The delivery's contract, as the fact source names it, with what its stage is derived from. */
-export interface FlowSourceContract {
+interface FlowSourceContract {
   id: string;
   number: number;
   /** ISO instant. */

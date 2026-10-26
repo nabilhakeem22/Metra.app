@@ -91,5 +91,3 @@ export const clientVerificationCodes = pgTable(
     index('client_verification_codes_created_idx').on(t.createdAt),
   ],
 );
-
-export type ClientVerificationCode = typeof clientVerificationCodes.$inferSelect;
