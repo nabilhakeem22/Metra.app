@@ -9,7 +9,7 @@ import { wholeNumberInRange } from '@/lib/validation/number-field-rules';
 export const TIME_EXTENSION_FIELD = 'timeExtensionDays';
 
 /** The DB CHECK's inclusive range; the box takes the same bounds. */
-export const TIME_EXTENSION_DAYS = { min: 0, max: 3650 } as const;
+const TIME_EXTENSION_DAYS = { min: 0, max: 3650 } as const;
 
 /** Latin digits only (the server stays strict), with an optional sign and fraction. */
 const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;

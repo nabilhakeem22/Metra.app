@@ -4,13 +4,13 @@ import { figureOf, type LineState, type SectionState } from './builder-model';
 // React, no db. It was an untested closure inside a 243-line component, which is
 // an odd place for the function that shapes the document a studio sends out.
 
-export interface ProposalPayloadHeader {
+interface ProposalPayloadHeader {
   discountPct: string;
   taxRate: string;
   supervisionPct: string;
 }
 
-export interface ProposalPayloadLine {
+interface ProposalPayloadLine {
   /** The stable id, round-tripped so the server preserves this line's STORED
    *  cost. Ids are not secret, so it is sent even when margin is hidden. */
   id: string | null;
@@ -28,7 +28,7 @@ export interface ProposalPayloadLine {
   sortOrder: number;
 }
 
-export interface ProposalPayloadSection {
+interface ProposalPayloadSection {
   /** The stored id (null for a section not yet stored): an unchanged section is
    *  then not rewritten by the save. */
   id: string | null;

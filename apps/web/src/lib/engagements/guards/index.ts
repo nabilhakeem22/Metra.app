@@ -8,7 +8,7 @@
 // module-private helpers that compose into `GUARDS` — only the original public
 // names are re-exported here. Pure structural refactor — no guard, type, or
 // behaviour changed.
-export type { GuardFacts, GuardResult, GuardKey } from './facts';
+export type { GuardFacts, GuardKey } from './facts';
 export { milestoneRequired4, milestoneShortfall4 } from './milestone-math';
 export { MONEY_GUARD_MILESTONE, moneyGuardOf } from './trigger-money-gate';
 export { GUARDS } from './registry';

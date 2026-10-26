@@ -13,7 +13,7 @@ import { boundedText, requiredText } from '@/lib/validation/text-field-rules';
 import { milestoneAmounts } from './milestone-amounts';
 
 export const MAX_SCHEDULE_ROWS = 12;
-export const MAX_SCHEDULE_LABEL_CHARS = 80;
+const MAX_SCHEDULE_LABEL_CHARS = 80;
 
 /** The smallest row a schedule takes: one piastre, or 0.01 percent. */
 const MIN_ROW_VALUE = '0.01';

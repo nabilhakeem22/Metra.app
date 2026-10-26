@@ -8,7 +8,7 @@ import { ImageTile } from './image-tile';
 import { Lightbox } from './lightbox';
 
 /** How many pictures the strip shows before "View all". */
-export const WORK_STRIP_MAX = 4;
+const WORK_STRIP_MAX = 4;
 
 const TEXT_LINK =
   'inline-flex min-h-11 items-center gap-1.5 rounded-pill px-1 text-body font-medium text-primary underline-offset-4 hover:underline';

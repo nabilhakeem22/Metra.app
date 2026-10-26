@@ -13,8 +13,8 @@
  * audiences, two ceilings; merging them would silently change one of them.
  */
 
-export const LIST_DEFAULT_LIMIT = 100;
-export const LIST_MAX_LIMIT = 500;
+const LIST_DEFAULT_LIMIT = 100;
+const LIST_MAX_LIMIT = 500;
 
 export interface PageFilter {
   limit?: number;

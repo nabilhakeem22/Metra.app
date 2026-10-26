@@ -26,7 +26,7 @@ import { sendDeliveryFollowupEmail } from '@/lib/email/delivery-senders';
 import { emailDeliveryLabel } from '@/lib/engagements/client-acts/email-label';
 
 /** Deliveries followed up per org per Cairo day at most (A12). */
-export const DELIVERY_FOLLOWUPS_PER_DAY = 10;
+const DELIVERY_FOLLOWUPS_PER_DAY = 10;
 
 type WaitingDelivery = InFlightDelivery & { days: number };
 
@@ -34,7 +34,7 @@ type WaitingDelivery = InFlightDelivery & { days: number };
  * The client's move for at least `thresholdDays` since the wait began
  * (`waitingSince`, not the last write), the longest wait first.
  */
-export function followupCandidates(
+function followupCandidates(
   deliveries: readonly InFlightDelivery[],
   thresholdDays: number,
   now: Date,

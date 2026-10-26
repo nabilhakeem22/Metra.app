@@ -21,7 +21,7 @@ export interface OrgProfileText {
   taxRegistrationNumber?: string | null;
 }
 
-export interface OrgProfileValues {
+interface OrgProfileValues {
   nameEn: string | null;
   nameAr: string | null;
   city: string | null;

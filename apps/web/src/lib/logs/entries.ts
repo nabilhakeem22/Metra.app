@@ -10,7 +10,7 @@
 // The merge shape lives here, apart from either reader, so the two never grow
 // incompatible ideas of what an entry is.
 
-export type LogSource = 'activity' | 'audit';
+type LogSource = 'activity' | 'audit';
 
 export interface LogEntry {
   /** Unique across BOTH sources — prefixed, because an activity id and an audit id

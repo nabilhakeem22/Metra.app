@@ -35,11 +35,11 @@ export interface BoqLayout {
   showDiscount: boolean;
 }
 
-export const pickText = (locale: string, ar: string, en: string) =>
+const pickText = (locale: string, ar: string, en: string) =>
   esc(locale.startsWith('ar') ? ar : en);
 
 /** Columns before the amount: description, unit, qty, rate, [disc], [cost x2]. */
-export function boqColumnCount(layout: BoqLayout): number {
+function boqColumnCount(layout: BoqLayout): number {
   return 5 + (layout.showDiscount ? 1 : 0) + (layout.showCost ? 2 : 0);
 }
 

@@ -22,7 +22,7 @@ export function newStaging(): Staging {
 }
 
 /** A stand-in PDF per period: one PDF published for two periods is B11. */
-export function pdfFor(staging: Staging, period: string): string {
+function pdfFor(staging: Staging, period: string): string {
   const path = join(staging.dir, `bulletin-${period}.pdf`);
   writeFileSync(path, `the ${period} bulletin PDF, as received`);
   return path;

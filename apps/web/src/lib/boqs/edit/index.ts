@@ -4,7 +4,7 @@
 // import site — including two dbtests this wave may not edit — keeps resolving
 // unchanged. Pure structural refactor: no SQL, no statement order and no
 // transaction boundary changed.
-export { updateBoqLineCore, type UpdateBoqLineInput } from './line-write';
+export { updateBoqLineCore } from './line-write';
 export { addBoqLineCore } from './line-add';
 export { deleteBoqLineCore } from './line-delete';
 export { addBoqSectionCore } from './section';

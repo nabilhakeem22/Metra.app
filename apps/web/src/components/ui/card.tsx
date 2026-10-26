@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 // and NO backdrop-filter — for a card that must not spend blur budget: a card
 // nested inside another glass Card, or a transient onboarding surface. Mirrors
 // the flat-panel treatment already used by the engagement rail/panels.
-export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   flat?: boolean;
 }
 
@@ -78,23 +78,10 @@ const CardContent = React.forwardRef<
 ));
 CardContent.displayName = 'CardContent';
 
-const CardFooter = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex items-center px-5 pb-4 pt-0', className)}
-    {...props}
-  />
-));
-CardFooter.displayName = 'CardFooter';
-
 export {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 };

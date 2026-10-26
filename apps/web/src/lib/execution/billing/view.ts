@@ -22,7 +22,7 @@ import {
   type PaymentRequestRow,
 } from '../requests/queries';
 
-export interface ScheduleBillingRow {
+interface ScheduleBillingRow {
   id: string;
   labelAr: string | null;
   labelEn: string | null;

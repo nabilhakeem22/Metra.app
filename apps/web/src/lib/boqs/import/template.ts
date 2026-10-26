@@ -56,7 +56,7 @@ function csvCell(value: string): string {
 }
 
 /** One price-book item, as the template lists it. */
-export interface TemplateItem {
+interface TemplateItem {
   code: string;
   description: string;
   unit: string;

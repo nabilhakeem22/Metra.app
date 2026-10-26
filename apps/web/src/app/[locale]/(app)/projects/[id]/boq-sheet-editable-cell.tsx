@@ -18,7 +18,7 @@ const CELL_INPUT_CLASS =
  * boq-sheet-focus.ts — so it is load-bearing, not a styling hook. A refused
  * cell is marked and its sentence said under it (`refusal`, resolved).
  */
-export function BoqCellInput({
+function BoqCellInput({
   id,
   value,
   onChange,

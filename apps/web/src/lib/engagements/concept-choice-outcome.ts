@@ -22,7 +22,7 @@ export type ConceptChoiceOutcome =
   | PortalActError;
 
 /** The two respond verbs of the concept review (app_delivery_respond_by_token). */
-export const CONCEPT_VERBS = ['approve_concept', 'request_concept_changes'] as const;
+const CONCEPT_VERBS = ['approve_concept', 'request_concept_changes'] as const;
 export type ConceptVerb = (typeof CONCEPT_VERBS)[number];
 
 export function isConceptVerb(verb: unknown): verb is ConceptVerb {

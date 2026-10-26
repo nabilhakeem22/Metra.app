@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 /** How long "Copied" stays on the button. */
-export const COPIED_FOR_MS = 2000;
+const COPIED_FOR_MS = 2000;
 
 type CopyState = 'idle' | 'copied' | 'failed';
 

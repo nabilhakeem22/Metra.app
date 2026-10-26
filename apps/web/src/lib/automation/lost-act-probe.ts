@@ -22,8 +22,8 @@ import { sql, type SQL } from 'drizzle-orm';
 import type { AutomationDeps } from './types';
 
 /** The sweep's window (app_notify_lost_client_acts): acts 10 minutes to 48 hours old. */
-export const LOST_ACT_LOOKBACK_MS = 48 * 60 * 60 * 1000;
-export const LOST_ACT_SETTLE_MS = 10 * 60 * 1000;
+const LOST_ACT_LOOKBACK_MS = 48 * 60 * 60 * 1000;
+const LOST_ACT_SETTLE_MS = 10 * 60 * 1000;
 
 export function lostActWindow(now: Date): { since: string; until: string } {
   return {

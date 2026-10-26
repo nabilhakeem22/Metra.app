@@ -16,8 +16,6 @@ import { loadContractSigning } from './signing';
 
 export type {
   ContractDetail,
-  ContractDetailLine,
-  ContractDetailSection,
   ContractHeaderDetail,
   ContractLineOption,
   ContractLineOptionsPage,
@@ -26,7 +24,6 @@ export type {
   ContractPageDetail,
   ContractSectionsPage,
   ContractSectionSummary,
-  ContractSigning,
 } from './detail-types';
 
 /**

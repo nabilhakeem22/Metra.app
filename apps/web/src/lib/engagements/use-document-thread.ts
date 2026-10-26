@@ -20,7 +20,7 @@ import { useState, useTransition } from 'react';
  * be widened to accommodate the other.
  */
 /** The error code of a thread that could not be READ (nothing was sent). */
-export const THREAD_LOAD_FAILED = 'load_failed';
+const THREAD_LOAD_FAILED = 'load_failed';
 
 export interface DocumentThread<TMessage> {
   /** Is the thread expanded? */

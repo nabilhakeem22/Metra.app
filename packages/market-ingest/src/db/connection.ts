@@ -14,7 +14,7 @@ export type Transaction = TransactionSql;
 /** Either handle: the history and catalogue reads run on both. */
 export type Queryable = PostgresJs | Transaction;
 
-export const DATABASE_URL_VARIABLE = 'MARKET_DATABASE_URL';
+const DATABASE_URL_VARIABLE = 'MARKET_DATABASE_URL';
 
 /**
  * How this CLI's sessions read in pg_stat_activity, so a lock holder names
@@ -43,7 +43,7 @@ function databaseUrl(): string {
   return url;
 }
 
-export function openDatabase(): PostgresJs {
+function openDatabase(): PostgresJs {
   return createSql(databaseUrl(), CLI_CONNECTION);
 }
 

@@ -8,7 +8,7 @@ import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-cal
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
 
-export interface PublicProposalLine {
+interface PublicProposalLine {
   id: string;
   description_ar: string | null;
   description_en: string | null;
@@ -20,7 +20,7 @@ export interface PublicProposalLine {
   sort_order: number;
 }
 
-export interface PublicProposalSection {
+interface PublicProposalSection {
   id: string;
   title_ar: string | null;
   title_en: string | null;

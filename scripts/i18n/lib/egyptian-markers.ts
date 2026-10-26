@@ -24,7 +24,7 @@
  * مشروع, so the gate does not try; style-guide.md and the human review own them.
  */
 
-export const EGYPTIAN_MARKERS: readonly string[] = [
+const EGYPTIAN_MARKERS: readonly string[] = [
   'ده', 'دي', 'مش', 'مفيش', 'مافيش', 'دلوقتي', 'تاني', 'عشان', 'علشان', 'لسه',
   'كده', 'كدا', 'إيه', 'ازاي', 'إزاي', 'إمتى', 'فين', 'ليه', 'اللي', 'بس',
   'عايز', 'عايزة', 'عايزين', 'زي', 'كمان', 'خلاص', 'معلش', 'بتاع', 'بتاعة',
@@ -34,13 +34,13 @@ export const EGYPTIAN_MARKERS: readonly string[] = [
 
 /** Transliterations that contain a listed word but are not Egyptian: removed
  *  from the text before matching. */
-export const EGYPTIAN_MARKER_ALLOWLIST: readonly string[] = ['دي لوكس', 'سي دي', 'دي جي'];
+const EGYPTIAN_MARKER_ALLOWLIST: readonly string[] = ['دي لوكس', 'سي دي', 'دي جي'];
 
 const FORMAT_AND_MARKS = /[\p{Cf}\p{Mn}\u0640]/gu;
 const WORD_SEPARATOR = /[^\p{L}\p{N}]+/u;
 
 /** The normal form both the list and the text are compared in. */
-export function normaliseArabic(text: string): string {
+function normaliseArabic(text: string): string {
   return text
     .replace(FORMAT_AND_MARKS, '')
     .replace(/ى/g, 'ي')

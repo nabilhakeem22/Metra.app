@@ -38,7 +38,7 @@ export interface NotificationFeed {
 }
 
 /** Where a notification points, by the entity it is about. */
-export const ENTITY_HREF: Record<string, (id: string) => string> = {
+const ENTITY_HREF: Record<string, (id: string) => string> = {
   proposal: (id) => `/proposals/${id}`,
   project: (id) => `/projects/${id}`,
   engagement: (id) => `/engagements/${id}`,

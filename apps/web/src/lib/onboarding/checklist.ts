@@ -11,7 +11,7 @@ import type {
 import type { OnboardingProgress } from './progress';
 import { shareDeliveryHref } from './share-delivery-href';
 
-export interface ChecklistItem {
+interface ChecklistItem {
   key: string;
   done: boolean;
   href: string;

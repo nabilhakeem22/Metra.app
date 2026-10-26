@@ -54,5 +54,3 @@ export const RLS_APPLY_ORDER = [
   'policies/60-market.sql',
   'policies/70-site.sql',
 ] as const;
-
-export type RlsFile = (typeof RLS_APPLY_ORDER)[number];

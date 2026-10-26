@@ -19,7 +19,7 @@ export const BOQ_ADD_BUTTON_CLASS =
 
 const BAND = 'border-y border-[color:var(--rule)] bg-[color:var(--track)]';
 
-export function BoqSectionHeaderRow({
+function BoqSectionHeaderRow({
   section,
   collapsed,
   colCount,

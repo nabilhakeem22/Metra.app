@@ -8,14 +8,14 @@ import { formatMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { ExecutionContractFacts } from '@/lib/execution/stage';
 import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 
-export type ModelRequestKind = 'milestone' | 'variation' | 'final_account';
-export type ModelRequestState = 'due' | 'claimed' | 'paid' | 'void' | 'partial' | 'partialClaimed';
+type ModelRequestKind = 'milestone' | 'variation' | 'final_account';
+type ModelRequestState = 'due' | 'claimed' | 'paid' | 'void' | 'partial' | 'partialClaimed';
 export interface ModelRequest {
   kind: ModelRequestKind;
   state: ModelRequestState;
 }
 
-export type ModelContract =
+type ModelContract =
   | 'no_boq'
   | 'no_contract'
   | 'draft_unscheduled'

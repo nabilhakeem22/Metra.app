@@ -7,11 +7,7 @@ import { loadProposalHeader } from './detail-header';
 import { loadProposalSections } from './detail-sections';
 import type { ProposalDetail } from './detail-types';
 
-export type {
-  ProposalDetail,
-  ProposalDetailLine,
-  ProposalDetailSection,
-} from './detail-types';
+export type { ProposalDetail } from './detail-types';
 
 async function loadDetail(
   ctx: OrgContext,

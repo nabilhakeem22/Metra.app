@@ -8,7 +8,7 @@ import { withOrgContext } from '@/lib/db/context';
  * The project's one active engagement, or null when there is none — or more than
  * one, because guessing between two is worse than asking.
  */
-export async function soleActiveEngagement(
+async function soleActiveEngagement(
   ctx: OrgContext,
   projectId: string,
 ): Promise<string | null> {

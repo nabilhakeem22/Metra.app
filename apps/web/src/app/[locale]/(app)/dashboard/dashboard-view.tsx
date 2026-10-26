@@ -21,13 +21,13 @@ import { RescueLedgerSection } from './rescue-ledger-section';
 // panel into the client bundle to make it testable, which is paying a production
 // cost for a test convenience.
 
-export interface DashboardIdentity {
+interface DashboardIdentity {
   role: MemberRole;
   orgName: { value: string; isFallback: boolean };
   primaryCta: { href: string; messageKey: string };
 }
 
-export interface DashboardOnboarding {
+interface DashboardOnboarding {
   checklist: ChecklistResult;
   orgId: string;
   dismissed: boolean;
@@ -41,7 +41,7 @@ export interface DashboardFirmBlock {
   canSeeTeam: boolean;
 }
 
-export interface DashboardDeliveriesBlock {
+interface DashboardDeliveriesBlock {
   rows: DashboardDelivery[];
   /** The TRUE count of in-flight deliveries, not rows.length. */
   totalActive: number;

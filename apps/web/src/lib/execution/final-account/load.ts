@@ -24,7 +24,7 @@ import type { ContractMoneyFacts } from '../flow-source';
 import { loadContractMoneyFacts } from '../queries/money-facts';
 import { listDifferencesAfter, loadMeasuredDifferences, type DifferenceRow, type DifferencesPage } from './differences';
 
-export interface FinalAccountDifference extends Omit<DifferenceRow, 'unitPrice' | 'discountPct'> {
+interface FinalAccountDifference extends Omit<DifferenceRow, 'unitPrice' | 'discountPct'> {
   residualQty: string;
   /** What the difference bills before the document discount; null on a flagged firm line. */
   works: string | null;
@@ -35,7 +35,7 @@ export interface FinalAccountDifferencesPage {
   nextCursor: string | null;
 }
 
-export interface IssuedFinalAccount {
+interface IssuedFinalAccount {
   id: string;
   documentNumber: string;
   amount: string;

@@ -36,7 +36,7 @@ export interface MarketSeededNames {
 }
 
 /** The studio's own price-book item linked to a market item (RLS: this studio's only). */
-export interface LinkedCostItem {
+interface LinkedCostItem {
   id: string;
   code: string;
 }
@@ -126,7 +126,7 @@ export interface PriceBookMarketColumn {
 }
 
 /** A market item the link combobox offers: one whose studio unit is the cost item's own. */
-export interface MarketLinkOption {
+interface MarketLinkOption {
   id: string;
   nameAr: string;
   nameEn: string;

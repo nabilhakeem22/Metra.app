@@ -43,7 +43,7 @@ export interface MappedBoqLine extends ProposalSourceLine {
   provisional: false;
 }
 
-export interface MappedBoqSection {
+interface MappedBoqSection {
   titleAr: string | null;
   titleEn: string | null;
   sortOrder: number;

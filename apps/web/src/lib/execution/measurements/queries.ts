@@ -14,7 +14,7 @@ import type { MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { everyWordSql } from '@/lib/search/words-sql';
 
-export const MEASURABLE_LINES_PAGE_SIZE = 50;
+const MEASURABLE_LINES_PAGE_SIZE = 50;
 
 export interface MeasurableLine {
   id: string;

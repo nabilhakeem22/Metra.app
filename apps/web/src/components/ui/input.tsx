@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 // Glass field: flat --glass fill + hairline at --r-item (no backdrop-filter, so
 // it never nests blur inside a .glass panel), brand focus ring visible over glass.

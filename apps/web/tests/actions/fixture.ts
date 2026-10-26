@@ -27,7 +27,7 @@ const OUTSTANDING_ORG_IDS = new Set<string>();
  * ISO timestamp says WHEN it leaked, so a future purge can tell a run from
  * yesterday apart from one still in flight.
  */
-export function fixtureOrgName(): string {
+function fixtureOrgName(): string {
   return `${FIXTURE_ORG_MARKER} ${new Date().toISOString()}`;
 }
 
@@ -241,7 +241,7 @@ export async function teardown(orgIds: string[]): Promise<void> {
  * repeatedly: teardown clears each id from the set as it goes, so a suite that
  * already ran its own afterAll leaves nothing here to do.
  */
-export async function teardownOutstanding(): Promise<void> {
+async function teardownOutstanding(): Promise<void> {
   await teardown([...OUTSTANDING_ORG_IDS]);
 }
 

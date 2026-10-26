@@ -29,7 +29,7 @@ export function configuredRateLimits(): RateLimitEntry[] {
 }
 
 /** The configured ceiling of one binding; throws when the binding is not declared. */
-export function rateLimitCeiling(name: string): number {
+function rateLimitCeiling(name: string): number {
   const entry = configuredRateLimits().find((candidate) => candidate.name === name);
   if (!entry) throw new Error(`${name} is not declared in wrangler.jsonc`);
   return entry.simple.limit;

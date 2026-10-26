@@ -38,7 +38,7 @@ export async function seedAssignment(
 export type Row = Record<string, unknown>;
 
 /** `insert into public.<table> (<keys>) values (<params>) returning id`. */
-export function insertSql(table: string, row: Row): { text: string; params: unknown[] } {
+function insertSql(table: string, row: Row): { text: string; params: unknown[] } {
   const columns = Object.keys(row);
   return {
     text: `insert into public.${table} (${columns.join(', ')})

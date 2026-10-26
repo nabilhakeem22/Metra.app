@@ -7,7 +7,7 @@
 import type { MemberRole } from '@/lib/permissions/roles';
 import { ENDING_DECIDERS } from './transitions/trigger-roles';
 
-export const HANDOVER_CONFIRMATION_RECORDERS: readonly MemberRole[] = ENDING_DECIDERS;
+const HANDOVER_CONFIRMATION_RECORDERS: readonly MemberRole[] = ENDING_DECIDERS;
 
 export function mayRecordHandoverConfirmation(role: MemberRole): boolean {
   return HANDOVER_CONFIRMATION_RECORDERS.includes(role);

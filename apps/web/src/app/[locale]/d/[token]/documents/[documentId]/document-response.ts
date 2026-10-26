@@ -13,7 +13,7 @@ export type HandOver = 'download' | 'view' | 'thumb';
 
 /** How long a PAID client's signed link stays valid: long enough to open a large
  *  PDF and reload its tab, short enough not to be worth passing around. */
-export const SIGNED_URL_TTL_SECONDS = 300;
+const SIGNED_URL_TTL_SECONDS = 300;
 
 /** Every answer of the document route: never cached, never a Referer (the share
  *  token is in the path), never content-sniffed. */
@@ -32,7 +32,7 @@ const PREVIEW_TRANSFORM: ImageTransform = {
 };
 
 /** A gallery tile: small, cropped to fill its square, light. */
-export const THUMB_TRANSFORM: ImageTransform = { width: 480, height: 480, resize: 'cover', quality: 60 };
+const THUMB_TRANSFORM: ImageTransform = { width: 480, height: 480, resize: 'cover', quality: 60 };
 
 /** A rendition's bytes, streamed from here, or null when Storage gave none. */
 async function streamedRendition(

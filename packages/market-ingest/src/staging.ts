@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-export function stagingRoot(): string {
+function stagingRoot(): string {
   const configured = process.env.MARKET_STAGING_DIR;
   return configured && configured.trim() !== '' ? resolve(configured) : join(repoRoot, '.market-staging');
 }
@@ -42,7 +42,7 @@ export function cataloguePath(): string {
 }
 
 /** Parsed JSON, or a specific error naming the file. */
-export function readJson(path: string): unknown {
+function readJson(path: string): unknown {
   let text: string;
   try {
     text = readFileSync(path, 'utf8');

@@ -14,7 +14,7 @@ import { categoriesFor, topOf } from './taxonomy';
 import type { RollPack } from './roll-pack';
 import { marketUnitOf, type MarketUnit, type UnitReading } from './units';
 
-export const STAGED_FORMAT = 'metra.market-staged.v1';
+const STAGED_FORMAT = 'metra.market-staged.v1';
 
 export interface StagedCategory {
   key: string;
@@ -24,7 +24,7 @@ export interface StagedCategory {
   sortOrder: number;
 }
 
-export interface StagedItem {
+interface StagedItem {
   key: string;
   categoryKey: string;
   nameAr: string;
@@ -39,7 +39,7 @@ export interface StagedItem {
   sourceLabel: string;
 }
 
-export interface StagedObservation {
+interface StagedObservation {
   itemKey: string;
   /** 'YYYY-MM'. */
   month: string;

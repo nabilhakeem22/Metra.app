@@ -22,7 +22,7 @@ import { useScheduleForm } from './use-schedule-form';
 // component never imports a runtime @metra/db value.
 const BASES: MilestoneBasis[] = ['percent', 'amount'];
 
-export const SCHEDULE_BASIS_ID = 'schedule-basis';
+const SCHEDULE_BASIS_ID = 'schedule-basis';
 export const SCHEDULE_TOTAL_ID = 'schedule-total';
 
 interface ScheduleTabProps {

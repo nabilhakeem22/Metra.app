@@ -5,7 +5,7 @@ import { readMoneyField } from '@/lib/validation/field-rules';
 import { isPercentInRange } from '@/lib/validation/percent';
 
 /** The cells of a line a refusal can sit under. */
-export type LineColumn = 'description' | 'qty' | 'unit' | 'unitCost' | 'unitPrice' | 'discountPct';
+type LineColumn = 'description' | 'qty' | 'unit' | 'unitCost' | 'unitPrice' | 'discountPct';
 export type LineErrors = Partial<Record<LineColumn, FieldError>>;
 
 /** The four priced figures, each read or refused under its own cell: a figure

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 // The multi-line Input: the same flat glass field and brand focus ring. NO text
 // size class: `.glass-field` sets `font-size: var(--field-fs)`, which is 14px

@@ -9,7 +9,7 @@ import 'server-only';
 import type { MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 
-export const DAY_KEY = 'delivery';
+const DAY_KEY = 'delivery';
 export const WEEKLY_KEY = 'delivery-followup';
 
 export interface FollowupDay {

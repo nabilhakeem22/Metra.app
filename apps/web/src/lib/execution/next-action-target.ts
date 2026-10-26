@@ -7,10 +7,10 @@ import type { ExecutionNextActionKind, ExecutionStage } from './stage';
 
 /** The dialogs the execution card opens in place. */
 export const EXECUTION_CARD_DIALOGS = ['generate_contract', 'sign_offline'] as const;
-export type ExecutionCardDialog = (typeof EXECUTION_CARD_DIALOGS)[number];
+type ExecutionCardDialog = (typeof EXECUTION_CARD_DIALOGS)[number];
 
 /** The contract tabs a money step happens on: the payments, and the final account (A5). */
-export type MoneyPage = 'contract_payments' | 'contract_final_account';
+type MoneyPage = 'contract_payments' | 'contract_final_account';
 
 /** The pages the card links to: a next action's, and the costs and measurements pages beside it. */
 export type ExecutionCardPage =
@@ -28,7 +28,7 @@ export type ExecutionCardPage =
  * payment and reviewing a client's claim are `payments` create. Reading the
  * tab is not enough: a role that can only read is told who does it (A4 F6).
  */
-export type MoneyCapability = 'sendRequests' | 'recordPayments';
+type MoneyCapability = 'sendRequests' | 'recordPayments';
 
 export type NextActionTarget =
   | { kind: 'link'; page: Exclude<ExecutionCardPage, MoneyPage> }

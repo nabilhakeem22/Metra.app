@@ -17,9 +17,9 @@ export const VOID_REQUEST_FIELDS = ['reason'] as const;
 export type VoidRequestField = (typeof VOID_REQUEST_FIELDS)[number];
 
 /** A request's note: `payment_requests_note_length`. */
-export const MAX_REQUEST_NOTE_CHARS = 500;
+const MAX_REQUEST_NOTE_CHARS = 500;
 /** A void reason: the same cap, so it reads as one paragraph in the audit trail. */
-export const MAX_VOID_REASON_CHARS = 500;
+const MAX_VOID_REASON_CHARS = 500;
 
 export interface TypedRequestTerms {
   dueOn?: unknown;

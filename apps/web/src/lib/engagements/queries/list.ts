@@ -38,7 +38,7 @@ export interface EngagementListRow {
 }
 
 /** Rows per page of the deliveries list. */
-export const ENGAGEMENT_PAGE_SIZE = 50;
+const ENGAGEMENT_PAGE_SIZE = 50;
 
 /**
  * How many live deliveries "My move" looks through (DECIDE A9). Past this an org

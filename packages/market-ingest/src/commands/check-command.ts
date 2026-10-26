@@ -9,7 +9,7 @@ import { blockingCount, performCheck, type CheckRun } from './perform-check';
 
 const LISTED_BLOCKING = 40;
 
-export function printSummary(run: CheckRun, period: string): void {
+function printSummary(run: CheckRun, period: string): void {
   const { findings, context } = run.outcome;
   for (const warning of run.warnings) console.log(`warning: ${warning}`);
   if (context !== null) {

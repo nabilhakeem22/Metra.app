@@ -40,7 +40,7 @@ export const PRINTED_UNITS: ReadonlyArray<[label: string, unit: MarketUnit]> = [
 ];
 
 /** The matching form of a unit label: normalised Arabic with every space removed. */
-export function unitMatchingForm(label: string): string {
+function unitMatchingForm(label: string): string {
   return normalizeArabic(label).replace(/\s+/g, '');
 }
 

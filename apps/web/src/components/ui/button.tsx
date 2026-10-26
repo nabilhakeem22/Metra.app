@@ -61,7 +61,7 @@ const buttonVariants = cva(
 
 type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
 
-export interface ButtonProps
+interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     Omit<VariantProps<typeof buttonVariants>, 'variant'> {
   /** Required: the call site names its place in the hierarchy. */
