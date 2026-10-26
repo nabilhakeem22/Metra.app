@@ -1,11 +1,12 @@
 import { PDF_BRAND } from '@/lib/pdf/brand';
 
 import { formatMoney } from '@/lib/format/money';
-import { formatPercent, formatQuantity } from '@/lib/format/number';
+import { formatPercent } from '@/lib/format/number';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { dirFor } from '@/i18n/routing';
-import { esc, pickEscaped } from '@/lib/pdf/html';
+import { pickEscaped } from '@/lib/pdf/html';
+import { pricedSectionsTableHtml } from './priced-sections-table';
 import { fontFaceCss } from './template';
 
 /**
@@ -37,34 +38,6 @@ export async function buildProposalHtml(
   const orgName = pickEscaped(opts.orgNameAr, opts.orgNameEn, locale);
   const clientName = pickEscaped(detail.clientNameAr, detail.clientNameEn, locale);
   const title = pickEscaped(detail.titleAr, detail.titleEn, locale);
-  const extraCols = showCost ? 2 : 0;
-
-  const sectionsHtml = detail.sections
-    .map((s) => {
-      const rows = s.lines
-        .map(
-          (l) => `
-        <tr>
-          <td class="desc">${pickEscaped(l.descriptionAr, l.descriptionEn, locale)}</td>
-          <td class="num">${formatQuantity(l.qty, locale)} ${esc(l.unit)}</td>
-          ${showCost ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
-          <td class="num">${m(l.unitPrice)}</td>
-          <td class="num">${formatPercent(l.discountPct, locale)}</td>
-          <td class="num">${m(l.lineTotal)}</td>
-          ${showCost ? `<td class="num">${m(l.lineMargin ?? '0')}</td>` : ''}
-        </tr>`,
-        )
-        .join('');
-      return `
-      <tr class="section"><td colspan="${5 + extraCols}">${pickEscaped(s.titleAr, s.titleEn, locale)}</td></tr>
-      ${rows}
-      <tr class="subtotal">
-        <td colspan="${4 + extraCols}">${'—'}</td>
-        <td class="num">${m(s.sectionSubtotal)}</td>
-        ${showCost ? '<td></td>' : ''}
-      </tr>`;
-    })
-    .join('');
 
   return `<!doctype html>
 <html lang="${locale}" dir="${dir}">
@@ -98,22 +71,7 @@ export async function buildProposalHtml(
     <div>${clientName}</div>
   </div>
 
-  <table dir="${dir}">
-    <thead>
-      <tr>
-        <th>${pickEscaped('الوصف', 'Description', locale)}</th>
-        <th class="num">${pickEscaped('الكمية', 'Qty', locale)}</th>
-        ${showCost ? `<th class="num">${pickEscaped('التكلفة', 'Cost', locale)}</th>` : ''}
-        <th class="num">${pickEscaped('سعر الوحدة', 'Unit price', locale)}</th>
-        <th class="num">${pickEscaped('خصم', 'Disc', locale)}</th>
-        <th class="num">${pickEscaped('الإجمالي', 'Total', locale)}</th>
-        ${showCost ? `<th class="num">${pickEscaped('الهامش', 'Margin', locale)}</th>` : ''}
-      </tr>
-    </thead>
-    <tbody>
-      ${sectionsHtml}
-    </tbody>
-  </table>
+  ${pricedSectionsTableHtml(detail.sections, { locale, dir, showCost })}
 
   <table class="totals">
     <tr><td>${pickEscaped('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
