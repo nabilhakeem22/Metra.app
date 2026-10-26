@@ -569,6 +569,7 @@
     "variation_not_draft": "This variation order is no longer a draft, so it cannot be edited. Refresh the page to see its current state.",
     "variation_not_internal_approved": "The variation order is not approved internally yet. Approve it first, then issue it.",
     "variation_not_issued": "This change order is no longer waiting for the client's answer. The variation register now shows its current state.",
+    "variation_contract_ended": "This contract was ended, so the client's answer can no longer be recorded on this change order. Refresh the page to see its current state.",
     "engagement_title_required": "The delivery has no title. Write one in Arabic or English; one of them is enough.",
     "engagement_client_required": "No client is selected. Pick the client this delivery is for.",
     "engagement_project_required": "No project is selected. Pick the project this delivery belongs to.",

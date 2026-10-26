@@ -210,6 +210,16 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the paper answer to a change order (
     expect((screen.getByRole('button', { name: cancel() }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  test('a contract ended meanwhile is said as an ended contract, not as a billing refusal', async () => {
+    await open();
+    variations.recordVariationDecisionOnPaper.mockResolvedValue({ ok: false, error: 'variation_contract_ended' });
+    choose('reject');
+    await press(at('variations.paper.submit'))();
+    expect(screen.getByRole('alert').textContent).toBe(at('errors.variation_contract_ended'));
+    expect(screen.getByRole('alert').textContent).not.toBe(at('errors.contract_not_active'));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   test('a save whose answer never came is said, and the register is re-read too (F3)', async () => {
     await open();
     const save = heldSave();

@@ -31,6 +31,8 @@ export type DocumentActionCode =
   | 'variation_not_draft'
   | 'variation_not_internal_approved'
   | 'variation_not_issued'
+  // The paper answer found its contract ended (not the billing refusal).
+  | 'variation_contract_ended'
   // Editing a draft BOQ line by line (boqs/edit.ts + boqs/edit-input.ts).
   | 'line_not_found'
   | 'section_not_found'

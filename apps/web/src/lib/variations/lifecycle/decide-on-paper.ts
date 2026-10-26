@@ -55,7 +55,7 @@ async function decideIssuedVariation(
     'record_not_found',
   );
   const contract = await holdContract(tx, contractId);
-  if (!isContractActive(contract.status)) fail('contract_not_active');
+  if (!isContractActive(contract.status)) fail('variation_contract_ended');
   const [locked] = await tx
     .select({ status: variationOrders.status })
     .from(variationOrders)
@@ -79,8 +79,10 @@ async function decideIssuedVariation(
  * Record that the client approved or rejected an ISSUED change order on paper,
  * on `decidedOn` (not after today, not before the issue day, in Cairo). An
  * order in any other status is `variation_not_issued`; one whose contract is
- * no longer live `contract_not_active`; any role but owner, admin or project
- * manager `forbidden`. An approval is billable exactly as an online one.
+ * no longer live `variation_contract_ended` (its own refusal: the shared
+ * `contract_not_active` speaks of billing, and an answer bills nothing); any
+ * role but owner, admin or project manager `forbidden`. An approval is
+ * billable exactly as an online one.
  */
 export async function recordVariationDecisionOnPaperCore(
   ctx: OrgContext,

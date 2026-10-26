@@ -79,6 +79,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   variation_not_draft: 'bad-request',
   variation_not_internal_approved: 'bad-request',
   variation_not_issued: 'bad-request',
+  variation_contract_ended: 'bad-request',
   engagement_title_required: 'bad-request',
   engagement_client_required: 'bad-request',
   engagement_project_required: 'bad-request',

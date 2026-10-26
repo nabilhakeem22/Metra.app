@@ -161,16 +161,20 @@ describe('recordVariationDecisionOnPaperCore', () => {
     }
   });
 
-  it('refuses an issued order whose contract is no longer live (contract_not_active)', async () => {
-    const { contract, order } = await issuedOrder();
-    // No app path leaves an issued order under a terminated contract (the
-    // termination rejects it in the same transaction): only a tamper can.
-    await tamper(`update public.contracts set status = 'terminated' where id = $1`, [contract.contractId]);
-    expect(
-      await recordVariationDecisionOnPaperCore(ctx.owner!, { variationOrderId: order.id, decision: 'approve', decidedOn: TODAY }),
-    ).toEqual({ ok: false, error: 'contract_not_active' });
-    expect(await statusOf(order.id)).toBe('issued');
-  });
+  it.each(['approve', 'reject'] as const)(
+    'refuses an answer (%s) on an issued order whose contract is no longer live, in its own words (variation_contract_ended, never the billing refusal)',
+    async (decision) => {
+      const { contract, order } = await issuedOrder();
+      // No app path leaves an issued order under a terminated contract (the
+      // termination rejects it in the same transaction): only a tamper can.
+      await tamper(`update public.contracts set status = 'terminated' where id = $1`, [contract.contractId]);
+      expect(
+        await recordVariationDecisionOnPaperCore(ctx.owner!, { variationOrderId: order.id, decision, decidedOn: TODAY }),
+      ).toEqual({ ok: false, error: 'variation_contract_ended' });
+      expect(await statusOf(order.id)).toBe('issued');
+      expect(await decisionsOf(order.id)).toEqual([]);
+    },
+  );
 
   it('takes an order of a proposal contract, as the client can online', async () => {
     const contractId = await seedProposalContract(orgId);
