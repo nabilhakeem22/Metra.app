@@ -5377,10 +5377,12 @@ kind:
   then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`,
   then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`),
   and nothing else on this first run (the two old page reads exist, so
-  their DROP prints nothing). Every LATER `db:apply-rls` (a re-run, the
-  forward-again of undo (0)) prints two more after the first two:
-  `message: 'function public.app_home_contract_sections_by_token(text,integer) does not exist, skipping',`
-  and `message: 'function public.app_home_contract_section_lines_by_token(text,uuid,integer) does not exist, skipping',`.
+  their DROP prints nothing). A RE-RUN of `db:apply-rls` on the step D
+  database prints two more, right after the first two:
+  `message: 'function public.app_home_contract_sections_by_token(text,pg_catalog.int4) does not exist, skipping',`
+  and `message: 'function public.app_home_contract_section_lines_by_token(text,uuid,pg_catalog.int4) does not exist, skipping',`.
+  (The forward-again of undo (0) prints only the four: undo puts the old
+  forms back.)
 
 Only a line that starts `Migration failed:` or `apply-rls failed:` is a
 failure (after one, npm adds `npm error` lines of its own; they only repeat
@@ -5405,8 +5407,8 @@ that the command failed). Expected:
   `16 found (16 declared in src/schema/), every one narrowed to a single non-org_id column.`
 
 **A lock race in `db:apply-rls` is retried for you.** A line like
-`apply-rls: functions/75-client-home.sql rolled back with SQLSTATE 55P03 on attempt 1 of 3 (a lock race with live traffic); trying it again in 2 s.`
-followed by `Applying functions/75-client-home.sql ... (attempt 2 of 3)` is
+`apply-rls: policies/36-client-home.sql rolled back with SQLSTATE 55P03 on attempt 1 of 3 (a lock race with live traffic); trying it again in 2 s.`
+followed by `Applying policies/36-client-home.sql ... (attempt 2 of 3)` is
 NOT a failure: that one file rolled back whole and is being applied again (3
 attempts, 2 s then 4 s apart). Carry on reading the output.
 
@@ -5427,9 +5429,11 @@ attempts, 2 s then 4 s apart). Carry on reading the output.
   traffic; step B's runbook says why). **Run `npm run db:apply-rls` again, and
   keep re-running it until it exits 0** (wait a minute between runs; it is
   safe, every statement is idempotent), then
-  `npm run assert-schema-applied -w @metra/db`. Until a run exits 0, the
-  functions file may still be the old one (step 2 (b) then reads its old
-  `0, 2`): the current site works on either, as it calls neither form.
+  `npm run assert-schema-applied -w @metra/db`. In between, step 2 (b) may
+  read `1, 2, 0` (`functions/75-client-home.sql` runs before the policy
+  files, so the new forms are in while a later file lost its race): the
+  current site works on that, as it calls neither form, and a run that exits
+  0 changes nothing more in step D's objects.
 - `Migration failed: SQLSTATE 42P07: relation "client_verification_codes_unused_created_idx" already exists`
   then `Migration failed: tell the lead before running anything else (the whole batch rolled back, nothing was changed).`:
   part of step D is already in this database, which step 2 (b) would have
@@ -5612,7 +5616,75 @@ Leave the database alone: the older Worker runs on it (see THE ORDER).
 **(2) The index:** never needed (it changes no answer). If the lead ever wants
 it gone, it is a new migration, never a hand edit here.
 
-**Rehearsed** (H5, Oct 27): see the notes below, written after the literal run.
+**Rehearsed** (PR H5, Oct 27). Every command and SQL block above was run as
+written, at `790aa693`, on a local PostgreSQL 17 database (UTF8) built in
+production's own order: Supabase's API roles and default grants simulated
+first; then `main`'s database code at `0f9cb2db` (`db:migrate`,
+`db:apply-rls`, `seed`); DB step S from `992bca1e`; DB step B's
+`db:apply-rls` from `65c78473`; DB step C from `bab6de80` (`db:migrate`, then
+`main`'s own `db:apply-rls`) and `assert-schema-applied`; then data written by
+`main`'s own cores (three studios: deliveries at every execution stage, a
+client's claim, change orders approved, internal and expired, a final
+account, a termination, contracts no delivery stands behind) and a bulk of
+ten studios: 2,023 contracts, 21 deliveries, 66 migrations. The runs used a
+fresh clone standing in for `merta-main` (its own `npm ci`, `origin` on
+GitHub): the PowerShell cut from this section with three substitutions only
+(the checkout path, the Desktop path, and the connection set in the session
+in place of `.env`), the SQL from the saved copy, each block on its own.
+
+- Steps 1 to 4 printed exactly what they say. Step 1's guards printed only the
+  `docs/DEPLOY.md` line and the three 0066 files, and the saved copy equals
+  the branch's runbook. Step 2 read 66 and 1792976742588; 0, 0 and 2; 0 and
+  0; 81 and 15; 35 MB. Step 3 printed the two migrate notices, the four
+  apply-rls notices, the two verified lines and the six
+  `assert-schema-applied` lines, and exited 0. Step 4 read 67 and
+  1793044397504; 1, 2 and 0; 1, 3, 3 and 0; true, true and false; 0 and 0;
+  81 and 15; 36 MB.
+- A catalogue comparison (every function body with its settings and grants,
+  policy, trigger, table and column grant, constraint, index and RLS flag)
+  from step C to step D found exactly the changes under *What it changes*:
+  the code request's body, the two page reads in their new forms (the old
+  forms gone, the grants `metra_app` only), one index; nothing else.
+- A second step 3 printed `Migrations applied.`, the four notices and the
+  two `pg_catalog.int4` ones, the same verified and `assert-schema-applied`
+  lines, and changed nothing in the catalogue.
+- **The migration's lock race, on purpose.** A writer holding the codes table
+  (ROW EXCLUSIVE, an open insert) for 10 s against step 3: the two 55P03
+  lines naming `public.client_verification_codes:SHARE`, exit 1, nothing run
+  after them; step 2 (a) still 66, step 2 (b) still 0, 0 and 2. The block run
+  again after the writer ended applied 0066 and printed what step 3 says.
+- **apply-rls's lock race, on purpose.** A reader holding the codes table for
+  30 s while step 3 ran: 0066 applied, then `policies/36-client-home.sql`
+  lost three times (55P03, retried after 2 s and 4 s), the two failure lines,
+  exit 1, `assert-schema-applied` skipped; in between, step 2 (b) read 1, 2
+  and 0. `db:apply-rls` run again after the reader ended exited 0 (the four
+  notices and the two `pg_catalog.int4` ones), `assert-schema-applied`
+  exited 0, and the catalogue was identical to a clean run's.
+- **Undo (0)**, from the saved copy: `bab6de80`'s `db:apply-rls` printed the
+  four notices and the same two verified lines as step 3, and exited 0; part
+  2 returned no rows; step 2 (b) read 1, 0 and 2, step 2 (d) 81 and 15; and
+  the catalogue equalled step C's but for the index 0066 keeps.
+- **Forward again** (step 1, then this branch's `db:apply-rls` only): the four
+  notices, the two verified lines, `assert-schema-applied` as in step 3, exit
+  0; step 2 (b) 1, 2 and 0, step 4 (c) and (d) as before, 81 and 15; and a
+  catalogue identical to the first forward's. Step 6 (3) then put the
+  checkout back on `main`.
+- **The current code on the step D database:** `main`'s (`bab6de80`) own
+  isolation gate passed 60 of 60, and its action tests 1,806 of 1,814, on a
+  copy of this step D database. The eight failures test schema objects, not
+  an app path: three call the two page reads in their old form or run `main`'s
+  own `roles.sql`, which grants on that form (42883: the form step D drops,
+  which no code on `main` calls); two pin the list of token functions with
+  their old argument lists; two pin the code request's old answer and its old
+  limit of 10 codes a delivery a day (the rule step D loosens); and one fails
+  the same way on the step C database (it checks a Supabase default grant
+  that the simulated roles add and `roles.sql` does not manage). No contract,
+  change order, delivery, payment, claim, final account or measurement test
+  of the shipped code failed.
+- **This branch's own tests** on a fresh database replayed as CI does: the
+  isolation gate passed 60 of 60 and the action tests 1,831 of 1,832 (the
+  one is that same Supabase default grant check, which passes on a database
+  built without the simulated roles, as CI builds it).
 
 ## Monthly market bulletin
 
