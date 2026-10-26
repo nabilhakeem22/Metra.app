@@ -10,8 +10,10 @@ import {
   createVariationDraftCore,
   internalApproveVariationCore,
   issueVariationCore,
+  recordVariationDecisionOnPaperCore,
   saveVariationDraftCore,
   type CreateVariationDraftInput,
+  type RecordVariationDecisionOnPaperInput,
   type SaveVariationDraftInput,
 } from './core';
 
@@ -65,6 +67,16 @@ export async function internalApproveVariation(
 export async function issueVariation(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await issueVariationCore(ctx, { id });
+  if (res.ok) refreshApp();
+  return res;
+}
+
+/** The client's answer to an issued change order, given on paper (owner, admin, PM). */
+export async function recordVariationDecisionOnPaper(
+  input: RecordVariationDecisionOnPaperInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await recordVariationDecisionOnPaperCore(ctx, input);
   if (res.ok) refreshApp();
   return res;
 }

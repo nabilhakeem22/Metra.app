@@ -70,6 +70,8 @@ const ALL_CODES: ActionCode[] = [
   'contract_not_signable',
   'variation_not_draft',
   'variation_not_internal_approved',
+  'variation_not_issued',
+  'variation_contract_ended',
   'engagement_title_required',
   'engagement_client_required',
   'engagement_project_required',

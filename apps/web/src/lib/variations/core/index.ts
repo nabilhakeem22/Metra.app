@@ -15,4 +15,6 @@ export * from './update';
 export {
   internalApproveVariationCore,
   issueVariationCore,
+  recordVariationDecisionOnPaperCore,
+  type RecordVariationDecisionOnPaperInput,
 } from '../lifecycle';

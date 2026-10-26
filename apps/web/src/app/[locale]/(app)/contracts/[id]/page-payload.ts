@@ -7,9 +7,11 @@
 // alone), so for them the page passes the SLIM header the tab strip and the
 // tab need, and nothing of the contract itself: no client, no terms, no scope,
 // no penalty, no money. The full detail goes only to roles that read the
-// contract.
+// contract. A project manager also opens the change-order register (H7.3):
+// for its charges he gets the contract's two charge rates, nothing more.
 import type { ContractStatus } from '@metra/db';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
+import type { VariationChargeRates } from './contract-vo-types';
 
 /** The contract as every role on its page may see it. */
 export interface ContractPageHeader {
@@ -26,9 +28,14 @@ export interface ContractPagePayload {
   header: ContractPageHeader;
   /** The whole contract; null for a role that only reads its payments. */
   detail: ContractPageDetail | null;
+  /** What the register charges on a change order: an execution contract's rates, for a role that sees the register; else null. */
+  variationChargeRates: VariationChargeRates | null;
 }
 
-export function contractPagePayload(detail: ContractPageDetail, access: { seeContract: boolean }): ContractPagePayload {
+export function contractPagePayload(
+  detail: ContractPageDetail,
+  access: { seeContract: boolean; seeRegister: boolean },
+): ContractPagePayload {
   const header: ContractPageHeader = {
     id: detail.id,
     number: detail.number,
@@ -38,5 +45,7 @@ export function contractPagePayload(detail: ContractPageDetail, access: { seeCon
     sourceBoqId: detail.sourceBoqId,
     createdAt: detail.createdAt,
   };
-  return { header, detail: access.seeContract ? detail : null };
+  const variationChargeRates =
+    access.seeRegister && detail.sourceBoqId !== null ? { taxRate: detail.taxRate, supervisionPct: detail.supervisionPct } : null;
+  return { header, detail: access.seeContract ? detail : null, variationChargeRates };
 }

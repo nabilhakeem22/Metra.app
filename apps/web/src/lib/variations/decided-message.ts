@@ -34,8 +34,9 @@ export interface VariationDecisionState {
   contractActive: boolean;
   outcome: VariationOutcome;
   /**
-   * WHO rejected it (0051): 'client' their own refusal, 'staff' the termination
-   * cascade, null for a row written before the column existed.
+   * WHO rejected it (0051): 'client' their own refusal (online, or on paper as
+   * the studio recorded it, H7.3), 'staff' the termination cascade, null for a
+   * row written before the column existed.
    */
   rejectionChannel: 'client' | 'staff' | null;
 }

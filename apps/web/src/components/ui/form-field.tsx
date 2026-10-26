@@ -10,6 +10,7 @@ type ChangeHandler = (...args: never[]) => void;
 
 interface DescribableProps {
   id?: string;
+  'aria-labelledby'?: string;
   'aria-invalid'?: boolean | 'true' | 'false';
   'aria-describedby'?: string;
   'aria-required'?: boolean | 'true' | 'false';
@@ -44,7 +45,9 @@ function withEdit(
  * `aria-describedby` pointing at the hint and the error text. A string hint
  * becomes the standard "?" FieldHint; any other node is rendered as given.
  * `onEdit` runs before the child's own change handler, so editing the field can
- * clear its refusal.
+ * clear its refusal. A `group` child (a radio group) holds controls of its own,
+ * and a <label> can name only one control: its label is plain text that names
+ * the group through `aria-labelledby`.
  */
 export function FormField({
   id,
@@ -53,6 +56,7 @@ export function FormField({
   error,
   hint,
   onEdit,
+  group = false,
   children,
 }: {
   id: string;
@@ -61,6 +65,7 @@ export function FormField({
   error?: string | null;
   hint?: ReactNode;
   onEdit?: () => void;
+  group?: boolean;
   children: ReactElement<DescribableProps>;
 }) {
   const t = useTranslations('common');
@@ -68,23 +73,36 @@ export function FormField({
   const errorId = error ? fieldErrorId(id) : undefined;
   const describedBy =
     [children.props['aria-describedby'], hintId, errorId].filter(Boolean).join(' ') || undefined;
+  const labelId = group ? `${id}-label` : undefined;
+  const labelContent = (
+    <>
+      {label}
+      {required && (
+        <>
+          <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
+            *
+          </span>
+          <span className="sr-only"> {t('required')}</span>
+        </>
+      )}
+      {typeof hint === 'string' ? <FieldHint id={hintId} hint={hint} /> : hint}
+    </>
+  );
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="flex items-center">
-        {label}
-        {required && (
-          <>
-            <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
-              *
-            </span>
-            <span className="sr-only"> {t('required')}</span>
-          </>
-        )}
-        {typeof hint === 'string' ? <FieldHint id={hintId} hint={hint} /> : hint}
-      </Label>
+      {group ? (
+        <span id={labelId} className="flex items-center text-body font-medium leading-none">
+          {labelContent}
+        </span>
+      ) : (
+        <Label htmlFor={id} className="flex items-center">
+          {labelContent}
+        </Label>
+      )}
       {cloneElement(children, {
         id,
+        'aria-labelledby': labelId ?? children.props['aria-labelledby'],
         'aria-invalid': error ? true : children.props['aria-invalid'],
         'aria-describedby': describedBy,
         'aria-required': required || children.props['aria-required'],

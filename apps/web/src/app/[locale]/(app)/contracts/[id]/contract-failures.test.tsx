@@ -89,7 +89,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
     renderWithIntl(
       <ContractDetailClient
-        {...contractPagePayload(DETAIL, { seeContract: true })}
+        {...contractPagePayload(DETAIL, { seeContract: true, seeRegister: true })}
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
@@ -103,6 +103,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         canIssue
         canDraftVariation={false}
         canPriceVariation={false}
+        canDecideVariationOnPaper={false}
       />,
       { locale },
     );
@@ -136,6 +137,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         variations={[]}
         canDraftVariation
         canPriceVariation={false}
+        canDecideOnPaper={false}
         pending={false}
         m={(v) => v}
         act={() => {}}

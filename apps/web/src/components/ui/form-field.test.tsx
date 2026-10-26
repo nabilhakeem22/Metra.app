@@ -29,6 +29,26 @@ describe.each<TestLocale>(['en', 'ar-EG'])('FormField (%s)', (locale) => {
 });
 
 describe('FormField', () => {
+  test('a group of controls is named by its label through aria-labelledby, never a <label> pointing at it (H7.3 F6)', () => {
+    renderWithIntl(
+      <FormField id="answer" label="The answer" required group error="Pick one">
+        <div role="radiogroup" tabIndex={-1}>
+          <label>
+            <input type="radio" name="answer" value="yes" /> Yes
+          </label>
+        </div>
+      </FormField>,
+      { locale: 'en' },
+    );
+    const group = screen.getByRole('radiogroup', { name: /The answer/ });
+    expect(group.id).toBe('answer');
+    expect(document.querySelector('label[for="answer"]')).toBeNull();
+    expect(document.getElementById(group.getAttribute('aria-labelledby')!)?.textContent).toContain('The answer');
+    expect(group.getAttribute('aria-invalid')).toBe('true');
+    expect(group.getAttribute('aria-required')).toBe('true');
+    expect(group.getAttribute('aria-describedby')).toBe('answer-error');
+  });
+
   test('without an error the field is not invalid and describes only its hint', () => {
     renderWithIntl(
       <FormField id="email" label="Email" hint="We send receipts here">

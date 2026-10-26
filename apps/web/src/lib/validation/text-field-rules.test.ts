@@ -25,6 +25,17 @@ describe('text field rules', () => {
     expect(readOptionalText('note\nmore', 2000)).toEqual({ ok: true, value: 'note\nmore' });
   });
 
+  it('refuses a lone surrogate half as unprintable, keeps a whole astral character (H7.3 F8)', () => {
+    // A half with no partner is no character: a jsonb audit row refuses it, so
+    // it must be a refusal under the field, never a failed write.
+    for (const pasted of ['x\uD800y', 'x\uDC00y', 'end\uDBFF', '\uDFFFstart', 'x\uDC00\uD800y']) {
+      expect(readOptionalText(pasted, 2000), JSON.stringify(pasted)).toEqual({ ok: false, error: { code: 'unprintable' } });
+      expect(boundedText(pasted, 200), JSON.stringify(pasted)).toEqual({ code: 'unprintable' });
+    }
+    expect(readOptionalText('tiles 😀 approved', 2000)).toEqual({ ok: true, value: 'tiles 😀 approved' });
+    expect(boundedText('😀', 200)).toBeNull();
+  });
+
   it('bilingualNameErrors: one name is enough, each is capped', () => {
     expect(bilingualNameErrors(null, null, 80)).toEqual({ name: { code: 'name_required' } });
     expect(bilingualNameErrors('Civil', null, 80)).toEqual({});

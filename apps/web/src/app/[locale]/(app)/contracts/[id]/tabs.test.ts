@@ -5,6 +5,7 @@ import { maySeeBilling } from '@/lib/execution/billing/access';
 import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
 import { mayReadCostEntries } from '@/lib/execution/costs/access';
 import { mayReadMeasurements } from '@/lib/execution/measurements/access';
+import { mayRecordVariationDecisionOnPaper } from '@/lib/variations/paper-access';
 import { contractTabsFor, openingContractTab, type ContractTab } from './tabs';
 
 // PR A4.3, B3 and A5: who sees which tab of a contract. The execution tabs are
@@ -14,7 +15,9 @@ import { contractTabsFor, openingContractTab, type ContractTab } from './tabs';
 // for the roles that read both the contract and its costs; the rest of the
 // contract is for the roles with `contracts_generate` read. A project manager
 // or an accountant bills, measures and reads costs without opening the contract
-// itself, and records costs on the costs page (./costs/page.tsx).
+// itself, and records costs on the costs page (./costs/page.tsx). The change
+// orders are also for the roles that record a client's paper answer to one
+// (H7.3 F1): the project manager too.
 
 const accessOf = (role: MemberRole) => ({
   seeContract: can(role, 'contracts_generate', 'read'),
@@ -22,6 +25,7 @@ const accessOf = (role: MemberRole) => ({
   seeMeasurements: mayReadMeasurements(role),
   readsCosts: mayReadCostEntries(role),
   seeCostSheet: mayOpenCostSheet(role),
+  decidesVariationsOnPaper: mayRecordVariationDecisionOnPaper(role),
 });
 const EXECUTION = { sourceBoqId: 'b-1' };
 const PROPOSAL = { sourceBoqId: null };
@@ -33,11 +37,14 @@ describe('contractTabsFor', () => {
     expect(contractTabsFor(EXECUTION, accessOf('viewer'))).toEqual(every.filter((tab) => tab !== 'costs' && tab !== 'cost_sheet'));
   });
 
-  it('gives the project manager and the accountant the execution tabs alone, all but the costs, and nothing of a proposal contract', () => {
-    for (const role of ['project_manager', 'accountant'] as const) {
-      expect(contractTabsFor(EXECUTION, accessOf(role)), role).toEqual(['payments', 'final_account', 'measurements', 'cost_sheet']);
-      expect(contractTabsFor(PROPOSAL, accessOf(role)), role).toEqual([]);
-    }
+  it('gives the accountant the execution tabs alone, all but the costs, and nothing of a proposal contract', () => {
+    expect(contractTabsFor(EXECUTION, accessOf('accountant'))).toEqual(['payments', 'final_account', 'measurements', 'cost_sheet']);
+    expect(contractTabsFor(PROPOSAL, accessOf('accountant'))).toEqual([]);
+  });
+
+  it('gives the project manager the execution tabs but the costs, and the change orders on any contract: he records paper answers there (H7.3 F1)', () => {
+    expect(contractTabsFor(EXECUTION, accessOf('project_manager'))).toEqual(['payments', 'final_account', 'measurements', 'cost_sheet', 'variations']);
+    expect(contractTabsFor(PROPOSAL, accessOf('project_manager'))).toEqual(['variations']);
   });
 
   it('gives the site engineer the measurements alone (they open the measurements page, not this one)', () => {
@@ -76,8 +83,8 @@ describe('every role against every contract tab and page', () => {
     owner: { execution: ALL, proposal: ['overview', 'variations'], contractPage: true, costsPage: true, measurementsPage: true },
     admin: { execution: ALL, proposal: ['overview', 'variations'], contractPage: true, costsPage: true, measurementsPage: true },
     project_manager: {
-      execution: ['payments', 'final_account', 'measurements', 'cost_sheet'],
-      proposal: [],
+      execution: ['payments', 'final_account', 'measurements', 'cost_sheet', 'variations'],
+      proposal: ['variations'],
       contractPage: true,
       costsPage: true,
       measurementsPage: true,

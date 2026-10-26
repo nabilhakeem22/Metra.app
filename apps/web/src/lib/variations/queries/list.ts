@@ -22,9 +22,10 @@ export interface VariationListRow {
   contractNumber: number | null;
   createdAt: string;
   /**
-   * WHO rejected it (0051) — 'client', 'staff' (the termination cascade), or
-   * null for a row written before the column. Meaningless unless `status` is
-   * `rejected`; `lib/variations/status-label.ts` is the only reader.
+   * WHO rejected it (0051): 'client' (online, or on paper as the studio
+   * recorded it, H7.3), 'staff' (the termination cascade), or null for a row
+   * written before the column. Meaningless unless `status` is `rejected`;
+   * `lib/variations/status-label.ts` is the only reader.
    */
   rejectionChannel: string | null;
 }
@@ -53,9 +54,12 @@ const VARIATION_LIST_COLUMNS = {
   // a join: at most one row is wanted per variation order, and a join would
   // multiply the register by the whole event history. Covered by
   // variation_order_events_variationOrder_idx (org_id, variation_order_id), and
-  // it reads a table this transaction is already scoped to by RLS.
+  // it reads a table this transaction is already scoped to by RLS. A refusal
+  // the studio recorded on paper is the CLIENT's refusal (H7.3), never the
+  // cascade: the same rule app_variation_by_token's `rejection_channel` reads.
   rejectionChannel: sql<string | null>`(
-    select e.actor_channel from ${variationOrderEvents} e
+    select case when e.recorded_on_paper then 'client' else e.actor_channel end
+    from ${variationOrderEvents} e
     where e.variation_order_id = ${variationOrders.id} and e.kind = 'rejected'
     order by e.decided_at desc, e.id desc limit 1)`,
 } as const;

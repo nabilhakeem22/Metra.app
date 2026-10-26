@@ -36,6 +36,8 @@ export interface ContractTabAccess {
   readsCosts: boolean;
   /** `margin_pnl` read: the cost sheet. */
   seeCostSheet: boolean;
+  /** Owner, admin or project manager: records a client's paper answer to a change order, from the register (H7.3). */
+  decidesVariationsOnPaper: boolean;
 }
 
 function mayOpen(tab: ContractTab, access: ContractTabAccess): boolean {
@@ -43,6 +45,7 @@ function mayOpen(tab: ContractTab, access: ContractTabAccess): boolean {
   if (tab === 'measurements') return access.seeMeasurements;
   if (tab === 'costs') return access.seeContract && access.readsCosts;
   if (tab === 'cost_sheet') return access.seeCostSheet;
+  if (tab === 'variations') return access.seeContract || access.decidesVariationsOnPaper;
   return access.seeContract;
 }
 
@@ -52,7 +55,9 @@ function mayOpen(tab: ContractTab, access: ContractTabAccess): boolean {
  * A project manager or an accountant, who bill, measure and read costs without
  * editing the contract, see those tabs alone, all but the costs: the Costs tab
  * shows here only to a role that reads both the contract and its costs, and the
- * others record costs on the costs page (./costs/page.tsx). The page itself
+ * others record costs on the costs page (./costs/page.tsx). The change orders
+ * show too to a project manager, who records a client's paper answer there
+ * (on a proposal contract they are his only tab). The page itself
  * opens only for a role that reads the contract or its payments (page.tsx); the
  * site engineer measures on the measurements page instead
  * (./measurements/page.tsx) and records costs on the costs page.

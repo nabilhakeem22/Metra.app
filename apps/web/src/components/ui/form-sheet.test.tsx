@@ -65,6 +65,47 @@ describe('FormSheet', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  test('while a save is pending nothing closes it: Cancel and the close button are disabled, Escape does nothing (H7.3 F3)', async () => {
+    const { onOpenChange } = renderSheet({ pending: true });
+    expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await act(async () => {});
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  test('once the save has answered, Escape closes it again', async () => {
+    const { onOpenChange } = renderSheet();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await act(async () => {});
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  test('on close, focus goes where onCloseAutoFocus puts it: a sheet opened without a trigger has none (H7.3 F4)', async () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    let calls = 0;
+    const returnFocus = (event: Event) => {
+      calls += 1;
+      event.preventDefault();
+      trigger.focus();
+    };
+    const sheet = renderWithIntl(
+      <FormSheet open onOpenChange={() => {}} title="New client" onSubmit={() => {}} submitLabel="Save" cancelLabel="Cancel" closeLabel="Close" pending={false} onCloseAutoFocus={returnFocus}>
+        <Input />
+      </FormSheet>,
+      { locale: 'en' },
+    );
+    await act(async () => {});
+    sheet.unmount();
+    await act(async () => new Promise((done) => setTimeout(done, 0)));
+    expect(calls).toBe(1);
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
   test('opening focuses the first field, not the hint button beside its label', async () => {
     renderSheet();
     await act(async () => {});
