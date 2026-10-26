@@ -9,6 +9,12 @@ export interface FreezeIssueInput {
   boqId: string;
   projectId: string;
   engagementId: string;
+  /**
+   * The ENGAGEMENT's client, never the project's: a BOQ under a delivery is
+   * that delivery's client's (H3 round 2), or the delivery stops owning it
+   * (`app_delivery_boqs`) once the project's client has changed.
+   */
+  clientId: string;
   fileId: string;
   label: string;
 }
@@ -19,7 +25,8 @@ export interface FreezeIssueInput {
  * PDF already exists, and in this order:
  *
  *   1. supersede every other live BOQ on the project (the version chain),
- *   2. freeze this one: draft -> issued, stamped with its version,
+ *   2. freeze this one: draft -> issued, stamped with its version, on the
+ *      engagement and for the engagement's client,
  *   3. record the PDF as the engagement's `boq` artifact, VISIBLE to the client,
  *   4. hide every older visible `boq` artifact on EVERY engagement of the
  *      project, since the supersede in step 1 is project-wide too.
@@ -116,6 +123,7 @@ async function markIssued(
       status: 'issued',
       issueDate: new Date().toISOString().slice(0, 10),
       engagementId: input.engagementId,
+      clientId: input.clientId,
       version,
       supersedesId: previousIssuedId,
     })

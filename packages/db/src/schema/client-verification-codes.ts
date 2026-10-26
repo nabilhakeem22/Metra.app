@@ -26,7 +26,8 @@ import { sameOrgFk } from './org-ref';
  * write none (rls/roles.sql). trg_client_verification_codes_guarded admits
  * only a wrong try (`attempts` + 1) or the one consumption (`consumed_at` and
  * `result_ref` together, once), and a delete only from the delivery's cascade
- * or of a code that expired more than 90 days ago (the issue function's purge).
+ * or of a code never used that expired more than 90 days ago (the issue
+ * function's purge). A used code is evidence of the act it gated and stays.
  *
  * `destination_hash` is sha256 of the lower-cased address the code went to and
  * `destination_hint` what the client was shown of it: evidence of where the

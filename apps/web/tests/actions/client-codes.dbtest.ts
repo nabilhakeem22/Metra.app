@@ -127,6 +127,13 @@ describe('client_verification_codes: read-only for the studio, guarded, isolated
     expect(await sqlstate(ownerQuery(`delete from public.client_verification_codes where id = $1`, [challengeId]))).toBe('MT100');
   });
 
+  it('a consumption naming no row is the guard\'s MT100, before the consumed_pair CHECK (round 2 functional L1)', async () => {
+    const home = await seedHome(orgId);
+    const { challengeId } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    expect(await sqlstate(ownerQuery(`select public.app_client_code_consume($1, null)`, [challengeId]))).toBe('MT100');
+    expect((await codesOf(home.delivery.id))[0]).toMatchObject({ consumed_at: null, result_ref: null });
+  });
+
   it('goes with its delivery: the cascade of a delivery delete is admitted', async () => {
     const delivery = await seedDesignDelivery();
     expect((await requestCode(delivery.tokenHash, 'claim_design_payment', 'deposit')).answer.status).toBe('ok');
@@ -245,25 +252,23 @@ describe('app_home_code_issue_by_token: the limits, in the database (AC8)', () =
     expect(await codesOf(home.delivery.id)).toHaveLength(5);
   });
 
-  it('10 an hour and 20 a day per delivery, over every target', async () => {
+  it('10 a day per delivery, over every target (round 2 L1)', async () => {
     const home = await seedHome(orgId, 'signed');
     const orders: string[] = [];
-    for (let index = 0; index < 21; index += 1) {
+    for (let index = 0; index < 11; index += 1) {
       const order = await seedVariation(orgId, home.contract, 'issued', { tokenHash: `${randomUUID()}-limit-${String(index)}` });
       orders.push(order.id);
     }
     for (let index = 0; index < 10; index += 1) {
       expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[index])).answer.status).toBe('ok');
     }
-    expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[10])).answer.status).toBe('too_many');
     await ageCodes(home.delivery.id, 3601);
-    for (let index = 10; index < 20; index += 1) {
-      expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[index])).answer.status).toBe('ok');
-    }
-    await ageCodes(home.delivery.id, 3601);
-    const day = (await requestCode(home.delivery.tokenHash, 'decide_variation', orders[20])).answer;
+    const day = (await requestCode(home.delivery.tokenHash, 'decide_variation', orders[10])).answer;
     expect(day.status).toBe('too_many');
-    expect(day.retry_after_seconds).toBeGreaterThan(3600);
+    expect(day.retry_after_seconds).toBeGreaterThan(22 * 3600);
+    expect(day.retry_after_seconds).toBeLessThanOrEqual(23 * 3600);
+    await ageCodes(home.delivery.id, day.retry_after_seconds as number);
+    expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[10])).answer.status).toBe('ok');
   });
 
   it('80 a day across the platform', async () => {

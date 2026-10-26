@@ -71,6 +71,15 @@ describe('getDeliveryByToken hardening', () => {
     expect(result?.clientActions).toEqual(['approve_concept', 'request_concept_changes']);
   });
 
+  it('maps a snapshot carrying entry_phase (H3 round 2) exactly as one without it: a key it does not read is dropped', async () => {
+    setSnapshot(validSnapshot());
+    const without = await readDelivery('raw-token');
+    for (const entryPhase of ['design', 'execution']) {
+      setSnapshot({ ...validSnapshot(), entry_phase: entryPhase });
+      expect(await readDelivery('raw-token')).toEqual(without);
+    }
+  });
+
   it('answers read_failed (no throw) when the DB/SDF call itself throws', async () => {
     dbState.throwOnCall = true;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

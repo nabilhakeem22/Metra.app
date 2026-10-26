@@ -5,6 +5,7 @@
 // file. Rows are written over the BYPASSRLS connection; teardown is
 // fixture.ts's.
 import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createSql } from '@metra/db';
 import { mintShareToken } from '@/lib/share/token';
 import { seedBillableContract, type BilledContract } from './execution-billing-fixture';
 import { ownerQuery, seedExecutionContract, tamper, type ContractState } from './execution-fixture';
@@ -197,6 +198,42 @@ export async function ageCodes(engagementId: string, seconds: number): Promise<v
       where engagement_id = $1`,
     [engagementId, seconds],
   );
+}
+
+class Released extends Error {}
+
+/**
+ * A studio transaction on its own connection that runs `lockSql` (a row lock,
+ * or an advisory lock) and holds what it took until `release`, or `maxMs` at
+ * most: what a studio write holding a row looks like to the client's calls.
+ */
+export async function holdLock(lockSql: string, params: unknown[], maxMs = 9000): Promise<{ release(): Promise<void> }> {
+  const holder = createSql(process.env.DATABASE_URL as string, { max: 1, prepare: false });
+  let letGo: () => void = () => undefined;
+  const decided = new Promise<void>((resolve) => {
+    letGo = resolve;
+    setTimeout(resolve, maxMs);
+  });
+  let locked: () => void = () => undefined;
+  const isLocked = new Promise<void>((resolve) => (locked = resolve));
+  const finished = holder
+    .begin(async (tx) => {
+      await tx.unsafe(lockSql, params as never[]);
+      locked();
+      await decided;
+      throw new Released();
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof Released)) throw error;
+    })
+    .finally(() => holder.end());
+  await isLocked;
+  return {
+    async release() {
+      letGo();
+      await finished;
+    },
+  };
 }
 
 /** The home's JSON, as the page will read it. */

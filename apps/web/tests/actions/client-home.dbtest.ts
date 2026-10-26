@@ -56,6 +56,15 @@ afterAll(async () => {
 
 type Json = Record<string, unknown>;
 
+/** Every key of app_delivery_by_token: main's, plus entry_phase (H3 round 2). */
+const DELIVERY_SNAPSHOT_KEYS = [
+  'claim', 'client', 'client_actions', 'concept_choice_id', 'concept_choice_position', 'concept_decision',
+  'concept_options', 'created_at', 'design_decision', 'design_fee_total', 'documents', 'entry_phase',
+  'expected_on', 'firm', 'handover_acknowledged_at', 'id', 'number', 'off_plan', 'payment_details',
+  'payment_schedule', 'receipts', 'receipts_truncated', 'renders_issued_at', 'rom', 'rom_acknowledged_at',
+  'share_expires_at', 'state', 'timeline', 'title_ar', 'title_en',
+];
+
 const scalar = async <T>(text: string, params: unknown[] = []): Promise<T> =>
   (await ownerQuery<{ value: T }>(`select ${text} as value`, params))[0].value;
 
@@ -91,6 +100,15 @@ describe('app_home_by_token: the home, by its token (AC1)', () => {
     expect(read?.code_channel).toEqual({ hint: 'c•••@e•••.com' });
     await setClientEmail(orgId, home.delivery.clientId, null);
     expect((await homeBySql<Json>(home.delivery.tokenHash))?.code_channel).toBeNull();
+  });
+
+  it('app_delivery_by_token carries the delivery\'s entry_phase, its one key more (H3 round 2, for H4\'s light delivery)', async () => {
+    const designing = await seedDelivery(orgId, { state: 'design_proposal' });
+    const light = await seedLightHome(orgId);
+    const design = await scalar<Json>(`public.app_delivery_by_token($1)`, [designing.tokenHash]);
+    expect(Object.keys(design).sort()).toEqual(DELIVERY_SNAPSHOT_KEYS);
+    expect(design.entry_phase).toBe('design');
+    expect((await scalar<Json>(`public.app_delivery_by_token($1)`, [light.delivery.tokenHash])).entry_phase).toBe('execution');
   });
 
   it('says the phase: design before execution with no execution block, closed once abandoned', async () => {
