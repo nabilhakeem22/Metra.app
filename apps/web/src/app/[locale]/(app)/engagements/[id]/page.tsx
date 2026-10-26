@@ -18,6 +18,7 @@ import {
   deliveryStatusOf,
   engagementCapabilities,
   loadEngagementDetail,
+  mayUploadDesignFiles,
 } from './engagement-detail-data';
 import { EngagementHeaderCard } from './engagement-header-card';
 
@@ -107,7 +108,7 @@ export default async function EngagementDetailPage({
           canRunTrigger(ctx.role, trigger),
         )}
         capabilities={engagementCapabilities(ctx.role, header.state)}
-        canUpload={can(ctx.role, 'engagements_design', 'create')}
+        canUpload={mayUploadDesignFiles(ctx.role, header.state)}
         canShare={canShare}
         gatePreview={gatePreview}
         canAdvance={canAdvance}

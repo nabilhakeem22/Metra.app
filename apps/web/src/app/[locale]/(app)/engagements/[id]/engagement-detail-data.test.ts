@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
+import { DESIGN_STATES, TERMINAL_STATES } from '@/lib/engagements/states';
 
 vi.mock('server-only', () => ({}));
 
@@ -51,7 +52,9 @@ vi.mock('@/lib/engagements/document-comments', () => ({ countAwaitingReplyCore: 
 vi.mock('./boq-step-data', () => ({ loadBoqStep: reads.loadBoqStep }));
 vi.mock('@/lib/execution/queries/facts', () => ({ getExecutionFacts: reads.getExecutionFacts }));
 
-const { loadEngagementDetail } = await import('./engagement-detail-data');
+const { engagementCapabilities, loadEngagementDetail, mayUploadDesignFiles } = await import(
+  './engagement-detail-data'
+);
 
 const CTX: OrgContext = { orgId: 'org-1', userId: 'user-1', role: 'owner' };
 
@@ -87,5 +90,35 @@ describe('loadEngagementDetail', () => {
     reads.getEngagementHeader.mockResolvedValue(null);
     expect(await loadEngagementDetail(CTX, 'e-1')).toBeNull();
     expect(totalReads()).toBe(1);
+  });
+});
+
+describe('the design-upload controls', () => {
+  // The server's upload guards refuse a terminal delivery with
+  // `engagement_not_active`; the page offers the controls by the same answer.
+  it.each(DESIGN_STATES)('%s: offered exactly when the delivery is still in flight', (state) => {
+    const takesFiles = !TERMINAL_STATES.has(state);
+    expect(mayUploadDesignFiles('owner', state)).toBe(takesFiles);
+    expect(engagementCapabilities('owner', state).recordArtifact).toBe(takesFiles);
+  });
+
+  it('the states that refuse are exactly the three terminal ones', () => {
+    expect(DESIGN_STATES.filter((state) => !mayUploadDesignFiles('owner', state)).sort()).toEqual([
+      'abandoned',
+      'closed_design_only',
+      'execution',
+    ]);
+  });
+
+  it('at execution neither the upload nor "Add a deliverable" is offered', () => {
+    expect(mayUploadDesignFiles('owner', 'execution')).toBe(false);
+    expect(engagementCapabilities('owner', 'execution').recordArtifact).toBe(false);
+  });
+
+  it('a read-only role is offered neither, in any state', () => {
+    for (const state of DESIGN_STATES) {
+      expect(mayUploadDesignFiles('viewer', state)).toBe(false);
+      expect(engagementCapabilities('viewer', state).recordArtifact).toBe(false);
+    }
   });
 });
