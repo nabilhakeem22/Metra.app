@@ -167,9 +167,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the contract in the client home (%s)
     home.lines.mockResolvedValueOnce({ ok: true, page: LATER_LINES });
     await tap(at('portal.contract.lines.show').replace('{count}', '2'));
     expect(home.lines).toHaveBeenCalledTimes(1);
-    expect(home.lines).toHaveBeenLastCalledWith('tok', 's-2', 0);
+    expect(home.lines).toHaveBeenLastCalledWith('tok', CONTRACT_ID, 's-2', 0);
     expect(link.lines).not.toHaveBeenCalled();
     expect(screen.getAllByRole('row').length).toBeGreaterThan(5);
+  });
+
+  test('more sections name the contract the document was opened on; once it was replaced they are gone, and say so (F1)', async () => {
+    home.open.mockResolvedValueOnce({ ok: true, contract: { ...contractDocumentOf(CONTRACT), section_count: 3 } });
+    renderWithIntl(<ContractDocumentDisclosure token="tok" contractId={CONTRACT_ID} />, { locale });
+    await tap(at('delivery.contract.document.show'));
+    home.sections.mockResolvedValueOnce({ ok: false, error: 'gone' });
+    await tap(at('portal.contract.lines.moreSections').replace('{count}', '1'));
+    expect(home.sections).toHaveBeenLastCalledWith('tok', CONTRACT_ID, 2);
+    expect(screen.getByRole('alert').textContent).toBe(at('portal.contract.lines.sectionsGone'));
+    const sections = locale === 'en' ? ['Demolition', 'Floors'] : ['أعمال الهدم', 'الأرضيات'];
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual([...sections, at('portal.contract.schedule.title')]);
   });
 
   test('PARITY: the same contract renders the same document as /c, opened and with a section expanded', async () => {

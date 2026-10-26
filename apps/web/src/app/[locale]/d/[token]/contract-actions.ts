@@ -36,24 +36,29 @@ export async function openHomeContract(token: string, contractId: string): Promi
   });
 }
 
-/** Public (no-session): the next 50 sections of the home's contract, collapsed. */
-export async function loadHomeContractSections(token: string, offset: number): Promise<ContractSectionsAnswer> {
+/**
+ * Public (no-session): the next 50 sections of the contract the document was
+ * opened on (`contractId`), collapsed; `gone` once the home's contract is
+ * another one, so an open document never takes on another contract's sections.
+ */
+export async function loadHomeContractSections(token: string, contractId: string, offset: number): Promise<ContractSectionsAnswer> {
   return answered('loadHomeContractSections', failed, async () => {
     if (!(await portalReadAllowed(token))) return { ok: false as const, error: 'too_many' as const };
-    const page = await getHomeContractSections(token, offset);
+    const page = await getHomeContractSections(token, contractId, offset);
     return page ? { ok: true as const, page } : { ok: false as const, error: 'gone' as const };
   });
 }
 
-/** Public (no-session): the next 100 lines of one section of the home's contract. */
+/** Public (no-session): the next 100 lines of one section of the contract the document was opened on; `gone` as for the sections. */
 export async function loadHomeContractSectionLines(
   token: string,
+  contractId: string,
   sectionId: string,
   offset: number,
 ): Promise<ContractSectionLinesAnswer> {
   return answered('loadHomeContractSectionLines', failed, async () => {
     if (!(await portalReadAllowed(token))) return { ok: false as const, error: 'too_many' as const };
-    const page = await getHomeContractSectionLines(token, sectionId, offset);
+    const page = await getHomeContractSectionLines(token, contractId, sectionId, offset);
     return page ? { ok: true as const, page } : { ok: false as const, error: 'gone' as const };
   });
 }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // are counted at the one connection they share. Opening the document is ONE
 // call, more sections ONE, a section's lines ONE; a refused ask is none.
 
-const db = vi.hoisted(() => ({ calls: [] as string[], answers: {} as Record<string, unknown>, fails: false }));
+const db = vi.hoisted(() => ({ calls: [] as string[], queries: [] as string[], answers: {} as Record<string, unknown>, fails: false }));
 const budget = vi.hoisted(() => ({ allowed: vi.fn(async () => true) }));
 
 vi.mock('server-only', () => ({}));
@@ -15,8 +15,10 @@ vi.mock('@/lib/db/client', () => ({
   withRequestDb: async (run: (handle: { execute: (query: unknown) => unknown }) => unknown) =>
     run({
       execute: (query: unknown) => {
-        const name = /public\.(app_[a-z_]+)\(/.exec(JSON.stringify(query))?.[1] ?? 'unknown';
+        const text = JSON.stringify(query);
+        const name = /public\.(app_[a-z_]+)\(/.exec(text)?.[1] ?? 'unknown';
         db.calls.push(name);
+        db.queries.push(text);
         if (db.fails) throw new Error('connection reset');
         return [{ data: db.answers[name] ?? null }];
       },
@@ -61,6 +63,7 @@ beforeEach(() => {
 
 afterEach(() => {
   db.calls = [];
+  db.queries = [];
   db.answers = {};
   db.fails = false;
 });
@@ -108,34 +111,49 @@ describe('more sections and a section lines', () => {
   it('more sections: ONE call, app_home_contract_sections_by_token', async () => {
     const page = { offset: 50, section_count: 60, sections: [] };
     db.answers = { app_home_contract_sections_by_token: page };
-    expect(await loadHomeContractSections('tok', 50)).toEqual({ ok: true, page });
+    expect(await loadHomeContractSections('tok', CONTRACT_ID, 50)).toEqual({ ok: true, page });
     expect(db.calls).toEqual(['app_home_contract_sections_by_token']);
   });
 
   it('a section lines: ONE call, app_home_contract_section_lines_by_token', async () => {
     const page = { section_id: SECTION_ID, offset: 0, line_count: 3, lines: [] };
     db.answers = { app_home_contract_section_lines_by_token: page };
-    expect(await loadHomeContractSectionLines('tok', SECTION_ID, 0)).toEqual({ ok: true, page });
+    expect(await loadHomeContractSectionLines('tok', CONTRACT_ID, SECTION_ID, 0)).toEqual({ ok: true, page });
     expect(db.calls).toEqual(['app_home_contract_section_lines_by_token']);
   });
 
   it('a section of another contract is gone (the SQL answers null), as /c says it', async () => {
-    expect(await loadHomeContractSectionLines('tok', SECTION_ID, 0)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSectionLines('tok', CONTRACT_ID, SECTION_ID, 0)).toEqual({ ok: false, error: 'gone' });
     expect(db.calls).toEqual(['app_home_contract_section_lines_by_token']);
   });
 
   it('a forged section id or offset is gone with NO call', async () => {
     for (const [sectionId, offset] of [['not-a-uuid', 0], [SECTION_ID, -1], [SECTION_ID, 1.5], [SECTION_ID, 100_001]] as const) {
-      expect(await loadHomeContractSectionLines('tok', sectionId, offset)).toEqual({ ok: false, error: 'gone' });
+      expect(await loadHomeContractSectionLines('tok', CONTRACT_ID, sectionId, offset)).toEqual({ ok: false, error: 'gone' });
     }
-    expect(await loadHomeContractSections('tok', -50)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSections('tok', CONTRACT_ID, -50)).toEqual({ ok: false, error: 'gone' });
+    expect(db.calls).toEqual([]);
+  });
+
+  it('each page names the contract the document was opened on (H6-read F1, DB step D)', async () => {
+    await loadHomeContractSections('tok', CONTRACT_ID, 50);
+    await loadHomeContractSectionLines('tok', CONTRACT_ID, SECTION_ID, 0);
+    expect(db.queries).toHaveLength(2);
+    for (const query of db.queries) expect(query).toContain(CONTRACT_ID);
+  });
+
+  it('a forged contract id is gone with NO call', async () => {
+    for (const contractId of ['', 'not-a-uuid', `${CONTRACT_ID} `, null, 42, {}] as unknown as string[]) {
+      expect(await loadHomeContractSections('tok', contractId, 50)).toEqual({ ok: false, error: 'gone' });
+      expect(await loadHomeContractSectionLines('tok', contractId, SECTION_ID, 0)).toEqual({ ok: false, error: 'gone' });
+    }
     expect(db.calls).toEqual([]);
   });
 
   it('past the read budget: too_many, unread', async () => {
     budget.allowed.mockResolvedValue(false);
-    expect(await loadHomeContractSections('tok', 50)).toEqual({ ok: false, error: 'too_many' });
-    expect(await loadHomeContractSectionLines('tok', SECTION_ID, 0)).toEqual({ ok: false, error: 'too_many' });
+    expect(await loadHomeContractSections('tok', CONTRACT_ID, 50)).toEqual({ ok: false, error: 'too_many' });
+    expect(await loadHomeContractSectionLines('tok', CONTRACT_ID, SECTION_ID, 0)).toEqual({ ok: false, error: 'too_many' });
     expect(db.calls).toEqual([]);
   });
 });

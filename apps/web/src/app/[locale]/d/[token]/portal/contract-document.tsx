@@ -17,7 +17,9 @@ const DOCUMENT_ID = 'home-contract-document';
  * the page (the tab's render reads nothing for it), opened on the client's
  * tap, then shown as /c shows it, through the SAME components: the sections
  * with their lines (more sections and a section's lines read when asked for),
- * the figures and the payment schedule. فصحى copy, Latin digits.
+ * the figures and the payment schedule. Those later reads name the contract
+ * the document was opened on, so once the studio has replaced it they answer
+ * gone rather than add another contract's pages. فصحى copy, Latin digits.
  */
 export function ContractDocumentDisclosure({ token, contractId }: { token: string; contractId: string }) {
   const t = useTranslations('delivery.contract.document');
@@ -55,8 +57,8 @@ export function ContractDocumentDisclosure({ token, contractId }: { token: strin
             flat
             sections={document.sections}
             sectionCount={document.section_count}
-            loadSections={(offset) => loadHomeContractSections(token, offset)}
-            loadSectionLines={(sectionId, offset) => loadHomeContractSectionLines(token, sectionId, offset)}
+            loadSections={(offset) => loadHomeContractSections(token, document.id, offset)}
+            loadSectionLines={(sectionId, offset) => loadHomeContractSectionLines(token, document.id, sectionId, offset)}
           />
           <ContractTotalsCard flat contract={document} />
           <ContractScheduleCard flat contract={document} />

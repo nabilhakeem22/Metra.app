@@ -5,14 +5,17 @@ import { terminateContractCore } from '@/lib/contracts/lifecycle/terminate';
 import type { PublicContract } from '@/lib/contracts/public-types';
 import type { OrgContext } from '@/lib/db/context';
 import { seedHome } from './client-home-fixture';
-import { closeExecutionFixture, ownerQuery } from './execution-fixture';
+import { seedDelivery } from './delivery-execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedExecutionContract } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // H6.2, the read, through the app's own readers and actions against the real
 // SQL: the home's contract document is the /c snapshot of the SAME contract
 // (the document part of it), its section pages and lines are /c's, a section
 // of another contract is gone, and a contract the home does not show (a
-// terminated one, another contract's id) is never handed over.
+// terminated one, another contract's id) is never handed over. The pages are
+// bound to the contract the document was opened on (DB step D): after the
+// studio terminates it and issues another, they answer gone (H6-read F1).
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -46,15 +49,15 @@ describe('the home contract document (H6.2, AC19)', () => {
 
     const [section] = home.contract.sectionIds;
     const linesByLink = await scalar(`public.app_contract_section_lines_by_token($1, $2::uuid, 0)`, [await contractHashOf(home.contract.contractId), section]);
-    expect(await loadHomeContractSectionLines(home.delivery.rawToken, section, 0)).toEqual({ ok: true, page: linesByLink });
+    expect(await loadHomeContractSectionLines(home.delivery.rawToken, home.contract.contractId, section, 0)).toEqual({ ok: true, page: linesByLink });
     const sectionsByLink = await scalar(`public.app_contract_sections_by_token($1, 0)`, [await contractHashOf(home.contract.contractId)]);
-    expect(await loadHomeContractSections(home.delivery.rawToken, 0)).toEqual({ ok: true, page: sectionsByLink });
+    expect(await loadHomeContractSections(home.delivery.rawToken, home.contract.contractId, 0)).toEqual({ ok: true, page: sectionsByLink });
   });
 
   it('a section of another contract is gone; another contract id is gone', async () => {
     const home = await seedHome(orgId, 'issued');
     const other = await seedHome(orgId, 'issued');
-    expect(await loadHomeContractSectionLines(home.delivery.rawToken, other.contract.sectionIds[0], 0)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSectionLines(home.delivery.rawToken, home.contract.contractId, other.contract.sectionIds[0], 0)).toEqual({ ok: false, error: 'gone' });
     expect(await openHomeContract(home.delivery.rawToken, other.contract.contractId)).toEqual({ ok: false, error: 'gone' });
   });
 
@@ -63,6 +66,25 @@ describe('the home contract document (H6.2, AC19)', () => {
     expect((await terminateContractCore(owner, { id: home.contract.contractId })).ok).toBe(true);
     expect(await getHomeContract(home.delivery.rawToken)).toBeNull();
     expect(await openHomeContract(home.delivery.rawToken, home.contract.contractId)).toEqual({ ok: false, error: 'gone' });
-    expect(await loadHomeContractSections(home.delivery.rawToken, 0)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSections(home.delivery.rawToken, home.contract.contractId, 0)).toEqual({ ok: false, error: 'gone' });
+  });
+
+  it('F1: terminated and re-issued while open, more sections and the section lines of the opened document are gone', async () => {
+    const delivery = await seedDelivery(orgId);
+    const fiftyFive = Array.from({ length: 55 }, () => 1);
+    const opened = await seedExecutionContract(orgId, { state: 'signed', delivery, linesPerSection: fiftyFive });
+    expect(await openHomeContract(delivery.rawToken, opened.contractId)).toMatchObject({ ok: true });
+    expect(await loadHomeContractSections(delivery.rawToken, opened.contractId, 50)).toMatchObject({ ok: true, page: { offset: 50 } });
+
+    expect((await terminateContractCore(owner, { id: opened.contractId })).ok).toBe(true);
+    await ownerQuery(`update public.boqs set status = 'superseded' where id = $1`, [opened.boqId]);
+    const reissued = await seedExecutionContract(orgId, { state: 'issued', delivery, linesPerSection: fiftyFive });
+
+    expect(await loadHomeContractSections(delivery.rawToken, opened.contractId, 50)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSectionLines(delivery.rawToken, opened.contractId, reissued.sectionIds[50], 0)).toEqual({ ok: false, error: 'gone' });
+    expect(await loadHomeContractSectionLines(delivery.rawToken, opened.contractId, opened.sectionIds[50], 0)).toEqual({ ok: false, error: 'gone' });
+    // The page read again names the new contract, and its document reads its own pages.
+    expect(await loadHomeContractSections(delivery.rawToken, reissued.contractId, 50)).toMatchObject({ ok: true, page: { offset: 50, section_count: 55 } });
+    expect(await loadHomeContractSectionLines(delivery.rawToken, reissued.contractId, reissued.sectionIds[50], 0)).toMatchObject({ ok: true });
   });
 });

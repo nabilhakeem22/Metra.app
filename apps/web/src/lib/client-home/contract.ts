@@ -56,28 +56,45 @@ export async function getHomeContract(rawToken: string): Promise<ContractDocumen
   return contract && contractDocumentOf(contract);
 }
 
-/** Up to 50 sections of the home's contract from `offset`, collapsed. Null as for the document, or for an offset out of range. */
-export async function getHomeContractSections(rawToken: string, offset: unknown): Promise<PublicSectionsPage | null> {
+/** A contract id as the browser hands it back: a uuid string, or nothing to read with. */
+function isContractId(contractId: unknown): contractId is string {
+  return typeof contractId === 'string' && isUuid(contractId);
+}
+
+/**
+ * Up to 50 sections of the home's contract from `offset`, collapsed. Bound to
+ * the contract the document was opened on (`contractId`, DB step D): null when
+ * the home's contract is now another one, as for the document, or for an
+ * offset out of range.
+ */
+export async function getHomeContractSections(
+  rawToken: string,
+  contractId: unknown,
+  offset: unknown,
+): Promise<PublicSectionsPage | null> {
   const token = normalizeRawToken(rawToken);
-  if (!token || !isSectionOffset(offset)) return null;
+  if (!token || !isContractId(contractId) || !isSectionOffset(offset)) return null;
   return readSdfJson<PublicSectionsPage>(
-    sql`select public.app_home_contract_sections_by_token(${hashShareToken(token)}, ${offset}::int) as data`,
+    sql`select public.app_home_contract_sections_by_token(${hashShareToken(token)}, ${contractId}::uuid, ${offset}::int) as data`,
   );
 }
 
 /**
  * Up to 100 lines of one section of the home's contract, from `offset`. Null
- * as for the document, and for a section that is not one of THAT contract's
+ * as for the sections, and for a section that is not one of THAT contract's
  * (no oracle about other contracts).
  */
 export async function getHomeContractSectionLines(
   rawToken: string,
+  contractId: unknown,
   sectionId: unknown,
   offset: unknown,
 ): Promise<PublicSectionLinesPage | null> {
   const token = normalizeRawToken(rawToken);
-  if (!token || typeof sectionId !== 'string' || !isUuid(sectionId) || !isLineOffset(offset)) return null;
+  if (!token || !isContractId(contractId) || typeof sectionId !== 'string' || !isUuid(sectionId) || !isLineOffset(offset)) {
+    return null;
+  }
   return readSdfJson<PublicSectionLinesPage>(
-    sql`select public.app_home_contract_section_lines_by_token(${hashShareToken(token)}, ${sectionId}::uuid, ${offset}::int) as data`,
+    sql`select public.app_home_contract_section_lines_by_token(${hashShareToken(token)}, ${contractId}::uuid, ${sectionId}::uuid, ${offset}::int) as data`,
   );
 }
