@@ -12,6 +12,7 @@ import { getContractPageExecution } from '@/lib/execution/queries/facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
+import { mayRecordVariationDecisionOnPaper } from '@/lib/variations/lifecycle';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
 import { contractPagePayload } from './page-payload';
@@ -83,6 +84,7 @@ export default async function ContractDetailPage({
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}
         canPriceVariation={canPriceVariation}
+        canDecideVariationOnPaper={mayRecordVariationDecisionOnPaper(ctx.role)}
       />
     </div>
   );

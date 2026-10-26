@@ -38,6 +38,7 @@ export function ContractDetailClient({
   canIssue,
   canDraftVariation,
   canPriceVariation,
+  canDecideVariationOnPaper,
 }: {
   /** What every role on the page sees: the tab strip and the on-demand execution tabs need nothing more. */
   header: ContractPageHeader;
@@ -61,6 +62,8 @@ export function ContractDetailClient({
   canIssue: boolean;
   canDraftVariation: boolean;
   canPriceVariation: boolean;
+  /** Owner, admin or project manager: may record a client's paper answer to an issued change order (H7.3). */
+  canDecideVariationOnPaper: boolean;
 }) {
   const te = useTranslations('errors');
   const locale = useLocale();
@@ -148,6 +151,7 @@ export function ContractDetailClient({
           variations={variations}
           canDraftVariation={canDraftVariation}
           canPriceVariation={canPriceVariation}
+          canDecideOnPaper={canDecideVariationOnPaper}
           pending={pending}
           m={m}
           act={act}

@@ -163,6 +163,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         canIssue={false}
         canDraftVariation={false}
         canPriceVariation={false}
+        canDecideVariationOnPaper={false}
       />,
       { locale },
     );
@@ -192,6 +193,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
           canIssue={false}
           canDraftVariation={false}
           canPriceVariation={false}
+          canDecideVariationOnPaper={false}
         />,
         { locale },
       );
@@ -266,6 +268,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         canIssue={false}
         canDraftVariation={false}
         canPriceVariation={false}
+        canDecideVariationOnPaper={false}
       />,
       { locale },
     );

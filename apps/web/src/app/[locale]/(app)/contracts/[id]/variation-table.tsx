@@ -14,6 +14,7 @@ import type { VariationListRow } from '@/lib/variations/queries';
 import { variationStatusKey } from '@/lib/variations/status-label';
 import type { ContractAction, VariationChargeRates } from './contract-vo-types';
 import { VariationChargeSummary } from './variation-charge-summary';
+import { VariationPaperDialog } from './variation-paper-dialog';
 
 /** A cell: a table cell from sm up, a piece of the stacked row below it. */
 const CELL = 'block sm:table-cell sm:px-4 sm:py-2';
@@ -21,12 +22,14 @@ const CELL = 'block sm:table-cell sm:px-4 sm:py-2';
 /**
  * The contract's variation orders, each with the next step its status allows.
  * On an execution contract (`chargeRates`) each also says what it charges the
- * client and the days it adds.
+ * client and the days it adds. An issued one may take the client's answer
+ * given on paper (`canDecideOnPaper`: owner, admin, project manager).
  */
 export function VariationTable({
   variations,
   chargeRates,
   canPriceVariation,
+  canDecideOnPaper,
   pending,
   m,
   act,
@@ -34,6 +37,7 @@ export function VariationTable({
   variations: VariationListRow[];
   chargeRates: VariationChargeRates | null;
   canPriceVariation: boolean;
+  canDecideOnPaper: boolean;
   pending: boolean;
   m: (v: string) => string;
   act: ContractAction;
@@ -61,13 +65,14 @@ export function VariationTable({
           <tbody className="block sm:table-row-group">
             {variations.map((v) => {
               const statusKey = variationStatusKey(v);
+              const number = formatDocNumber('VO', v.number, docYear(null, v.createdAt));
               return (
                 <tr
                   key={v.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 last:border-0 sm:table-row sm:p-0"
                 >
                   <td className={`${CELL} whitespace-nowrap font-mono text-caption`} dir="ltr">
-                    {formatDocNumber('VO', v.number, docYear(null, v.createdAt))}
+                    {number}
                   </td>
                   <td className={`${CELL} basis-full`}>
                     {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
@@ -106,6 +111,9 @@ export function VariationTable({
                       >
                         {tv('issue')}
                       </Button>
+                    )}
+                    {canDecideOnPaper && v.status === 'issued' && (
+                      <VariationPaperDialog variationOrderId={v.id} number={number} />
                     )}
                   </td>
                 </tr>

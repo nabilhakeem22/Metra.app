@@ -82,6 +82,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
         variations={[]}
         canDraftVariation
         canPriceVariation={false}
+        canDecideOnPaper={false}
         pending={false}
         m={(v) => v}
         act={() => {}}

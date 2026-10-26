@@ -69,6 +69,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
         variations={[]}
         canDraftVariation
         canPriceVariation={false}
+        canDecideOnPaper={false}
         pending={false}
         m={(value) => value}
         act={() => {}}
@@ -117,7 +118,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
 
   const table = (rows: VariationListRow[]) =>
     renderWithIntl(
-      <VariationTable variations={rows} chargeRates={RATES} canPriceVariation={false} pending={false} m={(v) => v} act={() => {}} />,
+      <VariationTable variations={rows} chargeRates={RATES} canPriceVariation={false} canDecideOnPaper={false} pending={false} m={(v) => v} act={() => {}} />,
       { locale },
     );
   /** A days sentence, recognised by the words its message opens with in this locale. */
@@ -166,7 +167,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
 
   test('a proposal contract\'s register shows the net change alone, as before', () => {
     renderWithIntl(
-      <VariationTable variations={[row({ timeExtensionDays: null })]} chargeRates={null} canPriceVariation={false} pending={false} m={(v) => v} act={() => {}} />,
+      <VariationTable variations={[row({ timeExtensionDays: null })]} chargeRates={null} canPriceVariation={false} canDecideOnPaper={false} pending={false} m={(v) => v} act={() => {}} />,
       { locale },
     );
     expect(screen.queryByText(at('variations.charge.supervision'))).toBeNull();

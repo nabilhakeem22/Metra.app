@@ -21,6 +21,7 @@ export function VariationRegister({
   variations,
   canDraftVariation,
   canPriceVariation,
+  canDecideOnPaper,
   pending,
   m,
   act,
@@ -31,6 +32,7 @@ export function VariationRegister({
   variations: VariationListRow[];
   canDraftVariation: boolean;
   canPriceVariation: boolean;
+  canDecideOnPaper: boolean;
   pending: boolean;
   m: (v: string) => string;
   act: ContractAction;
@@ -55,6 +57,7 @@ export function VariationRegister({
         variations={variations}
         chargeRates={chargeRates}
         canPriceVariation={canPriceVariation}
+        canDecideOnPaper={canDecideOnPaper}
         pending={pending}
         m={m}
         act={act}

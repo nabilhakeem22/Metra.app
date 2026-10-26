@@ -47,6 +47,7 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/contracts/[id]/use-variation-create.ts': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/variation-create-form.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/contracts/[id]/variation-line-row.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/variation-paper-dialog.tsx': 'app/[locale]/(app)/contracts/[id]/variation-paper-dialog.test.tsx',
   'app/[locale]/(app)/engagements/[id]/acknowledgement-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/[id]/client-expected-date.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/[id]/command-card-claim-row.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',

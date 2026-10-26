@@ -37,9 +37,10 @@ export interface PublicVariation {
   contractActive: boolean;
   /**
    * WHO rejected this variation order, or null when nothing was recorded (0051).
-   * 'client' is the client's own refusal through the token path; 'staff' is the
-   * termination cascade, which is the only staff route to `rejected` — there is
-   * no staff "reject VO" action. null is every row written before 0051.
+   * 'client' is the client's own refusal, through the token path or on paper
+   * as the studio recorded it (H7.3: the SDF reads `recorded_on_paper` as
+   * 'client'); 'staff' is the termination cascade. null is every row written
+   * before 0051.
    */
   rejectionChannel: 'client' | 'staff' | null;
   /**

@@ -30,6 +30,7 @@ export type DocumentActionCode =
   | 'contract_not_signable'
   | 'variation_not_draft'
   | 'variation_not_internal_approved'
+  | 'variation_not_issued'
   // Editing a draft BOQ line by line (boqs/edit.ts + boqs/edit-input.ts).
   | 'line_not_found'
   | 'section_not_found'

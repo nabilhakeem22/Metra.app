@@ -101,6 +101,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         canIssue
         canDraftVariation={false}
         canPriceVariation={false}
+        canDecideVariationOnPaper={false}
       />,
       { locale },
     );
@@ -134,6 +135,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         variations={[]}
         canDraftVariation
         canPriceVariation={false}
+        canDecideOnPaper={false}
         pending={false}
         m={(v) => v}
         act={() => {}}

@@ -16,8 +16,11 @@ export type VariationStatusKey = VariationStatus | 'rejected_on_termination';
  * register painted both with the same red "مرفوض" pill.
  *
  * Only `'staff'` splits, and only on `rejected`. The cascade is the ONLY staff
- * route to that status — there is no staff "reject VO" action — so the channel
- * is a complete discriminator rather than a heuristic. A null channel is a row
+ * route to that status the readers report as 'staff': a client's refusal the
+ * studio records on paper (H7.3) is written by staff but marked
+ * `recorded_on_paper`, and the readers (queries/list.ts,
+ * app_variation_by_token) report it as 'client'. So the channel is a complete
+ * discriminator rather than a heuristic. A null channel is a row
  * written before 0051 and keeps today's label, which is the same
  * no-regression rule the client-facing ladder follows.
  */
