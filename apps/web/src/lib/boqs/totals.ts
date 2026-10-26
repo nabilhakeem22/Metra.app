@@ -17,13 +17,11 @@ import {
   formatMoney4,
   parseMoney4,
   pctOf,
-  type LineInput,
-  type LineTotals,
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
 
 export { computeLine, computeSection };
-export type { LineInput, LineTotals, SectionTotals };
+export type { SectionTotals };
 
 export interface BoqDocTotals {
   subtotal: string;

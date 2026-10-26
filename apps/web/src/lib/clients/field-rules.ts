@@ -23,7 +23,7 @@ const CLIENT_LIMITS = {
 } as const;
 
 /** The free text as the database stores it: trimmed, and blank as null. */
-export function normalizedClient(input: ClientInput) {
+function normalizedClient(input: ClientInput) {
   return {
     nameEn: clean(input.nameEn),
     nameAr: clean(input.nameAr),
@@ -41,7 +41,7 @@ export function normalizedClient(input: ClientInput) {
 
 /** The typed values as the database stores them; a percentage left `undefined`
  *  was not sent, so an edit leaves the stored one as it was. */
-export type ClientValues = ReturnType<typeof normalizedClient> & {
+type ClientValues = ReturnType<typeof normalizedClient> & {
   advancePct: string | undefined;
   retentionPct: string | undefined;
 };

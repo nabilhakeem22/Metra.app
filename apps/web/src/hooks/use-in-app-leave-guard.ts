@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
 /** The in-app destination of a plain left click on a link, or null to let it be. */
-export function inAppLinkTarget(event: MouseEvent, here: Location): URL | null {
+function inAppLinkTarget(event: MouseEvent, here: Location): URL | null {
   if (event.defaultPrevented || event.button !== 0) return null;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
   const anchor = (event.target as Element | null)?.closest?.('a[href]');

@@ -24,7 +24,7 @@ const ROW_COLUMNS = {
   marketItemId: costItems.marketItemId,
 };
 
-export type PriceBookRow = Pick<CostItem, keyof typeof ROW_COLUMNS>;
+type PriceBookRow = Pick<CostItem, keyof typeof ROW_COLUMNS>;
 
 export interface PriceBookPage {
   rows: PriceBookRow[];

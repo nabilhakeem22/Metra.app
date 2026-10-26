@@ -13,7 +13,7 @@ import type { HeroView } from '../portal-hero';
 import type { PortalStageKey } from '../portal-stage';
 import type { PortalDocumentMedia, PortalPaymentDetails, PortalReceipt, PortalTimelineEntry } from './timeline-types';
 
-export type { PortalDocumentMedia, PortalPaymentDetails, PortalReceipt, PortalTimelineEntry } from './timeline-types';
+export type { PortalPaymentDetails, PortalReceipt, PortalTimelineEntry } from './timeline-types';
 
 /** One milestone in the client's payment schedule — DUE amounts only, no cost. */
 export interface PublicDeliveryMilestone {

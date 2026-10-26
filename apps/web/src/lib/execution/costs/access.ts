@@ -16,7 +16,7 @@ import { can } from '@/lib/permissions/can';
 import type { CostEntriesScope } from './types';
 
 /** The roles that may edit or void ANY live entry, whoever recorded it. */
-export const COST_ENTRY_KEEPERS: readonly MemberRole[] = ['owner', 'admin'];
+const COST_ENTRY_KEEPERS: readonly MemberRole[] = ['owner', 'admin'];
 
 /** Lists a contract's costs: all of them with their totals, or only its own (costEntriesScopeFor). */
 export function mayReadCostEntries(role: MemberRole): boolean {

@@ -3,7 +3,7 @@
 import type { ClientType } from '@metra/db';
 
 /** Every path a client refusal can name; `name` is the Arabic/English pair. */
-export const CLIENT_FIELDS = [
+const CLIENT_FIELDS = [
   'name',
   'nameEn',
   'nameAr',

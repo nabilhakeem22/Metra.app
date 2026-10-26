@@ -24,7 +24,7 @@ import type { BoqEditsApi } from './use-boq-edits';
  * EVERY server write the BOQ sheet makes, bound to React. What each one DOES is
  * in boq-write-actions.ts; this file owns only how they reach it.
  */
-export interface BoqWriteHandlers {
+interface BoqWriteHandlers {
   saveLine(line: EditableLine, patch: BoqLinePatch, columns: Column[]): void;
   onCellBlur(line: EditableLine, column: Column): void;
   onAddLine(sectionId: string): void;

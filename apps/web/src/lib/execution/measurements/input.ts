@@ -18,7 +18,7 @@ export const MEASUREMENT_FIELDS = ['measuredQty', 'measuredOn', 'note'] as const
 export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
 
 /** `contract_line_measurements_note_length`. */
-export const MAX_MEASUREMENT_NOTE_CHARS = 500;
+const MAX_MEASUREMENT_NOTE_CHARS = 500;
 
 export interface TypedMeasurement {
   measuredQty?: unknown;
@@ -52,7 +52,7 @@ export function measurementFieldErrors(
 }
 
 /** How many times its contract quantity a reading may be before the dialog asks the studio to check it. */
-export const FAR_BEYOND_CONTRACT_QTY_TIMES = 10n;
+const FAR_BEYOND_CONTRACT_QTY_TIMES = 10n;
 
 /**
  * Whether a reading the dialog has read (scale 4) is more than ten times the

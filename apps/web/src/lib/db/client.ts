@@ -104,7 +104,7 @@ let cached: { db: MetraDb; sql: PostgresJs } | null = null;
  * every CF caller must go through `withRequestDb()` instead — we fail loud here
  * rather than hand back a cross-request socket.
  */
-export function getDb(): MetraDb {
+function getDb(): MetraDb {
   if (isCloudflareRuntime()) {
     throw new Error(
       'getDb() is off-platform only; use withRequestDb() on the Cloudflare runtime',

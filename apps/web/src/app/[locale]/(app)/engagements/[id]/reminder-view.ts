@@ -20,7 +20,7 @@ export type ReminderLoad =
   | { ok: boolean; error?: ActionCode; reference?: string; data?: DeliveryReminder }
   | { ok: false; rejection: unknown };
 
-export const VIEW_OF_REFUSAL: Partial<Record<ActionCode, ReminderView>> = {
+const VIEW_OF_REFUSAL: Partial<Record<ActionCode, ReminderView>> = {
   delivery_link_not_shared: { status: 'notShared' },
   delivery_links_not_configured: { status: 'notConfigured' },
   delivery_link_unrecoverable: { status: 'unrecoverable' },

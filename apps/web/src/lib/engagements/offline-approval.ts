@@ -20,7 +20,7 @@ import { ENDING_DECIDERS } from './transitions/trigger-roles';
  * engineer still advances every other stage; standing in for the client's
  * consent is the owner's, an admin's or the project manager's call.
  */
-export const OFFLINE_APPROVAL_DECIDERS: readonly MemberRole[] = ENDING_DECIDERS;
+const OFFLINE_APPROVAL_DECIDERS: readonly MemberRole[] = ENDING_DECIDERS;
 
 export function mayRecordOfflineApproval(role: MemberRole): boolean {
   return OFFLINE_APPROVAL_DECIDERS.includes(role);

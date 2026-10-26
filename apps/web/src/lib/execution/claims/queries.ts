@@ -9,7 +9,7 @@ import { fail } from '@/lib/actions/mutate';
 import { formatDocNumber } from '@/lib/format/doc-number';
 
 /** At most one claim waits per request, and the tab shows the newest 100 requests. */
-export const PENDING_CLAIMS_SHOWN = 100;
+const PENDING_CLAIMS_SHOWN = 100;
 
 export interface PendingClaimRow {
   id: string;

@@ -10,10 +10,10 @@ import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { requestOutstanding } from '../money/outstanding';
 import { variationCharge } from '../money/variation-charge';
 
-export const REQUESTS_SHOWN = 100;
+const REQUESTS_SHOWN = 100;
 /** A change order's number year: its creation year in Cairo, as the register shows it (docYear). */
 const CAIRO_YEAR_OF_VARIATION = sql`extract(year from v.created_at at time zone 'Africa/Cairo')::int`;
-export const BILLABLE_VARIATIONS_SHOWN = 50;
+const BILLABLE_VARIATIONS_SHOWN = 50;
 
 export interface PaymentRequestRow {
   id: string;

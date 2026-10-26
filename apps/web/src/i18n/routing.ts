@@ -15,7 +15,7 @@ export const LOCALE_COOKIE_NAME = 'NEXT_LOCALE';
 /** One year: the lifetime next-intl 3.26.5 gives that cookie. Anything of ours that writes it uses the same. */
 export const LOCALE_COOKIE_MAX_AGE_SECONDS = 31536000;
 
-export function isRtl(locale: string): boolean {
+function isRtl(locale: string): boolean {
   return locale.startsWith('ar');
 }
 
@@ -23,5 +23,4 @@ export function dirFor(locale: string): 'rtl' | 'ltr' {
   return isRtl(locale) ? 'rtl' : 'ltr';
 }
 
-export const { Link, redirect, usePathname, useRouter, getPathname } =
-  createNavigation(routing);
+export const { Link, usePathname, useRouter } = createNavigation(routing);

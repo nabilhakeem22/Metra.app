@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 // Drawer/sheet anchored to an inline edge (start-0 by default, end-0 for the
 // form sheets), never left/right, so it flips automatically in RTL.
 const Sheet = DialogPrimitive.Root;
-const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
 
@@ -82,7 +81,6 @@ SheetDescription.displayName = 'SheetDescription';
 
 export {
   Sheet,
-  SheetTrigger,
   SheetClose,
   SheetContent,
   SheetTitle,

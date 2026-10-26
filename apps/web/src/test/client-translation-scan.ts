@@ -91,7 +91,7 @@ export function translationCalls(file: ts.SourceFile, path: string): ClientTrans
 }
 
 /** The modules that run in the browser when the `entries` render. */
-export function clientModulesReachedFrom(graph: SourceGraph, entries: readonly string[]): string[] {
+function clientModulesReachedFrom(graph: SourceGraph, entries: readonly string[]): string[] {
   const client = new Set<string>();
   const server = new Set<string>();
   const pending = entries.map((path) => ({ path, inClient: false }));

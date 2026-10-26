@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
-const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
@@ -70,7 +69,6 @@ DropdownMenuSeparator.displayName = 'DropdownMenuSeparator';
 export {
   DropdownMenu,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,

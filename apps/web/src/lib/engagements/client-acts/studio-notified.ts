@@ -4,7 +4,7 @@ import { LOCALES, type Locale } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
 
 /** The delivery the client acted on, as the notifier returned it (0057). */
-export interface NotifiedDelivery {
+interface NotifiedDelivery {
   number: number;
   /** The delivery's creation year in Africa/Cairo: the year its DE number shows. */
   year: number;

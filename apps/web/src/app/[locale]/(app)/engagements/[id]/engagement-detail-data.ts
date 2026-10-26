@@ -42,10 +42,6 @@ import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
 import type { PanelCapabilities } from './engagement-panels';
 
-export type EngagementDetailData = NonNullable<
-  Awaited<ReturnType<typeof loadEngagementDetail>>
->;
-
 /**
  * The header first (it decides whether the route is a 404 at all), then every
  * other read in ONE `Promise.all` — eleven round trips that do not depend on

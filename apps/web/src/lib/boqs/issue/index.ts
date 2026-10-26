@@ -16,7 +16,7 @@ import { renderAndStoreClientBoqPdf } from './render';
 import { boqRevision, fenceIssueRevision } from './revision';
 import { issueEngagementOf } from './sole-engagement';
 
-export { freezeAndRecordIssue, type FreezeIssueInput } from './freeze';
+export { freezeAndRecordIssue } from './freeze';
 export { loadDocumentNames, type DocumentNames } from './document-names';
 export { renderAndStoreClientBoqPdf } from './render';
 export { getBoqIssueReleasable } from './releasable';

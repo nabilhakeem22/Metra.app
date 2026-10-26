@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 // (respond-arity.test.ts, fetch-redirect-mode.test.ts). Tests and build output
 // are not source, so they are skipped.
 
-export const REPO_ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../..');
+const REPO_ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../..');
 
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', '.next', '.open-next', '.wrangler']);
 const SOURCE = /\.(tsx?|[cm]?js)$/;

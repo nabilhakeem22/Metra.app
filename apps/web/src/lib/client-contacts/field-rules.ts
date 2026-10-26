@@ -11,7 +11,7 @@ import type { ContactField, ContactInput } from './fields';
 const CONTACT_LIMITS = { name: 200, role: 120, phone: 40, email: 254, whatsapp: 40 } as const;
 
 /** The free text as the database stores it: trimmed, and blank as null. */
-export function normalizedContact(input: ContactInput) {
+function normalizedContact(input: ContactInput) {
   return {
     name: clean(input.name),
     role: clean(input.role),

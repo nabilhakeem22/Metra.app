@@ -124,7 +124,7 @@ const IMPORTED_CELL = {
  * prose and printed verbatim into the ar-EG preview. Mirrors the price book's
  * `ImportRowError` + `priceBook.import.errors.*`.
  */
-export type BoqImportRowErrorCode =
+type BoqImportRowErrorCode =
   | 'unmapped_columns'
   | 'description_empty'
   | 'unit_empty'
@@ -188,7 +188,7 @@ export interface ImportedLine {
   costItemCode: string | null;
 }
 
-export interface RowVerdict {
+interface RowVerdict {
   /** 1-based row number IN THE FILE, so an error names what the studio sees. */
   rowNumber: number;
   line: ImportedLine | null;

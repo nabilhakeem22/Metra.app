@@ -25,7 +25,7 @@ interface HolderRow {
  *  - STUDIO_SEED_LOCK, the two-key form (it, then the org): objsubid 2, the
  *    first key in classid as an unsigned 32-bit oid.
  */
-export async function readLockHolders(): Promise<LockHolder[]> {
+async function readLockHolders(): Promise<LockHolder[]> {
   const rows = await withDatabase((sql) => sql<HolderRow[]>`
     select * from (
       select distinct a.pid, a.application_name, a.state,

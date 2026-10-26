@@ -13,7 +13,7 @@ import type { Capability, PermissionAction } from '@/lib/permissions/roles';
 import { mutationFailure, type MutationFailureOptions } from './mutation-failure';
 import { ActionError, fail, type ActionCode, type ActionResult } from './result';
 
-export { ActionError, fail } from './result';
+export { fail } from './result';
 
 /**
  * The sanctioned mutation wrapper. Optionally gates on a §2.2 capability BEFORE

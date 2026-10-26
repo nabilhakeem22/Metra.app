@@ -5,7 +5,7 @@ import type { MarketItemStatus, MarketUnit } from '@metra/db';
 import { marketChanges } from './change';
 import type { MarketBulletinSummary, MarketCategory, MarketItemRow, MarketPoint } from './types';
 
-export type PointTuple = [month: string, status: MarketPoint['status'], price: string | null, bulletinMonth: string, page: number];
+type PointTuple = [month: string, status: MarketPoint['status'], price: string | null, bulletinMonth: string, page: number];
 
 export type ItemTuple = [
   id: string, key: string, categoryKey: string, nameAr: string, nameEn: string, specAr: string | null, specEn: string | null,
@@ -18,7 +18,7 @@ export type BulletinTuple = [periodMonth: string, publishedAt: string, fromDay: 
 
 export type CategoryTuple = [key: string, nameAr: string, nameEn: string, parentKey: string | null, itemCount: number];
 
-export function decodePoint([month, status, price, bulletinMonth, sourcePage]: PointTuple): MarketPoint {
+function decodePoint([month, status, price, bulletinMonth, sourcePage]: PointTuple): MarketPoint {
   return { month, status, price, bulletinMonth, sourcePage };
 }
 

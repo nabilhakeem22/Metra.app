@@ -19,7 +19,7 @@ export class NotFoundError extends Error {
 }
 
 /** Everything a v1 handler needs; all data access must use `ctx`. */
-export interface ApiContext {
+interface ApiContext {
   principal: ApiPrincipal;
   /** canSeeMargin(role, org.hideMarginFromPm) — computed once per request. */
   costVisible: boolean;

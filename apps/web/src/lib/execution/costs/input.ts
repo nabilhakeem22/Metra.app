@@ -37,8 +37,8 @@ export const COST_ENTRY_FIELDS = [
 export type CostEntryField = (typeof COST_ENTRY_FIELDS)[number];
 
 /** The description's cap, and the supplier's and reference's: the table's CHECKs. */
-export const MAX_COST_DESCRIPTION_CHARS = 300;
-export const MAX_COST_PARTY_CHARS = 120;
+const MAX_COST_DESCRIPTION_CHARS = 300;
+const MAX_COST_PARTY_CHARS = 120;
 
 /** Zero, or a figure so small it stores as 0.0000: said with the range a box takes (the smallest kept is 0.0001). */
 const POSITIVE_RANGE: FieldError = { code: 'out_of_range', params: { min: '0.0001', max: '1,000,000,000,000' } };

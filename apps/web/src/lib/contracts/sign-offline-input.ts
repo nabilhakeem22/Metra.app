@@ -10,7 +10,7 @@ export const SIGN_OFFLINE_FIELDS = ['signedOn', 'note'] as const;
 export type SignOfflineField = (typeof SIGN_OFFLINE_FIELDS)[number];
 
 /** The note's cap: the same 500 characters as a payment request's note. */
-export const MAX_SIGN_OFFLINE_NOTE_CHARS = 500;
+const MAX_SIGN_OFFLINE_NOTE_CHARS = 500;
 
 export interface TypedOfflineSignature {
   signedOn?: unknown;

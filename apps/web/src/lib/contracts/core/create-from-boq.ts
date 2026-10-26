@@ -24,7 +24,7 @@ export interface GenerateExecutionContractInput extends ContractChargesInput {
 }
 
 /** One execution contract per BOQ (0063): losing that race is `contract_exists`. */
-export const CONTRACT_PER_BOQ_CONSTRAINT = 'contracts_org_id_source_boq_unique';
+const CONTRACT_PER_BOQ_CONSTRAINT = 'contracts_org_id_source_boq_unique';
 
 type IssuedBoq = Pick<
   typeof boqs.$inferSelect,

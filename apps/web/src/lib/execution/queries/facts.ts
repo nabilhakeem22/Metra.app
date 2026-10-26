@@ -16,7 +16,7 @@ import { executionStage, type ExecutionContractFacts, type ExecutionStage } from
 import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts, type ContractMoneyFacts } from './money-facts';
 
-export interface ExecutionCardContract {
+interface ExecutionCardContract {
   id: string;
   number: number;
   createdAt: string;

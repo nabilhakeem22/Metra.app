@@ -7,12 +7,12 @@ import { nameIn } from '@/lib/price-book/name-order';
 import type { CostItemOption } from './builder-model';
 import type { SectionOption } from './section-combobox';
 
-export interface PickerEntry {
+interface PickerEntry {
   item: CostItemOption;
   name: string;
 }
 
-export interface PickerGroup {
+interface PickerGroup {
   /** The section id, or null for items whose section the builder does not know. */
   sectionId: string | null;
   title: string | null;

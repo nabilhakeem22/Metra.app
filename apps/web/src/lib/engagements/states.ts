@@ -85,7 +85,3 @@ export const ACTIVE_STATES = new Set<DesignState>(
 export function isTerminal(state: DesignState): boolean {
   return TERMINAL_STATES.has(state);
 }
-
-export function isActive(state: DesignState): boolean {
-  return ACTIVE_STATES.has(state);
-}

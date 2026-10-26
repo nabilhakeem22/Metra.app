@@ -37,7 +37,7 @@ export async function updateOrganization(
 }
 
 /** The org's first owner, the actor the suites write the studio's details as. */
-export async function ownerOf(orgId: string): Promise<string> {
+async function ownerOf(orgId: string): Promise<string> {
   const [row] = await raw.query<{ user_id: string }>(
     `select user_id from public.memberships where org_id = '${orgId}' and role = 'owner'
       order by user_id limit 1`,

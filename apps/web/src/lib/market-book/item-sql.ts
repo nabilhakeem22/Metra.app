@@ -7,7 +7,7 @@ import { effectiveSql, ITEM_JOINS, itemJson, POINT_JSON } from './effective-sql'
 // MARKET_DETAIL_MONTHS of them (five years of monthly bulletins), so the drawer
 // is bounded however long the history grows.
 
-export const MARKET_DETAIL_MONTHS = 60;
+const MARKET_DETAIL_MONTHS = 60;
 
 export function marketItemSql(itemId: string): SQL {
   return sql`

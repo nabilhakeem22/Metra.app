@@ -4,7 +4,7 @@ import type { OutboxRecord, SiteOp } from '@/lib/site/outbox/types';
 
 export const ENGINEER = 'user-engineer';
 export const OTHER_ENGINEER = 'user-other';
-export const ORG = 'org-a';
+const ORG = 'org-a';
 
 type OpOf<Kind extends SiteOp['kind']> = Extract<SiteOp, { kind: Kind }>;
 

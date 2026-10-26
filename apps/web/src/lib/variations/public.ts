@@ -9,7 +9,7 @@ import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-res
 import { hashShareToken } from '@/lib/share/token';
 import { validIsoDate } from '@/lib/validation/iso-date';
 
-export interface PublicVariationLine {
+interface PublicVariationLine {
   id: string;
   description_ar: string | null;
   description_en: string | null;

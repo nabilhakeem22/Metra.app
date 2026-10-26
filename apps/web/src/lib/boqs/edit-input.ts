@@ -59,8 +59,8 @@ export interface CleanLinePatch {
 }
 
 /** The sheet columns a refusal can sit under. */
-export type BoqLineColumn = 'itemCode' | 'description' | 'unit' | 'qty' | 'unitPrice';
-export type BoqLineErrors = Partial<Record<BoqLineColumn, FieldError>>;
+type BoqLineColumn = 'itemCode' | 'description' | 'unit' | 'qty' | 'unitPrice';
+type BoqLineErrors = Partial<Record<BoqLineColumn, FieldError>>;
 
 /** The patch as stored; or every refused column at once, each under its cell;
  *  or `malformed`, a patch no sheet can send. */

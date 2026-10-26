@@ -10,11 +10,10 @@ import { exceedsDraftSaveLimit } from './draft-size';
 import { autosaveDraft, persistDraft, type SaveDraft, type SaveDraftResult } from './persist-draft';
 import type { ProposalDraftState } from './proposal-payload';
 
-export type { DraftSaveState } from './draft-save-state';
 
-export const AUTOSAVE_DEBOUNCE_MS = 1500;
+const AUTOSAVE_DEBOUNCE_MS = 1500;
 /** Continuous editing still saves at least this often. */
-export const AUTOSAVE_MAX_WAIT_MS = 10_000;
+const AUTOSAVE_MAX_WAIT_MS = 10_000;
 
 export interface DraftAutosaveApi {
   saveState: DraftSaveState;
