@@ -172,10 +172,11 @@ describe('round 2 M1: 15 wrong tries on one target an hour refuse NEW codes only
     }
     const refused = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
     expect(refused.status).toBe('too_many');
-    // 20 tries over codes made 183, 122, 61 and 0 s ago: the oldest leaving the
-    // hour still leaves 15, the second leaving it leaves 10, so the wait ends
-    // when the code made 122 s ago is an hour old.
-    expect(refused.retry_after_seconds).toBeGreaterThanOrEqual(3600 - 122 - 2);
+    // 20 tries over codes made 183, 122, 61 and 0 s ago (plus the real seconds
+    // the calls took): the oldest leaving the hour still leaves 15, the second
+    // leaving it leaves 10, so the wait ends when the code made 122 s ago is an
+    // hour old. The oldest alone would have answered 3600 - 183.
+    expect(refused.retry_after_seconds).toBeGreaterThan(3600 - 122 - 30);
     expect(refused.retry_after_seconds).toBeLessThanOrEqual(3600 - 122 + 1);
     await ageCodes(home.delivery.id, (refused.retry_after_seconds as number) - 3);
     const almost = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
