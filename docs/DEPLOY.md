@@ -4417,7 +4417,7 @@ The client home's database step: migration `0065_client_home.sql` plus
 runs AFTER Stage 2 DB step B (the section above): production then holds 65
 migrations and 80 policies, 15 of them restrictive; step C leaves it at 66
 and 81. It is validated on branch `validate/home-h3-sql`, whose code is
-pinned at **`11899f96`**: the branch's last code commit (every commit after it
+pinned at **`31e21c8f`**: the branch's last code commit (every commit after it
 changes only `docs/DEPLOY.md`). That branch is `main` (`65c78473`: Stage 2,
 the site diary and step B) plus PR H3, its two fix rounds and the code cleanup of
 `validate/cleanup-oct26` (`6ed20154`, no database change).
@@ -4499,7 +4499,7 @@ git fetch origin
 git switch --detach origin/validate/home-h3-sql
 Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-c.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 11899f96 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (11899f96)
+git diff --stat 31e21c8f HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (31e21c8f)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 65c78473 HEAD -- packages/db/migrations    # MUST print exactly the three 0065 files below
 ```
@@ -4516,7 +4516,7 @@ The `Copy-Item` line saves this runbook (the branch's, which has this section)
 to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
 STOPs, tell the lead in each case:
 
-- The `git diff --stat 11899f96 HEAD` lists any file other than
+- The `git diff --stat 31e21c8f HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
 - The `git log ... -- packages/db` prints any line: database code reached
   `main` after this branch was last brought up to date, and this branch's
