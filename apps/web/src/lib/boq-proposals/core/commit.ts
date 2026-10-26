@@ -81,6 +81,7 @@ async function issueNewVersion(
     boqId,
     projectId: input.engagement.projectId,
     engagementId: input.engagement.id,
+    clientId: input.engagement.clientId,
     ...input.file,
   });
   await audit({

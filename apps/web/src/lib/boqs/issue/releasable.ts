@@ -23,6 +23,6 @@ export async function getBoqIssueReleasable(
       .limit(1),
   );
   if (!boq) return false;
-  const engagementId = await issueEngagementOf(ctx, boq);
-  return engagementId ? getEngagementBoqReleasable(ctx, engagementId) : false;
+  const engagement = await issueEngagementOf(ctx, boq);
+  return engagement ? getEngagementBoqReleasable(ctx, engagement.id) : false;
 }

@@ -35,6 +35,8 @@ interface Fixture {
   orgId: string;
   projectId: string;
   engagementId: string;
+  /** The engagement's client, whose the frozen BOQ is. */
+  clientId: string;
 }
 
 async function setup(): Promise<Fixture> {
@@ -57,7 +59,7 @@ async function setup(): Promise<Fixture> {
      values ('${orgId}', 1, '${client.id}', '${project.id}', 'Fit-out design')
      returning id`,
   );
-  return { ctx, orgId, projectId: project.id, engagementId: engagement.id };
+  return { ctx, orgId, projectId: project.id, engagementId: engagement.id, clientId: client.id };
 }
 
 /** A one-line draft BOQ on the fixture's project. */
@@ -123,6 +125,7 @@ async function freeze(fixture: Fixture, boqId: string) {
       boqId,
       projectId: fixture.projectId,
       engagementId: fixture.engagementId,
+      clientId: fixture.clientId,
       fileId,
       label: 'BQ.pdf',
     }),

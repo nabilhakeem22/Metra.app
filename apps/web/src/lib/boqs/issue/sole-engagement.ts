@@ -5,16 +5,44 @@ import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 
 /**
+ * The delivery an issue goes through, and the client it was sold to. A BOQ
+ * issued through it becomes THAT client's (H3 round 2): a project's client can
+ * change while its delivery runs, and a delivery owns only its own client's
+ * BOQs (`app_delivery_boqs`).
+ */
+export interface IssueEngagement {
+  id: string;
+  clientId: string;
+}
+
+const issueEngagementColumns = { id: designEngagements.id, clientId: designEngagements.clientId };
+
+/** The engagement a BOQ is already attached to, or null when RLS hides it. */
+async function attachedEngagement(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<IssueEngagement | null> {
+  const [row] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select(issueEngagementColumns)
+      .from(designEngagements)
+      .where(eq(designEngagements.id, engagementId))
+      .limit(1),
+  );
+  return row ?? null;
+}
+
+/**
  * The project's one active engagement, or null when there is none — or more than
  * one, because guessing between two is worse than asking.
  */
 async function soleActiveEngagement(
   ctx: OrgContext,
   projectId: string,
-): Promise<string | null> {
+): Promise<IssueEngagement | null> {
   const rows = await withOrgContext(ctx, (tx) =>
     tx
-      .select({ id: designEngagements.id })
+      .select(issueEngagementColumns)
       .from(designEngagements)
       .where(
         and(
@@ -24,7 +52,7 @@ async function soleActiveEngagement(
       )
       .limit(2),
   );
-  return rows.length === 1 ? (rows[0]?.id ?? null) : null;
+  return rows.length === 1 ? (rows[0] ?? null) : null;
 }
 
 /**
@@ -36,6 +64,8 @@ async function soleActiveEngagement(
 export async function issueEngagementOf(
   ctx: OrgContext,
   boq: { engagementId: string | null; projectId: string },
-): Promise<string | null> {
-  return boq.engagementId ?? (await soleActiveEngagement(ctx, boq.projectId));
+): Promise<IssueEngagement | null> {
+  return boq.engagementId
+    ? attachedEngagement(ctx, boq.engagementId)
+    : soleActiveEngagement(ctx, boq.projectId);
 }

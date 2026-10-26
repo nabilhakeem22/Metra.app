@@ -1,6 +1,5 @@
-import { createSql } from '@metra/db';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { ageCodes, codesOf, requestCode, seedHome, signWithCode, type Home } from './client-home-fixture';
+import { ageCodes, codesOf, holdLock, requestCode, seedHome, signWithCode, type Home } from './client-home-fixture';
 import { closeExecutionFixture, ownerQuery, sqlstate, tamper } from './execution-fixture';
 import { closeFixture, seedOrg, teardown } from './fixture';
 
@@ -11,10 +10,13 @@ import { closeFixture, seedOrg, teardown } from './fixture';
 //  - R1: no platform-wide lock is held while a row lock is waited for, so one
 //    studio's held delivery row delays that studio's code only, and past the
 //    4 s wait it answers `busy`, never 55P03;
-//  - R5: a code that expired more than 90 days ago may be deleted, and each
-//    issue removes at most 50 of them;
-//  - S5: 15 wrong tries on one target in a day, over all its codes, refuse even
-//    the right code, and no new code is sent for it.
+//  - R5, round 2 L2: a code never used that expired more than 90 days ago may
+//    be deleted, and each issue removes at most 50 of them; a used code is
+//    evidence and stays;
+//  - round 2 M1 (from S5): 15 wrong tries on one target in an hour, over all
+//    its codes, refuse a NEW code for it until the hour has passed, with the
+//    exact wait; a code already sent keeps its own five tries, so whoever
+//    holds only the link cannot lock the client out of the code in the mail.
 
 const orgIds: string[] = [];
 let studioA: string;
@@ -51,38 +53,6 @@ async function seedPastCodes(orgId: string, count: number, ageSql: string): Prom
   return filler;
 }
 
-class Released extends Error {}
-
-/** A studio transaction holding a delivery row FOR UPDATE on its own connection until `release`. */
-async function holdDeliveryRow(deliveryId: string, maxMs = 9000) {
-  const holder = createSql(process.env.DATABASE_URL as string, { max: 1, prepare: false });
-  let letGo: () => void = () => undefined;
-  const decided = new Promise<void>((resolve) => {
-    letGo = resolve;
-    setTimeout(resolve, maxMs);
-  });
-  let locked: () => void = () => undefined;
-  const isLocked = new Promise<void>((resolve) => (locked = resolve));
-  const finished = holder
-    .begin(async (tx) => {
-      await tx.unsafe(`select 1 from public.design_engagements where id = $1 for update`, [deliveryId]);
-      locked();
-      await decided;
-      throw new Released();
-    })
-    .catch((error: unknown) => {
-      if (!(error instanceof Released)) throw error;
-    })
-    .finally(() => holder.end());
-  await isLocked;
-  return {
-    async release() {
-      letGo();
-      await finished;
-    },
-  };
-}
-
 /** The advisory locks granted right now: the code issue's are the only ones these tests take. */
 const grantedAdvisoryLocks = async () =>
   (await ownerQuery<{ n: number }>(`select count(*)::int as n from pg_locks where locktype = 'advisory' and granted`))[0].n;
@@ -105,7 +75,7 @@ describe('R1: no platform lock held behind one studio\'s row', () => {
   it('while studio A\'s delivery is held, A\'s request waits holding no advisory lock, and B is answered within 100 ms', async () => {
     const held = await seedHome(studioA);
     const other = await seedHome(studioB);
-    const hold = await holdDeliveryRow(held.delivery.id);
+    const hold = await holdLock(`select 1 from public.design_engagements where id = $1 for update`, [held.delivery.id]);
     const waiting = requestCode(held.delivery.tokenHash, 'sign_contract', held.contract.contractId);
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await grantedAdvisoryLocks()).toBe(0);
@@ -120,7 +90,7 @@ describe('R1: no platform lock held behind one studio\'s row', () => {
 
   it('held past the 4 s wait: busy as an answer, never 55P03, and no row', async () => {
     const held = await seedHome(studioA);
-    const hold = await holdDeliveryRow(held.delivery.id);
+    const hold = await holdLock(`select 1 from public.design_engagements where id = $1 for update`, [held.delivery.id]);
     const answer = (await requestCode(held.delivery.tokenHash, 'sign_contract', held.contract.contractId)).answer;
     await hold.release();
     expect(answer).toEqual({ status: 'busy' });
@@ -143,32 +113,75 @@ describe('R5: codes are purged 90 days after they expired', () => {
     expect(await codesOf(old.delivery.id)).toEqual([]);
     expect(await codesOf(home.delivery.id)).toHaveLength(2);
   });
+
+  it('round 2 L2: a USED code is evidence: 120 days past expiry it survives the purge and a direct delete, an unused one goes', async () => {
+    const old = await seedPastCodes(studioA, 2, '120 days');
+    const [used, unused] = await codesOf(old.delivery.id);
+    await tamper(`update public.client_verification_codes set consumed_at = expires_at - interval '1 minute', result_ref = gen_random_uuid() where id = $1`, [used.id]);
+    expect(await sqlstate(ownerQuery(`delete from public.client_verification_codes where id = $1`, [used.id]))).toBe('MT100');
+    const home = await seedHome(studioB);
+    expect((await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId)).answer.status).toBe('ok');
+    const left = await codesOf(old.delivery.id);
+    expect(left.map((code) => code.id)).toEqual([used.id]);
+    expect(left[0].consumed_at).not.toBeNull();
+    expect(left.map((code) => code.id)).not.toContain(unused.id);
+  });
 });
 
-describe('S5: 15 wrong tries on one target a day', () => {
-  it('counts the tries over the target\'s codes: then even the right code is locked, and no new code is sent', async () => {
+/** `count` codes sent to sign the home's contract, 61 s apart: the first is the oldest. */
+async function requestSignCodes(home: Home, count: number) {
+  const issued = [];
+  for (let index = 0; index < count; index += 1) {
+    if (index > 0) await ageCodes(home.delivery.id, 61);
+    const code = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    expect(code.answer.status).toBe('ok');
+    issued.push(code);
+  }
+  return issued;
+}
+
+/** Five wrong answers to one code, as a holder of the link alone can give: the tries left after each. */
+async function spendFiveWrongTries(home: Home, code: { challengeId: string; code: string }) {
+  const wrong = code.code === '000000' ? '111111' : '000000';
+  const left: Array<number | undefined> = [];
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    left.push((await signWithCode(home.delivery.tokenHash, home.contract.contractId, code.challengeId, wrong)).attempts_left);
+  }
+  return left;
+}
+
+describe('round 2 M1: 15 wrong tries on one target an hour refuse NEW codes only', () => {
+  it('a link holder spends 15 tries over three codes: the client\'s right code from the 4th mail still signs', async () => {
     const home = await seedHome(studioA);
     const target = home.contract.contractId;
-    const left: Array<number | undefined> = [];
-    for (const tries of [3, 5, 5, 2]) {
-      const issued = await requestCode(home.delivery.tokenHash, 'sign_contract', target);
-      expect(issued.answer.status).toBe('ok');
-      const wrong = issued.code === '000000' ? '111111' : '000000';
-      for (let attempt = 0; attempt < tries; attempt += 1) {
-        const answer = await signWithCode(home.delivery.tokenHash, target, issued.challengeId, wrong);
-        expect(answer.code).toBe('code_wrong');
-        left.push(answer.attempts_left);
-      }
-      if (tries === 2) {
-        expect(await signWithCode(home.delivery.tokenHash, target, issued.challengeId, issued.code)).toEqual({ code: 'code_locked' });
-      }
-      await ageCodes(home.delivery.id, 61);
+    const issued = await requestSignCodes(home, 4);
+    for (const code of issued.slice(0, 3)) {
+      expect(await spendFiveWrongTries(home, code)).toEqual([4, 3, 2, 1, 0]);
+      expect(await signWithCode(home.delivery.tokenHash, target, code.challengeId, code.code)).toEqual({ code: 'code_locked' });
     }
-    expect(left).toEqual([4, 3, 2, 4, 3, 2, 1, 0, 4, 3, 2, 1, 0, 1, 0]);
+    expect(await signWithCode(home.delivery.tokenHash, target, issued[3].challengeId, issued[3].code)).toEqual({ code: 'ok' });
+    const contract = await ownerQuery<{ status: string }>(`select status::text from public.contracts where id = $1`, [target]);
+    expect(contract).toEqual([{ status: 'signed' }]);
+  });
+
+  it('refuses a new code with the exact wait, then the hour reopens', async () => {
+    const home = await seedHome(studioA);
+    const target = home.contract.contractId;
+    for (const code of await requestSignCodes(home, 4)) {
+      expect(await spendFiveWrongTries(home, code)).toEqual([4, 3, 2, 1, 0]);
+    }
     const refused = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
     expect(refused.status).toBe('too_many');
-    expect(refused.retry_after_seconds).toBeGreaterThan(23 * 3600);
-    const contract = await ownerQuery<{ status: string }>(`select status::text from public.contracts where id = $1`, [target]);
-    expect(contract).toEqual([{ status: 'issued' }]);
+    // 20 tries over codes made 183, 122, 61 and 0 s ago: the oldest leaving the
+    // hour still leaves 15, the second leaving it leaves 10, so the wait ends
+    // when the code made 122 s ago is an hour old.
+    expect(refused.retry_after_seconds).toBeGreaterThanOrEqual(3600 - 122 - 2);
+    expect(refused.retry_after_seconds).toBeLessThanOrEqual(3600 - 122 + 1);
+    await ageCodes(home.delivery.id, (refused.retry_after_seconds as number) - 3);
+    const almost = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
+    expect(almost.status).toBe('too_many');
+    expect(almost.retry_after_seconds).toBeLessThanOrEqual(4);
+    await ageCodes(home.delivery.id, 4);
+    expect((await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer.status).toBe('ok');
   });
 });

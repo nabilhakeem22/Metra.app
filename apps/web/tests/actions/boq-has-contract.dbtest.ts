@@ -52,6 +52,7 @@ async function issueNewVersion(issued: SeededBoq) {
       boqId: next.boqId,
       projectId: issued.projectId,
       engagementId: issued.engagementId!,
+      clientId: issued.clientId,
       fileId: file.id,
       label: 'BQ.pdf',
     }),

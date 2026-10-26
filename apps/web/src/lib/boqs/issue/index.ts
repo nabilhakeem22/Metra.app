@@ -64,6 +64,7 @@ export async function issueBoqCore(
       boqId: input.boqId,
       projectId: source.projectId,
       engagementId: source.engagementId,
+      clientId: source.clientId,
       ...file,
     });
   });
@@ -78,6 +79,8 @@ interface IssueSource {
   detail: BoqDetail;
   projectId: string;
   engagementId: string;
+  /** The delivery's client: the PDF names them, and the freeze makes the BOQ theirs. */
+  clientId: string;
   names: DocumentNames;
   year: number;
 }
@@ -93,7 +96,6 @@ async function loadIssueSource(
         status: boqs.status,
         projectId: boqs.projectId,
         engagementId: boqs.engagementId,
-        clientId: boqs.clientId,
         createdAt: boqs.createdAt,
         revision: boqRevision,
       })
@@ -117,13 +119,22 @@ async function loadIssueSource(
   if (detail.lineCount === 0) return 'line_required';
 
   // An engagement is required: the artifact hangs off one, and it is how the
-  // client ever sees this document.
-  const engagementId = await issueEngagementOf(ctx, row);
-  if (!engagementId) return 'engagement_not_found';
+  // client ever sees this document. Its client, not the project's, is the one
+  // the BOQ is for (the project's client may have changed since).
+  const engagement = await issueEngagementOf(ctx, row);
+  if (!engagement) return 'engagement_not_found';
 
-  const names = await loadDocumentNames(ctx, row);
+  const names = await loadDocumentNames(ctx, { clientId: engagement.clientId, projectId: row.projectId });
   if (!names) return 'boq_not_found';
 
   const year = new Date(row.createdAt).getUTCFullYear();
-  return { revision: row.revision, detail, projectId: row.projectId, engagementId, names, year };
+  return {
+    revision: row.revision,
+    detail,
+    projectId: row.projectId,
+    engagementId: engagement.id,
+    clientId: engagement.clientId,
+    names,
+    year,
+  };
 }

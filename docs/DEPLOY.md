@@ -4413,13 +4413,13 @@ copy.
 
 The client home's database step: migration `0065_client_home.sql` plus
 `db:apply-rls` (two new files under `rls/functions/`, one under
-`rls/policies/`, and changes to four existing files and `rls/roles.sql`). It
+`rls/policies/`, and changes to five existing files and `rls/roles.sql`). It
 runs AFTER Stage 2 DB step B (the section above): production then holds 65
 migrations and 80 policies, 15 of them restrictive; step C leaves it at 66
 and 81. It is validated on branch `validate/home-h3-sql`, whose code is
-pinned at **`e2557546`**: the branch's last code commit (every commit after it
+pinned at **`8221866b`**: the branch's last code commit (every commit after it
 changes only `docs/DEPLOY.md`). That branch is `main` (`65c78473`: Stage 2,
-the site diary and step B) plus PR H3, its fix round and the code cleanup of
+the site diary and step B) plus PR H3, its two fix rounds and the code cleanup of
 `validate/cleanup-oct26` (`6ed20154`, no database change).
 
 **Step C is not the last client home step.** DB step C2 (apply-rls only)
@@ -4457,14 +4457,18 @@ Why this order, one sentence each:
   current code gets. Five client functions are rewritten to share one helper
   each, and answer byte for byte what they did (rehearsed: an md5 of every
   contract link, change-order link, delivery link and execution card document
-  identical before and after); the change-order guard admits everything the old
+  identical before and after); the delivery link's answer gains one key,
+  `entry_phase` (`design` for every delivery today), which the current code
+  does not read (its mapper picks the keys it knows, and a test pins that);
+  the change-order guard admits everything the old
   one did; a delivery's execution contract is now also found by its project
   for a "light" delivery, of which none exists until PR H4. One rule moves for
   the execution card and the "I paid" behind it: they now stand on the
   delivery's contract by the rule the studio's cockpit uses, so a delivery
   whose terminated contract a newer issued BOQ replaced, or whose BOQ was made
   for another client of the project, shows what its cockpit shows. Step 2 (g)
-  counts those deliveries; production should have none. Rehearsed: the
+  counts those deliveries, and the BOQs made for another client; production
+  should have none of either. Rehearsed: the
   current `main`'s own isolation gate and action tests on the step C database
   (see *Rehearsed*).
 - **No client sees anything new** until PR H4: the new client functions have no
@@ -4477,9 +4481,10 @@ Why this order, one sentence each:
 | `design_engagements` | one new column, `entry_phase` (`design` for every delivery, the default; `execution` for a LIGHT delivery, the client page of an execution contract with no design delivery behind it, created from PR H4), two checks (only those two values; a light delivery is at `execution` and stays there), and one unique index (at most one light delivery per project and client) |
 | `client_verification_codes` (new, empty) | one row per one-time code a client asks for (from PR H5): which delivery, which act and which document, the HASH of the code (never the code), where it was sent (a hash and a hint of the address), the client's ip and browser, and what it was used for. Ten minutes of life and five tries, by check. RLS enabled and forced from the moment it exists |
 | `rls/functions/65-execution-facts.sql` (new) | the execution facts, ONE source for the studio's cockpit and the client's page: which BOQs a delivery owns (only its own client's; a light delivery's by its project), THE contract it stands on (one rule for the studio and the client), a contract's money facts, its measured lines and works, and everything the execution card is derived from. The studio reads them as itself, under its own RLS |
-| `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, 15 wrong tries on it a day, 10 an hour and 20 a day per delivery, 25 a day per studio, 80 a day across the platform; it also removes codes 90 days after they expired), the four acts that will need a code, and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
+| `rls/functions/75-client-home.sql` (new) | the client home (from PR H4): the page by its delivery link, its contract and change orders through the SAME functions as the contract and change-order links (so the document a client signs is the same), the one-time code request with its limits (60 s between codes for one document, 5 an hour for it, no new one for it after 15 wrong tries on its codes in an hour, 10 a day per delivery, 25 a day per studio, 80 a day across the platform; it also removes codes never used, 90 days after they expired, and keeps every used one), the four acts that will need a code (each answers `busy`, not an error, when a studio write holds what it needs), and where an old contract or change-order link sends its holder; plus their internal helpers and the codes table's guard |
+| `rls/functions/40-delivery-read.sql` | the delivery link's answer gains `entry_phase` (`design`, or `execution` for a light delivery, from PR H4), so the client page knows a light delivery from the read it already makes; every other key is unchanged |
 | `rls/functions/30-contracts-variations.sql`, `50-delivery-write.sql`, `70-execution-portal.sql` | the contract and change-order links, the two "I paid" functions and the execution card share four new helpers (how a contract was signed, the days approved change orders add, what is still due on a request, on a design instalment), with the same answers; the execution card stands on the delivery's contract by the cockpit's rule (a light delivery's found by its project; see step 2 (g)); the change-order guard is now its own function: everything it admitted before, plus issue restarting the link's 30 days |
-| `rls/policies/36-client-home.sql` (new), `policies/30-contracts-boqs-variations.sql` | the codes table's org isolation policy and guard trigger (a code changes only by one wrong try or its one use; it is deleted only with its delivery, or 90 days after it expired); the change-order trigger points at the new guard |
+| `rls/policies/36-client-home.sql` (new), `policies/30-contracts-boqs-variations.sql` | the codes table's org isolation policy and guard trigger (a code changes only by one wrong try or its one use; it is deleted only with its delivery, or, never used, 90 days after it expired); the change-order trigger points at the new guard |
 | `rls/roles.sql` | `metra_app` may read every column of the codes table but the code's hash, and write none of it (only the client home's own functions do); the new functions are callable by `metra_app` only, the helpers that take bare ids by nobody |
 
 **1. Put the step C code in the production checkout.** This step adds no
@@ -4493,7 +4498,7 @@ git fetch origin
 git switch --detach origin/validate/home-h3-sql
 Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-c.md
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat e2557546 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (e2557546)
+git diff --stat 8221866b HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (8221866b)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 65c78473 HEAD -- packages/db/migrations    # MUST print exactly the three 0065 files below
 ```
@@ -4510,7 +4515,7 @@ The `Copy-Item` line saves this runbook (the branch's, which has this section)
 to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
 STOPs, tell the lead in each case:
 
-- The `git diff --stat e2557546 HEAD` lists any file other than
+- The `git diff --stat 8221866b HEAD` lists any file other than
   `docs/DEPLOY.md`: the code is not the code that was rehearsed.
 - The `git log ... -- packages/db` prints any line: database code reached
   `main` after this branch was last brought up to date, and this branch's
@@ -4578,7 +4583,9 @@ select (select count(*) from public.design_engagements) as deliveries,
 
 (d) What every client link shows now, as one fingerprint per kind. Note the
 four values; step 4 (f) expects the same four (a client who signs, answers or
-says "I paid" in between changes one: then tell the lead which).
+says "I paid" in between changes one: then tell the lead which). The
+delivery links are fingerprinted without `entry_phase`, the one key step C
+adds to them (step 4 (h) checks it), so the four compare before and after.
 
 ```sql
 -- Step C step 2 (d): what the client links show, fingerprinted. Run this one alone.
@@ -4587,7 +4594,7 @@ select
      from public.contracts c where c.token_hash is not null) as contract_links,
   (select md5(coalesce(string_agg(md5(coalesce(public.app_variation_by_token(v.token_hash)::text, '')), '' order by v.id), ''))
      from public.variation_orders v where v.token_hash is not null) as change_order_links,
-  (select md5(coalesce(string_agg(md5(coalesce(public.app_delivery_by_token(d.token_hash)::text, '')), '' order by d.id), ''))
+  (select md5(coalesce(string_agg(md5(coalesce((public.app_delivery_by_token(d.token_hash) - 'entry_phase')::text, '')), '' order by d.id), ''))
      from public.design_engagements d where d.token_hash is not null) as delivery_links,
   (select md5(coalesce(string_agg(md5(coalesce(public.app_delivery_execution_by_token(d.token_hash)::text, '')), '' order by d.id), ''))
      from public.design_engagements d where d.token_hash is not null) as execution_cards;
@@ -4610,16 +4617,22 @@ from pg_policies where schemaname = 'public';
 select pg_size_pretty(pg_database_size(current_database())) as db_size;
 ```
 
-(g) **The execution cards step C changes. Expect one row, `cards_changed` 0.**
-It counts the deliveries at execution whose execution card (and the "I
-paid" behind it) step C points at another contract, or at none: a
-terminated contract that a newer issued BOQ replaced, or a BOQ made for
-another client of the project. Anything else: STOP before step 3 and tell
-the lead the number.
+(g) **The execution cards step C changes. Expect one row, `cards_changed` 0
+and `boqs_other_client` 0.** `cards_changed` counts the deliveries at
+execution whose execution card (and the "I paid" behind it) step C points
+at another contract, or at none: a terminated contract that a newer issued
+BOQ replaced, or a BOQ made for another client of the project.
+`boqs_other_client` counts the BOQs a delivery at execution holds that were
+made for another client of its project (the project's client changed while
+the delivery ran), with a contract or not: from step C on, the delivery no
+longer owns them, so its cockpit loses them (the merged code makes every new
+one the delivery client's). Anything else: STOP before step 3 and tell the
+lead both numbers.
 
 ```sql
 -- Step C step 2 (g): the execution cards step C changes. Run this one alone.
-select count(*) as cards_changed
+select (
+select count(*)
 from public.design_engagements de
 left join lateral (
   select c.id from public.boqs b
@@ -4645,7 +4658,15 @@ where de.state = 'execution'
   and shown_now.id is distinct from (
     case when newest.status = 'draft' or (newest.status = 'terminated' and issued_boq.id <> newest.source_boq_id)
          then null else newest.id end
-  );
+  )
+) as cards_changed,
+(
+select count(*)
+from public.design_engagements de
+join public.boqs b on b.org_id = de.org_id and b.engagement_id = de.id
+where de.state = 'execution'
+  and b.client_id <> de.client_id
+) as boqs_other_client;
 ```
 
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
@@ -4850,12 +4871,14 @@ order by 1;
 (e) Step 2 (c) again: the same five numbers as before.
 
 (f) Step 2 (d) again: the same four fingerprints as before (every client link
-shows exactly what it showed; step 2 (g) was 0).
+shows exactly what it showed, a delivery link but for its new `entry_phase`;
+step 2 (g) was 0 and 0).
 
 (g) Step 2 (e) again: now `policies` 81 and `restrictive` 15.
 
-(h) Every delivery begins in design, and the new checks and index are valid:
-one row, `not_design` 0, `valid_checks` 2, `valid_light_index` 1.
+(h) Every delivery begins in design, the new checks and index are valid, and
+every live delivery link says its `entry_phase`: one row, `not_design` 0,
+`valid_checks` 2, `valid_light_index` 1, `links_phase_wrong` 0.
 
 ```sql
 -- Step C step 4 (h): the new column, checks and index. Run this one alone.
@@ -4864,7 +4887,10 @@ select (select count(*) from public.design_engagements where entry_phase <> 'des
          where conname in ('design_engagements_entry_phase_known', 'design_engagements_light_is_execution')
            and convalidated) as valid_checks,
        (select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid
-         where c.relname = 'design_engagements_one_light_per_project_client' and i.indisvalid) as valid_light_index;
+         where c.relname = 'design_engagements_one_light_per_project_client' and i.indisvalid) as valid_light_index,
+       (select count(*) from public.design_engagements d
+         cross join lateral (select public.app_delivery_by_token(d.token_hash) as link) l
+         where l.link is not null and l.link ->> 'entry_phase' is distinct from d.entry_phase) as links_phase_wrong;
 ```
 
 (i) Step 2 (f) again: about the same size as before (the new table is empty;
@@ -4928,9 +4954,10 @@ page). Three parts: one SQL block that takes away the one policy the previous
 code does not declare (that code's own check refuses a policy it does not
 declare); the `db:apply-rls` of `main` (`65c78473`, the database code
 production ran on just before step 3: step B's), which puts back the five
-rewritten functions, the execution card without the light scope and the old
-change-order trigger; then one SQL block that removes what that code does not
-know (the codes table's trigger and the 32 functions). It leaves 0065 itself
+rewritten functions, the delivery link without `entry_phase`, the execution
+card without the light scope and the old change-order trigger; then one SQL
+block that removes what that code does not know (the codes table's trigger
+and the 32 functions). It leaves 0065 itself
 alone: the new column, the checks, the index and the empty codes table stay
 (forced, with no policy, so `metra_app` reads nothing in it; the current site
 never touches it). Afterwards the database is exactly as it was before step 3,

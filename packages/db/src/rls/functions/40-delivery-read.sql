@@ -291,7 +291,8 @@ $$;
 --
 -- Columns exposed (the WHOLE surface):
 --   design_engagements: id, number, state (raw key — the TS layer maps to a
---     client-friendly label), off_plan, title_ar, title_en, created_at,
+--     client-friendly label), entry_phase (0065: 'design' or 'execution'),
+--     off_plan, title_ar, title_en, created_at,
 --     design_fee (as design_fee_total — the fee the CLIENT pays, not a cost),
 --     rom_low, rom_high (the budget band, and ONLY once rom_issued_at is
 --     stamped — an unissued band is the studio's private working state),
@@ -429,6 +430,10 @@ as $$
     'id', de.id,
     'number', de.number,
     'state', de.state,
+    -- H3 round 2 (0065): 'design', or 'execution' for a LIGHT delivery (the
+    -- client page of an execution contract, born at `execution`), so the page
+    -- knows a light delivery without a second read.
+    'entry_phase', de.entry_phase,
     'off_plan', de.off_plan,
     'title_ar', de.title_ar,
     'title_en', de.title_en,

@@ -30,7 +30,7 @@ create policy org_isolation on public.client_verification_codes
   );
 
 -- A code changes only by one wrong try or its one consumption, and is deleted
--- only with its delivery or 90 days after it expired
+-- only with its delivery, or, never used, 90 days after it expired
 -- (functions/75-client-home.sql).
 drop trigger if exists trg_client_verification_codes_guarded on public.client_verification_codes;
 create trigger trg_client_verification_codes_guarded
