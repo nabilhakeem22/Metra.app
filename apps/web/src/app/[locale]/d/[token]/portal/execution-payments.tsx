@@ -4,13 +4,16 @@ import { useLocale, useTranslations } from 'next-intl';
 import { isRequestClaimable } from '@/lib/engagements/public/execution-requests';
 import { EXECUTION_LIST_CAP, type PortalExecution } from '@/lib/engagements/public/execution-types';
 import { bidiIsolate } from '@/lib/format/bidi';
+import { ClientCodePanel } from './client-code-panel';
 import { ConfirmActDialog } from './confirm-act-dialog';
 import { ExecutionEarlierClaims } from './execution-earlier-claims';
 import { ExecutionReceipts } from './execution-receipts';
 import { ExecutionRequestRow, useRequestLabel } from './execution-request-row';
 import { PaymentInstructions } from './payment-instructions';
 import { portalListMoney } from './portal-money';
+import type { KnownCodeChannel } from './use-client-code';
 import { useExecutionClaim } from './use-execution-claim';
+import { useStudioWhatsappHref, type StudioContactFacts } from './use-studio-whatsapp';
 
 /** Every amount the section prints, so they all keep one decimals rule. */
 function amountsOf(execution: PortalExecution): string[] {
@@ -28,23 +31,30 @@ function amountsOf(execution: PortalExecution): string[] {
  * waiting on an earlier contract of the delivery, how to pay while something
  * is due, and the payments received. Every amount in it keeps ONE decimals
  * rule (./portal-money.ts). Figures are what the client is asked to pay or has
- * paid, never the studio's own price basis. A claim that landed tells the page
- * (`onClaimed`), whose hero then says the studio is checking it. فصحى copy,
- * Latin digits, money left to right.
+ * paid, never the studio's own price basis. "I've made this payment" needs a
+ * one-time code emailed to the client (the panel in its dialog; `channel` is
+ * where it goes, or null with no address on file). A claim that landed, or a
+ * request that moved on, tells the page (`onChanged`), whose hero then follows.
+ * فصحى copy, Latin digits, money left to right.
  */
 export function ExecutionPayments({
   token,
   initial,
-  onClaimed,
+  onChanged,
+  channel,
+  studio,
 }: {
   token: string;
   initial: PortalExecution;
-  onClaimed: () => void;
+  onChanged: () => void;
+  channel: KnownCodeChannel;
+  studio: StudioContactFacts;
 }) {
   const t = useTranslations('delivery.execution');
   const tActions = useTranslations('delivery.actions');
   const locale = useLocale();
-  const claim = useExecutionClaim(token, initial, onClaimed);
+  const claim = useExecutionClaim(token, initial, onChanged, channel);
+  const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'execution');
   const requestLabel = useRequestLabel();
   const { requests } = claim.execution;
   const money = portalListMoney(amountsOf(claim.execution), locale);
@@ -79,17 +89,21 @@ export function ExecutionPayments({
         open={asking !== null}
         title={t('confirmTitle')}
         body={
-          <p>
-            {asking &&
-              t('confirmBody', {
-                request: `${requestLabel(asking)} ${bidiIsolate(asking.documentNumber)}`,
-                amount: bidiIsolate(money(asking.outstanding)),
-              })}
-          </p>
+          <>
+            <p>
+              {asking &&
+                t('confirmBody', {
+                  request: `${requestLabel(asking)} ${bidiIsolate(asking.documentNumber)}`,
+                  amount: bidiIsolate(money(asking.outstanding)),
+                })}
+            </p>
+            <ClientCodePanel code={claim.code} studioName={studio.name} whatsappHref={whatsappHref} />
+          </>
         }
         confirmLabel={tActions('confirm')}
         cancelLabel={tActions('cancel')}
         pending={claim.pending}
+        confirmDisabled={!claim.code.ready}
         onConfirm={claim.confirm}
         onOpenChange={(open) => !open && claim.dismiss()}
       />

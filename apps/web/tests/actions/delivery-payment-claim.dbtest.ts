@@ -12,7 +12,7 @@ import {
 } from '@/lib/engagements/payment-claims';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementPaymentClaims } from '@/lib/engagements/queries';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';

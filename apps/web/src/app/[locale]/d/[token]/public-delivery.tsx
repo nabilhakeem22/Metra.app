@@ -100,6 +100,7 @@ export function PublicDeliveryView({
           details={delivery.paymentDetails}
           receipts={delivery.receipts}
           receiptsTruncated={delivery.receiptsTruncated}
+          studio={{ name: firmName, whatsappDigits: delivery.firm.whatsappDigits, deliveryRef: deliveryReference(delivery) }}
         />
         <DocumentsCard
           token={token}

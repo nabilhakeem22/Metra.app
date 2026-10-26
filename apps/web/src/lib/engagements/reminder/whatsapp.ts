@@ -2,9 +2,7 @@
 // with the message prefilled. PURE and CLIENT-SAFE. No WhatsApp API, no send on
 // our side: the studio's own WhatsApp opens with the text ready, and the studio
 // presses send.
-
-/** Arabic-Indic (U+0660..9) and Extended Arabic-Indic (U+06F0..9) digits. */
-const EASTERN_DIGIT = /[\u0660-\u0669\u06F0-\u06F9]/g;
+import { latinDigits } from '@/lib/format/latin-digits';
 
 /**
  * Invisible marks a pasted number carries: LRM/RLM, the bidi embeddings and
@@ -21,14 +19,6 @@ const EGYPTIAN_MOBILE_NATIONAL = /^1[0125]\d{8}$/;
 
 /** E.164: a country code that does not start with 0, 8 to 15 digits in all. */
 const E164_DIGITS = /^[1-9]\d{7,14}$/;
-
-/** Fold Eastern Arabic digits to Latin ones (U+0660 and U+06F0 are both zero). */
-function latinDigits(value: string): string {
-  return value.replace(EASTERN_DIGIT, (digit) => {
-    const code = digit.charCodeAt(0);
-    return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
-  });
-}
 
 /**
  * A typed or pasted number with Latin digits only and nothing between them:

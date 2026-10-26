@@ -9,8 +9,9 @@ import { PaymentsCard } from './payments-card';
 // longer lists the milestone as claimable closes the dialog for good, sends
 // nothing, and says why in one line. It never reopens by itself.
 
-const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
+const actions = vi.hoisted(() => ({ claimDesignPaymentInHome: vi.fn() }));
 vi.mock('../actions', () => actions);
+vi.mock('../code-actions', () => ({ requestClientCode: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const SCHEDULE: PublicDeliveryMilestone[] = [
@@ -31,7 +32,7 @@ function Page() {
       <button type="button" hidden onClick={() => setClaim(CLAIMABLE)}>
         claimable again
       </button>
-      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} receipts={[]} receiptsTruncated={false} />
+      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />
     </>
   );
 }
@@ -50,6 +51,6 @@ describe('a payment confirmation the server made moot', () => {
     fireEvent.click(screen.getByText('claimable again'));
     await act(async () => {});
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(actions.markDeliveryPaymentPaid).not.toHaveBeenCalled();
+    expect(actions.claimDesignPaymentInHome).not.toHaveBeenCalled();
   });
 });

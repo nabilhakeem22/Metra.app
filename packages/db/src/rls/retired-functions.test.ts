@@ -73,3 +73,30 @@ describe('the retired six-argument respond write stays dropped (0060)', () => {
     expect('app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)'.match(SIX_ARGUMENT_SIGNATURE)).toBeNull();
   });
 });
+
+// Client codes DB step D (H6-read security S1) DROPS the unbound forms of the
+// home contract's two page reads; their replacements take the contract the
+// client opened. Each old argument list appears exactly once, in its DROP,
+// right before the CREATE of the bound form, and nowhere else (roles.sql too).
+describe('the unbound home contract page reads stay dropped (step D)', () => {
+  const RETIRED = [
+    {
+      drop: 'drop function if exists public.app_home_contract_sections_by_token(text, integer);',
+      create: 'create or replace function public.app_home_contract_sections_by_token(\n  p_hash text,\n  p_contract_id uuid,',
+      signature: /"?app_home_contract_sections_by_token"?\s*\(\s*text\s*,\s*integer\s*\)/gi,
+    },
+    {
+      drop: 'drop function if exists public.app_home_contract_section_lines_by_token(text, uuid, integer);',
+      create: 'create or replace function public.app_home_contract_section_lines_by_token(\n  p_hash text,\n  p_contract_id uuid,',
+      signature: /"?app_home_contract_section_lines_by_token"?\s*\(\s*text\s*,\s*uuid\s*,\s*integer\s*\)/gi,
+    },
+  ];
+
+  it.each(RETIRED)('$drop: once, right before the bound CREATE, and in no other statement', ({ drop, create, signature }) => {
+    const sql = rlsFile('functions/75-client-home.sql');
+    expect(sql.indexOf(`${drop}\n${create}`), 'the drop right before the bound create').toBeGreaterThan(-1);
+    const mentions = RLS_APPLY_ORDER.flatMap((file) => [...rlsFile(file).matchAll(signature)].map(() => file));
+    expect(mentions).toEqual(['functions/75-client-home.sql']);
+    expect(rlsFile('roles.sql')).not.toMatch(signature);
+  });
+});

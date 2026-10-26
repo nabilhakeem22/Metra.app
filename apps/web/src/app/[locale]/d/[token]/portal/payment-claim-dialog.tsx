@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import { paymentClaimState } from '@/lib/engagements/portal-payments';
 import { bidiIsolate } from '@/lib/format/bidi';
+import { ClientCodePanel } from './client-code-panel';
 import { ConfirmActDialog } from './confirm-act-dialog';
 import { formatPortalMoney } from './portal-money';
 import type { PaymentClaimSubmission } from './use-payment-claim';
@@ -12,18 +13,22 @@ import type { PaymentClaimSubmission } from './use-payment-claim';
 /**
  * "Did you make this payment?" before a claim is sent: it names the milestone
  * and the amount the claim records (the server-locked remaining), so the
- * client confirms the figure, not just the button. Cancel sends nothing. If a
- * refresh lands while it is open and the milestone is no longer claimable (the
- * studio recorded the payment, say), it closes for good and the card says why.
+ * client confirms the figure, not just the button, and holds the one-time code
+ * the claim needs (./client-code-panel.tsx): Confirm waits for the code.
+ * Cancel sends nothing. If a refresh lands while it is open and the milestone
+ * is no longer claimable (the studio recorded the payment, say), it closes for
+ * good and the card says why.
  */
 export function PaymentClaimDialog({
   claim,
   submission,
   milestoneLabel,
+  studio,
 }: {
   claim: PublicDelivery['paymentClaim'];
   submission: PaymentClaimSubmission;
   milestoneLabel: (milestoneKind: string) => string;
+  studio: { name: string; whatsappHref: string | null };
 }) {
   const t = useTranslations('delivery.payments');
   const tActions = useTranslations('delivery.actions');
@@ -43,16 +48,20 @@ export function PaymentClaimDialog({
       open={kind !== null && amount !== null}
       title={t('confirmTitle')}
       body={
-        <p>
-          {t('confirmBody', {
-            milestone: kind ? milestoneLabel(kind) : '',
-            amount: amount ? bidiIsolate(formatPortalMoney(amount, locale)) : '',
-          })}
-        </p>
+        <>
+          <p>
+            {t('confirmBody', {
+              milestone: kind ? milestoneLabel(kind) : '',
+              amount: amount ? bidiIsolate(formatPortalMoney(amount, locale)) : '',
+            })}
+          </p>
+          <ClientCodePanel code={submission.code} studioName={studio.name} whatsappHref={studio.whatsappHref} />
+        </>
       }
       confirmLabel={tActions('confirm')}
       cancelLabel={tActions('cancel')}
       pending={submission.pending}
+      confirmDisabled={!submission.code.ready}
       onConfirm={submission.confirm}
       onOpenChange={(open) => !open && submission.dismiss()}
     />

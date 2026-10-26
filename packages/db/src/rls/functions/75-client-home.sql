@@ -634,8 +634,19 @@ $$;
 
 -- Public share: the home contract's sections past the snapshot's first 50, 50
 -- at a time: app_contract_sections_by_token with the stored hash. NULL as
--- app_home_contract_by_token.
-create or replace function public.app_home_contract_sections_by_token(p_hash text, p_offset integer)
+-- app_home_contract_by_token, and NULL unless p_contract_id IS the home's
+-- contract now: a page is bound to the document the client opened, so after
+-- the studio replaced the contract an open document never gains the new
+-- one's sections (DB step D, H6-read security S1).
+-- CREATE OR REPLACE cannot add an argument, so the unbound (text, integer)
+-- form is an explicit DROP (`if exists` keeps apply-rls re-runnable); no app
+-- on main called it.
+drop function if exists public.app_home_contract_sections_by_token(text, integer);
+create or replace function public.app_home_contract_sections_by_token(
+  p_hash text,
+  p_contract_id uuid,
+  p_offset integer
+)
 returns jsonb
 language sql
 stable
@@ -644,30 +655,35 @@ set search_path = ''
 as $$
   select public.app_contract_sections_by_token(k.token_hash, p_offset)
     from public.app_home_contract(p_hash) k
-   where k.status in ('issued', 'signed');
+   where k.status in ('issued', 'signed')
+     and k.id = p_contract_id;
 $$;
 
-revoke all on function public.app_home_contract_sections_by_token(text, integer) from public;
+revoke all on function public.app_home_contract_sections_by_token(text, uuid, integer) from public;
 do $$
 declare
   r text;
 begin
   foreach r in array array['anon', 'authenticated', 'service_role'] loop
     if exists (select 1 from pg_roles where rolname = r) then
-      execute format('revoke all on function public.app_home_contract_sections_by_token(text, integer) from %I', r);
+      execute format('revoke all on function public.app_home_contract_sections_by_token(text, uuid, integer) from %I', r);
     end if;
   end loop;
   if exists (select 1 from pg_roles where rolname = 'metra_app') then
-    grant execute on function public.app_home_contract_sections_by_token(text, integer) to metra_app;
+    grant execute on function public.app_home_contract_sections_by_token(text, uuid, integer) to metra_app;
   end if;
 end
 $$;
 
 -- Public share: one section's lines of the home contract, 100 at a time:
 -- app_contract_section_lines_by_token with the stored hash, so a section of
--- another contract answers NULL there too.
+-- another contract answers NULL there too; and NULL unless p_contract_id IS
+-- the home's contract now (DB step D, as the sections above). The unbound
+-- (text, uuid, integer) form is dropped the same way.
+drop function if exists public.app_home_contract_section_lines_by_token(text, uuid, integer);
 create or replace function public.app_home_contract_section_lines_by_token(
   p_hash text,
+  p_contract_id uuid,
   p_section_id uuid,
   p_offset integer
 )
@@ -679,10 +695,11 @@ set search_path = ''
 as $$
   select public.app_contract_section_lines_by_token(k.token_hash, p_section_id, p_offset)
     from public.app_home_contract(p_hash) k
-   where k.status in ('issued', 'signed');
+   where k.status in ('issued', 'signed')
+     and k.id = p_contract_id;
 $$;
 
-revoke all on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from public;
+revoke all on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) from public;
 do $$
 declare
   r text;
@@ -690,13 +707,13 @@ begin
   foreach r in array array['anon', 'authenticated', 'service_role'] loop
     if exists (select 1 from pg_roles where rolname = r) then
       execute format(
-        'revoke all on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from %I',
+        'revoke all on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) from %I',
         r
       );
     end if;
   end loop;
   if exists (select 1 from pg_roles where rolname = 'metra_app') then
-    grant execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+    grant execute on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) to metra_app;
   end if;
 end
 $$;
@@ -831,15 +848,22 @@ $$;
 --                  on a target's codes made in the last hour (H3 round 2,
 --                  security M1: guessing across codes stops here, for an hour
 --                  at most, and the codes already sent keep their own tries);
---                  10 per delivery a day (round 2 L1: one link holder takes
---                  at most 10 of the studio's 25); 25 per studio a day (H3
---                  security S1: no studio spends the platform's share); 80 a
---                  day across the platform (the email provider's free day is
---                  100, shared). The wait is exact: until every limit reached
---                  is free again; the studio's own unless only the
---                  platform's cap is reached
---   ok             the row is written; {email (for the server's send only,
---                  never the browser), hint, resend_after_seconds: 60}
+--                  50 wrong tries a day on a delivery's codes (DB step D,
+--                  re-check M1: what is spent is GUESSES, so a link holder who
+--                  only asks for codes and never guesses does not use up the
+--                  delivery's day); 30 codes per delivery a day; 25 per studio
+--                  a day (H3 security S1: no studio spends the platform's
+--                  share); 80 a day across the platform (the email provider's
+--                  free day is 100, shared). The wait is exact: until every
+--                  limit reached is free again; the studio's own unless only
+--                  the platform's cap is reached
+--   ok             the row is written; {email, studio {name_ar, name_en} and
+--                  document {prefix, number, year} (the email's address and
+--                  the words it names, for the server's send only, never the
+--                  browser: the browser could put any text in them), hint,
+--                  resend_after_seconds: 60, platform_day_half: true once this
+--                  code makes the platform's day reach 40 of its 80, so the
+--                  app can raise the alarm before the cap refuses anyone}
 -- No row is written unless the answer is ok. A malformed challenge id or code
 -- hash is the server's bug and raises 22023 (a hash) or 23502 (no id).
 --
@@ -872,11 +896,12 @@ set search_path = ''
 set lock_timeout = '4s'
 as $$
 declare
-  v_home        record;
-  v_contract_id uuid;
-  v_actionable  boolean;
-  v_email       text;
-  v_wait        integer;
+  v_home           record;
+  v_contract_id    uuid;
+  v_actionable     boolean;
+  v_email          text;
+  v_wait           integer;
+  v_platform_codes integer;
 begin
   if p_code_hash is null or p_code_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'the code hash must be 64 lower-case hex characters' using errcode = '22023';
@@ -963,6 +988,11 @@ begin
            sum(m.attempts) over (order by m.created_at desc, m.id desc) as tries_since
       from mine m
      where m.purpose = p_purpose and m.target_key = p_target and m.created_at > now() - interval '1 hour'
+  ),
+  delivery_day as (
+    select m.created_at,
+           sum(m.attempts) over (order by m.created_at desc, m.id desc) as tries_since
+      from mine m
   )
   select greatest(
     (select ceil(extract(epoch from max(m.created_at) + interval '60 seconds' - now()))
@@ -974,9 +1004,12 @@ begin
     (select ceil(extract(epoch from max(t.created_at) + interval '1 hour' - now()))
        from target_hour t
       where t.tries_since >= 15),
+    (select ceil(extract(epoch from max(t.created_at) + interval '1 day' - now()))
+       from delivery_day t
+      where t.tries_since >= 50),
     (select ceil(extract(epoch from min(m.created_at) + interval '1 day' - now()))
        from mine m
-     having count(*) >= 10),
+     having count(*) >= 30),
     (select ceil(extract(epoch from min(o.created_at) + interval '1 day' - now()))
        from public.client_verification_codes o
       where o.org_id = v_home.org_id and o.created_at > now() - interval '1 day'
@@ -989,12 +1022,11 @@ begin
 
   perform pg_advisory_xact_lock(hashtextextended('client-verification-codes', 0));
 
-  select ceil(extract(epoch from min(p.created_at) + interval '1 day' - now()))::integer
-    into v_wait
+  select count(*)::integer, ceil(extract(epoch from min(p.created_at) + interval '1 day' - now()))::integer
+    into v_platform_codes, v_wait
     from public.client_verification_codes p
-   where p.created_at > now() - interval '1 day'
-  having count(*) >= 80;
-  if v_wait is not null then
+   where p.created_at > now() - interval '1 day';
+  if v_platform_codes >= 80 then
     return jsonb_build_object('status', 'too_many', 'retry_after_seconds', greatest(v_wait, 1));
   end if;
 
@@ -1013,7 +1045,33 @@ begin
     'status', 'ok',
     'email', v_email,
     'hint', public.app_email_hint(v_email),
-    'resend_after_seconds', 60
+    'resend_after_seconds', 60,
+    'platform_day_half', v_platform_codes + 1 >= 40,
+    'studio', (
+      select jsonb_build_object('name_ar', o.name_ar, 'name_en', o.name_en)
+        from public.organizations o where o.id = v_home.org_id
+    ),
+    'document', case p_purpose
+      when 'sign_contract' then (
+        select jsonb_build_object('prefix', 'C', 'number', c.number,
+                                  'year', extract(year from c.created_at at time zone 'Africa/Cairo')::int)
+          from public.contracts c where c.org_id = v_home.org_id and c.id = v_contract_id
+      )
+      when 'decide_variation' then (
+        select jsonb_build_object('prefix', 'VO', 'number', v.number,
+                                  'year', extract(year from v.created_at at time zone 'Africa/Cairo')::int)
+          from public.variation_orders v where v.org_id = v_home.org_id and v.id::text = p_target
+      )
+      when 'claim_request' then (
+        select jsonb_build_object('prefix', 'PR', 'number', r.number, 'year', extract(year from r.issued_on)::int)
+          from public.payment_requests r where r.org_id = v_home.org_id and r.id::text = p_target
+      )
+      else (
+        select jsonb_build_object('prefix', 'DE', 'number', de.number,
+                                  'year', extract(year from de.created_at at time zone 'Africa/Cairo')::int)
+          from public.design_engagements de where de.id = v_home.id
+      )
+    end
   );
 end
 $$;

@@ -72,7 +72,13 @@ export function ExecutionTabView({
             </div>
             {execution.money && (
               <div className="order-4">
-                <ExecutionPayments token={token} initial={execution.money} onClaimed={() => router.refresh()} />
+                <ExecutionPayments
+                  token={token}
+                  initial={execution.money}
+                  onChanged={() => router.refresh()}
+                  channel={home.codeChannel}
+                  studio={{ name: firmName, whatsappDigits: home.firm.whatsappDigits, deliveryRef: home.delivery.documentNumber }}
+                />
               </div>
             )}
           </div>

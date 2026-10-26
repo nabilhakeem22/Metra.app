@@ -150,7 +150,21 @@ describe('app_home_code_issue_by_token: what it checks before it makes a code (A
       ip: '1'.repeat(60),
       ua: 'u'.repeat(600),
     });
-    expect(issued.answer).toEqual({ status: 'ok', email: 'client.name@example.com', hint: 'c•••@e•••.com', resend_after_seconds: 60 });
+    const [named] = await ownerQuery<{ studio: unknown; document: unknown }>(
+      `select jsonb_build_object('name_ar', o.name_ar, 'name_en', o.name_en) as studio,
+              jsonb_build_object('prefix', 'C', 'number', c.number,
+                                 'year', extract(year from c.created_at at time zone 'Africa/Cairo')::int) as document
+         from public.contracts c join public.organizations o on o.id = c.org_id where c.id = $1`,
+      [home.contract.contractId],
+    );
+    expect(issued.answer).toEqual({
+      status: 'ok',
+      email: 'client.name@example.com',
+      hint: 'c•••@e•••.com',
+      resend_after_seconds: 60,
+      platform_day_half: false,
+      ...named,
+    });
     const [stored] = await codesOf(home.delivery.id);
     expect(stored).toMatchObject({
       id: issued.challengeId,
@@ -250,25 +264,6 @@ describe('app_home_code_issue_by_token: the limits, in the database (AC8)', () =
     expect(sixth.retry_after_seconds).toBeGreaterThan(60);
     expect(sixth.retry_after_seconds).toBeLessThanOrEqual(3600);
     expect(await codesOf(home.delivery.id)).toHaveLength(5);
-  });
-
-  it('10 a day per delivery, over every target (round 2 L1)', async () => {
-    const home = await seedHome(orgId, 'signed');
-    const orders: string[] = [];
-    for (let index = 0; index < 11; index += 1) {
-      const order = await seedVariation(orgId, home.contract, 'issued', { tokenHash: `${randomUUID()}-limit-${String(index)}` });
-      orders.push(order.id);
-    }
-    for (let index = 0; index < 10; index += 1) {
-      expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[index])).answer.status).toBe('ok');
-    }
-    await ageCodes(home.delivery.id, 3601);
-    const day = (await requestCode(home.delivery.tokenHash, 'decide_variation', orders[10])).answer;
-    expect(day.status).toBe('too_many');
-    expect(day.retry_after_seconds).toBeGreaterThan(22 * 3600);
-    expect(day.retry_after_seconds).toBeLessThanOrEqual(23 * 3600);
-    await ageCodes(home.delivery.id, day.retry_after_seconds as number);
-    expect((await requestCode(home.delivery.tokenHash, 'decide_variation', orders[10])).answer.status).toBe('ok');
   });
 
   it('80 a day across the platform', async () => {

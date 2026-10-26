@@ -8,7 +8,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { listEngagements } from '@/lib/engagements/queries';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';

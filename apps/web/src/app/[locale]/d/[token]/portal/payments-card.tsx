@@ -19,11 +19,12 @@ import { PaidMeter, SettledNote } from './payments-summary';
 import { formatPortalMoney } from './portal-money';
 import { useMilestoneLabel } from './use-milestone-label';
 import { usePaymentClaim } from './use-payment-claim';
+import { useStudioWhatsappHref, type StudioContactFacts } from './use-studio-whatsapp';
 
 /**
  * The client's payments: the design fee, how much is paid, the ONE next payment
  * highlighted with its "I've made this payment" control (which asks first, naming
- * the milestone and the amount), how to pay (the studio's own details, while a
+ * the milestone and the amount, and needs a one-time code), how to pay (the studio's own details, while a
  * payment is due and not yet claimed), then every milestone with its state, and
  * the payments received with their dates. Other claimable milestones keep a
  * small claim button in their row. DUE amounts only (never cost); money is Latin
@@ -37,6 +38,7 @@ export function PaymentsCard({
   details,
   receipts,
   receiptsTruncated,
+  studio,
 }: {
   token: string;
   schedule: PublicDelivery['paymentSchedule'];
@@ -44,11 +46,14 @@ export function PaymentsCard({
   details: PublicDelivery['paymentDetails'];
   receipts: PublicDelivery['receipts'];
   receiptsTruncated: PublicDelivery['receiptsTruncated'];
+  /** The studio, for the claim's code step (its WhatsApp when no code can be sent). */
+  studio: StudioContactFacts;
 }) {
   const t = useTranslations('delivery.payments');
   const locale = useLocale();
   const milestoneLabel = useMilestoneLabel();
   const submission = usePaymentClaim(token);
+  const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'design');
   const overview = derivePaymentsOverview(schedule);
   if (!overview) return null;
 
@@ -108,7 +113,7 @@ export function PaymentsCard({
         ))}
       </ul>
       <PaymentReceipts receipts={receipts} truncated={receiptsTruncated} />
-      <PaymentClaimDialog claim={claim} submission={submission} milestoneLabel={milestoneLabel} />
+      <PaymentClaimDialog claim={claim} submission={submission} milestoneLabel={milestoneLabel} studio={{ name: studio.name, whatsappHref }} />
     </section>
   );
 }

@@ -88,6 +88,9 @@ export interface IssueAnswer {
   hint?: string;
   resend_after_seconds?: number;
   retry_after_seconds?: number;
+  platform_day_half?: boolean;
+  studio?: { name_ar: string | null; name_en: string | null };
+  document?: { prefix: string; number: number; year: number };
 }
 
 export interface RequestedCode {

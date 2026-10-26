@@ -3149,7 +3149,6 @@
       "claimNotified": "The studio has been told.",
       "error": {
         "wrong_state": "This request cannot take a payment notice now. The page now shows where it stands.",
-        "busy": "Many payment notices were sent on this contract in the last hour. Please try again later, or contact the studio.",
         "not_received": "Your notice does not show as received. You can send it again; it is never counted twice."
       },
       "earlierClaims": {
@@ -3338,6 +3337,32 @@
       "awaiting": "Awaiting your decision",
       "open": "{count, plural, one {One change order is waiting for your decision.} other {{countText} change orders are waiting for your decision.}}",
       "answerWithLink": "Open the change order link {studio} sent you to review it and reply."
+    },
+    "code": {
+      "intro": "We will send a 6-digit verification code to {hint}.",
+      "introOnFile": "We will send a 6-digit verification code to the email {studio} has on file for you.",
+      "send": "Send the code",
+      "sent": "We sent the code to {hint}. It is valid for 10 minutes.",
+      "label": "Verification code",
+      "resend": "Send a new code",
+      "resendIn": "You can ask for a new code in {time}.",
+      "noChannel": "{studio} has no email address for you, so you cannot report this payment online right now. Ask {studio} to add your email, or tell {studio} directly that you paid so they can record it.",
+      "wait": {
+        "minutes": "{minutes, plural, one {1 minute} other {{minutesText} minutes}}",
+        "hours": "{hours, plural, one {1 hour} other {{hoursText} hours}}"
+      },
+      "error": {
+        "code_wrong": "{left, plural, =0 {That code is not right, and it has no tries left. Ask for a new code.} one {That code is not right. 1 try left for this code.} other {That code is not right. {leftText} tries left for this code.}}",
+        "code_incomplete": "Type the six digits from the email.",
+        "code_locked": "This code was entered wrongly 5 times and no longer works. Ask for a new code.",
+        "code_expired": "This code has expired. Ask for a new code.",
+        "code_used": "This code has already been used. Ask for a new code.",
+        "code_unknown": "This code is not for this step. Ask for a new code.",
+        "busy": "This could not be recorded right now. Try again in a moment; your code still works.",
+        "requestBusy": "The page is being updated, so no code was sent. Try again in a moment.",
+        "too_many": "Too many codes were asked for. You can ask for a new one in {wait}.",
+        "send_failed": "The code could not be sent right now. Contact {studio}."
+      }
     }
   },
   "portal": {

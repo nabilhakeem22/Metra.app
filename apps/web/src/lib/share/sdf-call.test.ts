@@ -6,9 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const execute = vi.fn();
+const runOptions = vi.hoisted(() => [] as unknown[]);
 vi.mock('@/lib/db/client', () => ({
-  withRequestDb: <T>(fn: (db: { execute: typeof execute }) => Promise<T>) =>
-    fn({ execute }),
+  withRequestDb: <T>(fn: (db: { execute: typeof execute }) => Promise<T>, opts: unknown) => {
+    runOptions.push(opts);
+    return fn({ execute });
+  },
 }));
 
 import { sql } from 'drizzle-orm';
@@ -55,6 +58,14 @@ describe('readSdfJson', () => {
     await expect(readSdfJson(anyQuery)).resolves.toBeNull();
     execute.mockResolvedValueOnce([{ data: null }]);
     await expect(readSdfJson(anyQuery)).resolves.toBeNull();
+  });
+
+  it('runs a WRITE as one, so a deadline on Cloudflare reads as "may have applied"', async () => {
+    runOptions.length = 0;
+    execute.mockResolvedValue([{ data: { code: 'ok' } }]);
+    await readSdfJson(anyQuery, { write: true });
+    await readSdfJson(anyQuery);
+    expect(runOptions).toEqual([{ write: true }, {}]);
   });
 });
 

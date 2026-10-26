@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { closeFixture, teardown } from './fixture';
 import { forceState, seedFeeSchedule, seedRoundBDelivery, snapshotOf } from './round-b-fixture';
 import { plantPayment } from './round-c-db-fixture';

@@ -1,7 +1,7 @@
 import { createSql } from '@metra/db';
 import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { addDeliveryCommentByToken } from '@/lib/engagements/public-comments';
 import type { ClientPageDetails } from '@/lib/org/client-page-details';
 import { updateClientPageDetailsCore } from '@/lib/org/client-page-details-core';

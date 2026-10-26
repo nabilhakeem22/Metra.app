@@ -2,14 +2,16 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-error-key';
+import type { ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
-import { markDeliveryPaymentPaid } from '../actions';
+import { claimDesignPaymentInHome } from '../actions';
+import { codeActFailureOf } from './code-act-failure';
+import { useClientCode, type ClientCode } from './use-client-code';
 
 export interface PaymentClaimSubmission {
   /** Any claim is in flight (every claim control disables while one is). */
   pending: boolean;
-  /** The milestone whose "I've made this payment" asked to be confirmed, or null. */
+  /** The milestone whose "I've made this payment" is open (its dialog, with the code panel), or null. */
   askingKind: string | null;
   /** The milestone whose claim is in flight, for its spinner. */
   submittingKind: string | null;
@@ -22,26 +24,31 @@ export interface PaymentClaimSubmission {
   /** The last failed claim (its answer narrowed to a key the portal says; a lost
    *  answer is `uncertain`), and the milestone it was for. */
   failure: { kind: string; shown: ShownActFailure } | null;
-  /** A milestone whose confirmation a refresh made moot (it stopped being
-   *  claimable while the dialog was open): nothing was sent, and the card says so. */
+  /** A milestone whose claim the server made moot (it stopped being claimable
+   *  while the dialog was open): nothing was sent, and the card says so. */
   changedKind: string | null;
-  /** Ask first: opens the confirmation for this milestone. Sends nothing. */
+  /** The open claim's one-time code. */
+  code: ClientCode;
+  /** Opens the claim for this milestone: its amount and the code panel. Sends nothing. */
   ask: (milestoneKind: string) => void;
-  /** Close the confirmation without sending anything. */
+  /** Close the claim without sending anything. */
   dismiss: () => void;
-  /** The confirmation's Confirm: claims the milestone being asked about. */
+  /** The dialog's Confirm: claims the open milestone with the typed code. */
   confirm: () => void;
-  /** Close a confirmation the server made moot, and keep the reason for the card. */
+  /** Close a claim the server made moot, and keep the reason for the card. */
   withdraw: (milestoneKind: string) => void;
 }
 
 /**
- * The behaviour behind the payments card's "I've made this payment" controls.
- * A tap ASKS (the dialog names the milestone and the amount); only Confirm
- * sends `markDeliveryPaymentPaid`, one at a time, the await wrapped so a
- * rejected action can never strand the spinner. The claim is advisory and
- * idempotent (a repeat resolves ok); the amount is locked server-side, so none
- * is sent. A claim that landed re-reads the page from the server.
+ * The behaviour behind the payments card's "I've made this payment" controls,
+ * with a one-time code (OD2 strict). A tap opens the claim (the dialog names
+ * the milestone and the amount, with the code panel); only Confirm sends
+ * `claimDesignPaymentInHome` with the typed code, one at a time, the await
+ * wrapped so a rejected action can never strand the spinner. A wrong, spent or
+ * expired code is said in the panel and the claim stays open; any other answer
+ * closes it. The claim is advisory and idempotent (a repeat resolves ok); the
+ * amount is locked server-side, so none is sent. A claim that landed re-reads
+ * the page from the server.
  */
 export function usePaymentClaim(token: string): PaymentClaimSubmission {
   const router = useRouter();
@@ -53,29 +60,42 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
   const [failure, setFailure] = useState<PaymentClaimSubmission['failure']>(null);
   const [changedKind, setChangedKind] = useState<string | null>(null);
 
+  const withdraw = (milestoneKind: string) => {
+    setAskingKind(null);
+    setChangedKind(milestoneKind);
+  };
+  /** The instalment stopped being claimable before a code could be sent: close it and show where it stands. */
+  function gone() {
+    if (askingKind) withdraw(askingKind);
+    router.refresh();
+  }
+  const code = useClientCode(token, 'claim_design_payment', askingKind, 'unknown', gone);
+
   function confirm() {
     const milestoneKind = askingKind;
-    if (!milestoneKind) return;
+    const proof = code.proof();
+    if (!milestoneKind || !proof) return;
     setFailure(null);
     setSubmittingKind(milestoneKind);
     startTransition(async () => {
       try {
-        const result = await markDeliveryPaymentPaid(token, milestoneKind);
+        const result = await claimDesignPaymentInHome(token, { milestoneKind, ...proof });
         if (result.ok) {
           setClaimedKinds((previous) => new Set(previous).add(milestoneKind));
-          if (result.studioNotified) {
-            setNotifiedKinds((previous) => new Set(previous).add(milestoneKind));
-          }
+          if (result.studioNotified) setNotifiedKinds((previous) => new Set(previous).add(milestoneKind));
+          setAskingKind(null);
           router.refresh();
-        } else {
-          setFailure({ kind: milestoneKind, shown: actFailureOf(result) });
+          return;
         }
+        if (code.heard(result)) return;
+        setAskingKind(null);
+        setFailure({ kind: milestoneKind, shown: codeActFailureOf(result) });
       } catch {
         // The claim may have been saved: refresh and check (UNCONFIRMED_WRITE).
+        setAskingKind(null);
         setFailure({ kind: milestoneKind, shown: UNCONFIRMED_WRITE });
       } finally {
         setSubmittingKind(null);
-        setAskingKind(null);
       }
     });
   }
@@ -88,15 +108,13 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
     notifiedKinds,
     failure,
     changedKind,
+    code,
     ask: (milestoneKind) => {
       setChangedKind(null);
       setAskingKind(milestoneKind);
     },
     dismiss: () => setAskingKind(null),
     confirm,
-    withdraw: (milestoneKind) => {
-      setAskingKind(null);
-      setChangedKind(milestoneKind);
-    },
+    withdraw,
   };
 }

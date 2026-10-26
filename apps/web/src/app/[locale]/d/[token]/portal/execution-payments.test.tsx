@@ -1,22 +1,29 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalExecution, PortalExecutionRequest } from '@/lib/engagements/public/execution-types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ExecutionPayments } from './execution-payments';
 
 // PR B4.3, moved into the client home's Execution tab (H4.2): the payments.
-// "I've made this payment" asks
-// first, naming the request and what is still due; Confirm claims once; a
-// claim that landed shows the card the answer carried; a lost answer, or one
-// the request moved past, re-reads the card, and after a lost answer the read
-// decides what the row says (B4 F1); and every figure is Latin digits, left to
-// right, in both locales.
+// "I've made this payment" opens the claim, naming the request and what is
+// still due, with the one-time code panel (H5, OD2 strict): Confirm waits for
+// a sent code and six typed digits, then claims once with it; a claim that
+// landed shows on its row at once and refreshes the page; a wrong or spent
+// code is said in the panel and the claim stays open; a request the studio
+// moved past refreshes the page; after a lost answer a read decides what the
+// row says (B4 F1); and every figure is Latin digits, left to right, in both
+// locales.
 
-const actions = vi.hoisted(() => ({ claimExecutionRequest: vi.fn(), loadDeliveryExecution: vi.fn() }));
+const actions = vi.hoisted(() => ({ claimRequestInHome: vi.fn(), loadDeliveryExecution: vi.fn() }));
 vi.mock('../execution-actions', () => actions);
+const codeActions = vi.hoisted(() => ({ requestClientCode: vi.fn() }));
+vi.mock('../code-actions', () => codeActions);
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const DASH = /[–—]/;
+const CHALLENGE = '22222222-2222-4222-8222-222222222222';
+const HINT = 'c•••@e•••.com';
 
 const request = (id: string, fields: Partial<PortalExecutionRequest> = {}): PortalExecutionRequest => ({
   id,
@@ -53,21 +60,37 @@ async function answerDialog(locale: TestLocale, button: 'confirm' | 'cancel') {
   fireEvent.click(within(await confirmDialog()).getByRole('button', { name: messageAt(locale, `delivery.actions.${button}`) }));
 }
 
-const onClaimed = vi.fn();
-const show = (locale: TestLocale, card: PortalExecution = CARD) =>
-  renderWithIntl(<ExecutionPayments token="tok" initial={card} onClaimed={onClaimed} />, { locale });
+const onChanged = vi.fn();
+const STUDIO = { name: 'Diwan Studio', whatsappDigits: '201001234567', deliveryRef: 'DE-2026-0012' };
+const show = (locale: TestLocale, card: PortalExecution = CARD, channel: { hint: string } | null = { hint: HINT }) =>
+  renderWithIntl(<ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={channel} studio={STUDIO} />, { locale });
 const claimButtons = (locale: TestLocale) => screen.queryAllByRole('button', { name: messageAt(locale, 'delivery.execution.claim') });
+const confirmButton = async (locale: TestLocale) =>
+  within(await confirmDialog()).getByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') }) as HTMLButtonElement;
+const codeBox = (dialog: HTMLElement, locale: TestLocale) =>
+  within(dialog).getByLabelText(messageAt(locale, 'delivery.code.label')) as HTMLInputElement;
 
-async function claimAndConfirm(locale: TestLocale) {
+/** Open the first claim, ask for a code, and type `code`. */
+async function openWithCode(locale: TestLocale, code = '042917') {
   fireEvent.click(claimButtons(locale)[0]);
+  const dialog = await confirmDialog();
+  fireEvent.click(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.code.send') }));
+  await act(async () => {});
+  fireEvent.change(codeBox(dialog, locale), { target: { value: code } });
+}
+
+async function claimAndConfirm(locale: TestLocale, code?: string) {
+  await openWithCode(locale, code);
   await answerDialog(locale, 'confirm');
   await act(async () => {});
 }
 
 beforeEach(() => {
-  actions.claimExecutionRequest.mockReset();
+  actions.claimRequestInHome.mockReset();
   actions.loadDeliveryExecution.mockReset();
-  onClaimed.mockReset();
+  codeActions.requestClientCode.mockReset();
+  codeActions.requestClientCode.mockResolvedValue({ ok: true, challengeId: CHALLENGE, hint: HINT, resendAfterSeconds: 60 });
+  onChanged.mockReset();
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('"how to pay" quotes the buttons it names (%s, B4 F4)', (locale) => {
@@ -96,73 +119,126 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     expect(claimButtons(locale)).toHaveLength(1);
   });
 
-  it('asks first, naming the request and what is due; Cancel sends nothing', async () => {
+  it('asks first, naming the request and what is due; Confirm waits for a code; Cancel sends nothing', async () => {
     show(locale);
     fireEvent.click(claimButtons(locale)[0]);
     const dialog = await confirmDialog();
     expect(dialog.textContent).toContain('PR-2026-0003');
     expect(dialog.textContent).toContain('62,000');
+    expect(dialog.textContent).toContain(HINT);
+    expect((await confirmButton(locale)).disabled).toBe(true);
     await answerDialog(locale, 'cancel');
-    expect(actions.claimExecutionRequest).not.toHaveBeenCalled();
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+    expect(actions.claimRequestInHome).not.toHaveBeenCalled();
   });
 
-  it('claims once, and shows the card the answer carried, with the studio told', async () => {
-    actions.claimExecutionRequest.mockResolvedValue({ ok: true, already: false, execution: CLAIMED });
+  it('asks for a code for this request, then claims once with it; the row shows it sent, the studio told', async () => {
+    actions.claimRequestInHome.mockResolvedValue({ ok: true, already: false });
     show(locale);
-    await claimAndConfirm(locale);
-    expect(actions.claimExecutionRequest).toHaveBeenCalledWith('tok', '3');
+    await openWithCode(locale, '٠٤٢٩١٧');
+    expect(codeActions.requestClientCode).toHaveBeenCalledWith('tok', { purpose: 'claim_request', target: '3' });
+    expect(codeBox(await confirmDialog(), locale).value).toBe('042917');
+    expect((await confirmButton(locale)).disabled).toBe(false);
+    await answerDialog(locale, 'confirm');
+    await act(async () => {});
+    expect(actions.claimRequestInHome).toHaveBeenCalledWith('tok', { requestId: '3', challengeId: CHALLENGE, code: '042917' });
     expect(claimButtons(locale)).toHaveLength(0);
     expect(screen.getByText(messageAt(locale, 'delivery.execution.claimNotified'))).toBeTruthy();
     expect(actions.loadDeliveryExecution).not.toHaveBeenCalled();
-    expect(onClaimed).toHaveBeenCalledTimes(1);
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('a request the studio moved past says so and re-reads the card', async () => {
-    actions.claimExecutionRequest.mockResolvedValue({ ok: false, error: 'wrong_state' });
-    actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: { ...CARD, requests: CARD.requests.slice(1) } });
+  it('a wrong code says the tries left and keeps the claim open; a locked one asks for a new code', async () => {
+    actions.claimRequestInHome.mockResolvedValueOnce({ ok: false, error: 'code_wrong', attemptsLeft: 3 });
     show(locale);
     await claimAndConfirm(locale);
-    expect(actions.loadDeliveryExecution).toHaveBeenCalledWith('tok');
-    expect(claimButtons(locale)).toHaveLength(0);
+    const dialog = await confirmDialog();
+    const wrong = within(dialog).getByRole('alert').textContent ?? '';
+    expect(wrong).toMatch(/\b3\b/);
+    expect(wrong).not.toMatch(ARABIC_INDIC);
+    expect(codeBox(dialog, locale).value).toBe('');
+
+    actions.claimRequestInHome.mockResolvedValueOnce({ ok: false, error: 'code_locked' });
+    fireEvent.change(codeBox(dialog, locale), { target: { value: '111111' } });
+    await answerDialog(locale, 'confirm');
+    await act(async () => {});
+    expect(within(dialog).getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.code.error.code_locked'));
+    expect(within(dialog).queryByLabelText(messageAt(locale, 'delivery.code.label'))).toBeNull();
+    expect(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.code.send') })).toBeTruthy();
   });
 
-  it('says the flood ceiling in its own words, and a lost answer as "refresh and check" after a re-read', async () => {
-    actions.claimExecutionRequest.mockResolvedValueOnce({ ok: false, error: 'busy' });
+  it('busy keeps the claim open and the typed code, said as "try again in a moment"', async () => {
+    actions.claimRequestInHome.mockResolvedValueOnce({ ok: false, error: 'busy' });
     show(locale);
     await claimAndConfirm(locale);
-    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.execution.error.busy'));
-    expect(actions.loadDeliveryExecution).not.toHaveBeenCalled();
+    const dialog = await confirmDialog();
+    expect(within(dialog).getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.code.error.busy'));
+    expect(codeBox(dialog, locale).value).toBe('042917');
+  });
 
-    actions.claimExecutionRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+  it('a request the studio moved past closes the claim, says so and refreshes the page', async () => {
+    actions.claimRequestInHome.mockResolvedValue({ ok: false, error: 'wrong_state' });
+    show(locale);
+    await claimAndConfirm(locale);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.execution.error.wrong_state'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lost answer is "refresh and check" after a read that failed too', async () => {
+    actions.claimRequestInHome.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     actions.loadDeliveryExecution.mockResolvedValue({ ok: false, error: 'too_many' });
+    show(locale);
     await claimAndConfirm(locale);
     expect(within(screen.getByRole('alert')).getByText(messageAt(locale, 'portal.errors.uncertain'))).toBeTruthy();
     expect(actions.loadDeliveryExecution).toHaveBeenCalledTimes(1);
   });
 
   it('a lost answer whose claim landed: the re-read shows it sent, with no warning beside it (B4 F1)', async () => {
-    actions.claimExecutionRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    actions.claimRequestInHome.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: CLAIMED });
     show(locale);
     await claimAndConfirm(locale);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(claimButtons(locale)).toHaveLength(0);
     expect(screen.getByRole('status').textContent).toContain(messageAt(locale, 'delivery.execution.claimNotified'));
-
-    actions.claimExecutionRequest.mockResolvedValueOnce({ ok: false, error: 'uncertain' });
-    show(locale);
-    await claimAndConfirm(locale);
-    expect(screen.queryAllByRole('alert')).toHaveLength(0);
   });
 
   it('a lost answer whose claim did not land: the row says so and keeps its button (B4 F1)', async () => {
-    actions.claimExecutionRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    actions.claimRequestInHome.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: CARD });
     show(locale);
     await claimAndConfirm(locale);
     expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.execution.error.not_received'));
     expect(screen.queryByText(messageAt(locale, 'portal.errors.uncertain'))).toBeNull();
     expect(claimButtons(locale)).toHaveLength(1);
+  });
+
+  it("with no email on file the claim says so plainly, offers the studio's WhatsApp, and sends nothing", async () => {
+    show(locale, CARD, null);
+    fireEvent.click(claimButtons(locale)[0]);
+    const dialog = await confirmDialog();
+    expect(dialog.textContent).toContain(messageAt(locale, 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(within(dialog).queryByRole('button', { name: messageAt(locale, 'delivery.code.send') })).toBeNull();
+    expect(within(dialog).getByRole('link').getAttribute('href')).toMatch(/^https:\/\/wa\.me\/201001234567\?text=/);
+    expect((await confirmButton(locale)).disabled).toBe(true);
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+  });
+
+  it('follows a new read the page hands down', () => {
+    function Page() {
+      const [card, setCard] = useState(CARD);
+      return (
+        <>
+          <button onClick={() => setCard(CLAIMED)}>refresh</button>
+          <ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={{ hint: HINT }} studio={STUDIO} />
+        </>
+      );
+    }
+    renderWithIntl(<Page />, { locale });
+    expect(claimButtons(locale)).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'refresh' }));
+    expect(claimButtons(locale)).toHaveLength(0);
   });
 
   it("keeps a receipt's request number on one line, left to right (B4 F5)", () => {

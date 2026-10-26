@@ -155,14 +155,14 @@ describe('the home shows /c and /v by their own functions (AC2)', () => {
     expect(textEqual).toBe(true);
     expect(contractPayloadHash(viaHome)).toBe(contractPayloadHash(viaLink));
     const [section] = home.contract.sectionIds;
-    expect(await scalar(`public.app_home_contract_sections_by_token($1, 0)`, [home.delivery.tokenHash])).toEqual(
+    expect(await scalar(`public.app_home_contract_sections_by_token($1, $2::uuid, 0)`, [home.delivery.tokenHash, home.contract.contractId])).toEqual(
       await scalar(`public.app_contract_sections_by_token($1, 0)`, [contractHash]),
     );
-    expect(await scalar(`public.app_home_contract_section_lines_by_token($1, $2::uuid, 0)`, [home.delivery.tokenHash, section])).toEqual(
+    expect(await scalar(`public.app_home_contract_section_lines_by_token($1, $2::uuid, $3::uuid, 0)`, [home.delivery.tokenHash, home.contract.contractId, section])).toEqual(
       await scalar(`public.app_contract_section_lines_by_token($1, $2::uuid, 0)`, [contractHash, section]),
     );
     const other = await seedHome(orgId, 'issued');
-    expect(await scalar(`public.app_home_contract_section_lines_by_token($1, $2::uuid, 0)`, [home.delivery.tokenHash, other.contract.sectionIds[0]])).toBeNull();
+    expect(await scalar(`public.app_home_contract_section_lines_by_token($1, $2::uuid, $3::uuid, 0)`, [home.delivery.tokenHash, home.contract.contractId, other.contract.sectionIds[0]])).toBeNull();
   });
 
   it('answers null for a draft contract, a link that is not live and a delivery not at execution', async () => {
@@ -170,7 +170,7 @@ describe('the home shows /c and /v by their own functions (AC2)', () => {
     expect(await scalar(`public.app_home_contract_by_token($1)`, [draft.delivery.tokenHash])).toBeNull();
     const issued = await seedHome(orgId, 'issued');
     await tamper(`update public.design_engagements set share_expires_at = now() - interval '1 second' where id = $1`, [issued.delivery.id]);
-    for (const fn of ['app_home_contract_by_token($1)', 'app_home_contract_sections_by_token($1, 0)', 'app_home_variations_by_token($1)']) {
+    for (const fn of ['app_home_contract_by_token($1)', `app_home_contract_sections_by_token($1, '${issued.contract.contractId}'::uuid, 0)`, 'app_home_variations_by_token($1)']) {
       expect({ fn, value: await scalar(`public.${fn}`, [issued.delivery.tokenHash]) }).toEqual({ fn, value: null });
     }
     const designing = await seedDelivery(orgId, { state: 'design_proposal' });

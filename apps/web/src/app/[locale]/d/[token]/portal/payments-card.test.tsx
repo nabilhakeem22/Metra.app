@@ -5,7 +5,8 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { PaymentsCard } from './payments-card';
 
 // The server action is replaced, so no server-only stack is loaded.
-const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
+const actions = vi.hoisted(() => ({ claimDesignPaymentInHome: vi.fn() }));
+vi.mock('../code-actions', () => ({ requestClientCode: vi.fn() }));
 vi.mock('../actions', () => actions);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -38,14 +39,14 @@ function renderCard(
   claim: PublicDelivery['paymentClaim'],
   locale: TestLocale = 'en',
 ) {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} receipts={[]} receiptsTruncated={false} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>
   screen.queryAllByRole('button', { name: messageAt(locale, 'delivery.payments.claim') });
 
 beforeEach(() => {
-  actions.markDeliveryPaymentPaid.mockReset();
+  actions.claimDesignPaymentInHome.mockReset();
 });
 
 describe('PaymentsCard', () => {

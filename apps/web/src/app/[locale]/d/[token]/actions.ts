@@ -1,11 +1,11 @@
 'use server';
 
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
+import type { CodeAnswer } from '@/lib/client-home/code-answers';
+import { claimDesignPaymentWithCodeByToken } from '@/lib/client-home/code-acts';
 import { paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { commentFieldErrors, type CommentField } from '@/lib/engagements/comment-field-rules';
-import { clientNote } from '@/lib/engagements/client-note';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
-import { claimPaymentByToken, type DeliveryActionResult } from '@/lib/engagements/public';
 import {
   addDeliveryCommentByToken,
   getDeliveryDocumentCommentsByToken,
@@ -19,6 +19,10 @@ import { requestProvenance } from '@/lib/share/request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
 // (concept, design, budget, handover) are in ./review-actions.ts.
+//
+// THE PAYMENT CLAIM NEEDS A ONE-TIME CODE (OD2 strict): the client asks for
+// one (./code-actions.ts) and sends it with the claim; there is no claim
+// without it.
 //
 // THE PER-LINK BRAKE (Round D, ../../../../lib/share/portal-rate-limit.ts): the
 // claim and a comment share the link's act budget and, past it, write nothing
@@ -39,37 +43,46 @@ type UnansweredAct = { ok: false; error: 'too_many' } | ({ ok: false } & PortalF
 const TOO_MANY = { ok: false, error: 'too_many', studioNotified: false } as const;
 const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure, studioNotified: false });
 
-/** A portal write's answer, plus whether the studio heard about it: true only
- *  when a notification row was written for THIS act, which is the only time the
- *  portal may say "your designer has been notified". */
-export type DeliveryActResult = (DeliveryActionResult | UnansweredAct) & { studioNotified?: boolean };
 /** A comment refused before anything is sent: blank, or past the thread's cap. */
 type CommentRefused = { ok: false; error: 'check_fields'; fields: FieldErrors<CommentField> };
+/** A comment's answer, plus whether the studio heard about it: true only when a
+ *  notification row was written for THIS comment, which is the only time the
+ *  portal may say "your designer has been notified". */
 export type DeliveryCommentActResult = (DeliveryCommentResult | UnansweredAct | CommentRefused) & {
   studioNotified?: boolean;
 };
 
+/** A design-fee claim's answer, plus whether the studio heard about it (as for a comment). */
+export type DesignClaimAnswer = CodeAnswer & { studioNotified: boolean };
+
 /**
- * Public (no-session) client delivery-portal action (Phase 3): the client "mark as
- * paid" on ONE milestone. Captures the client IP + user agent
- * (lib/share/request-provenance.ts) for the claim's provenance; the raw token is NEVER
- * logged. The claim is PENDING: no state move, no money ledger (the studio confirms
- * it later), and the amount is locked server-side, so no amount input exists. A
- * first `ok` notifies the finance roles, naming the milestone the SDF accepted.
+ * Public (no-session) client delivery-portal action: the client's "I paid" on
+ * ONE design-fee milestone, with the code emailed to them for it. Captures the
+ * client IP + user agent (lib/share/request-provenance.ts) for the claim's
+ * provenance; the raw token and the code are NEVER logged. The claim is
+ * PENDING: no state move, no money ledger (the studio confirms it later), and
+ * the amount is locked server-side, so no amount input exists. A first `ok`
+ * notifies the finance roles, naming the milestone the database accepted; an
+ * `already` (the claim is waiting) notifies only if that was never done.
  */
-export async function markDeliveryPaymentPaid(
+export async function claimDesignPaymentInHome(
   token: string,
-  milestoneKind: string,
-  note?: string,
-): Promise<DeliveryActResult> {
-  return answered('markDeliveryPaymentPaid', failed, async () => {
+  input: { milestoneKind: string; challengeId: string; code: string },
+): Promise<DesignClaimAnswer> {
+  return answered('claimDesignPaymentInHome', failed, async (): Promise<DesignClaimAnswer> => {
     if (!(await portalActAllowed(token))) return TOO_MANY;
-    const result = await claimPaymentByToken(token, {
+    const milestoneKind = input?.milestoneKind;
+    const answer = await claimDesignPaymentWithCodeByToken(token, {
       milestoneKind,
-      note: clientNote(note),
+      challengeId: input?.challengeId,
+      code: input?.code,
       ...(await requestProvenance()),
     });
-    return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));
+    if (!answer.ok) return { ...answer, studioNotified: false };
+    const act = typeof milestoneKind === 'string' ? paymentClaimedAct(milestoneKind) : null;
+    const signal = answer.already ? { ok: true as const, code: 'already' as const } : { ok: true as const };
+    const { studioNotified } = await withStudioNotified(token, signal, act);
+    return { ...answer, studioNotified };
   });
 }
 
