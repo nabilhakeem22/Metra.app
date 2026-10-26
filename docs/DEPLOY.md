@@ -4605,12 +4605,15 @@ select pg_size_pretty(pg_database_size(current_database())) as db_size;
 
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
 `C:\Users\HP\merta-main` (its `.env` is the production connection), **at a
-quiet hour** (late evening, when no studio is working; see *Locks*):
+quiet hour** (late evening, when no studio is working; see *Locks*). Each
+line runs its command only if the one before it exited 0, so a failure stops
+the block there (a `db:apply-rls` on a database without 0065 would apply half
+of its files and then fail):
 
 ```powershell
 npm run db:migrate
-npm run db:apply-rls
-npm run assert-schema-applied -w @metra/db
+if ($LASTEXITCODE -eq 0) { npm run db:apply-rls }
+if ($LASTEXITCODE -eq 0) { npm run assert-schema-applied -w @metra/db }
 ```
 
 **NOTICE blocks are normal.** Both commands print routine NOTICE blocks with
@@ -4668,7 +4671,8 @@ is NOT a failure: that one file rolled back whole and is being applied again
   tries again, for 3 s in all. This line means the named table never came
   free in those 3 s: a long query or transaction held it, or requests kept it
   busy without a gap. It held nothing while it tried, so no request waited on
-  it. Re-run `db:migrate` a little later. Rehearsed: a reader holding
+  it, and the block ran nothing after it. Re-run the block a little later.
+  Rehearsed: a reader holding
   `design_engagements` for 10 s gave exactly these two lines after 5.4 s,
   `migrations` stayed 65, step 2 (b) still read all 0, and the re-run after
   the reader finished applied 0065.
@@ -4676,14 +4680,15 @@ is NOT a failure: that one file rolled back whole and is being applied again
   (or `SQLSTATE 40P01: deadlock detected`) then
   `apply-rls failed: lock wait or deadlock, safe to re-run at a quieter moment (this file rolled back; the files before it stay applied).`
   That means the same file lost three times in a row. The cause is NOT a
-  broken database: a 55P03 is a studio transaction or report that held a
+  broken database (the block skipped `assert-schema-applied`): a 55P03 is a
+  studio transaction or report that held a
   table for more than 3 s (step C's own files touch `variation_orders` in
   `policies/30-contracts-boqs-variations.sql` and the new codes table, as well
   as the tables every run touches); a 40P01, almost always at
   `Applying policies/00-core.sql ...`, is ordinary studio traffic (step B's
   runbook says why). **Run `npm run db:apply-rls` again, and keep re-running it
   until it exits 0** (wait a minute between runs; it is safe, every statement is
-  idempotent). Until it does, the new functions may exist while the
+  idempotent), then `npm run assert-schema-applied -w @metra/db`. Until it does, the new functions may exist while the
   change-order trigger is still the old one and the codes table has no policy
   yet: the current site works on that (it calls none of the new functions,
   and the old trigger is what it was written for), `metra_app` reads nothing
