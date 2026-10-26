@@ -56,7 +56,7 @@ const ACT_OF_VERB: Readonly<Record<string, ClientActKind>> = {
   acknowledge_handoff: 'handover_acknowledged',
 };
 
-/** The milestones a client can mark as paid (app_delivery_claim_payment_by_token). */
+/** The milestones a client can mark as paid, with a code (app_home_claim_design_payment_by_token). */
 const CLAIMABLE_MILESTONES = ['deposit', 'gate_a', 'gate_b', 'balance'] as const satisfies
   readonly MilestoneKind[];
 

@@ -1,6 +1,6 @@
 import { createSql } from '@metra/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { claimExecutionRequestByToken, getDeliveryExecutionByToken } from '@/lib/engagements/public/execution';
+import { getDeliveryExecutionByToken } from '@/lib/engagements/public/execution';
 import { hashShareToken } from '@/lib/share/token';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedRequest, seedVariation, tamper } from './execution-fixture';
 import { seedPayment } from './execution-billing-fixture';
@@ -177,7 +177,7 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
       `select pg_get_function_arguments('public.app_delivery_claim_request_by_token(text, uuid, text, text, text, text)'::regprocedure) as args`,
     );
     expect(signature.args).not.toMatch(/amount/);
-    expect(await claimExecutionRequestByToken(delivery.rawToken, { requestId, ip: '10.0.0.1', userAgent: 'phone' })).toEqual({ ok: true, already: false });
+    expect(await claimBySql(delivery.tokenHash, requestId, { ip: '10.0.0.1', ua: 'phone' })).toBe('ok');
     expect(await claimsOf(contract.contractId)).toEqual([
       expect.objectContaining({ request_id: requestId, claimed_amount: '37000.0000', status: 'pending', actor_ip: '10.0.0.1', actor_user_agent: 'phone' }),
     ]);
@@ -189,7 +189,7 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
     );
     for (const row of notified) expect(row.params).toEqual({ number: request.number, year: request.year });
 
-    expect(await claimExecutionRequestByToken(delivery.rawToken, { requestId, ip: null, userAgent: null })).toEqual({ ok: true, already: true });
+    expect(await claimBySql(delivery.tokenHash, requestId)).toBe('already');
     expect(await claimsOf(contract.contractId)).toHaveLength(1);
     expect(await claimNotifications(contract.contractId)).toHaveLength(3);
     const card = await getDeliveryExecutionByToken(delivery.rawToken);
@@ -229,7 +229,6 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
     expect(await claimBySql(atBoq.tokenHash, foreign)).toBe('not_active');
     expect(await claimBySql((await seedDelivery(orgId)).tokenHash, foreign)).toBe('not_active');
     expect(await claimsOf(contract.contractId)).toEqual([]);
-    expect(await claimExecutionRequestByToken(delivery.rawToken, { requestId: 'not-a-uuid', ip: null, userAgent: null })).toEqual({ ok: false, error: 'wrong_state' });
   });
 
   it('answers busy for the 11th claim on one contract within an hour, dismissed ones counted', async () => {
@@ -241,7 +240,6 @@ describe('the client\'s "I paid" (AC33, AC34)', () => {
       await dismissBySql(claims[claims.length - 1].id, members.owner);
     }
     expect(await claimBySql(delivery.tokenHash, requestId)).toBe('busy');
-    expect(await claimExecutionRequestByToken(delivery.rawToken, { requestId, ip: null, userAgent: null })).toEqual({ ok: false, error: 'busy' });
     // An hour passing, written past the claim guard (a claim's created_at never changes).
     await tamper(`update public.contract_payment_claims set created_at = now() - interval '61 minutes' where contract_id = $1`, [contract.contractId]);
     expect(await claimBySql(delivery.tokenHash, requestId)).toBe('ok');

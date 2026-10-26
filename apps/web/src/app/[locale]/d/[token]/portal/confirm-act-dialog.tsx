@@ -11,8 +11,10 @@ import { useReturnFocus } from './use-return-focus';
  * approving the concept or the design, confirming the handover, and saying a
  * payment was made. Cancel (or Escape, or a tap outside) only closes it: it
  * calls nothing. Confirm calls `onConfirm` once and shows `pending` until the
- * caller closes the dialog. Both buttons are at least 44 px tall. Closing
- * returns focus to the button that opened it.
+ * caller closes the dialog; `confirmDisabled` holds it until the act can be
+ * sent (an act that needs a one-time code, before the code is typed). Both
+ * buttons are at least 44 px tall. Closing returns focus to the button that
+ * opened it.
  */
 export function ConfirmActDialog({
   open,
@@ -21,6 +23,7 @@ export function ConfirmActDialog({
   confirmLabel,
   cancelLabel,
   pending,
+  confirmDisabled = false,
   onConfirm,
   onOpenChange,
 }: {
@@ -30,6 +33,7 @@ export function ConfirmActDialog({
   confirmLabel: string;
   cancelLabel: string;
   pending: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -54,7 +58,7 @@ export function ConfirmActDialog({
             >
               {cancelLabel}
             </Button>
-            <Button variant="default" className="min-h-11" disabled={pending} onClick={onConfirm}>
+            <Button variant="default" className="min-h-11" disabled={pending || confirmDisabled} onClick={onConfirm}>
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {confirmLabel}
             </Button>

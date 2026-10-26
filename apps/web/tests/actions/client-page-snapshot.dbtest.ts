@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { getDeliveryLogoByToken } from '@/lib/engagements/public-logo';
 import { DESIGN_STATES } from '@/lib/engagements/states';
 import { deliveryOrNull } from './delivery-read';

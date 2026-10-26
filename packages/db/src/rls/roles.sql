@@ -650,10 +650,10 @@ grant execute on function public.app_home_by_token(text) to metra_app;
 revoke execute on function public.app_home_by_token(text) from public;
 grant execute on function public.app_home_contract_by_token(text) to metra_app;
 revoke execute on function public.app_home_contract_by_token(text) from public;
-grant execute on function public.app_home_contract_sections_by_token(text, integer) to metra_app;
-revoke execute on function public.app_home_contract_sections_by_token(text, integer) from public;
-grant execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) to metra_app;
-revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from public;
+grant execute on function public.app_home_contract_sections_by_token(text, uuid, integer) to metra_app;
+revoke execute on function public.app_home_contract_sections_by_token(text, uuid, integer) from public;
+grant execute on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) to metra_app;
+revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) from public;
 grant execute on function public.app_home_variations_by_token(text) to metra_app;
 revoke execute on function public.app_home_variations_by_token(text) from public;
 grant execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) to metra_app;
@@ -920,9 +920,9 @@ begin
       execute format('revoke execute on function public.app_execution_flow_source(uuid) from %I', r);
       execute format('revoke execute on function public.app_home_by_token(text) from %I', r);
       execute format('revoke execute on function public.app_home_contract_by_token(text) from %I', r);
-      execute format('revoke execute on function public.app_home_contract_sections_by_token(text, integer) from %I', r);
+      execute format('revoke execute on function public.app_home_contract_sections_by_token(text, uuid, integer) from %I', r);
       execute format(
-        'revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from %I',
+        'revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) from %I',
         r
       );
       execute format('revoke execute on function public.app_home_variations_by_token(text) from %I', r);

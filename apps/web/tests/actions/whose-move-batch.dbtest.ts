@@ -15,7 +15,7 @@ import {
   loadWhoseMovesInTx,
 } from '@/lib/engagements/queries';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import type { DesignState } from '@/lib/engagements/states';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';

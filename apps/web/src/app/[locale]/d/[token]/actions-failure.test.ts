@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Round E R3: the payment claim and a comment never throw to the client. When
+// Round E R3: the payment claim (H5: with its code) and a comment never throw to the client. When
 // the token write gives up on a lock (55P03, once 0060's 4 s lock_timeout is
 // live) the driver's error carries the failed query's parameters: the token
 // hash, the client's IP and user agent, the comment body. The action answers
@@ -21,7 +21,7 @@ const boom = vi.fn(async (): Promise<never> => {
   throw LEAKY;
 });
 const notified = vi.fn();
-vi.mock('@/lib/engagements/public', () => ({ claimPaymentByToken: boom }));
+vi.mock('@/lib/client-home/code-acts', () => ({ claimDesignPaymentWithCodeByToken: boom }));
 vi.mock('@/lib/engagements/public-comments', () => ({ addDeliveryCommentByToken: boom, getDeliveryDocumentCommentsByToken: boom }));
 vi.mock('@/lib/engagements/client-acts/notify', () => ({ withStudioNotified: notified }));
 
@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 const CALLS: Array<[string, () => Promise<unknown>]> = [
-  ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit', 'Is the wall moving?')],
+  ['claimDesignPaymentInHome', () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', challengeId: DOCUMENT, code: '123456' })],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT, 'Is the wall moving?')],
 ];
 

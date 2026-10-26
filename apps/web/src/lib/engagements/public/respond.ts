@@ -86,37 +86,6 @@ export async function recordDeliveryActionByToken(
 }
 
 /**
- * Session-less (Client Delivery Portal Phase 3): record a client's "mark as paid"
- * against ONE milestone of a delivery by its RAW share token. Mirrors
- * recordDeliveryActionByToken — sha256-hash the token (never sent in the clear,
- * never logged), run the cost-blind SECURITY DEFINER write SDF on the base
- * connection, and map its status code. The SDF locks the claimed amount to the
- * milestone's full remaining due server-side (the client sends NO amount), moves no
- * state, writes no money ledger, and returns only a status. A repeat while a claim
- * is still pending maps to a SUCCESSFUL no-op (`code: 'already'`), so a double
- * submit is idempotent.
- */
-export async function claimPaymentByToken(
-  rawToken: string,
-  input: {
-    milestoneKind: string;
-    note?: string | null;
-    actorName?: string | null;
-    ip?: string | null;
-    userAgent?: string | null;
-  },
-): Promise<DeliveryActionResult> {
-  const token = normalizeRawToken(rawToken);
-  if (!token) return { ok: false, error: 'token_invalid' };
-  const hash = hashShareToken(token);
-  const code = await readSdfCode(sql`select public.app_delivery_claim_payment_by_token(
-    ${hash}, ${input.milestoneKind}, ${input.note ?? null},
-    ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
-  ) as code`, { write: true });
-  return mapSignalSdfCode(code);
-}
-
-/**
  * Session-less (Round B, B12): the client CHOOSES one concept option, by its RAW
  * share token. `position` is the letter the client SAW (1 = A to 4 = D); the SDF
  * accepts the choice only while that option still sits at that letter, and SAVES

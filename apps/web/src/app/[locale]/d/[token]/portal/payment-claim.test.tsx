@@ -6,11 +6,16 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { PaymentsCard } from './payments-card';
 
 // AC 25: "I've made this payment" asks first, naming the milestone and the
-// amount the claim records; Cancel sends nothing; Confirm claims once, the card
-// flips to the waiting state at once and the page re-reads itself.
+// amount the claim records; Cancel sends nothing; with a one-time code (H5,
+// OD2 strict: Confirm waits for it), Confirm claims once, the card flips to
+// the waiting state at once and the page re-reads itself; a wrong code is said
+// in the panel and the claim stays open; no address on file is said plainly.
 
-const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
+const actions = vi.hoisted(() => ({ claimDesignPaymentInHome: vi.fn() }));
 vi.mock('../actions', () => actions);
+const codeActions = vi.hoisted(() => ({ requestClientCode: vi.fn() }));
+vi.mock('../code-actions', () => codeActions);
+const CHALLENGE = '22222222-2222-4222-8222-222222222222';
 vi.mock('../review-actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -36,7 +41,7 @@ function claimable(milestoneKind: string, amountRemaining: string, hasPendingCla
 }
 
 function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en') {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} receipts={[]} receiptsTruncated={false} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>
@@ -46,12 +51,18 @@ const AWAITING = (locale: TestLocale) => messageAt(locale, 'delivery.payments.aw
 
 async function claimAndConfirm(locale: TestLocale = 'en') {
   fireEvent.click(claimButtons(locale)[0]);
+  const dialog = await confirmDialog();
+  fireEvent.click(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.code.send') }));
+  await act(async () => {});
+  fireEvent.change(within(dialog).getByLabelText(messageAt(locale, 'delivery.code.label')), { target: { value: '042917' } });
   await answerDialog(locale, 'confirm');
   await act(async () => {});
 }
 
 beforeEach(() => {
-  actions.markDeliveryPaymentPaid.mockReset();
+  actions.claimDesignPaymentInHome.mockReset();
+  codeActions.requestClientCode.mockReset();
+  codeActions.requestClientCode.mockResolvedValue({ ok: true, challengeId: CHALLENGE, hint: 'c•••@e•••.com', resendAfterSeconds: 60 });
   router.refresh.mockReset();
 });
 
@@ -64,6 +75,7 @@ describe('the payment claim', () => {
     const body = dialog.textContent ?? '';
     expect(body).toContain(messageAt(locale, 'delivery.payments.kind.gate_b'));
     expect(body).toContain(locale === 'en' ? '28,000 EGP' : '28,000 ج.م');
+    expect(body).toContain(messageAt(locale, 'delivery.code.introOnFile').replace('{studio}', 'Diwan Studio'));
   });
 
   it('Cancel sends nothing and keeps the button', async () => {
@@ -71,17 +83,19 @@ describe('the payment claim', () => {
     fireEvent.click(claimButtons('en')[0]);
     await answerDialog('en', 'cancel');
     await act(async () => {});
-    expect(actions.markDeliveryPaymentPaid).not.toHaveBeenCalled();
+    expect(actions.claimDesignPaymentInHome).not.toHaveBeenCalled();
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(claimButtons('en')).toHaveLength(1);
   });
 
   it('Confirm claims once, flips to waiting without a reload, and refreshes once', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: true });
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: false });
     const { container } = renderCard(GATE_B);
     await claimAndConfirm();
-    expect(actions.markDeliveryPaymentPaid).toHaveBeenCalledTimes(1);
-    expect(actions.markDeliveryPaymentPaid).toHaveBeenCalledWith('tok', 'gate_b');
+    expect(codeActions.requestClientCode).toHaveBeenCalledWith('tok', { purpose: 'claim_design_payment', target: 'gate_b' });
+    expect(actions.claimDesignPaymentInHome).toHaveBeenCalledTimes(1);
+    expect(actions.claimDesignPaymentInHome).toHaveBeenCalledWith('tok', { milestoneKind: 'gate_b', challengeId: CHALLENGE, code: '042917' });
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(claimButtons('en')).toHaveLength(0);
@@ -91,7 +105,7 @@ describe('the payment claim', () => {
   });
 
   it('says the team was notified only when the claim really reached the studio', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: true, studioNotified: true });
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: true });
     const { container } = renderCard(GATE_B, 'ar-EG');
     await claimAndConfirm('ar-EG');
     const status = await screen.findByRole('status');
@@ -100,7 +114,7 @@ describe('the payment claim', () => {
   });
 
   it('a failed claim shows a localized error, keeps the button and does not refresh', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: false, error: 'wrong_state' });
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'wrong_state', studioNotified: false });
     renderCard(GATE_B);
     await claimAndConfirm();
     expect((await screen.findByRole('alert')).textContent).toBe(
@@ -108,6 +122,27 @@ describe('the payment claim', () => {
     );
     expect(claimButtons('en')).toHaveLength(1);
     expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it('a wrong code keeps the claim open, said in the panel; nothing is refreshed', async () => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'code_wrong', attemptsLeft: 4, studioNotified: false });
+    renderCard(GATE_B);
+    await claimAndConfirm();
+    const dialog = await confirmDialog();
+    expect(within(dialog).getByRole('alert').textContent).toMatch(/\b4\b/);
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it('a client with no address on file is told so when the code is asked for, and nothing is claimed', async () => {
+    codeActions.requestClientCode.mockResolvedValue({ ok: false, error: 'no_channel' });
+    renderCard(GATE_B, 'ar-EG');
+    fireEvent.click(claimButtons('ar-EG')[0]);
+    const dialog = await confirmDialog();
+    fireEvent.click(within(dialog).getByRole('button', { name: messageAt('ar-EG', 'delivery.code.send') }));
+    await act(async () => {});
+    expect(within(dialog).getByRole('status').textContent).toBe(messageAt('ar-EG', 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(within(dialog).queryByLabelText(messageAt('ar-EG', 'delivery.code.label'))).toBeNull();
+    expect(actions.claimDesignPaymentInHome).not.toHaveBeenCalled();
   });
 
   it('a pending claim shows the waiting state, and never "notified" from an earlier visit', () => {

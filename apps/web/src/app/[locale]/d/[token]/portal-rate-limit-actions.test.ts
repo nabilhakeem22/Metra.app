@@ -20,12 +20,13 @@ const writes = vi.hoisted(() => ({
   approveDesignWithBudgetAndNotify: vi.fn(async () => ({ kind: 'approved', studioNotified: true })),
   acknowledgeSeenBudgetAndNotify: vi.fn(async () => ({ kind: 'acknowledged', studioNotified: true })),
   acknowledgeHandoverAndNotify: vi.fn(async () => ({ kind: 'acknowledged', studioNotified: true })),
-  claimPaymentByToken: vi.fn(async () => ({ ok: true })),
   addDeliveryCommentByToken: vi.fn(async () => ({ ok: true })),
   getDeliveryDocumentCommentsByToken: vi.fn(async () => [{ body: 'hello' }]),
   withStudioNotified: vi.fn(async (_token: string, result: object) => ({ ...result, studioNotified: true })),
-  claimExecutionRequestByToken: vi.fn(async () => ({ ok: true, already: false })),
   getDeliveryExecutionByToken: vi.fn(async () => null),
+  claimRequestWithCodeByToken: vi.fn(async () => ({ ok: true, already: false })),
+  claimDesignPaymentWithCodeByToken: vi.fn(async () => ({ ok: true, already: false })),
+  issueClientCodeByToken: vi.fn(async () => ({ status: 'not_available' })),
 }));
 vi.mock('@/lib/engagements/client-acts/concept-acts', () => writes);
 vi.mock('@/lib/engagements/client-acts/design-acts', () => writes);
@@ -36,10 +37,17 @@ vi.mock('@/lib/engagements/client-acts/acts', () => ({ paymentClaimedAct: (kind:
 vi.mock('@/lib/engagements/public', () => writes);
 vi.mock('@/lib/engagements/public-comments', () => writes);
 vi.mock('@/lib/engagements/public/execution', () => writes);
+vi.mock('@/lib/client-home/code-acts', () => writes);
+vi.mock('@/lib/client-home/codes', () => ({
+  issueClientCodeByToken: writes.issueClientCodeByToken,
+  newClientCode: () => ({ challengeId: 'c', code: '000000', codeHash: 'h' }),
+}));
+vi.mock('@/lib/http/request-origin', () => ({ resolveRequestOrigin: async () => 'https://example.invalid' }));
 
 const review = await import('./review-actions');
 const portal = await import('./actions');
 const execution = await import('./execution-actions');
+const codes = await import('./code-actions');
 
 const TOKEN = 'portal-link-token';
 const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -56,10 +64,26 @@ const ACTS: Act[] = [
   ['approveDesignWithBudget', () => review.approveDesignWithBudget(TOKEN, '', SEEN), 'approveDesignWithBudgetAndNotify', TOO_MANY_OUTCOME],
   ['acknowledgeDeliveryBudget', () => review.acknowledgeDeliveryBudget(TOKEN, BAND_SEEN), 'acknowledgeSeenBudgetAndNotify', TOO_MANY_OUTCOME],
   ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', TOO_MANY_OUTCOME],
-  ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit'), 'claimPaymentByToken', TOO_MANY_RESULT],
+  [
+    'claimDesignPaymentInHome',
+    () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', challengeId: DOCUMENT_ID, code: '123456' }),
+    'claimDesignPaymentWithCodeByToken',
+    TOO_MANY_RESULT,
+  ],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_RESULT],
-  // Stage 2 (B4.3): the client's "I paid" on a payment request of the execution card.
-  ['claimExecutionRequest', () => execution.claimExecutionRequest(TOKEN, DOCUMENT_ID), 'claimExecutionRequestByToken', { ok: false, error: 'too_many' }],
+  // H5: the client's "I paid" on a payment request, with its code, and the code request itself.
+  [
+    'claimRequestInHome',
+    () => execution.claimRequestInHome(TOKEN, { requestId: DOCUMENT_ID, challengeId: DOCUMENT_ID, code: '123456' }),
+    'claimRequestWithCodeByToken',
+    { ok: false, error: 'too_many' },
+  ],
+  [
+    'requestClientCode',
+    () => codes.requestClientCode(TOKEN, { purpose: 'claim_request', target: DOCUMENT_ID }),
+    'issueClientCodeByToken',
+    { ok: false, error: 'too_many', retryAfterSeconds: 60 },
+  ],
 ];
 
 beforeEach(() => {
@@ -81,8 +105,9 @@ describe('the act budget on every portal server action', () => {
 
   it('the budget is per link, shared by every act of that link', async () => {
     for (let index = 0; index < PORTAL_ACT_CEILING; index += 1) await review.acknowledgeDeliveryHandover(TOKEN);
-    expect(await portal.markDeliveryPaymentPaid(TOKEN, 'deposit')).toEqual(TOO_MANY_RESULT);
-    expect(await portal.markDeliveryPaymentPaid('another-link', 'deposit')).toEqual({ ok: true, studioNotified: true });
+    const claim = { milestoneKind: 'deposit', challengeId: DOCUMENT_ID, code: '123456' };
+    expect(await portal.claimDesignPaymentInHome(TOKEN, claim)).toEqual(TOO_MANY_RESULT);
+    expect(await portal.claimDesignPaymentInHome('another-link', claim)).toEqual({ ok: true, already: false, studioNotified: true });
   });
 });
 

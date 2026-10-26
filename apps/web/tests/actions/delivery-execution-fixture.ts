@@ -39,7 +39,7 @@ export async function seedExecutionDelivery(orgId: string, contractState: Contra
   return { delivery, contract: await seedBillableContract(orgId, contractState, delivery) };
 }
 
-/** The app's direct call of the claim SDF, every argument the caller's. */
+/** A direct call of the claim SDF the code-checked act wraps (the app never makes it), every argument the caller's. */
 export async function claimBySql(
   tokenHash: string | null,
   requestId: string | null,

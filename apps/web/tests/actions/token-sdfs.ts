@@ -81,8 +81,8 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // link should send its holder (it returns the home's token hash and nonce).
   { name: 'app_home_by_token', args: 'text' },
   { name: 'app_home_contract_by_token', args: 'text' },
-  { name: 'app_home_contract_sections_by_token', args: 'text, integer' },
-  { name: 'app_home_contract_section_lines_by_token', args: 'text, uuid, integer' },
+  { name: 'app_home_contract_sections_by_token', args: 'text, uuid, integer' },
+  { name: 'app_home_contract_section_lines_by_token', args: 'text, uuid, uuid, integer' },
   { name: 'app_home_variations_by_token', args: 'text' },
   { name: 'app_home_code_issue_by_token', args: 'text, uuid, text, text, text, text, text' },
   { name: 'app_home_contract_ack_by_token', args: 'text, uuid, uuid, text, text, text, text, text' },

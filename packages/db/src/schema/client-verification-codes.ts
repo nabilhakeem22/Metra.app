@@ -91,5 +91,10 @@ export const clientVerificationCodes = pgTable(
     ),
     // The platform's daily ceiling counts every studio's codes of the last day.
     index('client_verification_codes_created_idx').on(t.createdAt),
+    // The issue function's purge of codes never used (0066, DB step D): it
+    // reaches them without walking past the used ones, which stay as evidence.
+    index('client_verification_codes_unused_created_idx')
+      .on(t.createdAt)
+      .where(sql`consumed_at is null`),
   ],
 );

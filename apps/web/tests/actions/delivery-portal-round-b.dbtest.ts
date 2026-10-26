@@ -1,7 +1,7 @@
 import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { executeTransition } from '@/lib/engagements/executor';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { addDeliveryCommentByToken } from '@/lib/engagements/public-comments';
 import { revokeDeliveryLinkCore, rotateDeliveryLinkCore } from '@/lib/engagements/share';
 import { deliveryOrNull } from './delivery-read';

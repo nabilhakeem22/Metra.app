@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { notifyStudioOfClientAct, withStudioNotified } from '@/lib/engagements/client-acts/notify';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from './design-claim-sdf';
 import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { closeFixture, raw, teardown } from './fixture';
 import {

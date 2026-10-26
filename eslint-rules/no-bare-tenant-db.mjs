@@ -318,13 +318,18 @@ const SDF_CALLER_ALLOWLIST = [
   // (and org) does it close? (app_delivery_close_target_by_token: two ids, same
   // token, no money column.) The close itself runs through the executor.
   'apps/web/src/lib/engagements/client-acts/handover-close.ts',
-  // Stage 2 DB step B: the delivery's execution card and the client's "I paid"
-  // on a payment request (app_delivery_execution_by_token,
-  // app_delivery_claim_request_by_token): the same delivery token, no session.
+  // Stage 2 DB step B: the delivery's execution card
+  // (app_delivery_execution_by_token): the same delivery token, no session.
   'apps/web/src/lib/engagements/public/execution.ts',
   // Client home DB step C: the home's Execution tab (app_home_by_token), by the
   // same delivery token, no session; it embeds the execution card above.
   'apps/web/src/lib/client-home/read.ts',
+  // Client home H5: the one-time code request (app_home_code_issue_by_token)
+  // and the code-checked "I paid" acts (app_home_claim_request_by_token,
+  // app_home_claim_design_payment_by_token): the same delivery token, no
+  // session; only the code's hash is passed.
+  'apps/web/src/lib/client-home/codes.ts',
+  'apps/web/src/lib/client-home/code-acts.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

@@ -46,9 +46,10 @@ export const CLIENT_DELIVERY_BODY_KEYS = [
  * creation year in Africa/Cairo.
  *
  * DB step B adds the client's "I paid" on a payment request from the DELIVERY
- * page (`app_delivery_claim_request_by_token`, to owners, admins and
- * accountants), on the same entity: params are the REQUEST's number and its
- * issue year (PR-YYYY-NNNN), and it opens the contract's Payments tab.
+ * page (since H5 only with a one-time code, `app_home_claim_request_by_token`;
+ * to owners, admins and accountants), on the same entity: params are the
+ * REQUEST's number and its issue year (PR-YYYY-NNNN), and it opens the
+ * contract's Payments tab.
  */
 export const CLIENT_CONTRACT_BODY_KEYS = [
   'client_contract_signed',

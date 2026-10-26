@@ -79,10 +79,13 @@ function assertTokenSdf(query: SQL): void {
  * that returned SQL NULL. The portal renders its invalid-token page from that
  * one value, which is why no distinction is made here — telling a visitor WHICH
  * of those it was is an oracle.
+ *
+ * `write`: the function WRITES and answers in JSON (the client home's code
+ * request and its code-checked acts), with readSdfCode's deadline rule below.
  */
-export async function readSdfJson<TPayload>(query: SQL): Promise<TPayload | null> {
+export async function readSdfJson<TPayload>(query: SQL, opts: { write?: boolean } = {}): Promise<TPayload | null> {
   assertTokenSdf(query);
-  const rows = (await withRequestDb((db) => db.execute(query))) as unknown as Array<{
+  const rows = (await withRequestDb((db) => db.execute(query), opts)) as unknown as Array<{
     data: TPayload | null;
   }>;
   return rows[0]?.data ?? null;
