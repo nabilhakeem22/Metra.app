@@ -5095,103 +5095,108 @@ public.variation_order_events where recorded_on_paper`, all 0). Tell the
 lead first: it is a revert of `rls/` and a new migration, never a hand edit
 here.
 
-**Rehearsed** (client home H3 and its fix round, Oct 26). After the fix
-round, every command and SQL block above was run again as written, at
-`25378108` (the change to `e2557546`, one light delivery per project and
-client, was re-rehearsed in the last bullet below), on a local PostgreSQL 17 database (UTF8) built in production's
-own order: Supabase's API roles and default grants simulated first; then
-`main`'s database code at `0f9cb2db` (`db:migrate`, `db:apply-rls`, `seed`);
-DB step S from `992bca1e`; DB step B's `db:apply-rls` from `65c78473` (`65
-tables, 80 policies, 35 triggers, 68 functions`) and `assert-schema-applied`;
-then data written by `main`'s own cores (three studios: deliveries at every
-execution stage, a client's claim, change orders approved, internal and
-expired, a final account, a termination, contracts no delivery stands behind)
-and a bulk of ten studios: 2,023 contracts (1,015 with a client link), 20,170
-contract lines, 21 deliveries, 18 of them at execution. The runs used a fresh
-clone standing in for `merta-main` (its own `npm ci`, `origin` on GitHub,
-`origin/main` at `65c78473`): the PowerShell cut from this section with three
-substitutions only (the checkout path, the Desktop path, and the connection
-set in the session in place of `.env`), the SQL from the saved copy, each
-block on its own.
+**Rehearsed** (client home H3, its fix round and round 2, Oct 26). After round
+2, every command and SQL block above was run again as written, at
+`31e21c8f`, on a local PostgreSQL 17 database (UTF8) built in production's own
+order:
+Supabase's API roles and default grants simulated first; then `main`'s
+database code at `0f9cb2db` (`db:migrate`, `db:apply-rls`, `seed`); DB step S
+from `992bca1e`; DB step B's `db:apply-rls` from `65c78473` (`65 tables, 80
+policies, 35 triggers, 68 functions`) and `assert-schema-applied`; then data
+written by `main`'s own cores (three studios: deliveries at every execution
+stage, a client's claim, change orders approved, internal and expired, a
+final account, a termination, contracts no delivery stands behind) and a bulk
+of ten studios: 2,023 contracts (1,015 issued or signed with a client link),
+20,170 contract lines, 21 deliveries, 18 of them at execution. The runs used a
+fresh clone standing in for `merta-main` (its own `npm ci`, `origin` on
+GitHub, `origin/main` at `65c78473`): the PowerShell cut from this section
+with three substitutions only (the checkout path, the Desktop path, and the
+connection set in the session in place of `.env`), the SQL from the saved
+copy, each block on its own.
 
 - Steps 1 to 4 printed exactly what they say. Step 1's guards printed only the
   `docs/DEPLOY.md` line and the three 0065 files, and the saved copy equals the
   branch's runbook. Step 2 read 65 and 1792880198159; all 0; 21, 18, 6, 3 and
-  1,015; four fingerprints; 80 and 15; 34 MB; `cards_changed` 0. Step 3 printed
-  the two migrate notices, the four and the two apply-rls notices, the two
-  verified lines (compared character for character) and the six
-  `assert-schema-applied` lines, and exited 0. Step 4 read 66 and
-  1792976742588; 1, 2, 32, 1 and 1; the codes table row as written; 32 rows in
-  (d) (eleven definers, nineteen callable by `metra_app`, thirteen internal);
-  the same five numbers and four fingerprints; 81 and 15; 0, 2 and 1; 35 MB.
-  A second step 3 printed only what *Safe to re-run* says and changed nothing
-  in the catalogue.
+  1,015; four fingerprints (the delivery links' the same as without the
+  `- 'entry_phase'`, which changes nothing before step C); 80 and 15; 34 MB;
+  `cards_changed` 0 and `boqs_other_client` 0. Step 3 printed the two migrate
+  notices, the four and the two apply-rls notices, the two verified lines
+  (compared character for character) and the six `assert-schema-applied`
+  lines, and exited 0. Step 4 read 66 and 1792976742588; 2, 2, 32, 1 and 1; the
+  codes table row as written; 32 rows in (d) (eleven definers, nineteen
+  callable by `metra_app`, thirteen internal); the same five numbers and four
+  fingerprints; 81 and 15; 0, 2, 1, 0 and 0; 35 MB. All 21 delivery links now
+  carry `entry_phase`. A second step 3 printed only what *Safe to re-run* says
+  and changed nothing in the catalogue.
 - A catalogue comparison (every function body with its settings and grants,
   policy, trigger, table and column grant, constraint, index and RLS flag) from
   step B to step C found exactly the changes under *What it changes*: 32
-  functions added; six replaced (the contract and change-order links, the two
-  "I paid" functions, the execution card and its contract helper); 1 policy;
-  the codes table's trigger and the re-pointed change-order trigger; the codes
-  table with its grants, constraints and indexes; nothing else.
+  functions added; seven replaced (the contract, change-order and delivery
+  links, the two "I paid" functions, the execution card and its contract
+  helper); 1 policy; the codes table's trigger and the re-pointed change-order
+  trigger; the codes table with its grants, constraints and indexes; the
+  change-order event column (`metra_app` may insert it, by its table grant);
+  nothing else.
 - **The migration's lock race, on purpose.** A reader holding
   `design_engagements` for 10 s against step 3: the two 55P03 lines, exit 1,
-  nothing run after them, `migrations` still 65, step 2 (b) all 0.
+  nothing run after them, `migrations` still 65, step 2 (b) all 0. A reader
+  holding `variation_order_events` for 10 s: the same two lines, stopped at
+  `public.variation_order_events:ACCESS EXCLUSIVE`, the same state. The block
+  run again after the readers ended applied 0065.
 - **apply-rls's lock race, on purpose.** A reader holding `variation_orders`
   for 30 s while step 3 ran (0065 then applied): `policies/30-contracts-boqs-variations.sql`
-  lost three times (55P03), the two failure lines, exit 1, and
-  `assert-schema-applied` skipped; in between, step 2 (b) read 1, 2, 32, 0 and
-  0. Step 3 run again after the reader ended exited 0 with the four and the two
-  notices, and the catalogue was identical to a clean run's.
+  lost three times (55P03, retried after 2 s and 4 s), the two failure lines,
+  exit 1, and `assert-schema-applied` skipped; in between, step 2 (b) read 2,
+  2, 32, 0 and 0. `db:apply-rls` run again after the reader ended exited 0 with
+  the four and the two notices, `assert-schema-applied` exited 0, and the
+  catalogue was identical to a clean run's.
 - **Undo (0)**, from the saved copy. Part 2 run first, and again after part 1
   but before `main`'s `db:apply-rls`: both times `cannot drop function
   enforce_variation_order_frozen() because other objects depend on it`
-  (2BP01), and step 2 (b) still read 1, 2, 32, 1 and 1: nothing dropped. Then,
-  in order: part 1 returned 0; `65c78473`'s `db:apply-rls` printed the four
-  notices and the two lines quoted there (the grants line exactly as derived)
-  and exited 0; part 2 returned no rows; step 2 (b) read 1, 2, 0, 0 and 0, step
-  2 (d) the same four fingerprints and step 2 (e) 80 and 15; and the catalogue
-  equalled step B's but for the 0065 objects it keeps.
-- **Forward again** (step 1, then this branch's `db:apply-rls` only): the four and
-  the two notices, the two verified lines, exit 0; step 2 (b) 1, 2, 32, 1 and
-  1, the same four fingerprints, 81 and 15; and a catalogue identical to the
-  first forward's. Step 6 (3) then put the checkout back on `main`.
-- **Step 2 (g) itself**, on a copy of the database at step B with two
+  (2BP01), and step 2 (b) still read 2, 2, 32, 1 and 1: nothing dropped. Part
+  1 while a reader held the codes table for 6 s: `canceling statement due to
+  lock timeout`, nothing dropped; run again, 0. `main`'s `db:apply-rls` run
+  before part 1 (on a second step C database): not landed, naming `policy
+  client_verification_codes.org_isolation`. Then, in order: `65c78473`'s
+  `db:apply-rls` printed the four notices and the two lines quoted there (the
+  grants line exactly as derived) and exited 0; part 2 returned no rows; step
+  2 (b) read 2, 2, 0, 0 and 0, step 2 (d) the same four fingerprints and step
+  2 (e) 80 and 15; and the catalogue equalled step B's but for the 0065
+  objects it keeps (the two columns among them; every function, the delivery
+  and change-order links' included, as at step B).
+- **Forward again** (step 1, then this branch's `db:apply-rls` only): the four
+  and the two notices, the two verified lines, exit 0; step 2 (b) 2, 2, 32, 1
+  and 1, the same four fingerprints, 81 and 15, step 4 (h) 0, 2, 1, 0 and 0;
+  and a catalogue identical to the first forward's. Step 6 (3) then put the
+  checkout back on `main`.
+- **Step 2 (g) itself**, on a copy of the database at step B with three
   deliveries planted (one whose signed contract was terminated and replaced by
-  a newer issued BOQ, one with a newer BOQ made for another client of the
-  project): `cards_changed` 2, and after step C's `db:apply-rls` the execution
-  card changed for exactly those two of the 21 deliveries.
+  a newer issued BOQ; one with a newer issued BOQ, a contract on it, made for
+  another client of the project; one with an issued BOQ made for another
+  client and no contract): `cards_changed` 2 (the first two) and
+  `boqs_other_client` 2 (the last two; the third is the case only this column
+  sees). After step C the execution card changed for exactly the first two of
+  the 18 deliveries at execution, and neither of the last two owned the other
+  client's BOQ any more. On the clean database both read 0.
 - **The current code on the step C database:** `main`'s (`65c78473`) own
-  isolation gate passed 60 of 60, and its action tests 1,699 of 1,701. The two
-  failures test schema objects, not an app path: one pins the list of token
-  functions in the database, which step C extends; the other fails the same
-  way on the step B database (it checks a Supabase default grant that the
-  simulated roles add and `roles.sql` does not manage). No contract, change
-  order, delivery, payment, claim, final account or measurement test of the
-  shipped code failed on the step C database.
-- **Carried over from the H3 build's rehearsal**, which the fix round does not
-  change: the migration's lock window under *Locks* (0065 changed by one
-  comment) and the 36 `db:apply-rls` runs beside studio traffic (the fix round
-  changed function bodies and grants, which every run re-creates, and no policy
-  file but a comment).
-- **At `e2557546`** (the light-delivery index on project and client), on a
-  new database built the same way: the lines that index can change, run as
-  written. Step 1 listed only `docs/DEPLOY.md`; step 2 (b) read all 0; step 3
-  printed the eight notices and the verified lines and exited 0; step 4 (b)
-  read 1, 2, 32, 1 and 1, (h) 0, 2 and 1, (d) the same 32 rows, with the same
-  four fingerprints before and after; the catalogue from step B to step C
-  differed exactly as above, with
-  `design_engagements_one_light_per_project_client` on (org_id, project_id,
-  client_id). Undo (0): part 2 run too early gave 2BP01 and dropped nothing;
-  then part 1, `65c78473`'s `db:apply-rls` (exit 0) and part 2 left step 2 (b)
-  at 1, 2, 0, 0 and 0 and a catalogue equal to step B's but for the 0065
-  objects (the new index among them). Forward again: the four and the two
-  notices, exit 0, step 4 (h) 0, 2 and 1, and a catalogue identical to the
-  first forward's.
+  isolation gate passed 60 of 60, and its action tests 1,699 of 1,701, on a
+  copy of this step C database (both new columns in it). The two failures
+  test schema objects, not an app path: one pins the list of token functions
+  in the database, which step C extends; the other fails the same way on the
+  step B database (it checks a Supabase default grant that the simulated
+  roles add and `roles.sql` does not manage). No contract, change order
+  (the termination cascade included), delivery, payment, claim, final
+  account or measurement test of the shipped code failed.
+- **Carried over from the H3 build's rehearsal:** the migration's lock window
+  beside studio traffic under *Locks* (round 2 added the change-order column
+  and a third lock; that file was measured on a quiet server only, as *Locks*
+  says) and the 36 `db:apply-rls` runs beside studio traffic (the fix rounds
+  changed function bodies and grants, which every run re-creates, and no
+  policy file but comments).
 - **This branch's own tests** on a fresh database replayed as CI does: the
-  isolation gate 60 of 60, the action tests 1,767 of 1,768 on a database with
-  Supabase's default grants simulated; the one left is that same default-grant
-  test, which fails the same way on the code before the fix round and passes
-  on a database built as CI builds it.
+  isolation gate and every action test passed (one timing test,
+  `execution-transaction-bounds`, failed once while the same machine ran the
+  unit suite beside it, and passed three of three on its own).
 
 ## Monthly market bulletin
 
