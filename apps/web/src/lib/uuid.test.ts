@@ -24,6 +24,7 @@ describe('isUuid', () => {
     for (const value of [
       '',
       '   ',
+      'not-a-uuid', // the tester's /clients/not-a-uuid, once a 22P02 "Application error"
       '3f2504e0-4f89-41d3-9a0c-0305e82c330', // one short
       '3f2504e0-4f89-41d3-9a0c-0305e82c33011', // one long
       '3f2504e04f8941d39a0c0305e82c3301', // no hyphens

@@ -18,6 +18,7 @@ import { renderPdf } from '@/lib/pdf/render';
 import { json, pdfResponse, renderFailure } from '@/lib/pdf/responses';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import type { Capability } from '@/lib/permissions/roles';
+import { isUuid } from '@/lib/uuid';
 
 export type { PdfOrg };
 
@@ -94,10 +95,12 @@ export async function servePdfDocument<TDetail, THeader = undefined>(
   const ctx = await requireOrg();
   if (!can(ctx.role, spec.capability, 'read')) return json('Forbidden', 403);
 
-  const loaded = await loadHeaderFor(ctx, id, spec);
+  // A malformed id is a missing document, settled before any read: it would
+  // otherwise reach a uuid cast and raise (22P02) instead of answering 404.
+  const loaded = isUuid(id) ? await loadHeaderFor(ctx, id, spec) : null;
   // Margin-gated BEFORE the load, so a blind role never even fetches cost — and
   // gated margin-HIDING when the header did not resolve, so the 403 cannot be
-  // skipped by naming an id that does not exist.
+  // skipped by naming an id that does not exist (or one that is not an id).
   const org = loaded?.org ?? MARGIN_HIDING_ORG;
   if (variant === 'internal' && !canSeeMargin(ctx.role, org.hideMarginFromPm)) {
     return json('Forbidden', 403);

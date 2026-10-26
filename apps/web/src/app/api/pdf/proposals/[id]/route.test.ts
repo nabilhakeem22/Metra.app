@@ -18,6 +18,8 @@ vi.mock('@/lib/db/context', () => ({
     { nameAr: null, nameEn: 'Studio', defaultLocale: 'en', hideMarginFromPm: false },
   ],
 }));
+const PROPOSAL_ID = 'a0c00000-0000-4000-8000-000000000001';
+
 const reads = vi.hoisted(() => ({ getProposalForPdf: vi.fn() }));
 vi.mock('@/lib/proposals/queries', () => reads);
 const render = vi.hoisted(() => ({ renderPdf: vi.fn() }));
@@ -37,13 +39,13 @@ beforeEach(() => {
 });
 
 const get = () =>
-  GET(new Request('https://app.metra.test/api/pdf/proposals/p1'), {
-    params: Promise.resolve({ id: 'p1' }),
+  GET(new Request(`https://app.metra.test/api/pdf/proposals/${PROPOSAL_ID}`), {
+    params: Promise.resolve({ id: PROPOSAL_ID }),
   });
 
 describe('GET /api/pdf/proposals/[id] (AC22)', () => {
   it('404s a BOQ-kind proposal and never builds or renders a quotation', async () => {
-    reads.getProposalForPdf.mockResolvedValue({ id: 'p1', kind: 'boq', number: 3, sections: [] });
+    reads.getProposalForPdf.mockResolvedValue({ id: PROPOSAL_ID, kind: 'boq', number: 3, sections: [] });
     const res = await get();
     expect(res.status).toBe(404);
     expect(template.buildProposalHtml).not.toHaveBeenCalled();
@@ -51,7 +53,7 @@ describe('GET /api/pdf/proposals/[id] (AC22)', () => {
   });
 
   it('still renders a quote', async () => {
-    reads.getProposalForPdf.mockResolvedValue({ id: 'p1', kind: 'quote', number: 3, sections: [] });
+    reads.getProposalForPdf.mockResolvedValue({ id: PROPOSAL_ID, kind: 'quote', number: 3, sections: [] });
     const res = await get();
     expect(res.status).toBe(200);
     expect(template.buildProposalHtml).toHaveBeenCalled();

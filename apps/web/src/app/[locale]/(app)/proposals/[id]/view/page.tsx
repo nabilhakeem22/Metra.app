@@ -7,6 +7,7 @@ import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { getProposalWithLines } from '@/lib/proposals/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
+import { isUuid } from '@/lib/uuid';
 import { ProposalView } from './view-client';
 
 export default async function ProposalViewPage({
@@ -15,6 +16,7 @@ export default async function ProposalViewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const ctx = await requireOrg();
   if (!can(ctx.role, 'proposals_build', 'read')) notFound();
 

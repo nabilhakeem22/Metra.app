@@ -17,7 +17,7 @@ vi.mock('@/lib/auth/require-org', () => ({
 vi.mock('@/lib/db/context', () => ({
   withOrgContext: async () => [
     {
-      boqId: 'b1',
+      boqId: BOQ_ID,
       createdAt: new Date('2026-03-01T00:00:00Z'),
       clientAr: null,
       clientEn: 'Acme',
@@ -31,6 +31,8 @@ vi.mock('@/lib/db/context', () => ({
   ],
 }));
 vi.mock('@/lib/boqs/core', () => ({ MAX_BOQ_LINES: 2000 }));
+const BOQ_ID = 'b0c00000-0000-4000-8000-000000000001';
+
 const reads = vi.hoisted(() => ({ getBoqDetail: vi.fn() }));
 vi.mock('@/lib/boqs/queries', () => reads);
 vi.mock('@/lib/pdf/render', async (importOriginal) => ({
@@ -41,7 +43,7 @@ vi.mock('@/lib/pdf/render', async (importOriginal) => ({
 const { GET } = await import('./route');
 
 const detail = {
-  id: 'b1',
+  id: BOQ_ID,
   number: 7,
   documentNumber: 'BQ-2026-0007',
   version: 1,
@@ -65,8 +67,8 @@ beforeEach(() => {
 });
 
 async function download(query = '') {
-  return GET(new Request(`https://app.metra.test/api/pdf/boq/b1${query}`), {
-    params: Promise.resolve({ id: 'b1' }),
+  return GET(new Request(`https://app.metra.test/api/pdf/boq/${BOQ_ID}${query}`), {
+    params: Promise.resolve({ id: BOQ_ID }),
   });
 }
 
