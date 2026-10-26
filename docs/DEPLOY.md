@@ -5198,6 +5198,422 @@ copy, each block on its own.
   `execution-transaction-bounds`, failed once while the same machine ran the
   unit suite beside it, and passed three of three on its own).
 
+### Client codes DB step D (0066, the one-time codes): owner runbook
+
+The client codes' database step: migration `0066_client_codes_purge_index.sql`
+plus `db:apply-rls` (changes to `rls/functions/75-client-home.sql` and
+`rls/roles.sql`; no new file). It runs AFTER client home DB step C (the
+section above): production then holds 66 migrations, 81 policies (15 of them
+restrictive) and 100 functions; step D leaves it at 67, 81 (15) and 100 (two
+functions are replaced by new forms, none is added). It is validated on
+branch `validate/home-h5`, whose code is pinned at **`790aa693`**: the
+branch's last code commit (every commit after it changes only
+`docs/DEPLOY.md`). That branch is `main` (`bab6de80`: PR H3, PR H4 and the
+paper decision) plus PR H5, the client's one-time codes and "I paid" through
+a code.
+
+**Step D is not the last client home step.** DB step C2 (apply-rls only)
+still comes later, after PR H7 is live: the four old client acts will then
+answer `moved` unless a code was checked first. Step D changes none of those
+four answers.
+
+**THE ORDER (do not change it):**
+
+0. **Already done:** client home **DB step C**, run from its pin `31e21c8f`,
+   and PR H3 merged: `main` is `bab6de80` or later. Step 1 checks the code;
+   check yourself that you ran step C.
+1. **The database goes first**, from the branch (steps 1 to 4 below), while
+   production still runs the current `main`.
+2. **Then a short check of the live site on the new database (step 5),**
+   still before any merge. If it fails, undo (0) puts the previous database
+   code back.
+3. **Then, right after that check,** the lead merges the branch to `main`, the
+   Deploy workflow deploys it, and you run the smoke test (step 6).
+
+Why this order, one sentence each:
+
+- **The new code needs the new database code:** a client's code request reads
+  the studio's name and the document's number from the database's answer (so
+  no browser can put words of its own into an email the client receives); on
+  the old database that answer has neither, and every code request fails with
+  a reference (no client could say "I paid").
+- **The current Worker is safe on the new database, with no visible
+  difference:** 0066 only adds an index to the codes table, which is empty
+  (no released code asks for a code yet); the code request's answer only gains
+  keys and its daily limit per delivery only loosens (the current code never
+  calls it); and the two contract page reads that change form have no caller
+  in the current code (checked on `main` at `bab6de80`: no file under
+  `apps/web/src` names them).
+- **No client sees anything new** until PR H5 is merged.
+- **PR H6-read** (not merged yet) calls the two contract page reads in their
+  OLD form: from step D on it must pass the contract id (the lead's ruling),
+  so it is merged only after step D, with that change.
+
+**What it changes.** No existing row is updated and nothing is backfilled.
+
+| Object | Change |
+|---|---|
+| `client_verification_codes` | one partial index, `client_verification_codes_unused_created_idx` (the codes never used, by when they were made): the code request removes codes never used 90 days after they expired, and reads them through it without walking past the used ones, which stay as evidence |
+| `app_home_code_issue_by_token` | the per-delivery daily limit counts GUESSES: a new code is refused after 50 wrong tries on a delivery's codes in a day (until the try that made 50 is a day old), and after 30 codes a delivery a day (was 10 codes), so a link holder who only asks for codes and never guesses does not use up the delivery's day; 60 s and 5 an hour for one document, 15 wrong tries on its codes in an hour, 25 a day per studio and 80 across the platform are unchanged. Its `ok` answer gains three keys for the server only (the browser is never sent them): the studio's two names, the document's number, and whether this code took the platform's day to half its 80 |
+| `app_home_contract_sections_by_token`, `app_home_contract_section_lines_by_token` | each now takes the id of the contract the client opened, and answers nothing unless that contract is still the home's: an open document never gains a replaced contract's sections (H6-read security S1). The old forms (without the id) are dropped |
+| `rls/roles.sql` | the grants follow the two new forms: callable by `metra_app` only |
+
+**1. Put the step D code in the production checkout.** This step adds no
+dependency of `db:migrate` or `db:apply-rls`, so the installed `node_modules`
+serve as they are. Right after the switch it saves a copy of this runbook:
+the checkout undo (0) switches to does not contain this section.
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/validate/home-h5
+Copy-Item docs\DEPLOY.md $HOME\Desktop\runbook-step-d.md
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat 790aa693 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (790aa693)
+git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
+git diff --name-only bab6de80 HEAD -- packages/db/migrations    # MUST print exactly the three 0066 files below
+```
+
+The last command must print exactly these three lines, in this order:
+
+```
+packages/db/migrations/0066_client_codes_purge_index.sql
+packages/db/migrations/meta/0066_snapshot.json
+packages/db/migrations/meta/_journal.json
+```
+
+The `Copy-Item` line saves this runbook (the branch's, which has this section)
+to your Desktop; read the rest of it from that copy (undo (0) needs it). Four
+STOPs, tell the lead in each case:
+
+- The `git diff --stat 790aa693 HEAD` lists any file other than
+  `docs/DEPLOY.md`: the code is not the code that was rehearsed.
+- The `git log ... -- packages/db` prints any line: database code reached
+  `main` after this branch was last brought up to date, and this branch's
+  `db:apply-rls` would take it away again.
+- The migrations diff prints anything else: this runbook covers 0066 only.
+- You ran step C from a pin other than `31e21c8f`, or have not run it.
+
+**2. Read-only, before** (Supabase SQL editor). The editor shows only the LAST
+result of what you run, so run each block below ON ITS OWN.
+
+(a) Expect `migrations` 66 and `newest` 1792976742588 (0065's journal stamp).
+Anything else: STOP, tell the lead.
+
+```sql
+-- Step D step 2 (a): migrations recorded so far. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) **THE PRE-CHECK. Exactly this row, or STOP:** `step_d_index` 0,
+`bound_page_reads` 0, `unbound_page_reads` 2. Anything else means part of
+step D is already in this database (or step C is not): do not run step 3,
+tell the lead.
+
+```sql
+-- Step D step 2 (b): the pre-check. Run this one alone.
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'client_verification_codes_unused_created_idx') as step_d_index,
+  (select count(*) from (values
+     (to_regprocedure('public.app_home_contract_sections_by_token(text, uuid, integer)')),
+     (to_regprocedure('public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer)'))) f(p)
+    where f.p is not null) as bound_page_reads,
+  (select count(*) from (values
+     (to_regprocedure('public.app_home_contract_sections_by_token(text, integer)')),
+     (to_regprocedure('public.app_home_contract_section_lines_by_token(text, uuid, integer)'))) f(p)
+    where f.p is not null) as unbound_page_reads;
+```
+
+(c) The codes table. Note the two numbers (production has had no caller of
+the code request, so expect 0 and 0); step 4 (e) expects the same.
+
+```sql
+-- Step D step 2 (c): the codes table. Run this one alone.
+select count(*) as codes, count(*) filter (where consumed_at is null) as never_used
+from public.client_verification_codes;
+```
+
+(d) Expect `policies` 81 and `restrictive` 15 (step C's step 4 (g)). Step 4
+(f) expects the same.
+
+```sql
+-- Step D step 2 (d): the policies, and how many are restrictive. Run this one alone.
+select count(*) as policies,
+       count(*) filter (where permissive = 'RESTRICTIVE') as restrictive
+from pg_policies where schemaname = 'public';
+```
+
+(e) The database size. Write the number down; step 4 (g) reads it again.
+
+```sql
+-- Step D step 2 (e): the database size. Run this one alone.
+select pg_size_pretty(pg_database_size(current_database())) as db_size;
+```
+
+**3. Migrate, then apply RLS, then prove it landed.** In this order, from
+`C:\Users\HP\merta-main` (its `.env` is the production connection), **at a
+quiet hour** (late evening, when no studio is working; see *Locks*). Each
+line runs its command only if the one before it exited 0, so a failure stops
+the block there:
+
+```powershell
+npm run db:migrate
+if ($LASTEXITCODE -eq 0) { npm run db:apply-rls }
+if ($LASTEXITCODE -eq 0) { npm run assert-schema-applied -w @metra/db }
+```
+
+**NOTICE blocks are normal.** Both commands print routine NOTICE blocks with
+a `message:` line; on Supabase the line about a role may differ, and any line
+that ends `does not exist, skipping` or `already exists, skipping` is the same
+kind:
+
+- `db:migrate`: `message: 'schema "drizzle" already exists, skipping',` and
+  `message: 'relation "__drizzle_migrations" already exists, skipping',`
+- `db:apply-rls`: the same first four as every run
+  (`message: 'function public.app_delivery_respond_by_token(text,text,text,text,text,text) does not exist, skipping',`,
+  then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`,
+  then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`,
+  then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`),
+  and nothing else on this first run (the two old page reads exist, so
+  their DROP prints nothing). Every LATER `db:apply-rls` (a re-run, the
+  forward-again of undo (0)) prints two more after the first two:
+  `message: 'function public.app_home_contract_sections_by_token(text,integer) does not exist, skipping',`
+  and `message: 'function public.app_home_contract_section_lines_by_token(text,uuid,integer) does not exist, skipping',`.
+
+Only a line that starts `Migration failed:` or `apply-rls failed:` is a
+failure (after one, npm adds `npm error` lines of its own; they only repeat
+that the command failed). Expected:
+
+- `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
+  count, so run step 4 (a): `migrations` is exactly one higher (67).
+- `db:apply-rls` exits 0 and ends with the same two lines step C's printed:
+  the first starts `apply-rls: verified in the catalogues` and goes on
+  `66 tables, 81 policies, 36 triggers, 100 functions, RLS forced on all of them, role metra_app present.`;
+  the second starts `apply-rls: grants verified` and is word for word step
+  C's step 3 line (`... 24 narrowed table(s) ... client_verification_codes readable on every column but code_hash; no truncate, references, trigger for metra_app on any table; no policy outside the manifest.`).
+  If that second line is replaced by a problem list, it exits 1: something
+  was added by hand. Do not merge; tell the lead.
+- `assert-schema-applied` exits 0 and prints six lines, each starting
+  `assert-schema-applied:`, in this order: `OK` then `66 declared table(s), every column present.`;
+  `indexes` then `151 declared, all present.` (one more than after step C:
+  0066's); `constraints` then `413 declared, all present.`; `functions` then
+  `100 declared, all present.`; `orphaned org rows` then
+  `58 org-scoped table(s) answered, none holds a row whose org_id names no organization.`;
+  and `composite set-null FKs` then
+  `16 found (16 declared in src/schema/), every one narrowed to a single non-org_id column.`
+
+**A lock race in `db:apply-rls` is retried for you.** A line like
+`apply-rls: functions/75-client-home.sql rolled back with SQLSTATE 55P03 on attempt 1 of 3 (a lock race with live traffic); trying it again in 2 s.`
+followed by `Applying functions/75-client-home.sql ... (attempt 2 of 3)` is
+NOT a failure: that one file rolled back whole and is being applied again (3
+attempts, 2 s then 4 s apart). Carry on reading the output.
+
+**If a command fails, it prints the SQLSTATE and what to do,** on two lines:
+
+- `Migration failed: SQLSTATE 55P03: 0066: could not take every lock within 3 s (stopped at public.client_verification_codes:SHARE)`
+  then
+  `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
+  The migration takes its one lock with NOWAIT (see *Locks*), tries again
+  every 10 to 40 ms for 3 s in all, and holds nothing while it tries, so no
+  request waited on it. This line means a long transaction held the codes
+  table for those 3 s. Re-run the block a little later.
+- `apply-rls failed: SQLSTATE 55P03: canceling statement due to lock timeout`
+  (or `SQLSTATE 40P01: deadlock detected`) then
+  `apply-rls failed: lock wait or deadlock, safe to re-run at a quieter moment (this file rolled back; the files before it stay applied).`
+  That means the same file lost three times in a row: a studio transaction or
+  report held what it needed for more than 3 s (a 40P01 is ordinary studio
+  traffic; step B's runbook says why). **Run `npm run db:apply-rls` again, and
+  keep re-running it until it exits 0** (wait a minute between runs; it is
+  safe, every statement is idempotent), then
+  `npm run assert-schema-applied -w @metra/db`. Until a run exits 0, the
+  functions file may still be the old one (step 2 (b) then reads its old
+  `0, 2`): the current site works on either, as it calls neither form.
+- `Migration failed: SQLSTATE 42P07: relation "client_verification_codes_unused_created_idx" already exists`
+  then `Migration failed: tell the lead before running anything else (the whole batch rolled back, nothing was changed).`:
+  part of step D is already in this database, which step 2 (b) would have
+  shown. Nothing changed; tell the lead.
+- Any other code ends `tell the lead before running anything else`.
+
+**Safe to re-run.** `db:migrate` records 0066 only when it commits, so after
+any failure a re-run starts again from 0065; after a success it finds nothing
+pending and prints `Migrations applied.` again. Every statement under `rls/`
+is idempotent: a second `db:apply-rls` prints the same two verified lines
+(its notices are under step 3). `assert-schema-applied` only reads.
+
+**Locks.** `db:migrate` runs 0066 as ONE transaction. It first takes SHARE on
+`client_verification_codes` (reads go on, writes wait) with NOWAIT, within
+one 3 s budget for all its attempts: if the table is busy it sleeps 10 to 40
+ms and tries again, so it never queues behind a code act (and never makes
+the next ones queue behind it). Then it builds the index. Not `CONCURRENTLY`:
+`db:migrate` runs a migration inside a transaction, where a concurrent index
+build cannot run, and the table is empty in production (step 2 (c)), so the
+build takes milliseconds. Nothing in the current site writes the codes
+table. `db:apply-rls` re-creates the code request and the two contract page
+reads in `functions/75-client-home.sql` (a DROP and a CREATE of each of the
+two page reads: no table lock) and runs every other file as it always does (the
+worst cases in step B's runbook are unchanged); a file that loses a lock race
+is tried again (above).
+
+**4. Read-only, after: expected results.** Each block ON ITS OWN.
+
+(a) Step 2 (a) again: `migrations` 67, `newest` 1793044397504 (0066's journal
+stamp).
+
+(b) Step 2 (b) again: now `step_d_index` 1, `bound_page_reads` 2 and
+`unbound_page_reads` 0.
+
+(c) The new index is valid and partial, and the three changed functions are
+the definers `metra_app` may call and nobody else: one row, `valid_index` 1,
+`definers` 3, `app_execute` 3, `others_execute` 0.
+
+```sql
+-- Step D step 4 (c): the index and who may call the changed functions. Run this one alone.
+select
+  (select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid
+    where c.relname = 'client_verification_codes_unused_created_idx' and i.indisvalid
+      and pg_get_indexdef(i.indexrelid) like '%WHERE (consumed_at IS NULL)') as valid_index,
+  count(*) filter (where p.prosecdef) as definers,
+  count(*) filter (where has_function_privilege('metra_app', p.oid, 'execute')) as app_execute,
+  count(*) filter (where exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0)
+                      or coalesce((select bool_or(has_function_privilege(r.oid, p.oid, 'execute')) from pg_roles r
+                                    where r.rolname in ('anon', 'authenticated', 'service_role')), false)) as others_execute
+from pg_proc p
+where p.oid in (to_regprocedure('public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text)'),
+                to_regprocedure('public.app_home_contract_sections_by_token(text, uuid, integer)'),
+                to_regprocedure('public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer)'));
+```
+
+(d) The code request's new daily rule is the one in the database: one row,
+`counts_guesses` true, `codes_30` true, `old_cap_10` false.
+
+```sql
+-- Step D step 4 (d): the code request's daily rule. Run this one alone.
+select p.prosrc like '%t.tries_since >= 50%' as counts_guesses,
+       p.prosrc like '%having count(*) >= 30%' as codes_30,
+       p.prosrc like '%having count(*) >= 10)%' as old_cap_10
+from pg_proc p
+where p.oid = to_regprocedure('public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text)');
+```
+
+(e) Step 2 (c) again: the same two numbers as before.
+
+(f) Step 2 (d) again: `policies` 81 and `restrictive` 15.
+
+(g) Step 2 (e) again: about the same size as before. Put the number in the
+release note.
+
+**Stop and do not go on** if any output in steps 3 or 4 differs from what is
+written there. Tell the lead what you saw instead.
+
+**5. Before the merge: the live site on the new database.** The site still runs
+the current `main`. About five minutes, in your own studio only. Open the log
+first, in a second window, and leave it open:
+
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler tail metra-web
+```
+
+Then, signed in to your own studio: open **Deliveries** (التسليمات) and a
+delivery at the execution stage, an execution contract and its **Payments**
+tab (الدفعات), and the dashboard. If a test project of yours has a delivery
+link (`/d/...`) you sent to yourself, open it too (only look: do not say you
+paid anything). Expected: every page loads and shows your data as before,
+and the log shows no `42501`, no `42883`, no `MT100`, no `mutateInOrg failed`.
+
+**If anything in step 5 fails:** do not merge. Run undo (0) below now, then
+tell the lead what you saw. If everything passes, go straight to step 6.
+
+**6. Then: merge, smoke test, return the checkout to main.**
+
+1. Tell the lead steps 1 to 5 are done; the lead merges the branch and the
+   Deploy workflow deploys it (the same evening).
+2. Smoke test on your own studio, the log still open: the page loads of step
+   5 again, now on the new code. Then, only if you have a test delivery link
+   whose client email is an address you read, open its "I've made this
+   payment" and press **Send the code** (أرسل الرمز). Expected: the code
+   arrives (or, until the Resend sending domain is verified, the panel says
+   the code could not be sent, and the log shows one
+   `client code email not sent:` line: that is the honest answer, not a
+   failure of this step). Do not type the code: nothing is claimed. The log
+   shows no `42883`, no `42501`, no `MT100` and no `mutateInOrg failed`.
+3. Put the production checkout back on main:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/main
+```
+
+**Undo, if ever needed.**
+
+**(0) The database code, before the merge** (step 5 fails, or before the merge
+the log shows a `42501`, a `42883` or an `MT100`, or a studio reports a broken
+page). Two parts: the `db:apply-rls` of `main` (`bab6de80`, the database code
+production ran on just before step 3: step C's), which puts back the code
+request as it was and the two contract page reads without the contract id;
+then one SQL block that removes the two forms that code does not know. It
+leaves 0066 itself alone: the index stays (it changes no answer). Use it only
+while the site still runs the code from before the merge: if the new code is
+already deployed, undo (1) the code first, then this.
+
+From the copy you saved in step 1:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach bab6de80
+git log --oneline -1    # bab6de80 Merge remote-tracking branch 'origin/validate/home-h7-paper' into validate/release-h7p
+npm run db:apply-rls
+```
+
+Run only `db:apply-rls` from this checkout, at a quiet hour as in step 3.
+Expected: it exits 0; the four notices of step 3; and the same two verified lines
+as step 3 (that code declares the same 66 tables, 81 policies and 100
+functions, and the two new page reads are extra to it, not missing).
+
+**If this `db:apply-rls` fails** with the two `apply-rls failed:` lines of step
+3 (`SQLSTATE 40P01` or `55P03`), it is the same lock race with live traffic as
+in step 3: **run `npm run db:apply-rls` again from this checkout, and keep
+re-running it until it exits 0.** Any other code: stop and tell the lead.
+
+Then, in the Supabase SQL editor, this block, on its own:
+
+```sql
+-- Step D undo (0), part 2: the two forms main's code does not know. Run this one alone.
+set lock_timeout = '3s';
+drop function if exists public.app_home_contract_sections_by_token(text, uuid, integer);
+drop function if exists public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer);
+```
+
+Expected: `Success. No rows returned`. If it fails with `canceling statement
+due to lock timeout`, nothing was dropped: run it again a minute later. Then,
+read-only, each block ON ITS OWN: step 2 (b) again (now `step_d_index` 1,
+`bound_page_reads` 0, `unbound_page_reads` 2: the index stays, the rest is as
+before step 3) and step 2 (d) again (81 and 15). Then step 5 again:
+everything works as it did before step 3. Put the checkout back on main (step
+6 (3)) and tell the lead what failed the first time. Do not merge. If step 5
+STILL fails after undo (0), the database code was not the cause: tell the
+lead at once and run nothing else.
+
+To go forward again later, only when the lead says so: step 1 again, then from
+step 3 only `npm run db:apply-rls` (0066 is still applied, so `db:migrate` is
+not needed; if you run it anyway it prints `Migrations applied.` and changes
+nothing). Expected: the notices and the two verified lines of step 3 (re-run
+until it exits 0, as step 3 says); then step 4 and on.
+
+**(1) The code** (a page fails after the deploy): from
+`C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
+the version that served before the merge (`npx wrangler deployments list`).
+Leave the database alone: the older Worker runs on it (see THE ORDER).
+
+**(2) The index:** never needed (it changes no answer). If the lead ever wants
+it gone, it is a new migration, never a hand edit here.
+
+**Rehearsed** (H5, Oct 27): see the notes below, written after the literal run.
+
 ## Monthly market bulletin
 
 Once 0061 is applied and the branch is merged, every month's ministry
