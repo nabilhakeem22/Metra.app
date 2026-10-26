@@ -23,6 +23,11 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // `expired`), so the cockpit must not say it waits on the client. It is the
 // studio's move, as the closed signing window is (F4). Real cores throughout;
 // only the clock is moved by SQL, the way the facts dbtest moves the contract's.
+//
+// Client home DB step C (the H2 fix round's F1(a) ruling): the window now
+// starts when the change order is ISSUED (issueVariationCore resets
+// share_expires_at, enforce_variation_order_frozen admits it), so a change
+// order approved long before it is issued no longer reaches the client dead.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -165,23 +170,59 @@ describe('a change order whose client link has expired is the studio move (F1)',
     expect((await reading(engagementId)).flow).toMatchObject({ issuedChangeOrderCount: 0, expiredChangeOrderCount: 0 });
   });
 
-  it('a change order issued after its link already expired reads as the studio move, not a wait on the client', async () => {
+  it('a change order whose internal-approval link expired before its issue gets the full window at issue: the client answers', async () => {
     const { engagementId, contractId } = await paidUpDelivery();
     const changeOrder = await internallyApprovedChangeOrder(contractId);
-    // The link's 30 days start at internal approval today, so a change order
-    // issued more than 30 days later goes out with a dead link. Issuing it is
-    // still admitted: moving the window to the issue needs a database change
-    // (the variation_orders immutability trigger admits only the status flip).
+    // The link minted at internal approval has lapsed by the day the studio
+    // issues the change order (DB step C moved the window to the issue).
     await expireLink(changeOrder);
     ok(await issueVariationCore(owner, { id: changeOrder }), 'issue change order');
 
-    const issuedDead = await reading(engagementId);
-    expect(issuedDead.flow).toMatchObject({ issuedChangeOrderCount: 0, expiredChangeOrderCount: 1 });
-    expect(issuedDead).toMatchObject({
-      studio: { whoseMove: 'studio', takenBack: 'change_order_link_expired' },
-      header: 'yourMove',
+    const [{ days }] = await ownerQuery<{ days: number }>(
+      `select round(extract(epoch from share_expires_at - now()) / 86400)::int as days from public.variation_orders where id = $1`,
+      [changeOrder],
+    );
+    expect(days).toBe(30);
+    const issued = await reading(engagementId);
+    expect(issued.flow).toMatchObject({ issuedChangeOrderCount: 1, expiredChangeOrderCount: 0 });
+    expect(issued).toMatchObject({
+      studio: { whoseMove: 'client', takenBack: null },
+      client: { reason: 'decide_change_order', whoseMove: 'client' },
+      header: 'waitingClient',
     });
-    expect(issuedDead.client.reason).not.toBe('decide_change_order');
-    expect(await clientAnswers(changeOrder, 'reject')).toBe('expired');
+    expect(await clientAnswers(changeOrder, 'reject')).toBe('ok');
+  });
+});
+
+describe('the change order frozen guard (enforce_variation_order_frozen)', () => {
+  /** The SQLSTATE an update of the change order's row is refused with, or null. */
+  async function refusal(id: string, set: string): Promise<string | null> {
+    try {
+      await ownerQuery(`update public.variation_orders set ${set} where id = $1`, [id]);
+      return null;
+    } catch (error) {
+      return (error as { code?: string }).code ?? 'unknown';
+    }
+  }
+
+  it('admits issue with a new expiry and the status flips as before; refuses every other change, and a delete (MT100)', async () => {
+    const { contractId } = await paidUpDelivery();
+    const changeOrder = await internallyApprovedChangeOrder(contractId);
+    expect(await refusal(changeOrder, `share_expires_at = now() + interval '9 days'`)).toBe('MT100');
+    expect(await refusal(changeOrder, `status = 'issued', title_en = 'Other'`)).toBe('MT100');
+    expect(await refusal(changeOrder, `status = 'issued', net_delta = net_delta + 1`)).toBe('MT100');
+    expect(await refusal(changeOrder, `status = 'issued', share_expires_at = now() + interval '30 days', updated_at = now()`)).toBeNull();
+    expect(await refusal(changeOrder, `status = 'approved', share_expires_at = now() + interval '60 days'`)).toBe('MT100');
+    expect(await refusal(changeOrder, `share_expires_at = now() + interval '60 days'`)).toBe('MT100');
+    expect(await refusal(changeOrder, `status = 'approved'`)).toBeNull();
+    expect(await refusal(changeOrder, `title_en = 'After approval'`)).toBe('MT100');
+    await expect(ownerQuery(`delete from public.variation_orders where id = $1`, [changeOrder])).rejects.toMatchObject({ code: 'MT100' });
+  });
+
+  it('leaves a draft free to change and to delete', async () => {
+    const { contractId } = await paidUpDelivery();
+    const id = (ok(await createVariationDraftCore(owner, { contractId, titleEn: 'Draft only' }), 'draft') as { data?: string }).data!;
+    expect(await refusal(id, `title_en = 'Renamed', share_expires_at = now()`)).toBeNull();
+    await expect(ownerQuery(`delete from public.variation_orders where id = $1`, [id])).resolves.toBeDefined();
   });
 });

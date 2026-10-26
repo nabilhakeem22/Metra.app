@@ -18,7 +18,10 @@ import { orgScopedTableNames } from './schema-catalogue';
  * this block references proposals/contracts/variation_orders.
  */
 export const TRIGGER_GUARDED_TABLES = [
-  // Stage 3 (0064), FIRST: the site diary's evidence guards raise MT100 on any
+  // Client home (0065), FIRST: a client's one-time code is evidence, and its
+  // guard raises MT100 on a DELETE that is not its delivery's cascade.
+  'client_verification_codes',
+  // Stage 3 (0064), next: the site diary's evidence guards raise MT100 on any
   // DELETE. Notes, materials and photos point at a visit (3-column restrict);
   // a material at a photo (set null), a contract and a contract line.
   'site_notes', 'site_material_receipts', 'site_photos', 'site_visits',

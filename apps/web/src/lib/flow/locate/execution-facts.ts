@@ -16,10 +16,12 @@ import type { ExecutionStepKey } from '../phases/execution';
 import type { PhaseStatus } from '../types';
 
 /**
- * What both sides know about a delivery's execution. The studio reads it with
- * `getExecutionFacts` (lib/execution/queries/facts.ts); the client home's SDF
- * computes every field in SQL (client home H4). Each count is taken in SQL over
- * every row, so neither side counts from a capped list.
+ * What both sides know about a delivery's execution. Both derive it from ONE
+ * SQL source, `app_execution_flow_source` (lib/execution/flow-facts.ts): the
+ * studio through `getExecutionFacts` (lib/execution/queries/facts.ts), the
+ * client home through its token function, which embeds the same statement.
+ * Each count is taken in SQL over every row, so neither side counts from a
+ * capped list.
  */
 export interface ExecutionFlowFacts {
   /** `executionStage()`'s input: the stage, and so the step, on both sides. */

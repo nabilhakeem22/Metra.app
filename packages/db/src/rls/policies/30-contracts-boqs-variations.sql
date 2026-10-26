@@ -176,17 +176,15 @@ create trigger trg_contract_lines_parent_draft
   for each row
   execute function public.enforce_contract_child_draft();
 
--- Variation orders are frozen once they leave 'draft' (A2): only a whitelisted
--- status transition (internal_approved->issued, issued->approved|rejected) allowed.
+-- Variation orders are frozen once they leave 'draft' (A2): only a status flip
+-- (internal_approved->issued, issued->approved|rejected), and since client
+-- home DB step C the issue's new link expiry (enforce_variation_order_frozen,
+-- functions/30-contracts-variations.sql).
 drop trigger if exists trg_variation_orders_immutable on public.variation_orders;
 create trigger trg_variation_orders_immutable
   before update or delete on public.variation_orders
   for each row
-  execute function public.enforce_immutable_when(
-    'status',
-    'internal_approved,issued,approved,rejected',
-    'issued,approved,rejected'
-  );
+  execute function public.enforce_variation_order_frozen();
 
 -- Variation order lines can only be mutated while the parent VO is 'draft'.
 drop trigger if exists trg_variation_order_lines_parent_draft on public.variation_order_lines;

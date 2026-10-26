@@ -4,7 +4,7 @@
 // it once, the card only renders it.
 import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import type { ExecutionCardFacts } from './queries/facts';
+import type { ExecutionCardFacts } from './flow-facts';
 import { executionStage, type ExecutionNextAction, type ExecutionStage } from './stage';
 
 export interface ExecutionCardView {

@@ -52,13 +52,16 @@ interface Catalogues {
   costEntryColumns?: Array<{ name: string; granted: boolean }>;
   /** The column-level UPDATE read-back on contract_payment_claims (DB step B). */
   claimColumns?: Array<{ name: string; granted: boolean }>;
+  /** The column-level SELECT read-back on client_verification_codes (DB step C). */
+  codeColumns?: Array<{ name: string; granted: boolean }>;
 }
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
 
-/** The twenty-three tables `verify-rls-applied.ts` reads back, in the order it asks. */
+/** The twenty-four tables `verify-rls-applied.ts` reads back, in the order it asks. */
 const NARROWED_TABLE_NAMES = [
   'boqs',
+  'client_verification_codes',
   'contract_cost_entries',
   'contract_line_measurements',
   'contract_payment_claims',
@@ -107,9 +110,15 @@ function fixtureSql(catalogues: Catalogues) {
     if (text.includes('has_column_privilege') && text.includes(') as granted')) {
       const table = values.find(
         (value) =>
-          value === 'contract_line_measurements' || value === 'contract_cost_entries' || value === 'contract_payment_claims',
+          value === 'contract_line_measurements' ||
+          value === 'contract_cost_entries' ||
+          value === 'contract_payment_claims' ||
+          value === 'client_verification_codes',
       );
       const columns = [...(declaredTables().get(String(table)) ?? [])];
+      if (table === 'client_verification_codes') {
+        return Promise.resolve(catalogues.codeColumns ?? columns.map((name) => ({ name, granted: name !== 'code_hash' })));
+      }
       if (table === 'contract_cost_entries') {
         return Promise.resolve(
           catalogues.costEntryColumns ?? columns.map((name) => ({ name, granted: COST_ENTRY_UPDATE_COLUMNS.has(name) })),
@@ -343,7 +352,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('65 tables, 80 policies, 35 triggers, 68 functions');
+    expect(declaredCounts()).toBe('66 tables, 81 policies, 36 triggers, 97 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -352,7 +361,7 @@ describe('verifyRlsApplied', () => {
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
       'grants verified — design_engagements update narrowed to 19 columns with no ' +
-        'table-level update, and 23 narrowed table(s) (boqs, contract_cost_entries, ' +
+        'table-level update, and 24 narrowed table(s) (boqs, client_verification_codes, contract_cost_entries, ' +
         'contract_line_measurements, contract_payment_claims, contract_payments, ' +
         'document_categories, engagement_document_comments, engagement_milestones, ' +
         'market_bulletins, market_categories, market_item_details, market_items, ' +
@@ -361,7 +370,8 @@ describe('verifyRlsApplied', () => {
         'site_visits, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every ' +
         'column but seq; contract_cost_entries updatable on its 15 entry and void columns only; ' +
-        'contract_payment_claims updatable on its 5 answer columns only; no truncate, ' +
+        'contract_payment_claims updatable on its 5 answer columns only; ' +
+        'client_verification_codes readable on every column but code_hash; no truncate, ' +
         'references, trigger for metra_app on any table; no policy outside the manifest.',
     );
   });

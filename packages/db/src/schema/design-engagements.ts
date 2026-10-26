@@ -92,6 +92,11 @@ export const designEngagements = pgTable(
     clientExpectedOn: date('client_expected_on'),
     clientExpectedState: designEngagementState('client_expected_state'),
     clientExpectedSetAt: timestamp('client_expected_set_at', { withTimezone: true }),
+    // The phase the delivery began in (0065): 'design' for every delivery the
+    // design machine runs, 'execution' for a LIGHT delivery, the client home of
+    // a BOQ contract no design delivery stands behind, born at `execution` and
+    // kept there (CHECK). metra_app cannot update it (roles.sql).
+    entryPhase: text('entry_phase').notNull().default('design'),
   },
   (t) => [
     unique('design_engagements_org_id_id_unique').on(t.orgId, t.id),
@@ -126,6 +131,13 @@ export const designEngagements = pgTable(
       .where(
         sql`state not in ('closed_design_only', 'execution', 'abandoned')`,
       ),
+    check('design_engagements_entry_phase_known', sql`entry_phase in ('design', 'execution')`),
+    check('design_engagements_light_is_execution', sql`entry_phase = 'design' or state = 'execution'`),
+    // At most one light delivery per project: the arbiter of two concurrent
+    // creates (0065).
+    uniqueIndex('design_engagements_one_light_per_project')
+      .on(t.orgId, t.projectId)
+      .where(sql`entry_phase = 'execution'`),
   ],
 );
 

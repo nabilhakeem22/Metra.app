@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 147 declared, 147 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 399 declared, 399 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 68 declared, 68 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 150 declared, 150 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 413 declared, 413 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 97 declared, 97 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 68 declared, 68 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 97 declared, 97 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 68 RLS functions', () => {
+  it('declares 97 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -240,8 +240,16 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // app_delivery_execution_contract and app_studio_payment_details, and the
     // trigger fns enforce_cost_entry_guarded and enforce_actor_is_session_user.
     // 68 with the B4 fix round's trigger fns enforce_contract_payment_claim_guarded
-    // and enforce_contract_line_measurement_guarded.
-    expect(declaredFunctions().size).toBe(68);
+    // and enforce_contract_line_measurement_guarded. 97 since client home DB
+    // step C (0065) added the five execution fact functions (app_delivery_boqs,
+    // app_contract_measured_lines, app_contract_measured_works,
+    // app_contract_money_facts, app_execution_flow_source), the four shared
+    // helpers app_payment_request_due, app_engagement_milestone_due,
+    // app_contract_signed and app_contract_time_extension_days, the trigger fn
+    // enforce_variation_order_frozen, and in 75-client-home.sql eleven token
+    // functions, seven internal helpers and the trigger fn
+    // enforce_client_code_guarded.
+    expect(declaredFunctions().size).toBe(97);
   });
 });
 

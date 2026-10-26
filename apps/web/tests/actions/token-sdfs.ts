@@ -74,6 +74,22 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // Stage 3 (0064): the studio-published site updates of the delivery's
   // project. It returns object keys inside the studio's storage prefix.
   { name: 'app_delivery_site_updates_by_token', args: 'text, date, integer' },
+  // Client home DB step C: the home, its contract (and that contract's
+  // sections and lines), its change orders, the one-time code request, the
+  // four code-checked acts (each takes caller-supplied p_name/p_ip/p_ua and
+  // writes a ledger row and studio notifications), and where an old /c or /v
+  // link should send its holder (it returns the home's token hash and nonce).
+  { name: 'app_home_by_token', args: 'text' },
+  { name: 'app_home_contract_by_token', args: 'text' },
+  { name: 'app_home_contract_sections_by_token', args: 'text, integer' },
+  { name: 'app_home_contract_section_lines_by_token', args: 'text, uuid, integer' },
+  { name: 'app_home_variations_by_token', args: 'text' },
+  { name: 'app_home_code_issue_by_token', args: 'text, uuid, text, text, text, text, text' },
+  { name: 'app_home_contract_ack_by_token', args: 'text, uuid, uuid, text, text, text, text, text' },
+  { name: 'app_home_variation_respond_by_token', args: 'text, uuid, text, uuid, text, text, text, text' },
+  { name: 'app_home_claim_request_by_token', args: 'text, uuid, uuid, text, text, text, text, text' },
+  { name: 'app_home_claim_design_payment_by_token', args: 'text, text, uuid, text, text, text, text, text' },
+  { name: 'app_client_home_target_by_token', args: 'text, text' },
 ];
 
 /** The regprocedure text of one listed function. */

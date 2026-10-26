@@ -69,6 +69,7 @@ export * from './site-visits';
 export * from './site-photos';
 export * from './site-material-receipts';
 export * from './site-notes';
+export * from './client-verification-codes';
 
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';
@@ -126,6 +127,7 @@ import { siteVisits } from './site-visits';
 import { sitePhotos } from './site-photos';
 import { siteMaterialReceipts } from './site-material-receipts';
 import { siteNotes } from './site-notes';
+import { clientVerificationCodes } from './client-verification-codes';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -186,4 +188,5 @@ export const orgScopedTables = {
   sitePhotos,
   siteMaterialReceipts,
   siteNotes,
+  clientVerificationCodes,
 } as const;

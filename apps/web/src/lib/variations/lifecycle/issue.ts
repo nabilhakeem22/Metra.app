@@ -13,6 +13,7 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { shareExpiryFromNow } from '@/lib/share/token';
 import { canIssueVariation } from '../lifecycle-rules';
 
 /**
@@ -45,9 +46,12 @@ async function loadVariationAndContractStatus(
 }
 
 /**
- * Flip internal_approved -> issued. The transition IS the admission gate: a
- * concurrent 2nd issue affects 0 rows and fails
- * `variation_not_internal_approved`.
+ * Flip internal_approved -> issued, and start the client's answer window NOW:
+ * the link was minted at internal approval, possibly weeks earlier, and the
+ * client must get the full window from the day the change order reaches them
+ * (enforce_variation_order_frozen admits this one column with the flip). The
+ * transition IS the admission gate: a concurrent 2nd issue affects 0 rows and
+ * fails `variation_not_internal_approved`.
  */
 async function issueApprovedVariation(
   tx: MetraDb,
@@ -55,7 +59,7 @@ async function issueApprovedVariation(
 ): Promise<void> {
   const gated = await tx
     .update(variationOrders)
-    .set({ status: 'issued', updatedAt: new Date() })
+    .set({ status: 'issued', shareExpiresAt: shareExpiryFromNow(), updatedAt: new Date() })
     .where(
       and(
         eq(variationOrders.id, variationOrderId),
@@ -86,12 +90,11 @@ async function recordIssuedEvent(
 
 /**
  * Issue to the client: internal_approved->issued (owner/admin, variations_price).
- * A PURE status flip — the token was already minted at internal approval (the
- * last write A2 immutability permits on a non-status column), so this activates it
- * (the SDF exposes only issued/approved/rejected VOs) and writes the event. The
- * transition IS the admission gate — a concurrent 2nd issue finds
- * status<>'internal_approved' -> variation_not_internal_approved. The contract
- * must still be live: terminating it closes the VO out instead.
+ * The token was already minted at internal approval, so this activates it (the
+ * SDF exposes only issued/approved/rejected VOs), restarts its expiry and
+ * writes the event. The transition IS the admission gate — a concurrent 2nd
+ * issue finds status<>'internal_approved' -> variation_not_internal_approved.
+ * The contract must still be live: terminating it closes the VO out instead.
  */
 export async function issueVariationCore(
   ctx: OrgContext,

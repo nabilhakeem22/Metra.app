@@ -40,6 +40,7 @@ function engagement(state: DesignState, designFee: string | null): DesignEngagem
     clientExpectedOn: null,
     clientExpectedState: null,
     clientExpectedSetAt: null,
+    entryPhase: 'design',
   };
 }
 

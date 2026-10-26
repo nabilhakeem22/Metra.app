@@ -20,7 +20,8 @@ import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { computeFinalAccount, finalAccountFigures, type FinalAccountFigures } from '../money/final-account';
 import { requestOutstanding } from '../money/outstanding';
 import { loadExecutionContract, type ExecutionContractBasis } from '../queries/execution-contract';
-import { loadContractMoneyFacts, type ContractMoneyFacts } from '../queries/money-facts';
+import type { ContractMoneyFacts } from '../flow-source';
+import { loadContractMoneyFacts } from '../queries/money-facts';
 import { listDifferencesAfter, loadMeasuredDifferences, type DifferenceRow, type DifferencesPage } from './differences';
 
 export interface FinalAccountDifference extends Omit<DifferenceRow, 'unitPrice' | 'discountPct'> {

@@ -1,8 +1,9 @@
 import 'server-only';
 // The payment schedule of one contract, as the contract page
-// (getContractPageExecution), the issue gate and the delivery's execution card
-// read it. At most 12 rows (MAX_SCHEDULE_ROWS), so nothing here grows with the
-// size of the contract.
+// (getContractPageExecution) and the issue gate read it, and what each row
+// bills (scheduleView, which the delivery's execution facts apply to the rows
+// their own SQL source carries). At most 12 rows (MAX_SCHEDULE_ROWS), so
+// nothing here grows with the size of the contract.
 import { contractPaymentMilestones, type MetraDb } from '@metra/db';
 import { asc, eq } from 'drizzle-orm';
 import { milestoneAmounts } from '@/lib/execution/money/milestone-amounts';

@@ -8,14 +8,15 @@ import 'server-only';
 // (../money/final-account.ts) over the page; the account's own figure, the
 // measured works, is summed in SQL by the same rule.
 //
-// The card reads the works, both counts and the first page in ONE statement
-// over ONE pass of the measured lines, each line's latest reading one index
-// probe (../queries/measured-lines.ts): its database time follows the lines,
-// not the readings, and the three figures cannot disagree (A5 reliability R2,
-// R3).
+// The card reads the works, both counts and the first page in ONE statement,
+// so the three figures cannot disagree (A5 reliability R2): the measured
+// lines are `app_contract_measured_lines` and the works
+// `app_contract_measured_works` (packages/db rls/functions/
+// 65-execution-facts.sql, the client home's facts read the same two), each
+// line's latest reading one index probe, so its database time follows the
+// lines, not the readings (R3).
 import type { MetraDb } from '@metra/db';
 import { sql, type SQL } from 'drizzle-orm';
-import { measuredLinesOf, measuredWorksOf } from '../queries/measured-lines';
 
 export const DIFFERENCES_PAGE_SIZE = 50;
 
@@ -58,7 +59,7 @@ type SqlRow = {
 const differencesOf = (contractId: string) => sql`
   with diff as (
     select measured.*, s.sort_order as section_sort, s.title_ar as section_title_ar, s.title_en as section_title_en
-      from (${measuredLinesOf(contractId)}) measured
+      from public.app_contract_measured_lines(${contractId}) measured
       join public.contract_sections s on s.id = measured.section_id
      where measured.measured_qty - measured.qty - measured.variation_qty <> 0
   )`;
@@ -101,7 +102,7 @@ export async function loadMeasuredDifferences(tx: MetraDb, contractId: string): 
   const rows = (await tx.execute(sql`${differencesOf(contractId)}, first_page as (
       select * from diff order by ${DOCUMENT_ORDER} limit ${DIFFERENCES_PAGE_SIZE + 1}
     )
-    select (${measuredWorksOf(sql`select * from diff`)}) as works,
+    select public.app_contract_measured_works(${contractId}) as works,
            (select count(*) filter (where provisional)::int from diff) as billed,
            (select count(*) filter (where not provisional)::int from diff) as flagged,
            coalesce((select jsonb_agg(${PAGE_ROW} order by ${DOCUMENT_ORDER}) from first_page), '[]'::jsonb) as page

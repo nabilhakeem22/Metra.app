@@ -27,6 +27,10 @@
 // it can't globally disable prod immutability or serialize concurrent test runs
 // (the bug of the old `ALTER TABLE ... DISABLE TRIGGER`, which is global).
 export const TEARDOWN_TABLES_IN_FK_ORDER = [
+  // Client home (0065): a client's one-time codes point at their delivery
+  // (cascade), so they go before design_engagements; first of all, as nothing
+  // points at them.
+  'client_verification_codes',
   // Stage 3 site diary (0064) before everything on a project or a contract:
   // notes, materials and photos point at a visit (3-column restrict), a
   // material at a photo (set null), a contract and a contract line; a visit

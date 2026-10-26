@@ -327,6 +327,7 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   site_photos: ['delete'],
   site_material_receipts: ['delete'],
   site_notes: ['delete'],
+  client_verification_codes: ['insert', 'update', 'delete'],
 };
 
 /** One cell of the table-privilege read-back. */

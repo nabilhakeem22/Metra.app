@@ -266,6 +266,51 @@ begin
 end
 $$;
 
+-- INTERNAL (client home DB step C): what is still due on ONE design-fee
+-- milestone of a delivery: its amount (a percent of the design fee, or a fixed
+-- value) less every payment recorded against its kind, in the cost-blind math
+-- of app_delivery_by_token. Null when the delivery has no milestone of that
+-- kind (an unknown kind included: compared as text, never cast). The client's
+-- "mark as paid" below claims exactly this, and the client home's code request
+-- (functions/75-client-home.sql) asks it before it sends a code for a claim.
+-- Revoked from every caller role, metra_app included: it takes a bare id.
+-- SECURITY INVOKER.
+create or replace function public.app_engagement_milestone_due(p_engagement_id uuid, p_milestone_kind text)
+returns numeric
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select (case
+            when m.basis = 'percent' then round(coalesce(de.design_fee, 0) * m.value / 100, 4)
+            else m.value
+          end)
+         - coalesce((
+             select sum(pe.amount)
+               from public.payment_events pe
+              where pe.engagement_id = de.id
+                and pe.kind::text = m.kind::text
+           ), 0)
+    from public.design_engagements de
+    join public.engagement_milestones m on m.engagement_id = de.id
+   where de.id = p_engagement_id
+     and m.kind::text = p_milestone_kind;
+$$;
+
+revoke all on function public.app_engagement_milestone_due(uuid, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_engagement_milestone_due(uuid, text) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
 -- Client Delivery Portal Phase 3 — a session-less client's "mark as paid" against a
 -- delivery by its share token. SECURITY DEFINER (the token IS the auth; no session).
 -- Mirrors app_delivery_respond_by_token: it NEVER moves state, NEVER adds a blocking
@@ -307,11 +352,10 @@ declare
   exp       timestamptz;
   eid       uuid;
   oid       uuid;
-  v_fee     numeric;
   v_remain  numeric;
 begin
-  select state, share_expires_at, id, org_id, design_fee
-    into st, exp, eid, oid, v_fee
+  select state, share_expires_at, id, org_id
+    into st, exp, eid, oid
     from public.design_engagements
     where token_hash = p_hash;
   if not found then return 'invalid'; end if;
@@ -328,24 +372,10 @@ begin
   end if;
 
   -- Remaining due for THAT milestone = amount_due − amount_cleared, in the SAME
-  -- cost-blind math as app_delivery_by_token. NULL when the milestone doesn't exist
-  -- on this engagement (no row) — mapped to wrong_state below.
-  select
-    (case
-       when m.basis = 'percent'
-         then round(coalesce(v_fee, 0) * m.value / 100, 4)
-       else m.value
-     end)
-    - coalesce((
-        select sum(pe.amount)
-        from public.payment_events pe
-        where pe.engagement_id = eid
-          and pe.kind::text = m.kind::text
-      ), 0)
-    into v_remain
-    from public.engagement_milestones m
-    where m.engagement_id = eid
-      and m.kind = p_milestone_kind::public.milestone_kind;
+  -- cost-blind math as app_delivery_by_token (app_engagement_milestone_due).
+  -- NULL when the milestone doesn't exist on this engagement (no row) — mapped
+  -- to wrong_state below.
+  v_remain := public.app_engagement_milestone_due(eid, p_milestone_kind);
 
   -- Milestone absent for this engagement OR already settled (remaining ≤ 0).
   if v_remain is null or v_remain <= 0 then return 'wrong_state'; end if;

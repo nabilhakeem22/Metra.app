@@ -456,6 +456,13 @@
       "when": 1792880198159,
       "tag": "0064_site_diary",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792976742588,
+      "tag": "0065_client_home",
+      "breakpoints": true
     }
   ]
 }

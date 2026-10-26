@@ -149,6 +149,30 @@ revoke all on public.site_material_receipts from metra_app;
 grant select, insert, update on public.site_material_receipts to metra_app;
 revoke all on public.site_notes from metra_app;
 grant select, insert, update on public.site_notes to metra_app;
+-- Client home DB step C (0065): the client's one-time codes. Written ONLY by
+-- the client home's definer functions (functions/75-client-home.sql), so
+-- metra_app writes nothing; it reads every column but code_hash, the hash a
+-- code is checked against (a million guesses from the code itself), so no
+-- studio read path can ever carry it.
+revoke all on public.client_verification_codes from metra_app;
+grant select (
+  id,
+  org_id,
+  created_at,
+  updated_at,
+  engagement_id,
+  purpose,
+  target_key,
+  channel,
+  destination_hash,
+  destination_hint,
+  attempts,
+  expires_at,
+  consumed_at,
+  result_ref,
+  actor_ip,
+  actor_user_agent
+) on public.client_verification_codes to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
@@ -411,6 +435,15 @@ revoke execute on function public.app_contract_section_lines_by_token(text, uuid
 grant execute on function public.app_contract_sections_by_token(text, integer) to metra_app;
 revoke execute on function public.app_contract_sections_by_token(text, integer) from public;
 grant execute on function public.enforce_payment_request_frozen() to metra_app;
+-- Client home DB step C: the change order's frozen guard (it replaces the
+-- immutability factory on variation_orders, so issue can reset the link
+-- expiry) and the client code's guard, plain trigger functions, granted for
+-- symmetry with the guards above and locked down in place right after their
+-- CREATE (functions/30-contracts-variations.sql, functions/75-client-home.sql).
+grant execute on function public.enforce_variation_order_frozen() to metra_app;
+revoke execute on function public.enforce_variation_order_frozen() from public;
+grant execute on function public.enforce_client_code_guarded() to metra_app;
+revoke execute on function public.enforce_client_code_guarded() from public;
 -- The payment-fits guard (A2 reliability R2) is an INVOKER trigger function
 -- (S5: it reads as the caller, under RLS); locked down anyway, also in place
 -- right after its CREATE (functions/35-execution.sql).
@@ -594,6 +627,67 @@ revoke execute on function public.app_studio_payment_details(uuid) from metra_ap
 -- place, right after its CREATE (functions/85-site-portal.sql).
 grant execute on function public.app_delivery_site_updates_by_token(text, date, integer) to metra_app;
 revoke execute on function public.app_delivery_site_updates_by_token(text, date, integer) from public;
+-- Client home DB step C. The execution fact source (functions/65-execution-
+-- facts.sql) is SECURITY INVOKER: the studio reads it as metra_app under its
+-- own RLS, so metra_app keeps EXECUTE on it. The client home's token functions
+-- (functions/75-client-home.sql) get the portal SDF treatment. Every helper
+-- that takes bare ids and answers for any studio as its definer caller is
+-- INTERNAL: no grant at all, metra_app included. All are also locked down in
+-- place, right after their CREATE.
+grant execute on function public.app_delivery_boqs(uuid, uuid) to metra_app;
+revoke execute on function public.app_delivery_boqs(uuid, uuid) from public;
+grant execute on function public.app_contract_measured_lines(uuid) to metra_app;
+revoke execute on function public.app_contract_measured_lines(uuid) from public;
+grant execute on function public.app_contract_measured_works(uuid) to metra_app;
+revoke execute on function public.app_contract_measured_works(uuid) from public;
+grant execute on function public.app_contract_money_facts(uuid) to metra_app;
+revoke execute on function public.app_contract_money_facts(uuid) from public;
+grant execute on function public.app_execution_flow_source(uuid) to metra_app;
+revoke execute on function public.app_execution_flow_source(uuid) from public;
+grant execute on function public.app_home_by_token(text) to metra_app;
+revoke execute on function public.app_home_by_token(text) from public;
+grant execute on function public.app_home_contract_by_token(text) to metra_app;
+revoke execute on function public.app_home_contract_by_token(text) from public;
+grant execute on function public.app_home_contract_sections_by_token(text, integer) to metra_app;
+revoke execute on function public.app_home_contract_sections_by_token(text, integer) from public;
+grant execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from public;
+grant execute on function public.app_home_variations_by_token(text) to metra_app;
+revoke execute on function public.app_home_variations_by_token(text) from public;
+grant execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) from public;
+grant execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_client_home_target_by_token(text, text) to metra_app;
+revoke execute on function public.app_client_home_target_by_token(text, text) from public;
+revoke execute on function public.app_payment_request_due(uuid, uuid) from public;
+revoke execute on function public.app_payment_request_due(uuid, uuid) from metra_app;
+revoke execute on function public.app_engagement_milestone_due(uuid, text) from public;
+revoke execute on function public.app_engagement_milestone_due(uuid, text) from metra_app;
+revoke execute on function public.app_contract_signed(uuid, uuid) from public;
+revoke execute on function public.app_contract_signed(uuid, uuid) from metra_app;
+revoke execute on function public.app_contract_time_extension_days(uuid, uuid) from public;
+revoke execute on function public.app_contract_time_extension_days(uuid, uuid) from metra_app;
+revoke execute on function public.app_home_delivery(text) from public;
+revoke execute on function public.app_home_delivery(text) from metra_app;
+revoke execute on function public.app_home_contract(text) from public;
+revoke execute on function public.app_home_contract(text) from metra_app;
+revoke execute on function public.app_client_code_destination(uuid, uuid) from public;
+revoke execute on function public.app_client_code_destination(uuid, uuid) from metra_app;
+revoke execute on function public.app_email_hint(text) from public;
+revoke execute on function public.app_email_hint(text) from metra_app;
+revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from public;
+revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from metra_app;
+revoke execute on function public.app_client_code_refusal(text) from public;
+revoke execute on function public.app_client_code_refusal(text) from metra_app;
+revoke execute on function public.app_client_code_consume(uuid, uuid) from public;
+revoke execute on function public.app_client_code_consume(uuid, uuid) from metra_app;
 
 do $$
 declare
@@ -809,6 +903,54 @@ begin
         'revoke execute on function public.app_delivery_site_updates_by_token(text, date, integer) from %I',
         r
       );
+      -- Client home DB step C (functions/30, 50, 65, 70 and 75).
+      execute format('revoke execute on function public.enforce_variation_order_frozen() from %I', r);
+      execute format('revoke execute on function public.enforce_client_code_guarded() from %I', r);
+      execute format('revoke execute on function public.app_delivery_boqs(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_contract_measured_lines(uuid) from %I', r);
+      execute format('revoke execute on function public.app_contract_measured_works(uuid) from %I', r);
+      execute format('revoke execute on function public.app_contract_money_facts(uuid) from %I', r);
+      execute format('revoke execute on function public.app_execution_flow_source(uuid) from %I', r);
+      execute format('revoke execute on function public.app_home_by_token(text) from %I', r);
+      execute format('revoke execute on function public.app_home_contract_by_token(text) from %I', r);
+      execute format('revoke execute on function public.app_home_contract_sections_by_token(text, integer) from %I', r);
+      execute format(
+        'revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, integer) from %I',
+        r
+      );
+      execute format('revoke execute on function public.app_home_variations_by_token(text) from %I', r);
+      execute format(
+        'revoke execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) from %I',
+        r
+      );
+      execute format('revoke execute on function public.app_client_home_target_by_token(text, text) from %I', r);
+      execute format('revoke execute on function public.app_payment_request_due(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_engagement_milestone_due(uuid, text) from %I', r);
+      execute format('revoke execute on function public.app_contract_signed(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_contract_time_extension_days(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_home_delivery(text) from %I', r);
+      execute format('revoke execute on function public.app_home_contract(text) from %I', r);
+      execute format('revoke execute on function public.app_client_code_destination(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_email_hint(text) from %I', r);
+      execute format('revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from %I', r);
+      execute format('revoke execute on function public.app_client_code_refusal(text) from %I', r);
+      execute format('revoke execute on function public.app_client_code_consume(uuid, uuid) from %I', r);
     end if;
   end loop;
 end

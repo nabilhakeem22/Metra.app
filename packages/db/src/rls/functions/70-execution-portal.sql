@@ -21,13 +21,16 @@
 -- bodies below carry no comment that could trip it.
 
 -- INTERNAL: which execution contract the client of a delivery sees (plan A26).
--- The newest contract generated from a BOQ of this delivery that the client
--- can see (issued, signed or terminated; a draft is the studio's working
--- copy), a live one before a terminated one. The read and the claim below both
--- ask it, so the request a client claims is always one of the contract the
--- card shows. It takes bare ids, so it is revoked from every caller role,
--- metra_app included: only the definer functions in this file call it, as
--- their owner (the app_client_act_anchor pattern). SECURITY INVOKER.
+-- The newest contract generated from a BOQ the delivery owns
+-- (app_delivery_boqs, functions/65-execution-facts.sql: its own BOQs, and for
+-- a light delivery, 0065, its project's BOQs no delivery stands behind) that
+-- the client can see (issued, signed or terminated; a draft is the studio's
+-- working copy), a live one before a terminated one. The read and the claim
+-- below both ask it, and so do the client home's functions
+-- (functions/75-client-home.sql), so the request a client claims is always one
+-- of the contract the card shows. It takes bare ids, so it is revoked from
+-- every caller role, metra_app included: only the definer functions call it,
+-- as their owner (the app_client_act_anchor pattern). SECURITY INVOKER.
 create or replace function public.app_delivery_execution_contract(
   p_engagement_id uuid,
   p_org_id uuid
@@ -39,11 +42,9 @@ security invoker
 set search_path = ''
 as $$
   select c.id
-    from public.boqs b
-    join public.contracts c on c.org_id = b.org_id and c.source_boq_id = b.id
-   where b.org_id = p_org_id
-     and b.engagement_id = p_engagement_id
-     and c.status in ('issued', 'signed', 'terminated')
+    from public.app_delivery_boqs(p_engagement_id, p_org_id) b
+    join public.contracts c on c.org_id = p_org_id and c.source_boq_id = b.id
+   where c.status in ('issued', 'signed', 'terminated')
    order by (c.status = 'terminated'), c.created_at desc, c.id desc
    limit 1;
 $$;
@@ -104,6 +105,42 @@ begin
 end
 $$;
 
+-- INTERNAL: what is still due on ONE payment request: its amount less every
+-- payment recorded on it, while it is issued; null for a void request, or an
+-- id that is not one of this studio's requests. The client's "I paid" below
+-- claims exactly this, and the client home's code request (functions/
+-- 75-client-home.sql) asks it before it sends a code for a claim. Revoked from
+-- every caller role, metra_app included: it takes bare ids. SECURITY INVOKER.
+create or replace function public.app_payment_request_due(p_org_id uuid, p_request_id uuid)
+returns numeric
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select r.amount - coalesce((
+           select sum(p.amount) from public.contract_payments p
+            where p.org_id = r.org_id and p.request_id = r.id
+         ), 0)
+    from public.payment_requests r
+   where r.org_id = p_org_id
+     and r.id = p_request_id
+     and r.status = 'issued';
+$$;
+
+revoke all on function public.app_payment_request_due(uuid, uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_payment_request_due(uuid, uuid) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
 -- Public share: the delivery's execution card, by the delivery's token hash.
 -- SECURITY DEFINER (the token IS the authorization; no session).
 --
@@ -130,8 +167,8 @@ $$;
 --              studio recorded it (B4 F8: same-day payments newest first)
 --   receipts_truncated  more than 60 payments
 --   earlier_claims  the client's claims still waiting on the delivery's OTHER
---              contracts (B4 F6: a claim on a contract the card no longer
---              shows stays visible), at most 10, newest first, each
+--              contracts, on any BOQ it owns (B4 F6: a claim on a contract the
+--              card no longer shows stays visible), at most 10, newest first, each
 --              {request_number, request_year, amount (what was claimed),
 --              claimed_at}
 --   payment_details  app_studio_payment_details, ONLY while some issued
@@ -194,8 +231,8 @@ as $$
     select pc.id, pc.claimed_amount, pc.created_at, r.number as request_number,
            extract(year from r.issued_on)::int as request_year
       from contract k
-      join public.boqs b on b.org_id = k.org_id and b.engagement_id = k.engagement_id
-      join public.contracts c on c.org_id = b.org_id and c.source_boq_id = b.id and c.id <> k.id
+     cross join lateral public.app_delivery_boqs(k.engagement_id, k.org_id) b
+      join public.contracts c on c.org_id = k.org_id and c.source_boq_id = b.id and c.id <> k.id
       join public.contract_payment_claims pc
         on pc.org_id = c.org_id and pc.contract_id = c.id and pc.status = 'pending'
       join public.payment_requests r on r.org_id = pc.org_id and r.id = pc.request_id
@@ -360,7 +397,6 @@ declare
   v_expires_at    timestamptz;
   v_contract_id   uuid;
   v_status        text;
-  v_amount        numeric;
   v_number        integer;
   v_year          integer;
   v_due           numeric;
@@ -380,8 +416,8 @@ begin
 
   perform pg_advisory_xact_lock(hashtextextended('contract-payment-claims:' || v_contract_id::text, 0));
 
-  select r.status::text, r.amount, r.number, extract(year from r.issued_on)::int
-    into v_status, v_amount, v_number, v_year
+  select r.status::text, r.number, extract(year from r.issued_on)::int
+    into v_status, v_number, v_year
     from public.payment_requests r
    where r.org_id = v_org_id
      and r.contract_id = v_contract_id
@@ -389,10 +425,9 @@ begin
    for update;
   if not found or v_status <> 'issued' then return 'wrong_state'; end if;
 
-  v_due := v_amount - coalesce((
-    select sum(p.amount) from public.contract_payments p
-     where p.org_id = v_org_id and p.request_id = p_request_id
-  ), 0);
+  -- A new statement after the row lock, so it sees every payment a writer it
+  -- waited for committed.
+  v_due := public.app_payment_request_due(v_org_id, p_request_id);
   if v_due <= 0 then return 'wrong_state'; end if;
 
   if exists (

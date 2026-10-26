@@ -45,8 +45,9 @@ async function recordInternalApprovedEvent(
  * of the total, and the status flip are one atomic statement. A line rewrite can
  * therefore never interleave between the sum and the freeze. The client token is
  * ALSO minted here — the draft row is still unlocked, so this is the last write
- * that may touch a non-status column; the immutability trigger then permits only
- * the status flip on issue (the SDF keeps the token inert until then).
+ * that may touch a non-status column but one; the frozen guard then permits
+ * only the status flips, and issue's reset of the link expiry (the SDF keeps
+ * the token inert until then).
  * Owner/admin only; a concurrent 2nd call finds status<>'draft' ->
  * variation_not_draft.
  *
@@ -86,7 +87,8 @@ export async function internalApproveVariationCore(
       });
       // The raw token — inert until issue flips the VO to 'issued', at which point
       // this is the client decision link. Returned here because internal approval
-      // is the last write allowed to set a non-status column (A2 immutability).
+      // is the last write allowed to set a non-status column but the link
+      // expiry, which issue restarts (enforce_variation_order_frozen).
       return raw;
     },
   );

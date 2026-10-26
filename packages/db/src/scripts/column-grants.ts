@@ -53,7 +53,7 @@ export const CLAIM_UPDATE_COLUMNS: ReadonlySet<string> = new Set([
 
 interface ColumnGrantRule {
   table: string;
-  privilege: 'insert' | 'update';
+  privilege: 'select' | 'insert' | 'update';
   /** Is metra_app meant to hold the privilege on this column? */
   granted: (column: string) => boolean;
   /** The problem line for a column it holds and must not. */
@@ -93,6 +93,16 @@ const COLUMN_GRANT_RULES: readonly ColumnGrantRule[] = [
     missing: (column) =>
       `  - ${APP_ROLE} may NOT update contract_payment_claims.${column}: every claim confirm or dismiss will fail with 42501`,
   },
+  {
+    table: 'client_verification_codes',
+    privilege: 'select',
+    granted: (column) => column !== 'code_hash',
+    surplus: (column) =>
+      `  - ${APP_ROLE} may READ client_verification_codes.${column}, the hash a client's one-time code is ` +
+      'checked against (a million guesses from the code). rls/roles.sql grants select on every other column only',
+    missing: (column) =>
+      `  - ${APP_ROLE} may NOT read client_verification_codes.${column}: the studio's reads of the codes will fail with 42501`,
+  },
 ];
 
 async function ruleProblems(sql: Sql, rule: ColumnGrantRule): Promise<string[]> {
@@ -125,6 +135,7 @@ export function columnGrantsSummary(): string {
   return (
     'contract_line_measurements insertable on every column but seq; contract_cost_entries ' +
     `updatable on its ${String(COST_ENTRY_UPDATE_COLUMNS.size)} entry and void columns only; ` +
-    `contract_payment_claims updatable on its ${String(CLAIM_UPDATE_COLUMNS.size)} answer columns only`
+    `contract_payment_claims updatable on its ${String(CLAIM_UPDATE_COLUMNS.size)} answer columns only; ` +
+    'client_verification_codes readable on every column but code_hash'
   );
 }

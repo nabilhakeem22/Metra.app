@@ -205,6 +205,7 @@ function engagement(): DesignEngagement {
     clientExpectedOn: null,
     clientExpectedState: null,
     clientExpectedSetAt: null,
+    entryPhase: 'design',
   };
 }
 

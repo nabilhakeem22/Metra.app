@@ -124,6 +124,143 @@ begin
 end
 $$;
 
+-- INTERNAL (client home DB step C): how and when a contract was signed, the
+-- `signed` key of app_contract_by_token below and of the client home's
+-- contract summary (functions/75-client-home.sql), so the two never disagree.
+-- Null until the contract is signed, then {on, via}: the signing DAY in Cairo
+-- as `YYYY-MM-DD` (never a UTC timestamp, which shows the day before for a
+-- paper signature recorded at Cairo midnight) and how: 'online' (the client's
+-- acknowledgement) or 'paper' (recorded by the studio), read from the
+-- contract's own events (A3 fix round, F3/F4). Revoked from every caller role,
+-- metra_app included: it takes bare ids. SECURITY INVOKER.
+create or replace function public.app_contract_signed(p_org_id uuid, p_contract_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'on', to_char(e.decided_at at time zone 'Africa/Cairo', 'YYYY-MM-DD'),
+    'via', case e.kind when 'acknowledged_offline' then 'paper' else 'online' end
+  )
+  from public.contract_events e
+  where e.org_id = p_org_id and e.contract_id = p_contract_id
+    and e.kind in ('acknowledged', 'acknowledged_offline')
+  order by e.decided_at desc, e.id desc
+  limit 1;
+$$;
+
+revoke all on function public.app_contract_signed(uuid, uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_contract_signed(uuid, uuid) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
+-- INTERNAL (client home DB step C): the days the APPROVED change orders of a
+-- contract add to its finish date, 0 when none: the `time_extension_days_total`
+-- of app_contract_by_token, app_variation_by_token and the client home's
+-- contract summary, one sum for the three. Revoked from every caller role,
+-- metra_app included: it takes bare ids. SECURITY INVOKER.
+create or replace function public.app_contract_time_extension_days(p_org_id uuid, p_contract_id uuid)
+returns bigint
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select coalesce(sum(v.time_extension_days), 0)
+    from public.variation_orders v
+   where v.org_id = p_org_id and v.contract_id = p_contract_id and v.status = 'approved';
+$$;
+
+revoke all on function public.app_contract_time_extension_days(uuid, uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_contract_time_extension_days(uuid, uuid) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
+-- A variation order (أمر تغيير) is FROZEN once it leaves 'draft' (A2): its
+-- lines, net delta, token and texts are what the studio approved. The changes
+-- allowed after that (client home DB step C, the H2 fix round's F1(a) ruling):
+--   * a PURE status flip to issued, approved or rejected: only `status` and
+--     `updated_at` change, exactly what enforce_immutable_when admitted on this
+--     table before (the termination's rejections included);
+--   * internal_approved -> issued, which may ALSO reset `share_expires_at`: the
+--     client's answer window starts when the change order is ISSUED to them,
+--     not when the studio approved it internally (issueVariationCore sets it),
+--     so a change order approved weeks before it is issued does not reach the
+--     client with its link already expired.
+-- Any other UPDATE of a frozen row, and any DELETE of one, raises MT100. A
+-- draft is unrestricted. WHY NOT enforce_immutable_when: that factory admits a
+-- status change and nothing else; issue now also stamps one column, which its
+-- arguments cannot say (the enforce_payment_request_frozen reasoning). NOT
+-- security definer. `set search_path = ''`: every name lives in pg_catalog
+-- (to_jsonb, the jsonb `-` / `=` operators).
+create or replace function public.enforce_variation_order_frozen()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if OLD.status::text = 'draft' then
+    if TG_OP = 'DELETE' then return OLD; end if;
+    return NEW;
+  end if;
+
+  if TG_OP = 'DELETE' then
+    raise exception 'a variation order is never deleted once it leaves draft (number %, status %)', OLD.number, OLD.status
+      using errcode = 'MT100';
+  end if;
+
+  if NEW.status::text in ('issued', 'approved', 'rejected')
+     and (to_jsonb(NEW) - 'status' - 'updated_at') = (to_jsonb(OLD) - 'status' - 'updated_at') then
+    return NEW;
+  end if;
+
+  if OLD.status::text = 'internal_approved' and NEW.status::text = 'issued'
+     and (to_jsonb(NEW) - 'status' - 'share_expires_at' - 'updated_at')
+       = (to_jsonb(OLD) - 'status' - 'share_expires_at' - 'updated_at') then
+    return NEW;
+  end if;
+
+  raise exception
+    'a variation order is frozen once it leaves draft: only a status flip, or issue with a new link expiry, may change it (number %, status % -> %)',
+    OLD.number, OLD.status, NEW.status
+    using errcode = 'MT100';
+end
+$$;
+
+revoke all on function public.enforce_variation_order_frozen() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.enforce_variation_order_frozen() from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.enforce_variation_order_frozen() to metra_app;
+  end if;
+end
+$$;
+
 -- Public share: fetch a contract by its token hash as a nested JSON document.
 -- SECURITY DEFINER (the token IS the authorization; no session). Only issued /
 -- signed contracts are visible. OMITS every cost/margin column (unit_cost,
@@ -141,12 +278,9 @@ $$;
 --   * line `item_code` and `provisional` (a BOQ contract's; null / false on a
 --     proposal contract's);
 --   * `time_extension_days_total`: the days the APPROVED change orders add to
---     the finish date;
---   * `signed` (A3 fix round, F3/F4): null until the contract is signed, then
---     {on, via}: the signing DAY in Cairo as `YYYY-MM-DD` (never a UTC
---     timestamp, which shows the day before for a paper signature recorded at
---     Cairo midnight) and how: 'online' (the client's acknowledgement here) or
---     'paper' (recorded by the studio), read from the contract's own events.
+--     the finish date (app_contract_time_extension_days above);
+--   * `signed` (A3 fix round, F3/F4): app_contract_signed above, null until
+--     the contract is signed, then {on, via}.
 --
 -- THE CAP (DB step B, lead rulings Oct 19 and Oct 20 D5). What the /c page
 -- opens with, so the document a client downloads does not grow with the
@@ -244,23 +378,9 @@ as $$
     'original_value', c.original_value,
     'total', c.original_value,
     'share_expires_at', c.share_expires_at,
-    'signed', (
-      select jsonb_build_object(
-        'on', to_char(e.decided_at at time zone 'Africa/Cairo', 'YYYY-MM-DD'),
-        'via', case e.kind when 'acknowledged_offline' then 'paper' else 'online' end
-      )
-      from public.contract_events e
-      where e.org_id = c.org_id and e.contract_id = c.id
-        and e.kind in ('acknowledged', 'acknowledged_offline')
-      order by e.decided_at desc, e.id desc
-      limit 1
-    ),
+    'signed', public.app_contract_signed(c.org_id, c.id),
     'source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
-    'time_extension_days_total', coalesce((
-      select sum(v.time_extension_days)
-      from public.variation_orders v
-      where v.org_id = c.org_id and v.contract_id = c.id and v.status = 'approved'
-    ), 0),
+    'time_extension_days_total', public.app_contract_time_extension_days(c.org_id, c.id),
     'payment_schedule', coalesce((
       select jsonb_agg(
         jsonb_build_object(
@@ -707,11 +827,7 @@ as $$
     'time_extension_days', v.time_extension_days,
     'contract_source', case when c.source_boq_id is not null then 'boq' else 'proposal' end,
     'contract_end_date', to_char(c.end_date, 'YYYY-MM-DD'),
-    'time_extension_days_total', coalesce((
-      select sum(a.time_extension_days)
-      from public.variation_orders a
-      where a.org_id = c.org_id and a.contract_id = c.id and a.status = 'approved'
-    ), 0),
+    'time_extension_days_total', public.app_contract_time_extension_days(c.org_id, c.id),
     -- WHO rejected this variation order (0051), or null when the row predates
     -- the column. `contract_active` alone could not tell a client's own refusal
     -- from a termination cascade, so the portal denied decisions clients had
