@@ -838,7 +838,6 @@
     "table": {
       "code": "Code",
       "name": "Name",
-      "category": "Section",
       "section": "Section",
       "unit": "Unit",
       "cost": "Unit cost",
@@ -1031,7 +1030,6 @@
         "noActivity": "No activity yet."
       },
       "details": {
-        "title": "Client details",
         "save": "Save details",
         "saved": "Details saved"
       },
@@ -1060,7 +1058,6 @@
         "deleted": "Contact deleted"
       },
       "projects": {
-        "title": "Projects",
         "newForClient": "New project for this client",
         "empty": "No projects for this client yet.",
         "noDelivery": "No delivery yet"
@@ -1077,7 +1074,6 @@
         "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}"
       },
       "documents": {
-        "title": "Documents",
         "upload": "Upload document",
         "empty": "No documents yet.",
         "download": "Download",
@@ -1093,7 +1089,6 @@
         }
       },
       "activity": {
-        "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
         "empty": "Nothing recorded yet.",
@@ -1208,7 +1203,6 @@
         "noStage": "None"
       },
       "details": {
-        "title": "Project details",
         "type": "Type",
         "addType": "Add type",
         "addTypePlaceholder": "New type name",
@@ -1262,12 +1256,10 @@
         "candidatesFailed": "We could not load the members. Try again."
       },
       "proposals": {
-        "title": "Proposals",
         "newForProject": "New proposal for this project",
         "empty": "No proposals for this project yet."
       },
       "documents": {
-        "title": "Documents",
         "upload": "Upload document",
         "empty": "No documents yet.",
         "download": "Download",
@@ -1283,7 +1275,6 @@
         }
       },
       "activity": {
-        "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
         "empty": "Nothing recorded yet.",
@@ -2052,7 +2043,6 @@
           "measured": "Measured",
           "residual": "Difference",
           "works": "Works",
-          "billed": "Billed",
           "flagged": "Needs a change order",
           "more": "Show more lines",
           "discountNote": "The works on each line are before the contract's {pct} document discount, which applies to the total, so the lines do not add up to the measured works above."
@@ -2623,7 +2613,6 @@
       "retracted": "Retracted"
     },
     "controls": {
-      "title": "Data entry",
       "recordPayment": "Record payment",
       "amount": "Amount",
       "kind": "Kind",
