@@ -1,10 +1,11 @@
 -- 0065: the client home (DB step C). SCHEMA ONLY and ADDITIVE: one column and
--- two CHECKs and one partial unique index on design_engagements, and one new
--- org-scoped table. No row is updated, nothing is backfilled, no policy, no
--- grant, no trigger and no apply-rls function is referenced (the policy, the
--- grants, the guard trigger and the functions live in rls/policies/
--- 36-client-home.sql, rls/roles.sql, rls/functions/65-execution-facts.sql and
--- rls/functions/75-client-home.sql, applied by `db:apply-rls` AFTER this file).
+-- two CHECKs and one partial unique index on design_engagements, one column on
+-- variation_order_events, and one new org-scoped table. No row is updated,
+-- nothing is backfilled, no policy, no grant, no trigger and no apply-rls
+-- function is referenced (the policy, the grants, the guard trigger and the
+-- functions live in rls/policies/36-client-home.sql, rls/roles.sql,
+-- rls/functions/65-execution-facts.sql and rls/functions/75-client-home.sql,
+-- applied by `db:apply-rls` AFTER this file).
 --
 -- WHAT IT ADDS.
 --   * design_engagements.entry_phase: the phase a delivery began in, 'design'
@@ -19,6 +20,13 @@
 --       delivery per project and client (a project's client can change, and
 --       each client keeps its own page), the arbiter a concurrent second
 --       create meets (23505).
+--   * variation_order_events.recorded_on_paper: true on a client's change-order
+--     decision that the studio recorded from a paper document the client
+--     signed (H7.3): the event is the studio's write (actor_channel 'staff')
+--     but the decision is the CLIENT's, so a paper rejection reads as the
+--     client's refusal, never as the termination cascade's. false for every
+--     existing event and for every event today's code writes (the constant
+--     default: catalogue only, no row is rewritten).
 --   * client_verification_codes: one row per one-time code a client asked for,
 --     bound to (delivery, purpose, target). It stores the code's HASH only
 --     (sha256 of `challengeId:code`, made by the app), the hash and a hint of
@@ -37,16 +45,18 @@
 -- LOCKS, ALL OR NONE (the 0064 pattern). `db:migrate` runs the batch as ONE
 -- transaction. The first block takes EVERY lock this file needs on an EXISTING
 -- table, ACCESS EXCLUSIVE on design_engagements (the column, the CHECKs and the
--- index) and SHARE ROW EXCLUSIVE on organizations (the new table's foreign
--- key), as ONE attempt of two `LOCK TABLE ... NOWAIT` inside a subtransaction.
+-- index), SHARE ROW EXCLUSIVE on organizations (the new table's foreign key)
+-- and ACCESS EXCLUSIVE on variation_order_events (its column), as ONE attempt
+-- of three `LOCK TABLE ... NOWAIT` inside a subtransaction.
 -- An attempt that meets a busy table rolls back, which RELEASES the lock it
 -- already took, sleeps 10 to 40 ms and tries again, within ONE 3 s budget in
 -- all; a spent budget is 55P03 and the batch rolls back whole. So the
--- migration never holds design_engagements while it waits for organizations
--- (a studio save reads the membership, then writes the delivery). Then, held
--- to the commit:
---   design_engagements  one metadata-only ADD COLUMN, two CHECK validations
---                       (one scan each) and one partial unique index build.
+-- migration never holds one of them while it waits for another (a studio save
+-- reads the membership, then writes the delivery). Then, held to the commit:
+--   design_engagements      one metadata-only ADD COLUMN, two CHECK
+--                           validations (one scan each) and one partial
+--                           unique index build;
+--   variation_order_events  one metadata-only ADD COLUMN.
 -- The new table is created empty, so its foreign keys validate nothing. The
 -- measured figures are in docs/DEPLOY.md (client home DB step C).
 --
@@ -57,7 +67,8 @@ DECLARE
   lock_started constant timestamptz := clock_timestamp();
   lock_targets constant text[] := array[
     'public.design_engagements:ACCESS EXCLUSIVE',
-    'public.organizations:SHARE ROW EXCLUSIVE'
+    'public.organizations:SHARE ROW EXCLUSIVE',
+    'public.variation_order_events:ACCESS EXCLUSIVE'
   ];
   lock_target  text;
 BEGIN
@@ -92,6 +103,9 @@ BEGIN
   ALTER TABLE public.design_engagements VALIDATE CONSTRAINT design_engagements_light_is_execution;
   CREATE UNIQUE INDEX design_engagements_one_light_per_project_client
     ON public.design_engagements USING btree (org_id, project_id, client_id) WHERE entry_phase = 'execution';
+  -- The client's change-order decision, recorded by the studio from a paper
+  -- document the client signed (H7.3): see WHAT IT ADDS above.
+  ALTER TABLE public.variation_order_events ADD COLUMN IF NOT EXISTS recorded_on_paper boolean NOT NULL DEFAULT false;
 END $$;
 
 CREATE TABLE "client_verification_codes" (

@@ -848,8 +848,12 @@ as $$
     -- does, reading an un-applied function, gets undefined -> null -> today's
     -- behaviour. The deploy is therefore safe in EITHER order, exactly as
     -- `contract_active` already documents.
+    -- A rejection the studio RECORDED from the client's paper document (0065,
+    -- H7.3) is the client's refusal: 'client', not the termination cascade's
+    -- 'staff'.
     'rejection_channel', (
-      select e.actor_channel from public.variation_order_events e
+      select case when e.recorded_on_paper then 'client' else e.actor_channel end
+      from public.variation_order_events e
       where e.org_id = v.org_id and e.variation_order_id = v.id and e.kind = 'rejected'
       order by e.decided_at desc, e.id desc limit 1
     ),
