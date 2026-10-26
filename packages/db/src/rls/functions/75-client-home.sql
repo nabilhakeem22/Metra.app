@@ -176,17 +176,25 @@ begin
 end
 $$;
 
--- INTERNAL: check one code against the challenge it was sent for, under the
--- challenge row's lock (two submissions of one code meet here: the second
--- reads it consumed). Answers, in this order:
+-- INTERNAL: check one code against the challenge it was sent for. Answers, in
+-- this order:
 --   code_unknown   no such challenge for THIS delivery, purpose and target (a
 --                  code of another act, another target or another delivery
 --                  is unknown here, never a hint that it exists elsewhere)
 --   code_used      already consumed by its act
---   code_locked    five wrong tries already: even the right code is refused
+--   code_locked    five wrong tries on this code, or 15 on its target in the
+--                  last day over all its codes (H3 security S5: guessing
+--                  across fresh codes stops there): even the right code is
+--                  refused
 --   code_expired   past its ten minutes
---   code_wrong:N   the hash differs; the try is counted, N tries are left
+--   code_wrong:N   the hash differs; the try is counted, N tries are left (on
+--                  this code, or on the target's day if that ends first)
 --   ok             the act may run
+-- LOCKS: an advisory lock per (delivery, purpose, target) first, so the
+-- target's tries of the day are counted one check at a time, then the
+-- challenge row (two submissions of one code meet here: the second reads it
+-- consumed). Only the act wrappers below take that advisory lock, always
+-- first, so it orders nothing against a studio writer.
 -- Revoked from every caller role, metra_app included. SECURITY INVOKER.
 create or replace function public.app_client_code_check(
   p_engagement_id uuid,
@@ -203,8 +211,12 @@ security invoker
 set search_path = ''
 as $$
 declare
-  v_code public.client_verification_codes%rowtype;
+  v_code         public.client_verification_codes%rowtype;
+  v_target_tries integer;
 begin
+  perform pg_advisory_xact_lock(
+    hashtextextended(concat_ws(':', 'client-code-target', p_engagement_id, p_purpose, p_target), 0)
+  );
   select * into v_code
     from public.client_verification_codes c
    where c.org_id = p_org_id
@@ -216,12 +228,20 @@ begin
   if not found then return 'code_unknown'; end if;
   if v_code.consumed_at is not null then return 'code_used'; end if;
   if v_code.attempts >= 5 then return 'code_locked'; end if;
+  select coalesce(sum(c.attempts), 0) into v_target_tries
+    from public.client_verification_codes c
+   where c.org_id = p_org_id
+     and c.engagement_id = p_engagement_id
+     and c.purpose = p_purpose
+     and c.target_key = p_target
+     and c.created_at > now() - interval '1 day';
+  if v_target_tries >= 15 then return 'code_locked'; end if;
   if v_code.expires_at <= now() then return 'code_expired'; end if;
   if v_code.code_hash is distinct from p_code_hash then
     update public.client_verification_codes
        set attempts = attempts + 1, updated_at = now()
      where id = v_code.id;
-    return 'code_wrong:' || (4 - v_code.attempts)::text;
+    return 'code_wrong:' || least(4 - v_code.attempts, 14 - v_target_tries)::text;
   end if;
   return 'ok';
 end
@@ -270,11 +290,13 @@ begin
 end
 $$;
 
--- INTERNAL: mark a checked code used by the row its act wrote. Once only (the
--- guard trigger refuses a second consumption). A null ref consumes nothing:
--- an act that answered `already` with no row of its own to name leaves the
--- code to expire. Revoked from every caller role, metra_app included.
--- SECURITY INVOKER.
+-- INTERNAL: mark a checked code used by the row its act wrote, the act's own
+-- evidence. Called only on `ok`: a code whose act answered anything else
+-- authorised nothing and names nothing, so it is left to expire (H3 functional
+-- F8, reliability note 1). Once only (the guard trigger refuses a second
+-- consumption); a null ref fails the consumed_pair CHECK (23514) rather than
+-- consume nothing in silence. Revoked from every caller role, metra_app
+-- included. SECURITY INVOKER.
 create or replace function public.app_client_code_consume(p_challenge_id uuid, p_result_ref uuid)
 returns void
 language sql
@@ -285,8 +307,7 @@ as $$
   update public.client_verification_codes
      set consumed_at = now(), result_ref = p_result_ref, updated_at = now()
    where id = p_challenge_id
-     and consumed_at is null
-     and p_result_ref is not null;
+     and consumed_at is null;
 $$;
 
 revoke all on function public.app_client_code_consume(uuid, uuid) from public;
@@ -307,11 +328,15 @@ $$;
 --   * the consumption: `consumed_at` and `result_ref` go from null to set,
 --     together, once;
 -- with `updated_at`, and nothing else, also changing. A consumed row is
--- frozen. A DELETE raises MT100 too, unless it is the delivery's own cascade
--- (`pg_trigger_depth() > 1`: a referential action reaches this BEFORE DELETE
--- from inside the parent's RI trigger, a direct DELETE at depth 1, the fence
--- enforce_immutable_when uses). Attached by policies/36-client-home.sql. NOT
--- security definer. `set search_path = ''`.
+-- frozen. A DELETE raises MT100 too, unless it is
+--   * the delivery's own cascade (`pg_trigger_depth() > 1`: a referential
+--     action reaches this BEFORE DELETE from inside the parent's RI trigger, a
+--     direct DELETE at depth 1, the fence enforce_immutable_when uses), or
+--   * the purge of a code that expired more than 90 days ago (H3 reliability
+--     R5: app_home_code_issue_by_token removes a few with each code it makes;
+--     the act a used code authorised keeps its own evidence row).
+-- Attached by policies/36-client-home.sql. NOT security definer.
+-- `set search_path = ''`.
 create or replace function public.enforce_client_code_guarded()
 returns trigger
 language plpgsql
@@ -319,8 +344,8 @@ set search_path = ''
 as $$
 begin
   if TG_OP = 'DELETE' then
-    if pg_trigger_depth() > 1 then return OLD; end if;
-    raise exception 'a client verification code is never deleted (challenge %)', OLD.id
+    if pg_trigger_depth() > 1 or OLD.expires_at < now() - interval '90 days' then return OLD; end if;
+    raise exception 'a client verification code is deleted only with its delivery or 90 days after it expired (challenge %)', OLD.id
       using errcode = 'MT100';
   end if;
 
@@ -356,6 +381,88 @@ begin
 end
 $$;
 
+-- INTERNAL: when a contract was terminated, from its `terminated` event (the
+-- contract row keeps no such column); null for a contract never terminated.
+-- Revoked from every caller role, metra_app included: it takes bare ids.
+-- SECURITY INVOKER.
+create or replace function public.app_contract_terminated_at(p_org_id uuid, p_contract_id uuid)
+returns timestamptz
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select e.decided_at
+    from public.contract_events e
+   where e.org_id = p_org_id and e.contract_id = p_contract_id and e.kind = 'terminated'
+   order by e.decided_at desc, e.id desc
+   limit 1;
+$$;
+
+revoke all on function public.app_contract_terminated_at(uuid, uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_contract_terminated_at(uuid, uuid) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
+-- INTERNAL: app_execution_flow_source as the CLIENT may hold it, evaluated
+-- once (H3 reliability R2). Two differences from the studio's:
+--   * a draft contract (the studio's working copy) is null;
+--   * money.open_variations counts the change orders the client can see
+--     (issued, the link live or expired) plus AT MOST ONE for any the studio
+--     approved internally and has not issued (H3 security S4): the count is
+--     the client's, and the stage still waits on an open change order before
+--     it says "settled", so both sides stand on the same step.
+-- issued_boq_id and measured_works stay: the client's projection needs them
+-- (whether a BOQ is issued, and the full balance that tells the final account
+-- from settled). Revoked from every caller role, metra_app included: it takes
+-- a bare id. SECURITY INVOKER.
+create or replace function public.app_home_flow_source(p_engagement_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  with source as materialized (
+    select public.app_execution_flow_source(p_engagement_id) as facts
+  ),
+  money as materialized (
+    select (s.facts #>> '{contract,money,open_variations}')::int as open,
+           (s.facts #>> '{contract,money,issued_variations}')::int
+             + (s.facts #>> '{contract,money,expired_variations}')::int as seen
+      from source s
+  )
+  select case
+    when s.facts -> 'contract' ->> 'status' = 'draft'
+      then jsonb_set(s.facts, '{contract}', 'null'::jsonb)
+    when m.open is not null
+      then jsonb_set(s.facts, '{contract,money,open_variations}', to_jsonb(m.seen + (m.open > m.seen)::int))
+    else s.facts
+  end
+  from source s, money m;
+$$;
+
+revoke all on function public.app_home_flow_source(uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_home_flow_source(uuid) from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
 -- Public share: the client home, by the delivery's token hash. SECURITY
 -- DEFINER (the token IS the authorization). NULL, uniformly, unless the link
 -- is live: an unknown, revoked or expired link, a light delivery's included,
@@ -373,12 +480,19 @@ $$;
 --     contract     the home's execution contract (app_delivery_execution_
 --                  contract) {id, number, year (creation, Cairo), status,
 --                  signing_open (issued, its online window still open),
---                  signed (app_contract_signed), end_date (YYYY-MM-DD),
---                  time_extension_days_total}, or null
---     flow_source  app_execution_flow_source, the studio's own fact source,
---                  with ONE difference: a draft contract (the studio's working
---                  copy) is null here, as the client cannot see it
+--                  signed (app_contract_signed), terminated_at (app_contract_
+--                  terminated_at, null unless terminated), end_date
+--                  (YYYY-MM-DD), time_extension_days_total}, or null
+--     previous_contract  {status: 'terminated', terminated_at} of the newest
+--                  terminated contract the delivery owns that is not the one
+--                  above (a terminated contract that a newer issued BOQ, a
+--                  draft or a new contract stands in front of), or null
+--     flow_source  app_home_flow_source: the studio's own fact source as the
+--                  client may hold it (a draft masked, the open change orders
+--                  counted as the client sees them)
 --     money        app_delivery_execution_by_token, the execution card
+-- Every helper is evaluated ONCE per call (each in a materialized CTE; H3
+-- reliability R2): the fact source and the address are the costly ones.
 create or replace function public.app_home_by_token(p_hash text)
 returns jsonb
 language sql
@@ -398,6 +512,23 @@ as $$
         on c.org_id = h.org_id
        and c.id = public.app_delivery_execution_contract(h.id, h.org_id)
      where h.state = 'execution'
+  ),
+  previous as materialized (
+    select c.id, c.org_id
+      from home h
+     cross join lateral public.app_delivery_boqs(h.id, h.org_id) b
+      join public.contracts c on c.org_id = h.org_id and c.source_boq_id = b.id
+     where h.state = 'execution'
+       and c.status = 'terminated'
+       and c.id is distinct from (select k.id from contract k)
+     order by c.created_at desc, c.id desc
+     limit 1
+  ),
+  address as materialized (
+    select public.app_client_code_destination(h.org_id, h.client_id) as email from home h
+  ),
+  flow as materialized (
+    select public.app_home_flow_source(h.id) as source from home h where h.state = 'execution'
   )
   select jsonb_build_object(
     'delivery', jsonb_build_object(
@@ -422,9 +553,7 @@ as $$
     ),
     'client', jsonb_build_object('name_ar', cl.name_ar, 'name_en', cl.name_en),
     'code_channel', (
-      select jsonb_build_object('hint', public.app_email_hint(address.email))
-        from (select public.app_client_code_destination(h.org_id, h.client_id) as email) address
-       where address.email is not null
+      select jsonb_build_object('hint', public.app_email_hint(a.email)) from address a where a.email is not null
     ),
     'execution', case when h.state = 'execution' then jsonb_build_object(
       'contract', (
@@ -435,19 +564,17 @@ as $$
           'status', k.status,
           'signing_open', k.status = 'issued' and (k.share_expires_at is null or k.share_expires_at > now()),
           'signed', public.app_contract_signed(k.org_id, k.id),
+          'terminated_at', public.app_contract_terminated_at(k.org_id, k.id),
           'end_date', to_char(k.end_date, 'YYYY-MM-DD'),
           'time_extension_days_total', public.app_contract_time_extension_days(k.org_id, k.id)
         )
         from contract k
       ),
-      'flow_source', (
-        select case
-          when source.facts -> 'contract' ->> 'status' = 'draft'
-            then jsonb_set(source.facts, '{contract}', 'null'::jsonb)
-          else source.facts
-        end
-        from (select public.app_execution_flow_source(h.id) as facts) source
+      'previous_contract', (
+        select jsonb_build_object('status', 'terminated', 'terminated_at', public.app_contract_terminated_at(p.org_id, p.id))
+          from previous p
       ),
+      'flow_source', (select f.source from flow f),
       'money', public.app_delivery_execution_by_token(p_hash)
     ) end
   )
@@ -578,11 +705,18 @@ $$;
 -- Public share: the home contract's change orders. NULL as
 -- app_home_contract_by_token (a terminated contract still answers: its
 -- decided change orders are the record). Otherwise:
---   open     the newest 10 ISSUED change orders, each app_variation_by_token
---            with its stored hash (the /v document, its link expiry included)
---   decided  the newest 20 approved or rejected ones, {id, number, year
---            (creation, Cairo, the VO-YYYY-NNNN year), status, net_delta (a
---            scale-4 string), decided_on (the decision's day in Cairo)}
+--   open     the newest 10 change orders the client can decide NOW: issued,
+--            the link live (H3 functional F4: so the count of the facts,
+--            issued_variations, is this list's length while under 10), each
+--            app_variation_by_token with its stored hash (the /v document)
+--   expired  the newest 10 issued ones whose link has lapsed, the same
+--            document: the client can no longer answer them online
+--   decided  the newest 20 approved or rejected ones that were put to the
+--            client (an `issued` event; H3 functional F3: one the studio
+--            approved internally and the termination then rejected was never
+--            the client's), {id, number, year (creation, Cairo, the
+--            VO-YYYY-NNNN year), status, net_delta (a scale-4 string),
+--            decided_on (the decision's day in Cairo)}
 create or replace function public.app_home_variations_by_token(p_hash text)
 returns jsonb
 language sql
@@ -593,12 +727,20 @@ as $$
   with home_contract as materialized (
     select k.id, k.org_id from public.app_home_contract(p_hash) k
   ),
-  open_orders as materialized (
-    select v.token_hash, v.created_at, v.id
+  issued_orders as materialized (
+    select v.token_hash, v.created_at, v.id, (v.share_expires_at is null or v.share_expires_at > now()) as live
       from home_contract k
       join public.variation_orders v on v.org_id = k.org_id and v.contract_id = k.id
      where v.status = 'issued' and v.token_hash is not null
-     order by v.created_at desc, v.id desc
+  ),
+  open_orders as materialized (
+    select o.token_hash, o.created_at, o.id from issued_orders o where o.live
+     order by o.created_at desc, o.id desc
+     limit 10
+  ),
+  expired_orders as materialized (
+    select o.token_hash, o.created_at, o.id from issued_orders o where not o.live
+     order by o.created_at desc, o.id desc
      limit 10
   ),
   decided_orders as materialized (
@@ -612,6 +754,10 @@ as $$
          limit 1
       ) decision
      where v.status in ('approved', 'rejected')
+       and exists (
+         select 1 from public.variation_order_events e
+          where e.org_id = v.org_id and e.variation_order_id = v.id and e.kind = 'issued'
+       )
      order by decision.decided_at desc, v.id desc
      limit 20
   )
@@ -619,6 +765,10 @@ as $$
     'open', coalesce((
       select jsonb_agg(public.app_variation_by_token(o.token_hash) order by o.created_at desc, o.id desc)
         from open_orders o
+    ), '[]'::jsonb),
+    'expired', coalesce((
+      select jsonb_agg(public.app_variation_by_token(x.token_hash) order by x.created_at desc, x.id desc)
+        from expired_orders x
     ), '[]'::jsonb),
     'decided', coalesce((
       select jsonb_agg(
@@ -675,18 +825,32 @@ $$;
 --                                          milestone_due), no pending claim,
 --                                          the delivery still in design
 --   no_channel     the client has no address on file (app_client_code_destination)
+--   busy           a studio write has held the delivery (or the studio) row
+--                  for the whole 4 s wait: nothing is written, ask again
 --   too_many       a limit is reached, with retry_after_seconds: 60 s between
---                  codes for one target; 5 per target an hour; 10 per delivery
---                  an hour; 20 per delivery a day; 80 a day across the
---                  platform (the email provider's free day is 100, shared)
+--                  codes for one target; 5 per target an hour; 15 wrong tries
+--                  on a target in a day (app_client_code_check); 10 per
+--                  delivery an hour; 20 per delivery a day; 25 per studio a
+--                  day (H3 security S1: no studio spends the platform's
+--                  share); 80 a day across the platform (the email
+--                  provider's free day is 100, shared). The wait is the
+--                  studio's own unless only the platform's cap is reached
 --   ok             the row is written; {email (for the server's send only,
 --                  never the browser), hint, resend_after_seconds: 60}
 -- No row is written unless the answer is ok. A malformed challenge id or code
 -- hash is the server's bug and raises 22023 (a hash) or 23502 (no id).
 --
--- LOCKS: one transaction-scoped advisory lock for every code issue of the
--- platform, so the limits are counted and the row written one issue at a
--- time (a handful a day at pilot scale); every wait at most 4 s.
+-- LOCKS, in this order, so that NO advisory lock is ever held while a row lock
+-- is waited for (H3 reliability R1: one studio's held row stalled every
+-- studio's codes):
+--   1. the delivery's and the studio's rows FOR KEY SHARE, the locks the new
+--      row's foreign keys take: a studio transaction holding one FOR UPDATE
+--      delays this studio's request only, and past 4 s it answers `busy`;
+--   2. a purge of at most 50 codes that expired more than 90 days ago (H3
+--      reliability R5; `skip locked`, so it waits on nothing);
+--   3. an advisory lock per STUDIO: its limits are counted one issue at a time;
+--   4. an advisory lock for the PLATFORM, last and held for one count and one
+--      insert, which wait on nothing.
 create or replace function public.app_home_code_issue_by_token(
   p_hash text,
   p_challenge_id uuid,
@@ -763,10 +927,27 @@ begin
   v_email := public.app_client_code_destination(v_home.org_id, v_home.client_id);
   if v_email is null then return jsonb_build_object('status', 'no_channel'); end if;
 
-  perform pg_advisory_xact_lock(hashtextextended('client-verification-codes', 0));
+  begin
+    perform 1 from public.design_engagements de where de.id = v_home.id for key share;
+    perform 1 from public.organizations o where o.id = v_home.org_id for key share;
+  exception when lock_not_available then
+    return jsonb_build_object('status', 'busy');
+  end;
+
+  delete from public.client_verification_codes x
+   where x.id in (
+     select p.id from public.client_verification_codes p
+      where p.created_at < now() - interval '90 days'
+        and p.expires_at < now() - interval '90 days'
+      order by p.created_at
+      limit 50
+      for update skip locked
+   );
+
+  perform pg_advisory_xact_lock(hashtextextended('client-verification-codes:' || v_home.org_id::text, 0));
 
   with mine as (
-    select c.created_at, c.purpose, c.target_key
+    select c.created_at, c.purpose, c.target_key, c.attempts
       from public.client_verification_codes c
      where c.org_id = v_home.org_id
        and c.engagement_id = v_home.id
@@ -779,17 +960,32 @@ begin
     (select ceil(extract(epoch from min(m.created_at) + interval '1 hour' - now()))
        from mine m where m.purpose = p_purpose and m.target_key = p_target and m.created_at > now() - interval '1 hour'
      having count(*) >= 5),
+    (select ceil(extract(epoch from min(m.created_at) filter (where m.attempts > 0) + interval '1 day' - now()))
+       from mine m where m.purpose = p_purpose and m.target_key = p_target
+     having sum(m.attempts) >= 15),
     (select ceil(extract(epoch from min(m.created_at) + interval '1 hour' - now()))
        from mine m where m.created_at > now() - interval '1 hour'
      having count(*) >= 10),
     (select ceil(extract(epoch from min(m.created_at) + interval '1 day' - now()))
        from mine m
      having count(*) >= 20),
-    (select ceil(extract(epoch from min(p.created_at) + interval '1 day' - now()))
-       from public.client_verification_codes p where p.created_at > now() - interval '1 day'
-     having count(*) >= 80)
+    (select ceil(extract(epoch from min(o.created_at) + interval '1 day' - now()))
+       from public.client_verification_codes o
+      where o.org_id = v_home.org_id and o.created_at > now() - interval '1 day'
+     having count(*) >= 25)
   )::integer
     into v_wait;
+  if v_wait is not null then
+    return jsonb_build_object('status', 'too_many', 'retry_after_seconds', greatest(v_wait, 1));
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('client-verification-codes', 0));
+
+  select ceil(extract(epoch from min(p.created_at) + interval '1 day' - now()))::integer
+    into v_wait
+    from public.client_verification_codes p
+   where p.created_at > now() - interval '1 day'
+  having count(*) >= 80;
   if v_wait is not null then
     return jsonb_build_object('status', 'too_many', 'retry_after_seconds', greatest(v_wait, 1));
   end if;
@@ -836,24 +1032,37 @@ $$;
 -- THE FOUR ACTS. Each is SECURITY DEFINER (the token IS the authorization),
 -- waits at most 4 s on any lock, and answers jsonb {code, attempts_left?}:
 --   invalid        no delivery has this token hash
---   expired        the home link has expired
+--   token_expired  the home link has expired
 --   not_active     the delivery is not at the stage the act belongs to
 --   wrong_target   the contract, change order or request is not the home's
 --                  (checked before the code, so a forged id costs no try)
 --   code_unknown | code_used | code_locked | code_expired | code_wrong (with
 --                  attempts_left): app_client_code_check's refusals
---   otherwise      the inner act's own code, unchanged (ok, already, expired,
---                  not_active, wrong_state, invalid, busy, not_found,
---                  contract_inactive)
+--   otherwise      the inner act's own answer, with ONE meaning per code (H3
+--                  functional F1, F2):
+--     ok                 the act is done
+--     already            the same act is done already: the contract IS
+--                        signed (online or on paper), the change order is
+--                        decided, the claim is pending
+--     contract_inactive  the contract is not open to the act: terminated, or
+--                        no longer the home's contract
+--     signing_closed     the contract's online signing window has closed
+--     link_expired       the change order's own link has lapsed
+--     not_active | wrong_state | invalid | busy  as the inner act says them
 -- After the check, `app.client_code_verified` is set to 'on' for the inner
 -- call only, and back to 'off' at once, transaction-local (the flag DB step C2
--- will make the inner functions ask for). On `ok` or `already` the code is
--- consumed, in the same transaction, by the row the act wrote (or the one
--- already there).
+-- will make the inner functions ask for). ONLY on `ok` is the code consumed,
+-- in the same transaction, by the row the act wrote: a code whose act
+-- answered anything else authorised nothing and stays unused (reliability
+-- note 1, functional F8).
 
 -- Sign the home's execution contract: app_contract_ack_by_token with the
 -- contract's stored hash. p_pdf_hash is what the app computed over
--- app_home_contract_by_token, which is /c's document.
+-- app_home_contract_by_token, which is /c's document. The target is any
+-- contract on a BOQ the delivery owns; one that is not the home's contract
+-- now (a newer BOQ or contract replaced it) is `contract_inactive`. The inner
+-- act's `already` says only that the contract is no longer issued, so it is
+-- read again here: `already` if signed, `contract_inactive` otherwise.
 create or replace function public.app_home_contract_ack_by_token(
   p_hash text,
   p_contract_id uuid,
@@ -880,35 +1089,45 @@ declare
 begin
   select d.* into v_home from public.app_home_delivery(p_hash) d;
   if not found then return jsonb_build_object('code', 'invalid'); end if;
-  if not v_home.live then return jsonb_build_object('code', 'expired'); end if;
+  if not v_home.live then return jsonb_build_object('code', 'token_expired'); end if;
   if v_home.state <> 'execution' then return jsonb_build_object('code', 'not_active'); end if;
 
   select c.id, c.token_hash into v_contract
     from public.contracts c
    where c.org_id = v_home.org_id
-     and c.id = public.app_delivery_execution_contract(v_home.id, v_home.org_id);
-  if not found then return jsonb_build_object('code', 'not_active'); end if;
-  if p_contract_id is distinct from v_contract.id then return jsonb_build_object('code', 'wrong_target'); end if;
+     and c.id = p_contract_id
+     and c.source_boq_id in (select b.id from public.app_delivery_boqs(v_home.id, v_home.org_id) b);
+  if not found then return jsonb_build_object('code', 'wrong_target'); end if;
 
   v_check := public.app_client_code_check(
     v_home.id, v_home.org_id, p_challenge_id, 'sign_contract', p_contract_id::text, p_code_hash
   );
   if v_check <> 'ok' then return public.app_client_code_refusal(v_check); end if;
+  if v_contract.id is distinct from public.app_delivery_execution_contract(v_home.id, v_home.org_id) then
+    return jsonb_build_object('code', 'contract_inactive');
+  end if;
 
   perform set_config('app.client_code_verified', 'on', true);
   v_answer := public.app_contract_ack_by_token(v_contract.token_hash, p_name, p_ip, p_ua, p_pdf_hash);
   perform set_config('app.client_code_verified', 'off', true);
 
-  if v_answer in ('ok', 'already') then
+  if v_answer = 'ok' then
     select e.id into v_result_ref
       from public.contract_events e
-     where e.org_id = v_home.org_id and e.contract_id = v_contract.id
-       and e.kind in ('acknowledged', 'acknowledged_offline')
+     where e.org_id = v_home.org_id and e.contract_id = v_contract.id and e.kind = 'acknowledged'
      order by e.decided_at desc, e.id desc
      limit 1;
     perform public.app_client_code_consume(p_challenge_id, v_result_ref);
   end if;
-  return jsonb_build_object('code', v_answer);
+  return jsonb_build_object('code', case v_answer
+    when 'already' then (
+      select case when c.status = 'signed' then 'already' else 'contract_inactive' end
+        from public.contracts c
+       where c.org_id = v_home.org_id and c.id = v_contract.id
+    )
+    when 'expired' then 'signing_closed'
+    else v_answer
+  end);
 end
 $$;
 
@@ -933,7 +1152,9 @@ $$;
 
 -- Approve or reject one change order of the home's contract:
 -- app_variation_respond_by_token with the change order's stored hash. An
--- unknown decision answers `invalid` before the code is checked.
+-- unknown decision answers `invalid` before the code is checked. The target is
+-- a change order of any contract on a BOQ the delivery owns, so one of a
+-- terminated contract answers the inner act's `contract_inactive`.
 create or replace function public.app_home_variation_respond_by_token(
   p_hash text,
   p_variation_id uuid,
@@ -960,7 +1181,7 @@ declare
 begin
   select d.* into v_home from public.app_home_delivery(p_hash) d;
   if not found then return jsonb_build_object('code', 'invalid'); end if;
-  if not v_home.live then return jsonb_build_object('code', 'expired'); end if;
+  if not v_home.live then return jsonb_build_object('code', 'token_expired'); end if;
   if v_home.state <> 'execution' then return jsonb_build_object('code', 'not_active'); end if;
   if p_decision is null or p_decision not in ('approve', 'reject') then
     return jsonb_build_object('code', 'invalid');
@@ -968,10 +1189,11 @@ begin
 
   select v.id, v.token_hash into v_variation
     from public.variation_orders v
+    join public.contracts c on c.org_id = v.org_id and c.id = v.contract_id
    where v.org_id = v_home.org_id
      and v.id = p_variation_id
-     and v.contract_id = public.app_delivery_execution_contract(v_home.id, v_home.org_id)
-     and v.token_hash is not null;
+     and v.token_hash is not null
+     and c.source_boq_id in (select b.id from public.app_delivery_boqs(v_home.id, v_home.org_id) b);
   if not found then return jsonb_build_object('code', 'wrong_target'); end if;
 
   v_check := public.app_client_code_check(
@@ -983,7 +1205,7 @@ begin
   v_answer := public.app_variation_respond_by_token(v_variation.token_hash, p_decision, p_name, p_ip, p_ua);
   perform set_config('app.client_code_verified', 'off', true);
 
-  if v_answer in ('ok', 'already') then
+  if v_answer = 'ok' then
     select e.id into v_result_ref
       from public.variation_order_events e
      where e.org_id = v_home.org_id and e.variation_order_id = v_variation.id
@@ -992,7 +1214,7 @@ begin
      limit 1;
     perform public.app_client_code_consume(p_challenge_id, v_result_ref);
   end if;
-  return jsonb_build_object('code', v_answer);
+  return jsonb_build_object('code', case v_answer when 'expired' then 'link_expired' else v_answer end);
 end
 $$;
 
@@ -1017,6 +1239,7 @@ $$;
 
 -- "I paid" on one payment request of the home's contract:
 -- app_delivery_claim_request_by_token (the amount is the server's, B4 AC33).
+-- Its `expired` is the home link's (it reads the same delivery token).
 create or replace function public.app_home_claim_request_by_token(
   p_hash text,
   p_request_id uuid,
@@ -1042,7 +1265,7 @@ declare
 begin
   select d.* into v_home from public.app_home_delivery(p_hash) d;
   if not found then return jsonb_build_object('code', 'invalid'); end if;
-  if not v_home.live then return jsonb_build_object('code', 'expired'); end if;
+  if not v_home.live then return jsonb_build_object('code', 'token_expired'); end if;
   if v_home.state <> 'execution' then return jsonb_build_object('code', 'not_active'); end if;
 
   if not exists (
@@ -1063,13 +1286,13 @@ begin
   v_answer := public.app_delivery_claim_request_by_token(p_hash, p_request_id, p_note, p_name, p_ip, p_ua);
   perform set_config('app.client_code_verified', 'off', true);
 
-  if v_answer in ('ok', 'already') then
+  if v_answer = 'ok' then
     select pc.id into v_result_ref
       from public.contract_payment_claims pc
      where pc.org_id = v_home.org_id and pc.request_id = p_request_id and pc.status = 'pending';
     perform public.app_client_code_consume(p_challenge_id, v_result_ref);
   end if;
-  return jsonb_build_object('code', v_answer);
+  return jsonb_build_object('code', case v_answer when 'expired' then 'token_expired' else v_answer end);
 end
 $$;
 
@@ -1095,7 +1318,8 @@ $$;
 -- "I paid" on one design-fee instalment of the delivery:
 -- app_delivery_claim_payment_by_token. The milestone kind is the code's
 -- target, so a kind no code was sent for is `code_unknown`; the inner function
--- answers the stage (`not_active` at execution and after).
+-- answers the stage (`not_active` at execution and after), and its `expired`
+-- is the home link's.
 create or replace function public.app_home_claim_design_payment_by_token(
   p_hash text,
   p_milestone_kind text,
@@ -1121,7 +1345,7 @@ declare
 begin
   select d.* into v_home from public.app_home_delivery(p_hash) d;
   if not found then return jsonb_build_object('code', 'invalid'); end if;
-  if not v_home.live then return jsonb_build_object('code', 'expired'); end if;
+  if not v_home.live then return jsonb_build_object('code', 'token_expired'); end if;
 
   v_check := public.app_client_code_check(
     v_home.id, v_home.org_id, p_challenge_id, 'claim_design_payment', p_milestone_kind, p_code_hash
@@ -1132,14 +1356,14 @@ begin
   v_answer := public.app_delivery_claim_payment_by_token(p_hash, p_milestone_kind, p_note, p_name, p_ip, p_ua);
   perform set_config('app.client_code_verified', 'off', true);
 
-  if v_answer in ('ok', 'already') then
+  if v_answer = 'ok' then
     select pc.id into v_result_ref
       from public.client_payment_claims pc
      where pc.org_id = v_home.org_id and pc.engagement_id = v_home.id
        and pc.milestone_kind::text = p_milestone_kind and pc.status = 'pending';
     perform public.app_client_code_consume(p_challenge_id, v_result_ref);
   end if;
-  return jsonb_build_object('code', v_answer);
+  return jsonb_build_object('code', case v_answer when 'expired' then 'token_expired' else v_answer end);
 end
 $$;
 

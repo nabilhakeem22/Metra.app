@@ -133,7 +133,7 @@ ALTER TABLE "client_verification_codes" FORCE ROW LEVEL SECURITY;
 -- Foreign keys: org_id -> organizations RESTRICT (the orgScoped convention),
 -- and the delivery, same org, CASCADE: a code is evidence of the delivery's
 -- client acts and goes with the delivery (the guard trigger admits a delete
--- only from that cascade).
+-- only from that cascade, or 90 days after the code expired).
 ALTER TABLE "client_verification_codes" ADD CONSTRAINT "client_verification_codes_org_id_organizations_id_fk"
   FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE RESTRICT;
 ALTER TABLE "client_verification_codes" ADD CONSTRAINT "client_verification_codes_engagement_same_org_fk"

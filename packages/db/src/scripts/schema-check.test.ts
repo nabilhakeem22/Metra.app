@@ -190,7 +190,7 @@ describe('runSchemaCheck', () => {
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 150 declared, 150 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: constraints — 413 declared, 413 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 97 declared, 97 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 100 declared, 100 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 97 declared, 97 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 100 declared, 100 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 97 RLS functions', () => {
+  it('declares 100 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -248,8 +248,10 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // app_contract_signed and app_contract_time_extension_days, the trigger fn
     // enforce_variation_order_frozen, and in 75-client-home.sql eleven token
     // functions, seven internal helpers and the trigger fn
-    // enforce_client_code_guarded.
-    expect(declaredFunctions().size).toBe(97);
+    // enforce_client_code_guarded. 100 with the H3 fix round's one contract
+    // picker app_delivery_current_contract and the client home's internal
+    // helpers app_contract_terminated_at and app_home_flow_source.
+    expect(declaredFunctions().size).toBe(100);
   });
 });
 

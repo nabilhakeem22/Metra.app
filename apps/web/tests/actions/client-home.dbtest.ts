@@ -113,9 +113,11 @@ describe('app_home_by_token: the home, by its token (AC1)', () => {
       status: 'signed',
       signing_open: false,
       signed: null,
+      terminated_at: null,
       end_date: '2026-12-31',
       time_extension_days_total: 15,
     });
+    expect(read?.execution.previous_contract).toBeNull();
     expect(read?.execution.money).toEqual(await scalar(`public.app_delivery_execution_by_token($1)`, [home.delivery.tokenHash]));
     expect(JSON.stringify(read)).not.toMatch(/cost|margin/i);
   });
@@ -167,7 +169,8 @@ describe('the home shows /c and /v by their own functions (AC2)', () => {
     const approved = await seedVariation(orgId, home.contract, 'approved', { netDelta: '2500' });
     await ownerQuery(
       `insert into public.variation_order_events (org_id, variation_order_id, kind, actor_channel, from_status, to_status, decided_at)
-       values ($1, $2, 'approved', 'client', 'issued', 'approved', '2026-10-20T22:30:00Z')`,
+       values ($1, $2, 'issued', 'staff', 'internal_approved', 'issued', '2026-10-19T10:00:00Z'),
+              ($1, $2, 'approved', 'client', 'issued', 'approved', '2026-10-20T22:30:00Z')`,
       [orgId, approved.id],
     );
     const other = await seedHome(orgId, 'signed');
@@ -191,9 +194,10 @@ describe('the bodies are client-safe (AC3)', () => {
          proname like 'app_home%' or proname in ('app_client_code_destination', 'app_email_hint', 'app_client_code_check',
            'app_client_code_refusal', 'app_client_code_consume', 'enforce_client_code_guarded', 'app_client_home_target_by_token',
            'app_delivery_boqs', 'app_contract_measured_lines', 'app_contract_measured_works', 'app_contract_money_facts',
-           'app_payment_request_due', 'app_engagement_milestone_due', 'app_contract_signed', 'app_contract_time_extension_days'))`,
+           'app_payment_request_due', 'app_engagement_milestone_due', 'app_contract_signed', 'app_contract_time_extension_days',
+           'app_contract_terminated_at', 'app_delivery_current_contract'))`,
     );
-    expect(sources.length).toBe(27);
+    expect(sources.length).toBe(30);
     for (const source of sources) {
       expect({ fn: source.proname, forbidden: /cost|margin|supervision/i.test(source.prosrc) }).toEqual({ fn: source.proname, forbidden: false });
     }

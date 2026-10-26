@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   ageCodes,
   claimDesignWithCode,
@@ -23,6 +23,10 @@ import { closeFixture, seedOrg, teardown } from './fixture';
 // function's checks and limits, and the four code-checked acts (AC4 to AC14 at
 // the SQL level). Every call passes what the app will: a fresh challenge id
 // and sha256(challengeId:code), never the code itself.
+//
+// Each test has a studio of its own, and its codes are cleared after it: the
+// per-studio and platform day caps would otherwise carry one test's codes
+// into the next.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -31,14 +35,22 @@ let members: { owner: string; admin: string; pm: string; accountant: string };
 let otherOwner: string;
 
 beforeAll(async () => {
+  const other = await seedOrg({ owners: 1 });
+  otherOrgId = other.orgId;
+  otherOwner = other.ownerIds[0];
+  orgIds.push(otherOrgId);
+});
+
+beforeEach(async () => {
   const seeded = await seedOrg({ owners: 1, members: [{ role: 'admin' }, { role: 'project_manager' }, { role: 'accountant' }] });
   orgId = seeded.orgId;
   const [admin, pm, accountant] = seeded.memberIds;
   members = { owner: seeded.ownerIds[0], admin, pm, accountant };
-  const other = await seedOrg({ owners: 1 });
-  otherOrgId = other.orgId;
-  otherOwner = other.ownerIds[0];
-  orgIds.push(orgId, otherOrgId);
+  orgIds.push(orgId);
+});
+
+afterEach(async () => {
+  await tamper(`delete from public.client_verification_codes where org_id = any($1::uuid[])`, [[orgId, otherOrgId]]);
 });
 
 afterAll(async () => {
@@ -334,11 +346,11 @@ describe('the code check: wrong, locked, expired, unknown, used (AC10, AC11, AC1
     expect((await codesOf(home.delivery.id))[0].attempts).toBe(0);
   });
 
-  it('answers the signing window closing after the code was sent as the inner act does, and keeps the code', async () => {
+  it('answers the signing window closing after the code was sent as signing_closed, and keeps the code', async () => {
     const home = await seedHome(orgId);
     const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     await tamper(`update public.contracts set share_expires_at = now() - interval '1 second' where id = $1`, [home.contract.contractId]);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code)).toEqual({ code: 'expired' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code)).toEqual({ code: 'signing_closed' });
     expect((await codesOf(home.delivery.id))[0].consumed_at).toBeNull();
   });
 

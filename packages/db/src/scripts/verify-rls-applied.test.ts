@@ -352,7 +352,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('66 tables, 81 policies, 36 triggers, 97 functions');
+    expect(declaredCounts()).toBe('66 tables, 81 policies, 36 triggers, 100 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {

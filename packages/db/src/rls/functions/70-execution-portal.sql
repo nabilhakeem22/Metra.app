@@ -20,13 +20,12 @@
 -- same strict word list as the delivery snapshot's, comments included, so the
 -- bodies below carry no comment that could trip it.
 
--- INTERNAL: which execution contract the client of a delivery sees (plan A26).
--- The newest contract generated from a BOQ the delivery owns
--- (app_delivery_boqs, functions/65-execution-facts.sql: its own BOQs, and for
--- a light delivery, 0065, its project's BOQs no delivery stands behind) that
--- the client can see (issued, signed or terminated; a draft is the studio's
--- working copy), a live one before a terminated one. The read and the claim
--- below both ask it, and so do the client home's functions
+-- INTERNAL: which execution contract the client of a delivery sees (plan A26):
+-- THE delivery's contract (app_delivery_current_contract, functions/
+-- 65-execution-facts.sql, the one picker the studio's cockpit stands on too,
+-- H3 functional F5), while the client can see it (issued, signed or
+-- terminated); null while it is a draft, the studio's working copy. The read
+-- and the claim below both ask it, and so do the client home's functions
 -- (functions/75-client-home.sql), so the request a client claims is always one
 -- of the contract the card shows. It takes bare ids, so it is revoked from
 -- every caller role, metra_app included: only the definer functions call it,
@@ -42,11 +41,10 @@ security invoker
 set search_path = ''
 as $$
   select c.id
-    from public.app_delivery_boqs(p_engagement_id, p_org_id) b
-    join public.contracts c on c.org_id = p_org_id and c.source_boq_id = b.id
-   where c.status in ('issued', 'signed', 'terminated')
-   order by (c.status = 'terminated'), c.created_at desc, c.id desc
-   limit 1;
+    from public.contracts c
+   where c.org_id = p_org_id
+     and c.id = public.app_delivery_current_contract(p_engagement_id, p_org_id)
+     and c.status in ('issued', 'signed', 'terminated');
 $$;
 
 revoke all on function public.app_delivery_execution_contract(uuid, uuid) from public;

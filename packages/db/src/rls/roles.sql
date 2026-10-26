@@ -636,6 +636,8 @@ revoke execute on function public.app_delivery_site_updates_by_token(text, date,
 -- place, right after their CREATE.
 grant execute on function public.app_delivery_boqs(uuid, uuid) to metra_app;
 revoke execute on function public.app_delivery_boqs(uuid, uuid) from public;
+grant execute on function public.app_delivery_current_contract(uuid, uuid) to metra_app;
+revoke execute on function public.app_delivery_current_contract(uuid, uuid) from public;
 grant execute on function public.app_contract_measured_lines(uuid) to metra_app;
 revoke execute on function public.app_contract_measured_lines(uuid) from public;
 grant execute on function public.app_contract_measured_works(uuid) to metra_app;
@@ -688,6 +690,10 @@ revoke execute on function public.app_client_code_refusal(text) from public;
 revoke execute on function public.app_client_code_refusal(text) from metra_app;
 revoke execute on function public.app_client_code_consume(uuid, uuid) from public;
 revoke execute on function public.app_client_code_consume(uuid, uuid) from metra_app;
+revoke execute on function public.app_contract_terminated_at(uuid, uuid) from public;
+revoke execute on function public.app_contract_terminated_at(uuid, uuid) from metra_app;
+revoke execute on function public.app_home_flow_source(uuid) from public;
+revoke execute on function public.app_home_flow_source(uuid) from metra_app;
 
 do $$
 declare
@@ -907,6 +913,7 @@ begin
       execute format('revoke execute on function public.enforce_variation_order_frozen() from %I', r);
       execute format('revoke execute on function public.enforce_client_code_guarded() from %I', r);
       execute format('revoke execute on function public.app_delivery_boqs(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_delivery_current_contract(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_measured_lines(uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_measured_works(uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_money_facts(uuid) from %I', r);
@@ -951,6 +958,8 @@ begin
       execute format('revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from %I', r);
       execute format('revoke execute on function public.app_client_code_refusal(text) from %I', r);
       execute format('revoke execute on function public.app_client_code_consume(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_contract_terminated_at(uuid, uuid) from %I', r);
+      execute format('revoke execute on function public.app_home_flow_source(uuid) from %I', r);
     end if;
   end loop;
 end

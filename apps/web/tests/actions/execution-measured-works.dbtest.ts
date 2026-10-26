@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { loadMeasuredDifferences } from '@/lib/execution/final-account/differences';
 import { computeFinalAccount, finalAccountBalance, type MeasuredLine } from '@/lib/execution/money/final-account';
 import { loadMeasuredWorks } from '@/lib/execution/queries/measured-works';
 import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedVariation } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
+import { callsDuring } from './function-calls';
 
 // A3 reliability R3: the delivery card reads the measured works as ONE SQL
 // figure (lib/execution/queries/measured-works.ts) instead of loading every
@@ -13,6 +15,10 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // quantities, prices and line discounts, several readings (the latest recorded
 // one wins), approved change-order quantity on a line, a residual below zero, a
 // residual of exactly zero, and firm lines (flagged, never billed).
+//
+// H3 reliability R3: the final account card reads the same figure off its ONE
+// pass of the measured lines (lib/execution/final-account/differences.ts), so
+// it must equal the delivery card's, text for text.
 
 const orgIds: string[] = [];
 let orgId: string;
@@ -123,6 +129,23 @@ describe('the measured works, summed in SQL (R3)', () => {
     const works = await withOrgContext(owner, (tx) => loadMeasuredWorks(tx, id));
     expect(formatMoney4(parseMoney4(works))).toBe(expectedWorks);
     expect(finalAccountBalance(charges, works)).toBe(account.balance);
+    const card = await withOrgContext(owner, (tx) => loadMeasuredDifferences(tx, id));
+    expect(card.measuredWorks).toBe(works);
+    expect(card.counts).toEqual({ billed: account.billedLines.length, flagged: account.flaggedLines.length });
+  });
+
+  it('the final account card reads the measured lines once, and gives the delivery card figure when no line differs', async () => {
+    const contract = await seedExecutionContract(orgId, { linesPerSection: [10], state: 'signed' });
+    const lines = await ownerQuery<{ id: string; qty: string }>(
+      `select id, qty::text from public.contract_lines where contract_id = $1 and provisional order by sort_order`,
+      [contract.contractId],
+    );
+    for (const line of lines) await measure(contract.contractId, line.id, line.qty);
+    const works = await withOrgContext(owner, (tx) => loadMeasuredWorks(tx, contract.contractId));
+    const card = await withOrgContext(owner, (tx) => loadMeasuredDifferences(tx, contract.contractId));
+    expect(card).toMatchObject({ measuredWorks: works, counts: { billed: 0, flagged: 0 } });
+    const calls = await callsDuring(['public.app_contract_measured_lines(uuid)'], (tx) => loadMeasuredDifferences(tx, contract.contractId));
+    expect(calls).toEqual({ 'public.app_contract_measured_lines(uuid)': 1 });
   });
 
   it('is 0 with no measurement, and for another studio reads nothing (row-level security)', async () => {

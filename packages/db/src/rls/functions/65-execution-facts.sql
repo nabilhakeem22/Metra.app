@@ -30,6 +30,12 @@
 -- project that no delivery stands behind. A light delivery is found by its
 -- project because an issued BOQ is frozen and cannot be re-pointed at it. The
 -- one rule every "which contract does this delivery show" read takes.
+--
+-- BOTH WAYS, ONLY THE DELIVERY'S OWN CLIENT'S BOQs (H3 security S2, S6): a BOQ
+-- takes its client from the project when it is made, and a project's client
+-- can be changed afterwards, while a delivery's client never changes. So a BOQ
+-- made for another client of the same project is never this delivery's, and
+-- its contract never shows in this client's home.
 create or replace function public.app_delivery_boqs(p_engagement_id uuid, p_org_id uuid)
 returns table (id uuid, status text, created_at timestamptz)
 language sql
@@ -39,7 +45,7 @@ set search_path = ''
 as $$
   select b.id, b.status::text, b.created_at
     from public.design_engagements de
-    join public.boqs b on b.org_id = de.org_id
+    join public.boqs b on b.org_id = de.org_id and b.client_id = de.client_id
    where de.org_id = p_org_id
      and de.id = p_engagement_id
      and (
@@ -64,15 +70,73 @@ begin
 end
 $$;
 
+-- THE delivery's contract, the one picker (H3 functional F5): the studio's
+-- cockpit (app_execution_flow_source below), and through
+-- app_delivery_execution_contract (functions/70-execution-portal.sql) the
+-- client's money card, claims and home, all stand on this row. The newest
+-- contract on a BOQ the delivery owns, a live one before a terminated one, ANY
+-- status (the studio works on a draft; the client's reads mask it). A
+-- terminated contract on an older BOQ does not stand in front of a newer
+-- issued BOQ: then null, so the studio is offered a new contract and the
+-- client home shows the terminated one only as its previous contract. Null
+-- when the caller cannot see the delivery.
+create or replace function public.app_delivery_current_contract(p_engagement_id uuid, p_org_id uuid)
+returns uuid
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  with owned as materialized (
+    select b.id, b.status, b.created_at from public.app_delivery_boqs(p_engagement_id, p_org_id) b
+  ),
+  issued_boq as materialized (
+    select o.id from owned o where o.status = 'issued' order by o.created_at desc, o.id desc limit 1
+  ),
+  newest as materialized (
+    select c.id, c.status, c.source_boq_id
+      from owned o
+      join public.contracts c on c.org_id = p_org_id and c.source_boq_id = o.id
+     order by (c.status = 'terminated'), c.created_at desc, c.id desc
+     limit 1
+  )
+  select n.id from newest n
+   where not (n.status = 'terminated' and exists (select 1 from issued_boq i where i.id <> n.source_boq_id));
+$$;
+
+revoke all on function public.app_delivery_current_contract(uuid, uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_delivery_current_contract(uuid, uuid) from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_current_contract(uuid, uuid) to metra_app;
+  end if;
+end
+$$;
+
 -- Every MEASURED line of one execution contract, with its FINAL measured
 -- quantity and what approved change orders ordered on it: the input of the
--- final account (lib/execution/money/final-account.ts). Moved here, unchanged
--- in what it answers, from lib/execution/queries/measured-lines.ts.
+-- final account (lib/execution/money/final-account.ts). Moved here from
+-- lib/execution/queries/measured-lines.ts.
 --
 -- The final measured quantity is the line's latest RECORDED reading (`seq
 -- desc`, A12), found by ONE probe of the (org_id, contract_line_id, seq desc)
 -- index per line (a LATERAL, A5 reliability R3): its cost follows the lines,
 -- never the readings behind them.
+--
+-- `works` is what a PROVISIONAL line (decision D2a) bills before the document
+-- discount: round(residual x unit price, 4), less round(that x line discount x
+-- 0.01, 4), where residual = measured - contract qty - ordered; null on a firm
+-- line. Numeric multiplication is exact and round() on numeric is half away
+-- from zero, the money engine's rule (computeFinalAccount, line for line).
+-- It is here, on the line, so a reader that already walks the lines sums it
+-- in the same pass (H3 reliability R3, the final account's differences card).
 create or replace function public.app_contract_measured_lines(p_contract_id uuid)
 returns table (
   line_id uuid,
@@ -87,7 +151,8 @@ returns table (
   discount_pct numeric,
   provisional boolean,
   measured_qty numeric,
-  variation_qty numeric
+  variation_qty numeric,
+  works numeric
 )
 language sql
 stable
@@ -109,7 +174,8 @@ as $$
   )
   select l.id, l.section_id, l.sort_order, l.item_code, l.description_ar, l.description_en,
          l.unit::text, l.qty, l.unit_price, l.discount_pct, l.provisional,
-         latest.measured_qty, coalesce(o.qty, 0)
+         latest.measured_qty, coalesce(o.qty, 0),
+         case when l.provisional then billed.gross - round(billed.gross * l.discount_pct * 0.01, 4) end
     from contract k
     join public.contract_lines l on l.org_id = k.org_id and l.contract_id = k.id
     join lateral (
@@ -118,7 +184,10 @@ as $$
        order by m.seq desc
        limit 1
     ) latest on true
-    left join ordered o on o.contract_line_id = l.id;
+    left join ordered o on o.contract_line_id = l.id
+    cross join lateral (
+      select round((latest.measured_qty - l.qty - coalesce(o.qty, 0)) * l.unit_price, 4) as gross
+    ) billed;
 $$;
 
 revoke all on function public.app_contract_measured_lines(uuid) from public;
@@ -138,11 +207,9 @@ end
 $$;
 
 -- What the measured PROVISIONAL lines (decision D2a) add to the final account,
--- before the document discount: per line, round(residual x unit price, 4),
--- less round(that x line discount x 0.01, 4), where residual = measured -
--- contract qty - ordered. Numeric multiplication is exact and round() on
--- numeric is half away from zero, the money engine's rule (computeFinalAccount,
--- line for line). A scale-4 string; '0' when nothing is measured.
+-- before the document discount: the sum of their `works`
+-- (app_contract_measured_lines above). A scale-4 string; '0' when nothing is
+-- measured.
 create or replace function public.app_contract_measured_works(p_contract_id uuid)
 returns text
 language sql
@@ -150,13 +217,9 @@ stable
 security invoker
 set search_path = ''
 as $$
-  select coalesce(sum(billed.gross - round(billed.gross * billed.discount_pct * 0.01, 4)), 0)::text
-    from (
-      select measured.discount_pct,
-             round((measured.measured_qty - measured.qty - measured.variation_qty) * measured.unit_price, 4) as gross
-        from public.app_contract_measured_lines(p_contract_id) measured
-       where measured.provisional
-    ) billed;
+  select coalesce(sum(measured.works), 0)::text
+    from public.app_contract_measured_lines(p_contract_id) measured
+   where measured.provisional;
 $$;
 
 revoke all on function public.app_contract_measured_works(uuid) from public;
@@ -276,11 +339,8 @@ $$;
 -- delivery. Answers:
 --   issued_boq_id  the newest issued BOQ the delivery owns (app_delivery_boqs),
 --                  what "create contract" generates from; null when none;
---   contract       null, or the newest contract on a BOQ the delivery owns, a
---                  live one before a terminated one, ANY status (the studio
---                  works on a draft; the client home masks it). A terminated
---                  contract on an older BOQ does not stand in front of a newer
---                  issued BOQ: then null, so the studio is offered a new one.
+--   contract       null, or app_delivery_current_contract, ANY status (the
+--                  studio works on a draft; the client home masks it).
 --                  {id, number, created_at, status, signing_open (issued, and
 --                  its online signing window still open, OD7), the money basis
 --                  original_value, tax_amount, tax_rate, supervision_pct (the
@@ -298,28 +358,23 @@ security invoker
 set search_path = ''
 as $$
   with delivery as materialized (
-    select de.id, de.org_id from public.design_engagements de where de.id = p_engagement_id
-  ),
-  owned as materialized (
-    select b.id, b.status, b.created_at
-      from delivery d
-     cross join lateral public.app_delivery_boqs(d.id, d.org_id) b
+    select de.id, de.org_id, public.app_delivery_current_contract(de.id, de.org_id) as contract_id
+      from public.design_engagements de
+     where de.id = p_engagement_id
   ),
   issued_boq as materialized (
-    select o.id from owned o where o.status = 'issued' order by o.created_at desc, o.id desc limit 1
-  ),
-  newest as materialized (
-    select c.id, c.org_id, c.number, c.created_at, c.status, c.source_boq_id, c.share_expires_at,
-           c.original_value, c.tax_amount, c.tax_rate, c.supervision_pct, c.discount_pct
+    select b.id
       from delivery d
-      join owned o on true
-      join public.contracts c on c.org_id = d.org_id and c.source_boq_id = o.id
-     order by (c.status = 'terminated'), c.created_at desc, c.id desc
+     cross join lateral public.app_delivery_boqs(d.id, d.org_id) b
+     where b.status = 'issued'
+     order by b.created_at desc, b.id desc
      limit 1
   ),
   contract as materialized (
-    select n.* from newest n
-     where not (n.status = 'terminated' and exists (select 1 from issued_boq i where i.id <> n.source_boq_id))
+    select c.id, c.org_id, c.number, c.created_at, c.status, c.share_expires_at,
+           c.original_value, c.tax_amount, c.tax_rate, c.supervision_pct, c.discount_pct
+      from delivery d
+      join public.contracts c on c.org_id = d.org_id and c.id = d.contract_id
   ),
   billing as materialized (
     select k.id, case when k.status = 'signed' then public.app_contract_money_facts(k.id) end as money

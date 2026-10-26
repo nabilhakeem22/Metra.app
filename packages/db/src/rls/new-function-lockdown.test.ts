@@ -152,6 +152,7 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   // frozen guard; and the client home's token functions, internal helpers
   // and the code's guard.
   { file: 'functions/65-execution-facts.sql', signature: 'public.app_delivery_boqs(uuid, uuid)', grantsApp: true },
+  { file: 'functions/65-execution-facts.sql', signature: 'public.app_delivery_current_contract(uuid, uuid)', grantsApp: true },
   { file: 'functions/65-execution-facts.sql', signature: 'public.app_contract_measured_lines(uuid)', grantsApp: true },
   { file: 'functions/65-execution-facts.sql', signature: 'public.app_contract_measured_works(uuid)', grantsApp: true },
   { file: 'functions/65-execution-facts.sql', signature: 'public.app_contract_money_facts(uuid)', grantsApp: true },
@@ -169,6 +170,8 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_refusal(text)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_consume(uuid, uuid)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.enforce_client_code_guarded()', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_contract_terminated_at(uuid, uuid)', grantsApp: false },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_flow_source(uuid)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_by_token(text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_by_token(text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_sections_by_token(text, integer)', grantsApp: true },

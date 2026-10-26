@@ -125,7 +125,8 @@ export interface DeliveryRef {
  * An issued BOQ and the execution contract generated from it. `linesPerSection`
  * sets the shape; line n of a section has qty n, unit price 100, unit cost 60,
  * item code `A-<n>`, and is provisional when n is a multiple of 5. With
- * `delivery`, the BOQ is that delivery's (boqs.engagement_id, plan A26).
+ * `delivery`, the BOQ is that delivery's (boqs.engagement_id, plan A26); with
+ * `project`, it is made for that client and project, no delivery behind it.
  */
 export async function seedExecutionContract(
   orgId: string,
@@ -134,11 +135,12 @@ export async function seedExecutionContract(
     state?: ContractState;
     schedule?: ScheduleRow[];
     delivery?: DeliveryRef;
+    project?: { clientId: string; projectId: string };
   } = {},
 ): Promise<ExecutionContract> {
   const linesPerSection = opts.linesPerSection ?? [3];
   const state = opts.state ?? 'issued';
-  const { clientId, projectId } = opts.delivery ?? (await seedClientProject(orgId));
+  const { clientId, projectId } = opts.delivery ?? opts.project ?? (await seedClientProject(orgId));
 
   const [boq] = await ownerQuery<{ id: string }>(
     `insert into public.boqs (org_id, number, title_en, client_id, project_id, engagement_id, status, total, subtotal)
