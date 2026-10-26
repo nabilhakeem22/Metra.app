@@ -68,7 +68,7 @@ export type SideEffectKey =
   | 'resetRevisionsOnReject';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
-export interface MilestoneInput {
+interface MilestoneInput {
   kind: MilestoneKind;
   basis: MilestoneBasis;
   value: string;
@@ -91,12 +91,6 @@ export interface GenerateFeeSchedulePayload {
 export interface RequestRevisionPayload {
   changeOrderAmount?: string;
   reason?: string;
-}
-
-/** Maps each side-effect key to the payload its executor branch requires. */
-export interface TriggerPayloads {
-  generateFeeSchedule: GenerateFeeSchedulePayload;
-  applyRevision: RequestRevisionPayload;
 }
 
 export interface TransitionDef {

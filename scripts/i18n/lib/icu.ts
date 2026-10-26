@@ -14,7 +14,7 @@ import {
 } from '@formatjs/icu-messageformat-parser';
 
 /** CLDR plural categories Arabic (ar) actually uses; all six are required. */
-export const ARABIC_PLURAL_CATEGORIES = [
+const ARABIC_PLURAL_CATEGORIES = [
   'zero',
   'one',
   'two',

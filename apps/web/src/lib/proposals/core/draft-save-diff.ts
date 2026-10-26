@@ -19,8 +19,8 @@ import type { ResolvedLine, ResolvedSection } from './draft-save-resolve';
 import type { StoredDraft, WrittenLine, WrittenSection } from './draft-save-stored';
 import type { DraftSaveReceipt } from './types';
 
-export type SectionWrite = WrittenSection & { id: string };
-export type LineWrite = WrittenLine & { id: string };
+type SectionWrite = WrittenSection & { id: string };
+type LineWrite = WrittenLine & { id: string };
 
 export interface DraftWritePlan {
   sectionInserts: SectionWrite[];

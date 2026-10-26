@@ -31,7 +31,7 @@ export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn'
 /** An act that did not land. `reference`: an unknown failure's, for the client
  *  to quote. `budget`: the one-tap approve+budget saved its budget half; said in
  *  a line of its own beside the error. */
-export interface HeroRefusal {
+interface HeroRefusal {
   error: HeroError;
   reference?: string;
   budget?: 'acknowledged';

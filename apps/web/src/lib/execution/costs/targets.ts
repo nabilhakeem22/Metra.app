@@ -66,7 +66,7 @@ export async function requireTargets(tx: MetraDb, contractId: string, entry: Cle
 }
 
 /** The columns an entry writes, as the edit's audit records them. */
-export const COST_ENTRY_COLUMNS = {
+const COST_ENTRY_COLUMNS = {
   contractId: contractCostEntries.contractId,
   category: contractCostEntries.category,
   description: contractCostEntries.description,

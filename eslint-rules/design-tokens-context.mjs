@@ -31,7 +31,7 @@ const EXPRESSION_HOPS = new Set([
   'SpreadElement',
 ]);
 
-export function calleeName(callee) {
+function calleeName(callee) {
   if (callee.type === 'Identifier') return callee.name;
   if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
     return callee.property.name;

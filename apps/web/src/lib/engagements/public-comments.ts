@@ -99,7 +99,7 @@ export async function getDeliveryDocumentCommentsByToken(
  *  hour", not something the client did wrong, and NOT the per-link act limit's
  *  `too_many` ("wait a minute"), so the two are said apart. `empty` never reaches
  *  the DB: a blank message is rejected in TS. */
-export type DeliveryCommentError = DeliveryActionError | 'comments_too_many' | 'empty';
+type DeliveryCommentError = DeliveryActionError | 'comments_too_many' | 'empty';
 
 export interface DeliveryCommentResult {
   ok: boolean;

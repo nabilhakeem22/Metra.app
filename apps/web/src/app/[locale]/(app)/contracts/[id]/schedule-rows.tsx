@@ -10,7 +10,7 @@ import type { useScheduleForm } from './use-schedule-form';
 
 /** The DOM ids of a row's boxes: its refusals sit under these. */
 export const scheduleLabelControlId = (index: number) => `schedule-${String(index)}-label`;
-export const scheduleLabelEnControlId = (index: number) => `schedule-${String(index)}-label-en`;
+const scheduleLabelEnControlId = (index: number) => `schedule-${String(index)}-label-en`;
 export const scheduleValueControlId = (index: number) => `schedule-${String(index)}-value`;
 
 /**

@@ -6,7 +6,7 @@ import type { Finding } from './findings';
 import type { Slot } from './format';
 import { ShapeReader } from './guard-shape';
 
-export type MappingEntry =
+type MappingEntry =
   | { action: 'map'; itemKey: string }
   | { action: 'skip'; reason: string }
   | { action: 'discontinue'; itemKey: string };

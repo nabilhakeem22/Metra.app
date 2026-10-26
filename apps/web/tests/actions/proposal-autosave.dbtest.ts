@@ -5,7 +5,7 @@
 //            session is a stored line from its first save; an owner's cost
 //            override on a new price-book line survives every save.
 //  R4        one audit row per draft per five minutes of saving.
-//  S1        a malformed payload is `invalid` at the boundary.
+//  S1        a malformed payload is `malformed` at the boundary.
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
@@ -213,7 +213,7 @@ describe('one writer at a time (R1, R6, R9)', () => {
       deleteDraftProposalCore(ctx, { id }),
     ]);
     expect(removal.ok).toBe(true);
-    expect(save.ok ? 'ok' : save.error).toMatch(/^(ok|invalid)$/);
+    expect(save.ok ? 'ok' : save.error).toMatch(/^(ok|record_not_found)$/);
     expect(await documentState(id)).toMatchObject({ sections: 0, lines: 0 });
   });
 });

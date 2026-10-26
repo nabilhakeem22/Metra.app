@@ -12,8 +12,8 @@ export interface AuthShellProps {
 /**
  * The signed-out shell: a brand panel beside the form.
  *
- * IT SAID EVERYTHING TWICE. The wordmark rendered in BOTH panels, and
- * `app.descriptor` is byte-identical to `home.tagline` -- so the same sentence
+ * IT SAID EVERYTHING TWICE. The wordmark rendered in BOTH panels, and the
+ * old `app.descriptor` was byte-identical to `home.tagline` -- so the same sentence
  * appeared on both halves of one screen. Below it, `home.intro` and
  * `onboarding.valueProp` made the same promise again in different words. Four
  * near-identical pieces of copy competing on a screen whose entire job is to

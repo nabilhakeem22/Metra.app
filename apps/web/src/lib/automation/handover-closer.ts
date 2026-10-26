@@ -22,7 +22,7 @@ import { lostActProbeSql, rememberLostActProbe } from './lost-act-probe';
 import type { AutomationDeps, AutomationResult } from './types';
 
 /** Deliveries closed per org per tick at most (A12). */
-export const HANDOVER_CLOSES_PER_TICK = 50;
+const HANDOVER_CLOSES_PER_TICK = 50;
 /** An acknowledgement this fresh is left to its own request's inline close. */
 const SETTLE_MS = 2 * 60 * 1000;
 

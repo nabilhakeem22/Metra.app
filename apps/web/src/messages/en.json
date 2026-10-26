@@ -1,15 +1,11 @@
 {
   "app": {
     "name": "Metra",
-    "descriptor": "Project and cost control for interior-design studios",
     "loading": "Loading…"
   },
   "home": {
-    "title": "Metra",
     "tagline": "Project and cost control for interior-design studios",
-    "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
-    "getStarted": "Get started",
-    "signIn": "Sign in"
+    "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced."
   },
   "landing": {
     "seo": {
@@ -147,11 +143,9 @@
     "clients": "Clients"
   },
   "shell": {
-    "search": "Search",
     "menu": "Menu",
     "userMenu": "User menu",
-    "role": "Role",
-    "locale": "Language"
+    "role": "Role"
   },
   "login": {
     "signInTitle": "Sign in",
@@ -175,7 +169,6 @@
     "verifying": "Verifying…",
     "sending": "Sending…",
     "codeSentTitle": "Enter the 6-digit code",
-    "back": "Back",
     "channelLabel": "How should we send your code?",
     "pageRefused": "We could not complete sign-in from this page. Refresh the page and try again."
   },
@@ -761,8 +754,6 @@
       "address": "The client's full address, shown on documents.",
       "taxRegistrationNumber": "The client's tax registration number, printed on invoices.",
       "type": "Whether this client is an individual, a company, or a consultant.",
-      "advancePct": "Default advance payment percentage for this client's contracts.",
-      "retentionPct": "Default retention percentage withheld on this client's contracts.",
       "notes": "Private notes about this client. Never shown to the client."
     },
     "project": {
@@ -771,9 +762,7 @@
       "client": "The client this project belongs to.",
       "status": "The project's current stage.",
       "type": "The kind of project (villa, office, …). Pick one or add a new type.",
-      "description": "A short description of the scope of work.",
-      "advancePct": "Advance payment percentage agreed for this project.",
-      "retentionPct": "Retention percentage withheld on this project's payments."
+      "description": "A short description of the scope of work."
     },
     "costItem": {
       "code": "A short unique code for this item within your price book.",
@@ -830,16 +819,6 @@
       "previous": "Previous page",
       "next": "Next page"
     },
-    "categories": {
-      "civil": "Civil",
-      "gypsum": "Gypsum",
-      "electrical": "Electrical",
-      "plumbing": "Plumbing",
-      "joinery": "Joinery",
-      "finishes": "Finishes",
-      "furniture": "Furniture",
-      "preliminaries": "Preliminaries"
-    },
     "units": {
       "sqm": "m²",
       "linear_meter": "Linear meter",
@@ -859,7 +838,6 @@
     "table": {
       "code": "Code",
       "name": "Name",
-      "category": "Section",
       "section": "Section",
       "unit": "Unit",
       "cost": "Unit cost",
@@ -893,7 +871,6 @@
       "taxCode": "Tax code",
       "etaItemCode": "ETA item code",
       "etaCodeType": "ETA code type",
-      "active": "Active",
       "save": "Save",
       "cancel": "Cancel"
     },
@@ -914,8 +891,6 @@
     "import": {
       "title": "Import from CSV",
       "chooseFile": "Choose a .csv file",
-      "upload": "Upload",
-      "map": "Map columns",
       "preview": "Preview",
       "mapDescription": "Match each column in your file to a field.",
       "none": "(Not mapped)",
@@ -934,7 +909,6 @@
       "willImport": "Will import",
       "importNow": "Import {count} items",
       "back": "Back",
-      "cancel": "Cancel",
       "done": "Imported {imported}, skipped {skipped}.",
       "errors": {
         "row_empty": "Empty row",
@@ -980,8 +954,6 @@
       "dismiss": "Not now"
     },
     "search": "Search by name",
-    "activeOnly": "Active only",
-    "itemsCount": "{count} clients",
     "status": {
       "active": "Active",
       "inactive": "Inactive"
@@ -1021,8 +993,6 @@
       "city": "City",
       "address": "Address",
       "taxCode": "Tax registration number",
-      "advancePct": "Advance %",
-      "retentionPct": "Retention %",
       "notes": "Notes",
       "moreDetails": "More details",
       "save": "Save",
@@ -1060,7 +1030,6 @@
         "noActivity": "No activity yet."
       },
       "details": {
-        "title": "Client details",
         "save": "Save details",
         "saved": "Details saved"
       },
@@ -1089,7 +1058,6 @@
         "deleted": "Contact deleted"
       },
       "projects": {
-        "title": "Projects",
         "newForClient": "New project for this client",
         "empty": "No projects for this client yet.",
         "noDelivery": "No delivery yet"
@@ -1106,9 +1074,7 @@
         "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}"
       },
       "documents": {
-        "title": "Documents",
         "upload": "Upload document",
-        "uploading": "Uploading…",
         "empty": "No documents yet.",
         "download": "Download",
         "delete": "Delete",
@@ -1123,11 +1089,9 @@
         }
       },
       "activity": {
-        "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
         "empty": "Nothing recorded yet.",
-        "system": "System",
         "kinds": {
           "note": "Note",
           "client_created": "Client created",
@@ -1158,7 +1122,6 @@
     "search": "Search code or name",
     "allStatuses": "All statuses",
     "activeOnly": "Active only",
-    "itemsCount": "{count} projects",
     "archived": "Archived",
     "statuses": {
       "draft": "Draft",
@@ -1214,12 +1177,6 @@
       "deactivated": "Project deactivated",
       "typeAdded": "Type added"
     },
-    "stageStatuses": {
-      "not_started": "Not started",
-      "in_progress": "In progress",
-      "done": "Done",
-      "skipped": "Skipped"
-    },
     "profile": {
       "back": "Back to projects",
       "noType": "No type",
@@ -1227,7 +1184,6 @@
         "sectionsLabel": "Project sections",
         "overview": "Overview",
         "details": "Details",
-        "stages": "Stages",
         "financials": "Financials",
         "team": "Team",
         "proposals": "Proposals",
@@ -1247,28 +1203,12 @@
         "noStage": "None"
       },
       "details": {
-        "title": "Project details",
         "type": "Type",
         "addType": "Add type",
         "addTypePlaceholder": "New type name",
         "description": "Description",
-        "advancePct": "Advance %",
-        "retentionPct": "Retention %",
         "save": "Save details",
         "saved": "Details saved"
-      },
-      "stages": {
-        "title": "Stages",
-        "add": "Add stage",
-        "name": "Stage",
-        "status": "Status",
-        "progress": "Progress %",
-        "startDate": "Start",
-        "endDate": "End",
-        "delete": "Delete",
-        "empty": "No stages yet.",
-        "save": "Save",
-        "cancel": "Cancel"
       },
       "financials": {
         "contracted": "Contracted value",
@@ -1316,12 +1256,10 @@
         "candidatesFailed": "We could not load the members. Try again."
       },
       "proposals": {
-        "title": "Proposals",
         "newForProject": "New proposal for this project",
         "empty": "No proposals for this project yet."
       },
       "documents": {
-        "title": "Documents",
         "upload": "Upload document",
         "empty": "No documents yet.",
         "download": "Download",
@@ -1337,7 +1275,6 @@
         }
       },
       "activity": {
-        "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
         "empty": "Nothing recorded yet.",
@@ -1456,8 +1393,6 @@
     "subtitle": "Quotations (عروض الأسعار) for your clients.",
     "search": "Search by title",
     "pagerLabel": "Proposal pages",
-    "allStatuses": "All statuses",
-    "itemsCount": "{count} proposals",
     "statuses": {
       "draft": "Draft",
       "sent": "Sent",
@@ -1470,7 +1405,6 @@
       "number": "Number",
       "title": "Title",
       "client": "Client",
-      "project": "Project",
       "status": "Status",
       "total": "Total"
     },
@@ -1481,14 +1415,9 @@
     },
     "actions": {
       "new": "New proposal",
-      "open": "Open",
-      "view": "View",
-      "edit": "Edit",
       "delete": "Delete",
-      "send": "Send",
       "expire": "Mark expired",
-      "createV2": "Create version 2",
-      "back": "Back"
+      "createV2": "Create version 2"
     },
     "create": {
       "title": "New proposal",
@@ -1819,9 +1748,7 @@
     "saveDraft": "Save draft",
     "saved": "Saved",
     "issue": "Issue contract",
-    "issued": "Contract issued",
     "terminate": "Terminate",
-    "terminated": "Contract terminated",
     "terminateConfirm": {
       "title": "Terminate contract {number}?",
       "body": "Terminating ends this contract for good. Change orders still waiting for a decision are rejected, and no new payment requests or measurements can be recorded on it. This can't be undone.",
@@ -1829,8 +1756,6 @@
     },
     "shareLink": "Acknowledgement link",
     "copyLink": "Copy link",
-    "copied": "Copied",
-    "backToList": "Back to contracts",
     "status": {
       "draft": "Draft",
       "issued": "Issued",
@@ -1838,7 +1763,6 @@
       "terminated": "Terminated"
     },
     "header": {
-      "title": "Title",
       "signatureDate": "Signature date",
       "startDate": "Start date",
       "endDate": "End date",
@@ -2119,7 +2043,6 @@
           "measured": "Measured",
           "residual": "Difference",
           "works": "Works",
-          "billed": "Billed",
           "flagged": "Needs a change order",
           "more": "Show more lines",
           "discountNote": "The works on each line are before the contract's {pct} document discount, which applies to the total, so the lines do not add up to the measured works above."
@@ -2191,14 +2114,9 @@
     }
   },
   "variations": {
-    "title": "Variation orders",
-    "subtitle": "Priced changes against a contract. Internally approved before the client sees them.",
     "register": "Variation register",
     "empty": "No variation orders yet.",
     "create": "New variation order",
-    "created": "Variation order created",
-    "variation": "Variation order",
-    "number": "Number",
     "title_": "Title",
     "reason": "Reason",
     "line": {
@@ -2215,13 +2133,8 @@
       "newScope": "New work, not on the contract"
     },
     "saveDraft": "Save draft",
-    "saved": "Saved",
     "internalApprove": "Internal approval",
     "issue": "Issue to client",
-    "issued": "Issued to client",
-    "shareLink": "Client decision link",
-    "copyLink": "Copy link",
-    "copied": "Copied",
     "status": {
       "draft": "Draft",
       "internal_approved": "Internally approved",
@@ -2275,9 +2188,6 @@
     "empty": "No deliveries yet. Create one to start the design flow.",
     "startDelivery": "Start delivery",
     "engagement": "Delivery",
-    "number": "Number",
-    "client": "Client",
-    "project": "Project",
     "offPlan": {
       "existing": "Existing unit",
       "offPlan": "Off-plan",
@@ -2288,8 +2198,6 @@
     "paymentsBadge": "{n} due",
     "questionsBadge": "{n} to answer",
     "asBuiltDue": "As-built due",
-    "created": "Created",
-    "designFee": "Design fee",
     "conceptLocked": "Concept locked",
     "form": {
       "titleEn": "Title (English)",
@@ -2359,14 +2267,6 @@
       "documentation_boq": "Documentation & BOQ",
       "handoff_execution": "Handoff & execution"
     },
-    "phaseStatus": {
-      "done": "Done",
-      "current": "In progress",
-      "upcoming": "Upcoming"
-    },
-    "rail": {
-      "recentActivity": "Recent activity"
-    },
     "pulse": {
       "contractTotal": "Contract total",
       "collected": "Collected to date",
@@ -2404,10 +2304,6 @@
       "payNote": "Logging the payment advances the delivery automatically. The client is never shown the amount.",
       "payNoteRecordOnly": "Logging the balance only records it. Choose how the delivery ends once it clears."
     },
-    "nextActions": {
-      "title": "Next actions",
-      "none": "No actions available from this stage."
-    },
     "command": {
       "readyHeadline": "Ready to advance to {phase}",
       "readyHint": "Everything checks out. Advance when you're ready.",
@@ -2425,10 +2321,7 @@
       "abandonConfirmCta": "Abandon delivery",
       "abandonConfirmCancel": "Keep working",
       "pill": {
-        "waitingClient": "Waiting on client",
-        "crumb": "Deliveries",
-        "feeChip": "Design fee {amount}",
-        "startedOn": "Started {date}"
+        "waitingClient": "Waiting on client"
       },
       "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}",
       "nextAction": "Next action",
@@ -2589,7 +2482,6 @@
       "basis": "Basis",
       "milestones": "Milestones",
       "remove": "Remove",
-      "kind": "Milestone",
       "value": "Value",
       "submit": "Submit fee schedule",
       "addNamed": "Add {name}",
@@ -2603,7 +2495,6 @@
       "title": "Request revision",
       "designChangeTitle": "Revise the 3D",
       "reason": "Reason (optional)",
-      "changeOrderAmount": "Change-order amount (optional)",
       "addAmount": "Change-order amount",
       "hint": "Enter an amount only when this revision is beyond the free allowance.",
       "submit": "Request revision",
@@ -2617,12 +2508,10 @@
       "changeOrders": "Change orders",
       "rom": "Build-cost range",
       "timeline": "Timeline",
-      "clientActivity": "Client activity",
       "budget": "Budget",
       "budgetHistory": "What we have quoted"
     },
     "clientActivity": {
-      "empty": "No client responses yet. Approvals and change requests from the client's link appear here.",
       "by": "By {name}"
     },
     "noteQuote": "“{note}”",
@@ -2676,16 +2565,12 @@
     },
     "fee": {
       "designFee": "Design fee",
-      "notSet": "No fee schedule yet.",
-      "kind": "Milestone",
-      "basis": "Basis",
-      "value": "Value"
+      "notSet": "No fee schedule yet."
     },
     "payments": {
       "empty": "No payments recorded.",
       "kind": "Kind",
       "amount": "Amount",
-      "method": "Method",
       "reference": "Reference",
       "clearedAt": "Cleared"
     },
@@ -2693,7 +2578,6 @@
       "empty": "No artifacts recorded.",
       "kind": "Kind",
       "label": "Label",
-      "contentHash": "Hash",
       "attestedAt": "Attested"
     },
     "conceptOption": {
@@ -2703,15 +2587,12 @@
     "changeOrders": {
       "empty": "No change orders raised.",
       "amount": "Amount",
-      "reason": "Reason",
       "status": "Status",
       "raisedAt": "Raised"
     },
     "rom": {
       "range": "Range",
       "notSet": "No build-cost range set.",
-      "low": "Low",
-      "high": "High",
       "noHistory": "No range has been recorded yet."
     },
     "timeline": {
@@ -2732,7 +2613,6 @@
       "retracted": "Retracted"
     },
     "controls": {
-      "title": "Data entry",
       "recordPayment": "Record payment",
       "amount": "Amount",
       "kind": "Kind",

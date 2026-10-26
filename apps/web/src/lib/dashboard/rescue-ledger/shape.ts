@@ -5,7 +5,7 @@ import { monthsInRange, type RangeMonths } from '../range';
 import type { RescueLedger, RescueLedgerRow, RescueMoneyFigure, RescueRowRisk } from './types';
 
 /** What an empty money figure reads as: the SQL scale, so empty and summed figures look alike. */
-export const ZERO_AMOUNT = '0.0000';
+const ZERO_AMOUNT = '0.0000';
 
 function rowKey(risk: RescueRowRisk, month: string | null): string {
   return `${risk}|${month ?? 'total'}`;

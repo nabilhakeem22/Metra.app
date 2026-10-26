@@ -22,7 +22,7 @@ const UNIT_ALIASES: Record<CostItemUnit, readonly string[]> = {
  * أ/إ/آ -> ا, ة -> ه, ى -> ي, and any run of spaces, dots, underscores or
  * hyphens as one space ('م.ط' and 'م ط' are one spelling).
  */
-export function unitMatchingForm(raw: string): string {
+function unitMatchingForm(raw: string): string {
   return raw
     .trim()
     .toLowerCase()

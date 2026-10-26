@@ -14,7 +14,7 @@ import type {
 import type { ActionCode } from '@/lib/actions/result';
 
 /** The engagement columns a guard reads (the batch loader selects exactly these). */
-export type GuardEngagement = Pick<
+type GuardEngagement = Pick<
   DesignEngagement,
   | 'id'
   | 'state'
@@ -30,10 +30,10 @@ export type GuardEngagement = Pick<
   | 'clientId'
   | 'projectId'
 >;
-export type GuardMilestone = Pick<EngagementMilestone, 'kind' | 'basis' | 'value'>;
-export type GuardPayment = Pick<PaymentEvent, 'kind' | 'amount'>;
-export type GuardArtifact = Pick<EngagementArtifact, 'kind'>;
-export type GuardChangeOrder = Pick<EngagementChangeOrder, 'status' | 'amount'>;
+type GuardMilestone = Pick<EngagementMilestone, 'kind' | 'basis' | 'value'>;
+type GuardPayment = Pick<PaymentEvent, 'kind' | 'amount'>;
+type GuardArtifact = Pick<EngagementArtifact, 'kind'>;
+type GuardChangeOrder = Pick<EngagementChangeOrder, 'status' | 'amount'>;
 export type GuardEvent = Pick<
   EngagementEvent,
   | 'id'

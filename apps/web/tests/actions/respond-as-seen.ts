@@ -15,7 +15,7 @@ import { deliveryOrNull } from './delivery-read';
 type RespondInput = Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'expectedIssueAt'>;
 
 /** The issuance the current page shows for `action`, or null. */
-export async function issuanceShownFor(rawToken: string, action: string): Promise<string | null> {
+async function issuanceShownFor(rawToken: string, action: string): Promise<string | null> {
   if (action !== 'acknowledge_rom' && !isDesignVerb(action)) return null;
   const delivery = await deliveryOrNull(rawToken);
   if (!delivery) return null;

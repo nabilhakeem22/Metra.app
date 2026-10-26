@@ -10,9 +10,9 @@ import type { NestedMessages } from './flatten';
 
 // This file lives in scripts/i18n/lib, so the repo root is three levels up.
 const here = dirname(fileURLToPath(import.meta.url));
-export const REPO_ROOT = resolve(here, '..', '..', '..');
-export const I18N_DIR = resolve(here, '..');
-export const MESSAGES_DIR = resolve(REPO_ROOT, 'apps', 'web', 'src', 'messages');
+const REPO_ROOT = resolve(here, '..', '..', '..');
+const I18N_DIR = resolve(here, '..');
+const MESSAGES_DIR = resolve(REPO_ROOT, 'apps', 'web', 'src', 'messages');
 
 export const EN_PATH = resolve(MESSAGES_DIR, 'en.json');
 export const AR_PATH = resolve(MESSAGES_DIR, 'ar-EG.json');

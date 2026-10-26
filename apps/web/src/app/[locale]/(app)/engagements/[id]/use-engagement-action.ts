@@ -9,7 +9,7 @@ import { releasesKey } from '@/lib/engagements/retry-policy';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { useHeldKeys } from './use-held-keys';
 
-export type { ActionFailure, RefusalSink, RunAction } from './run-action';
+export type { RefusalSink, RunAction } from './run-action';
 
 export interface EngagementActionApi {
   pending: boolean;

@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 export type Register = 'eg' | 'msa';
 
-export interface RegisterRule {
+interface RegisterRule {
   prefix: string;
   register: Register;
   why?: string;
@@ -28,7 +28,7 @@ export interface RegisterPolicy {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url)); // scripts/i18n/lib
-export const REGISTERS_PATH = resolve(HERE, '../registers.json');
+const REGISTERS_PATH = resolve(HERE, '../registers.json');
 
 export function loadPolicy(path: string = REGISTERS_PATH): RegisterPolicy {
   const raw = JSON.parse(readFileSync(path, 'utf8')) as RegisterPolicy & {
@@ -58,20 +58,6 @@ export function registerFor(key: string, policy: RegisterPolicy): Register {
     if (!best || rule.prefix.length > best.prefix.length) best = rule;
   }
   return best ? best.register : policy.default;
-}
-
-/** Split a flat catalog into the two registers, preserving key order. */
-export function splitByRegister<T>(
-  flat: Record<string, T>,
-  policy: RegisterPolicy,
-): { eg: Record<string, T>; msa: Record<string, T> } {
-  const eg: Record<string, T> = {};
-  const msa: Record<string, T> = {};
-  for (const [key, value] of Object.entries(flat)) {
-    if (registerFor(key, policy) === 'eg') eg[key] = value;
-    else msa[key] = value;
-  }
-  return { eg, msa };
 }
 
 /**

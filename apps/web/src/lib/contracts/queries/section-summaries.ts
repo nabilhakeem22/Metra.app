@@ -83,7 +83,7 @@ async function readOpeningLines(
  * with its line count; the first page with the opening lines too. Three
  * queries, at most SECTIONS_PAGE_SIZE sections and LINES_PAGE_SIZE lines.
  */
-export async function loadSectionsPage(
+async function loadSectionsPage(
   tx: MetraDb,
   contractId: string,
   afterSectionId: string | null,

@@ -33,7 +33,7 @@ export interface PublicContractSection {
 }
 
 /** One row of the payment schedule the client signs; its amount is derived. */
-export interface PublicScheduleRow {
+interface PublicScheduleRow {
   label_ar: string | null;
   label_en: string | null;
   basis: MilestoneBasis;

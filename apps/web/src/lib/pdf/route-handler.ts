@@ -20,9 +20,8 @@ import { can, canSeeMargin } from '@/lib/permissions/can';
 import type { Capability } from '@/lib/permissions/roles';
 import { isUuid } from '@/lib/uuid';
 
-export type { PdfOrg };
 
-export type PdfVariant = 'client' | 'internal';
+type PdfVariant = 'client' | 'internal';
 
 /** The org row plus whatever else THIS document's header needs. */
 export interface PdfHeader<THeader> {

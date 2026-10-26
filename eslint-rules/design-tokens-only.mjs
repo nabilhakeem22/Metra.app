@@ -48,7 +48,7 @@ const DISPLAY_ALLOWED = [
 ];
 
 /** Split a class token into its variants and the utility, honouring `[...]`. */
-export function splitVariants(token) {
+function splitVariants(token) {
   const parts = [];
   let depth = 0;
   let current = '';

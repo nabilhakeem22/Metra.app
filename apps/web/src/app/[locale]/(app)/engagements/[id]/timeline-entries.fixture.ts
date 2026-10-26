@@ -7,7 +7,7 @@ import type {
 import { buildTimelineEntries } from './timeline-entries';
 import type { TimelineLabels } from './timeline-labels';
 
-export const LABELS: TimelineLabels = {
+const LABELS: TimelineLabels = {
   transition: (from, to) => (from && to ? `${from}->${to}` : `state:${to ?? 'created'}`),
   eventKind: (kind) => `kind:${kind}`,
   clientActivity: (kind, actorName) =>

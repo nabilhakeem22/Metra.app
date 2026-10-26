@@ -11,20 +11,5 @@
 // Kept as a module rather than deleted so the pipeline's import sites and its
 // `SheetGrid` type keep resolving from where they always did. Still PURE and
 // CLIENT-SAFE: the preview decodes in the browser before anything is uploaded.
-export {
-  decodeCsv,
-  padToRectangle,
-  sniffDelimiter,
-  stripBom,
-  type DecodeNote,
-  type DecodeResult,
-  type SheetGrid,
-} from '@/lib/import/decode';
+export { decodeCsv, sniffDelimiter, stripBom, type DecodeNote, type SheetGrid } from '@/lib/import/decode';
 export { parseCsvRows } from '@/lib/import/parse-csv';
-export {
-  ImportParseError,
-  MAX_IMPORT_BYTES,
-  MAX_IMPORT_ROWS,
-  MAX_RAW_ROWS,
-  type ImportParseReason,
-} from '@/lib/import/limits';

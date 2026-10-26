@@ -52,7 +52,7 @@ export type BudgetOutcome =
   | PortalActError;
 
 /** The two respond verbs of the final design (app_delivery_respond_by_token). */
-export const DESIGN_VERBS = ['approve_design', 'request_design_changes'] as const;
+const DESIGN_VERBS = ['approve_design', 'request_design_changes'] as const;
 export type DesignVerb = (typeof DESIGN_VERBS)[number];
 
 export function isDesignVerb(verb: unknown): verb is DesignVerb {
@@ -80,7 +80,7 @@ export function answersFromSaved(result: { ok: boolean; code?: string; error?: s
 }
 
 /** With nothing on file: still at the review stage reads `changed`, elsewhere `moved_on`. */
-export function nothingOnFile(
+function nothingOnFile(
   saved: Pick<PublicDelivery, 'stageKey'> | null,
   reviewStage: PortalStageKey,
 ): { kind: 'changed' } | { kind: 'moved_on' } {

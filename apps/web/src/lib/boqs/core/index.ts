@@ -6,5 +6,5 @@
 // keeps resolving unchanged. Pure structural refactor: no SQL, no statement order
 // and no transaction boundary changed.
 export { MAX_BOQ_LINES, createBoqCore, type CreateBoqInput } from './create';
-export { commitImportCore, type CommitImportInput } from './commit-import';
+export { commitImportCore } from './commit-import';
 export { recomputeBoqTotals } from './recompute';

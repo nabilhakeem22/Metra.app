@@ -17,7 +17,7 @@ import type { MetraDb } from '@metra/db';
 import { sql, type SQL } from 'drizzle-orm';
 import { measuredLinesOf, measuredWorksOf } from '../queries/measured-lines';
 
-export const DIFFERENCES_PAGE_SIZE = 50;
+const DIFFERENCES_PAGE_SIZE = 50;
 
 export interface DifferenceRow {
   lineId: string;

@@ -11,14 +11,7 @@ import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import type { PublicContract, PublicSectionLinesPage, PublicSectionsPage } from './public-types';
 
-export type {
-  PublicContract,
-  PublicContractLine,
-  PublicContractSection,
-  PublicScheduleRow,
-  PublicSectionLinesPage,
-  PublicSectionsPage,
-} from './public-types';
+export type { PublicContract, PublicSectionLinesPage, PublicSectionsPage } from './public-types';
 
 /** The furthest a "show more" may start, the SQL's own clamp. */
 const MAX_LINE_OFFSET = 100_000;

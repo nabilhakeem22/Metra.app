@@ -25,7 +25,7 @@ import type { MemberRole } from '@/lib/permissions/roles';
  * number of reads for any count), so every in-flight delivery is read; only past
  * this many are the most dormant (oldest `updated_at`) left out, and logged.
  */
-export const IN_FLIGHT_LIMIT = 1000;
+const IN_FLIGHT_LIMIT = 1000;
 
 export interface InFlightDelivery {
   id: string;

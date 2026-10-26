@@ -9,8 +9,8 @@ export const FLAG_CODES = [
   'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11',
 ] as const;
 
-export type BlockingCode = (typeof BLOCKING_CODES)[number];
-export type FlagCode = (typeof FLAG_CODES)[number];
+type BlockingCode = (typeof BLOCKING_CODES)[number];
+type FlagCode = (typeof FLAG_CODES)[number];
 export type FindingCode = BlockingCode | FlagCode;
 
 /** One-line titles, shown in the CLI summary and review.html. */

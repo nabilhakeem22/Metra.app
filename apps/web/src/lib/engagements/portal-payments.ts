@@ -14,7 +14,7 @@ import type { PublicDelivery, PublicDeliveryMilestone } from './public/types';
  *   - `due`     — the next milestone, nothing cleared on it yet
  *   - `later`   — a future milestone, nothing cleared on it yet (greyed)
  */
-export type PaymentRowState = 'paid' | 'partial' | 'due' | 'later';
+type PaymentRowState = 'paid' | 'partial' | 'due' | 'later';
 
 export interface PaymentRow {
   milestoneKind: string;

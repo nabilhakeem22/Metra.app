@@ -87,7 +87,7 @@ export function resolveUnit(text: string): CostItemUnit | null {
   return text ? unitFromToken(text) : null;
 }
 
-export type ImportRowError =
+type ImportRowError =
   | 'row_empty'
   | 'code_missing'
   | 'code_too_long'
@@ -116,7 +116,7 @@ export interface ColumnMapping {
   etaCodeType?: number;
 }
 
-export interface ParsedCostItem {
+interface ParsedCostItem {
   code: string;
   nameEn: string | null;
   nameAr: string | null;

@@ -10,7 +10,7 @@ import type { PickerSearch } from '@/lib/price-book/picker-types';
 /** How long typing rests before the picker asks the server: one request per pause. */
 export const PICKER_PAUSE_MS = 200;
 /** How long an answer is reused for the same search (reopening, or typing back to it). */
-export const PICKER_ANSWER_MS = 60_000;
+const PICKER_ANSWER_MS = 60_000;
 
 export interface PriceBookSearchState {
   /** The latest answer: kept on screen while the next one loads. */

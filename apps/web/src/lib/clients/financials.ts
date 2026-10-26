@@ -20,7 +20,7 @@ import { weightedRates, type ClientEffectiveRates } from './rates';
 /** Contract statuses that represent a real commercial commitment. `draft` is a
  *  work-in-progress and must not drag the client's effective rate around;
  *  `terminated` is no longer a commitment. That leaves issued + signed. */
-export const COMMITTED_STATUSES = ['issued', 'signed'] as const;
+const COMMITTED_STATUSES = ['issued', 'signed'] as const;
 
 /** Whose contracted value: one client's, or one project's. Both tables carry both columns. */
 export interface ContractedScope {

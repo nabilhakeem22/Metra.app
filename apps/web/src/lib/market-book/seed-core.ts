@@ -17,7 +17,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { holdStudioBookOrBusy } from './studio-hold';
 
 /** Marks the audit rows of each app path, as `market:seed-price-books` marks the CLI's. Chosen on the server. */
-export const SEED_SOURCES = {
+const SEED_SOURCES = {
   signup: 'market:seed-on-signup',
   emptyPriceBook: 'market:seed-from-price-book',
 } as const;

@@ -18,7 +18,7 @@ import { isUuid } from '@/lib/uuid';
 import type { MarketLinkSearch } from './types';
 
 /** The most items one answer offers; typing more narrows the rest. */
-export const MARKET_LINK_LIMIT = 20;
+const MARKET_LINK_LIMIT = 20;
 const MAX_LINK_SEARCH_LENGTH = 100;
 
 const SEARCHED = sql`concat_ws(' ', ${marketSeedBook.nameAr}, ${marketSeedBook.nameEn}, ${marketSeedBook.leafNameAr}, ${marketSeedBook.leafNameEn})`;

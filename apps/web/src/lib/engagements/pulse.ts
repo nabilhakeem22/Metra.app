@@ -40,7 +40,7 @@ const GATE_TRIGGER: Record<GateKind, Trigger> = {
 };
 
 /** The next un-cleared paying gate: what is still owed and what it opens. */
-export interface PendingGate {
+interface PendingGate {
   /** Which gate is outstanding — labels the "clears {gate}" line. */
   gate: GateKind;
   /** The scale-4 shortfall still owed on this gate (required − paid, clamped ≥ 0). */

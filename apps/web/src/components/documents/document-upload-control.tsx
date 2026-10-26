@@ -19,6 +19,13 @@ export const DOCUMENT_CATEGORY_ID = 'document-category';
 /** What the upload action answers: a signed URL to PUT to, or a refusal. */
 type SignedUploadAnswer = { signedUrl: string } | ActionResult;
 
+/** The entity's upload action, bound to its client or project. */
+export type CreateDocumentUpload = (input: {
+  contentType: string;
+  originalName: string;
+  categoryId: string | null;
+}) => Promise<SignedUploadAnswer>;
+
 type UploadText = 'category' | 'uncategorised' | 'upload' | 'uploaded';
 
 const NO_FIELDS: readonly DocumentUploadField[] = [];
@@ -34,7 +41,7 @@ export function DocumentUploadControl({
   t,
 }: {
   categories: Array<{ id: string; nameEn: string | null; nameAr: string | null }>;
-  createUpload: (input: { contentType: string; originalName: string; categoryId: string | null }) => Promise<SignedUploadAnswer>;
+  createUpload: CreateDocumentUpload;
   t: (key: UploadText) => string;
 }) {
   const te = useTranslations('errors');

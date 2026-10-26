@@ -17,9 +17,9 @@ import { readFields, readOptionalText } from '@/lib/validation/field-rules';
 export const CONTRACT_PAYMENT_FIELDS = ['amount', 'receivedOn', 'method', 'reference', 'note'] as const;
 export type ContractPaymentField = (typeof CONTRACT_PAYMENT_FIELDS)[number];
 
-export const MAX_PAYMENT_METHOD_CHARS = 40;
-export const MAX_PAYMENT_REFERENCE_CHARS = 120;
-export const MAX_PAYMENT_NOTE_CHARS = 500;
+const MAX_PAYMENT_METHOD_CHARS = 40;
+const MAX_PAYMENT_REFERENCE_CHARS = 120;
+const MAX_PAYMENT_NOTE_CHARS = 500;
 
 export interface TypedContractPayment {
   amount?: unknown;

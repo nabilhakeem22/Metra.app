@@ -23,7 +23,7 @@ import { RANGE_OPTIONS, type RangeMonths } from '../range';
 import { rangeStartSql } from '../queries/range-start';
 
 /** How far before the widest window the ledger reads history (months). */
-export const HISTORY_LOOKBACK_MONTHS = 12;
+const HISTORY_LOOKBACK_MONTHS = 12;
 
 /** How long before its stage move a follow up alert still belongs to the chain (days). */
 export const ALERT_LOOKBACK_DAYS = 60;

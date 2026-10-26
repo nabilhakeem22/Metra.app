@@ -5,21 +5,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
-import type { ProjectDeliverySummary } from '@/lib/engagements/queries';
 import type { ProjectOverview } from '@/lib/projects/queries';
-
-/**
- * The through-project Delivery entry point, wired only when the caller may read
- * deliveries (`engagements_design` read). `delivery` is null when the project has
- * none yet; `canStart` gates the "Start delivery" CTA on the create capability.
- */
-export interface DeliveryPanelProps {
-  delivery: ProjectDeliverySummary | null;
-  deliveryCount: number;
-  clientId: string;
-  projectId: string;
-  canStart: boolean;
-}
 
 export async function OverviewTab({
   overview,

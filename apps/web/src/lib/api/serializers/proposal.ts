@@ -48,7 +48,7 @@ export function serializeProposalSummary(
   };
 }
 
-export interface PublicProposalLine {
+interface PublicProposalLine {
   id: string;
   description_ar: string | null;
   description_en: string | null;
@@ -65,7 +65,7 @@ export interface PublicProposalLine {
   line_margin?: string;
 }
 
-export interface PublicProposalSection {
+interface PublicProposalSection {
   id: string;
   title_ar: string | null;
   title_en: string | null;

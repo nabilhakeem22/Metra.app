@@ -13,7 +13,7 @@ import { asc, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 
 /** A single milestone in a fee schedule (money as a scale-4 string). */
-export interface FeeScheduleMilestone {
+interface FeeScheduleMilestone {
   kind: MilestoneKind;
   basis: MilestoneBasis;
   value: string;

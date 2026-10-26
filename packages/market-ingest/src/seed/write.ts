@@ -22,7 +22,7 @@ export interface RunBook {
 }
 
 /** Marks every audit row this command writes, so its creates read apart from a studio's own. */
-export const SEED_SOURCE = 'market:seed-price-books';
+const SEED_SOURCE = 'market:seed-price-books';
 
 /** A publish or withdrawal changed the stored book after the run rebuilt it; the studio's transaction wrote nothing. */
 export class SeedBookChangedError extends Error {

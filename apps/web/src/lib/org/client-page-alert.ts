@@ -16,7 +16,7 @@ import { claimPeriod } from '@/lib/automation/claim';
 import { cairoHourKey } from '@/lib/automation/clock';
 import type { ClientPageField } from './client-page-details';
 
-export const ALERT_EMAIL_BATCHES_PER_HOUR = 3;
+const ALERT_EMAIL_BATCHES_PER_HOUR = 3;
 
 /** Whether this change's alert is also emailed. The in-app notification never depends on it. */
 export async function claimAlertEmail(

@@ -9,9 +9,9 @@ import { formatDocNumber } from '@/lib/format/doc-number';
 import { isUuid } from '@/lib/uuid';
 import { validIsoDate } from '@/lib/validation/iso-date';
 
-export const PAYMENTS_PAGE_SIZE = 50;
+const PAYMENTS_PAGE_SIZE = 50;
 
-export interface ContractPaymentRow {
+interface ContractPaymentRow {
   id: string;
   /** The request it paid, by its PR number. */
   requestNumber: string;

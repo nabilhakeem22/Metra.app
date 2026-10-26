@@ -1,7 +1,7 @@
 // The check pipeline, pure: merge the producer files, apply the owner's
 // mapping and corrections, run every validator, and build staged.json. The CLI
 // does the file and database IO around it.
-import { finding, isBlocking, sortFindings, type Finding } from '../findings';
+import { finding, sortFindings, type Finding } from '../findings';
 import { mergeProducerFiles, type ProducerFile } from '../merge';
 import { guardCorrections, guardMapping } from '../overrides';
 import { buildStaged, type StagedBulletin, type StagedProvenance } from '../stage';
@@ -87,8 +87,4 @@ export function runCheck(input: CheckInput): CheckOutcome {
     ...[...VALIDATORS, ...input.historyValidators].flatMap((validate) => validate(context)),
   ]);
   return { findings, context, staged: buildStaged(input.period, provenanceOf(input), context, findings) };
-}
-
-export function blockingOf(findings: Finding[]): Finding[] {
-  return findings.filter(isBlocking);
 }
