@@ -24,6 +24,7 @@ import { getProjectEffectiveRates } from '@/lib/clients/financials';
 import { mayOpenCostSheet } from '@/lib/execution/cost-sheet/access';
 import { getProjectCostSummary } from '@/lib/execution/cost-sheet/project';
 import { resolveSeeMargin } from '@/lib/org/queries';
+import { isUuid } from '@/lib/uuid';
 import { FinancialsTab } from './financials-tab';
 import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 import { OverviewTab } from './overview-tab';
@@ -43,6 +44,7 @@ export default async function ProjectProfilePage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const { tab: tabParam } = await searchParams;
   const ctx = await requireOrg();
   if (!can(ctx.role, 'projects', 'read')) notFound();

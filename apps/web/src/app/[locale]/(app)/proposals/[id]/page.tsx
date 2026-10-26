@@ -9,6 +9,7 @@ import { hasActiveCostItem } from '@/lib/price-book/picker-query';
 import { getProposalWithLines } from '@/lib/proposals/queries';
 import { listSections } from '@/lib/sections/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
+import { isUuid } from '@/lib/uuid';
 import { ProposalBuilder, type BoqModeProps } from './builder-client';
 
 export default async function ProposalBuilderPage({
@@ -17,6 +18,7 @@ export default async function ProposalBuilderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const ctx = await requireOrg();
   if (!can(ctx.role, 'proposals_build', 'read')) notFound();
 

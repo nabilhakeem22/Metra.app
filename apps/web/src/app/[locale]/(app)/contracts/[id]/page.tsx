@@ -13,6 +13,7 @@ import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
+import { isUuid } from '@/lib/uuid';
 import { ContractDetailClient } from './contract-detail-client';
 import { contractPagePayload } from './page-payload';
 import { contractSubtitle } from './subtitle';
@@ -35,6 +36,7 @@ export default async function ContractDetailPage({
   };
   if (!access.seeContract && !access.seeBilling) notFound();
   const { id } = await params;
+  if (!isUuid(id)) notFound();
 
   const t = await getTranslations('contracts');
   const seeMargin = await resolveSeeMargin(ctx);

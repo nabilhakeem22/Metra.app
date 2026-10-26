@@ -39,6 +39,8 @@ function spec<THeader = undefined>(
   };
 }
 
+const DOC_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+
 const request = (url = 'https://app.metra.test/api/pdf/x/1') => new Request(url);
 
 beforeEach(() => {
@@ -55,7 +57,7 @@ describe('servePdfDocument — the order the three routes must follow', () => {
   it('401s with no session, and never touches the document', async () => {
     session.mockResolvedValue(null);
     const stub = spec();
-    const res = await servePdfDocument(request(), '1', stub);
+    const res = await servePdfDocument(request(), DOC_ID, stub);
     expect(res.status).toBe(401);
     expect(stub.load).not.toHaveBeenCalled();
   });
@@ -64,7 +66,7 @@ describe('servePdfDocument — the order the three routes must follow', () => {
     // accountant has no read on boq_build at all (viewer does, so it would pass).
     org.mockResolvedValue({ orgId: 'o1', userId: 'u1', role: 'accountant' });
     const stub = spec({ capability: 'boq_build' });
-    const res = await servePdfDocument(request(), '1', stub);
+    const res = await servePdfDocument(request(), DOC_ID, stub);
     expect(res.status).toBe(403);
     expect(stub.load).not.toHaveBeenCalled();
   });
@@ -78,7 +80,7 @@ describe('servePdfDocument — the order the three routes must follow', () => {
     const stub = spec();
     const res = await servePdfDocument(
       request('https://app.metra.test/api/pdf/x/1?variant=internal'),
-      '1',
+      DOC_ID,
       stub,
     );
     expect(res.status).toBe(403);
@@ -87,12 +89,37 @@ describe('servePdfDocument — the order the three routes must follow', () => {
 
   it('404s a document that does not resolve', async () => {
     const stub = spec({ load: vi.fn(async () => null) });
-    expect((await servePdfDocument(request(), '1', stub)).status).toBe(404);
+    expect((await servePdfDocument(request(), DOC_ID, stub)).status).toBe(404);
+  });
+
+  it.each(['not-a-uuid', '1', `${DOC_ID}' or 1=1--`])(
+    '404s the malformed id %j without reading the header or the document',
+    async (id) => {
+      // A malformed id would reach a uuid cast and raise 22P02, a 500.
+      const loadHeader = vi.fn();
+      const stub = spec({ loadHeader });
+      expect((await servePdfDocument(request(), id, stub)).status).toBe(404);
+      expect(loadHeader).not.toHaveBeenCalled();
+      expect(orgRow).not.toHaveBeenCalled();
+      expect(stub.load).not.toHaveBeenCalled();
+    },
+  );
+
+  it('403s a margin-blind internal request for a malformed id, as for a missing one', async () => {
+    org.mockResolvedValue({ orgId: 'o1', userId: 'u1', role: 'project_manager' });
+    const stub = spec();
+    const res = await servePdfDocument(
+      request('https://app.metra.test/api/pdf/x/1?variant=internal'),
+      'not-a-uuid',
+      stub,
+    );
+    expect(res.status).toBe(403);
+    expect(stub.load).not.toHaveBeenCalled();
   });
 
   it('413s a document past the line cap WITHOUT asking the renderer', async () => {
     const stub = spec({ load: vi.fn(async () => ({ lines: 11 })) });
-    const res = await servePdfDocument(request(), '1', stub);
+    const res = await servePdfDocument(request(), DOC_ID, stub);
     expect(res.status).toBe(413);
     expect(render).not.toHaveBeenCalled();
     expect(stub.buildHtml).not.toHaveBeenCalled();
@@ -102,7 +129,7 @@ describe('servePdfDocument — the order the three routes must follow', () => {
   });
 
   it('200s with the pdf headers, including no-store', async () => {
-    const res = await servePdfDocument(request(), '1', spec());
+    const res = await servePdfDocument(request(), DOC_ID, spec());
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
     expect(res.headers.get('content-disposition')).toBe('inline; filename="stub.pdf"');
@@ -113,34 +140,34 @@ describe('servePdfDocument — the order the three routes must follow', () => {
 
   it('503s with retry-after when the renderer is busy, not 500', async () => {
     render.mockRejectedValue(new RendererBusyError());
-    const res = await servePdfDocument(request(), '1', spec());
+    const res = await servePdfDocument(request(), DOC_ID, spec());
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('5');
   });
 
   it('500s any other render failure', async () => {
     render.mockRejectedValue(new Error('chromium died'));
-    expect((await servePdfDocument(request(), '1', spec())).status).toBe(500);
+    expect((await servePdfDocument(request(), DOC_ID, spec())).status).toBe(500);
   });
 });
 
 describe('servePdfDocument — the variant', () => {
   it('defaults to the client copy and loads it WITHOUT cost', async () => {
     const stub = spec();
-    await servePdfDocument(request('https://app.metra.test/api/pdf/x/1?variant=bogus'), '1', stub);
+    await servePdfDocument(request('https://app.metra.test/api/pdf/x/1?variant=bogus'), DOC_ID, stub);
     // The fourth argument is the spec's own header row: `undefined` here,
     // because this spec defines no loadHeader.
-    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', false, undefined);
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), DOC_ID, false, undefined);
   });
 
   it('loads cost only for ?variant=internal', async () => {
     const stub = spec();
     await servePdfDocument(
       request('https://app.metra.test/api/pdf/x/1?variant=internal'),
-      '1',
+      DOC_ID,
       stub,
     );
-    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', true, undefined);
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), DOC_ID, true, undefined);
   });
 });
 
@@ -151,7 +178,7 @@ describe('servePdfDocument — the org lookup', () => {
     org.mockResolvedValue({ orgId: 'o1', userId: 'u1', role: 'project_manager' });
     const res = await servePdfDocument(
       request('https://app.metra.test/api/pdf/x/1?variant=internal'),
-      '1',
+      DOC_ID,
       spec(),
     );
     expect(res.status).toBe(403);
@@ -171,11 +198,11 @@ describe('servePdfDocument — the org lookup', () => {
       header: { projectId: 'p1' },
     }));
     const stub = spec<{ projectId: string }>({ loadHeader });
-    await servePdfDocument(request(), '1', stub);
-    expect(loadHeader).toHaveBeenCalledWith(expect.anything(), '1');
+    await servePdfDocument(request(), DOC_ID, stub);
+    expect(loadHeader).toHaveBeenCalledWith(expect.anything(), DOC_ID);
     expect(orgRow).not.toHaveBeenCalled();
     // ...and the header reaches both the load and the template.
-    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', false, {
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), DOC_ID, false, {
       projectId: 'p1',
     });
     expect(stub.buildHtml).toHaveBeenCalledWith(
@@ -186,7 +213,7 @@ describe('servePdfDocument — the org lookup', () => {
 
   it('404s when the spec\'s header read does not resolve, without loading a detail', async () => {
     const stub = spec({ loadHeader: vi.fn(async () => null) });
-    expect((await servePdfDocument(request(), '1', stub)).status).toBe(404);
+    expect((await servePdfDocument(request(), DOC_ID, stub)).status).toBe(404);
     expect(stub.load).not.toHaveBeenCalled();
   });
 
@@ -197,7 +224,7 @@ describe('servePdfDocument — the org lookup', () => {
     const stub = spec({ loadHeader: vi.fn(async () => null) });
     const res = await servePdfDocument(
       request('https://app.metra.test/api/pdf/x/1?variant=internal'),
-      '1',
+      DOC_ID,
       stub,
     );
     expect(res.status).toBe(403);
@@ -205,7 +232,7 @@ describe('servePdfDocument — the org lookup', () => {
 
   it('hands the template the org and its locale', async () => {
     const stub = spec();
-    await servePdfDocument(request(), '1', stub);
+    await servePdfDocument(request(), DOC_ID, stub);
     expect(stub.buildHtml).toHaveBeenCalledWith(
       { lines: 1 },
       {

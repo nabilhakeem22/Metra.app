@@ -14,6 +14,7 @@ import { getDeliveriesByProjects } from '@/lib/engagements/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
+import { isUuid } from '@/lib/uuid';
 import { ActivityTab } from './activity-tab';
 import { ClientCreatedHandoff } from './client-created-handoff';
 import { ContactsTab } from './contacts-tab';
@@ -33,6 +34,7 @@ export default async function ClientProfilePage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const { tab: tabParam } = await searchParams;
   const ctx = await requireOrg();
   // The client role has no `clients` access -> 404.

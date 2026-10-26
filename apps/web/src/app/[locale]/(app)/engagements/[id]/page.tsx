@@ -12,6 +12,7 @@ import { mayRecordMeasurements } from '@/lib/execution/measurements/access';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
+import { isUuid } from '@/lib/uuid';
 import { clientExpectedCardOf } from './client-expected-card';
 import { EngagementDetailClient } from './engagement-detail-client';
 import {
@@ -32,6 +33,7 @@ export default async function EngagementDetailPage({
   const ctx = await requireOrg();
   if (!can(ctx.role, 'engagements_design', 'read')) notFound();
   const { id } = await params;
+  if (!isUuid(id)) notFound();
 
   const data = await loadEngagementDetail(ctx, id);
   if (!data) notFound();
