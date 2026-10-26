@@ -180,8 +180,8 @@ describe('the messages each scope hands the browser', () => {
   it('scopedMessages keeps exactly the listed namespaces', () => {
     expect(Object.keys(scopedMessages(en, 'deliveryLink')).sort()).toEqual(['app', 'delivery', 'portal']);
     expect(scopedMessages(en, 'deliveryLink').delivery).toBe(en.delivery);
-    // A dotted entry copies only its sub-tree: the portal's errors, nothing else under `portal`.
-    expect(scopedMessages(en, 'deliveryLink').portal).toEqual({ errors: en.portal.errors });
+    // A dotted entry copies only its sub-tree: the portal's errors, units and contract words, nothing else under `portal`.
+    expect(scopedMessages(en, 'deliveryLink').portal).toEqual({ contract: en.portal.contract, errors: en.portal.errors, units: en.portal.units });
     expect(scopedMessages({ app: { name: 'x' } }, 'deliveryLink')).toEqual({ app: { name: 'x' } });
   });
 });

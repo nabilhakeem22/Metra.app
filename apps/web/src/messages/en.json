@@ -1792,26 +1792,7 @@
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
       "notSignature": "This is an electronic acknowledgement, not a binding signature.",
-      "heading": "Contract",
-      "originalValue": "Original value",
-      "advancePct": "Advance %",
-      "retentionPct": "Retention %",
-      "worksValue": "Works value",
-      "vat": "VAT ({rate})",
-      "supervision": "Supervision fee ({rate})",
-      "schedule": {
-        "title": "Payment schedule",
-        "note": "Each amount is a share of the contract value, VAT included."
-      },
-      "lines": {
-        "showMore": "Show more lines ({count} left)",
-        "provisional": "Provisional",
-        "gone": "These lines can no longer be shown. Please refresh the page.",
-        "loadFailed": "We could not load these lines. Please check your connection and try again.",
-        "loadSectionsFailed": "We could not load more sections. Please check your connection and try again.",
-        "show": "Show the lines ({count})",
-        "moreSections": "Show more sections ({count} left)"
-      }
+      "heading": "Contract"
     },
     "lines": {
       "show": "Show lines ({count})",
@@ -3344,7 +3325,13 @@
       "signingClosed": "The online signing period has ended. Contact {studio} to sign.",
       "none": "{studio} has not issued the execution contract yet.",
       "previousTerminated": "An earlier contract for this project was ended on {date}.",
-      "designRecord": "See the design record"
+      "designRecord": "See the design record",
+      "document": {
+        "show": "Show the full contract",
+        "hide": "Hide the contract",
+        "gone": "This contract can no longer be shown here. Please refresh the page.",
+        "loadFailed": "We could not load the contract. Please check your connection and try again."
+      }
     },
     "changeOrders": {
       "title": "Change orders",
@@ -3397,6 +3384,29 @@
       "liter": "liter",
       "cbm": "m³",
       "roll": "roll"
+    },
+    "contract": {
+      "lines": {
+        "showMore": "Show more lines ({count} left)",
+        "provisional": "Provisional",
+        "gone": "These lines can no longer be shown. Please refresh the page.",
+        "loadFailed": "We could not load these lines. Please check your connection and try again.",
+        "loadSectionsFailed": "We could not load more sections. Please check your connection and try again.",
+        "show": "Show the lines ({count})",
+        "moreSections": "Show more sections ({count} left)"
+      },
+      "totals": {
+        "worksValue": "Works value",
+        "vat": "VAT ({rate})",
+        "supervision": "Supervision fee ({rate})",
+        "originalValue": "Original value",
+        "advancePct": "Advance %",
+        "retentionPct": "Retention %"
+      },
+      "schedule": {
+        "title": "Payment schedule",
+        "note": "Each amount is a share of the contract value, VAT included."
+      }
     }
   },
   "marketBook": {

@@ -29,6 +29,9 @@ const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'forbidden',
 const ONBOARDING_ERRORS = errorsOf('amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'file_too_large', 'firm_type_unavailable', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'logo_image_unsupported', 'name_required', 'phone_required', 'record_not_found', 'reference', 'storage_unavailable', 'uncertain', 'unreachable');
 const INVITE_ERRORS = errorsOf('already_member', 'amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'invite_expired', 'invite_not_found', 'invite_wrong_account', 'last_owner', 'malformed', 'owner_immutable', 'pending_exists', 'record_not_found', 'reference', 'self', 'token_invalid', 'uncertain', 'unreachable');
 
+/** What the client contract components (components/client-contract) read, on /c and in the client home. */
+const CLIENT_CONTRACT = ['portal.contract.lines', 'portal.contract.schedule', 'portal.contract.totals'];
+
 export const CLIENT_NAMESPACES = {
   /** app/[locale]/layout.tsx: the landing page and anything not scoped below. */
   root: ['app'],
@@ -48,9 +51,9 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/invite: accepting a team invitation. */
   invite: ['accept', 'app', ...INVITE_ERRORS],
   /** app/[locale]/c: the client's contract link. */
-  contractLink: ['contracts.ack', 'portal.errors'],
+  contractLink: ['contracts.ack', ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/d: the client's delivery page. */
-  deliveryLink: ['app', 'delivery', 'portal.errors'],
+  deliveryLink: ['app', 'delivery', ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/p: the client's proposal link. */
   proposalLink: ['portal.errors', 'portal.units', 'proposals.p'],
   /** app/[locale]/v: the client's variation link. */

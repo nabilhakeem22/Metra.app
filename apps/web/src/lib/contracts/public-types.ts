@@ -96,6 +96,29 @@ export interface PublicContract {
   sections: PublicContractSection[];
 }
 
+/**
+ * What a client page shows of a contract's DOCUMENT (components/client-contract):
+ * its sections, its figures and its payment schedule. /c hands over the whole
+ * snapshot; the client home only this part of it (lib/client-home/contract.ts).
+ */
+export type ContractDocument = Pick<
+  PublicContract,
+  | 'id'
+  | 'source'
+  | 'taxable_base'
+  | 'tax_rate'
+  | 'tax_amount'
+  | 'supervision_pct'
+  | 'supervision_amount'
+  | 'original_value'
+  | 'total'
+  | 'advance_pct'
+  | 'retention_pct'
+  | 'payment_schedule'
+  | 'section_count'
+  | 'sections'
+>;
+
 /** One "show more" answer: up to 100 lines of a section, from `offset`. */
 export interface PublicSectionLinesPage {
   section_id: string;

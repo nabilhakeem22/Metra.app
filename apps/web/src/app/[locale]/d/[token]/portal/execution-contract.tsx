@@ -11,6 +11,7 @@ import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { ContractDocumentDisclosure } from './contract-document';
 import { DocumentNumber } from './document-number';
 import { formatPortalMoney } from './portal-money';
 
@@ -28,9 +29,11 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
  * where it stands, its value, when and how it was signed, when the works are
  * expected to finish, and when it ended if it did. Before the studio issues one,
  * it says so and, for a delivery that began with a design, links the design
- * record. While the contract waits for a signature, the client is told where
- * to sign it: the contract's own link the studio sent (signing moves into this
- * page with its one-time code in a later step). فصحى copy, Latin digits.
+ * record. An issued or signed contract opens in full on the client's tap
+ * (./contract-document.tsx). While it waits for a signature, the client is
+ * told where to sign it: the contract's own link the studio sent (signing
+ * moves into this page with its one-time code in a later step). فصحى copy,
+ * Latin digits.
  */
 export function ExecutionContract({
   token,
@@ -81,6 +84,7 @@ export function ExecutionContract({
             {contract.revisedFinish && contract.status !== 'terminated' && <Fact label={t('expectedFinish')}>{day(contract.revisedFinish)}</Fact>}
             {contract.terminatedAt && <Fact label={t('terminatedOn')}>{day(contract.terminatedAt)}</Fact>}
           </dl>
+          {contract.status !== 'terminated' && <ContractDocumentDisclosure token={token} contractId={contract.id} />}
           {contract.status === 'issued' && (
             <p className="rounded-item bg-muted/50 p-3 text-caption text-muted-foreground">
               {t(contract.signingOpen ? 'signWithLink' : 'signingClosed', { studio: firmName })}

@@ -6,39 +6,48 @@ import { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
-import type { PublicContractLine, PublicContractSection } from '@/lib/contracts/public-types';
+import type { PublicContractLine, PublicContractSection, PublicSectionLinesPage, PublicSectionsPage } from '@/lib/contracts/public-types';
 import { formatMoney } from '@/lib/format/money';
-import { formatQuantity } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { ShownPortalFailure } from '@/lib/share/portal-failure';
-import { loadContractSectionLines, loadContractSections } from './actions';
+import { ContractLineRow } from './line-row';
 
-/** What a "show more" left on screen: a shared portal failure, or this page's own sentence. */
+/** One "show more" answer as the list reads it: the page, `gone`, or a shared portal failure. */
+type PageAnswer<P> = { ok: true; page: P } | { ok: false; error: string; reference?: string };
+
+/** What a "show more" left on screen: a shared portal failure, or the list's own sentence. */
 type LoadProblem = { failure: ShownPortalFailure } | { own: 'gone' | 'loadFailed' | 'loadSectionsFailed' };
 
 /** The key of the list's own ask; a section's lines are asked under the section's id. */
 const SECTIONS = 'sections';
 
 /**
- * The contract's sections on /c, as ONE list (A3 reliability R1): the first 50
- * sections open with the page, holding the first 50 lines of the contract
- * between them; "show more sections" adds the next 50, collapsed; each section
- * shows its subtotal, the lines shown so far and "show lines" for the rest, 100
- * at a time. Every request spends the link's read budget. Every section renders
- * inside this one component, so the page follows the sections shown, never the
- * contract's total. A failed ask keeps what is shown and says why, in فصحى,
- * under the button that made it.
+ * A client's contract sections, as ONE list (A3 reliability R1), on /c and in
+ * the client home: the first 50 sections open with the contract, holding its
+ * first 50 lines between them; "show more sections" adds the next 50,
+ * collapsed; each section shows its subtotal, the lines shown so far and "show
+ * lines" for the rest, 100 at a time. The page decides where those reads go
+ * (`loadSections`, `loadSectionLines`: its own link's server actions, each
+ * spending that link's read budget). Every section renders inside this one
+ * component, so the page follows the sections shown, never the contract's
+ * total. A failed ask keeps what is shown and says why, in فصحى, under the
+ * button that made it. `flat` draws the sections without glass, for a page
+ * that nests them inside a panel of its own.
  */
 export function ContractSectionList({
-  token,
   sections: opening,
   sectionCount,
+  loadSections,
+  loadSectionLines,
+  flat = false,
 }: {
-  token: string;
   sections: PublicContractSection[];
   sectionCount: number;
+  loadSections: (offset: number) => Promise<PageAnswer<PublicSectionsPage>>;
+  loadSectionLines: (sectionId: string, offset: number) => Promise<PageAnswer<PublicSectionLinesPage>>;
+  flat?: boolean;
 }) {
-  const t = useTranslations('contracts.ack.lines');
+  const t = useTranslations('portal.contract.lines');
   const locale = useLocale();
   const [sections, setSections] = useState<PublicContractSection[]>(opening);
   const [lines, setLines] = useState<Record<string, PublicContractLine[]>>(() =>
@@ -51,11 +60,7 @@ export function ContractSectionList({
   const text = (ar: string | null, en: string | null) => pickLocale({ textAr: ar, textEn: en }, 'text', locale).value;
 
   /** One ask under `key`, at most one at a time; its answer kept, or its problem said. */
-  function ask<P>(
-    key: string,
-    run: () => Promise<{ ok: true; page: P } | { ok: false; error: string; reference?: string }>,
-    keep: (page: P) => void,
-  ) {
+  function ask<P>(key: string, run: () => Promise<PageAnswer<P>>, keep: (page: P) => void) {
     if (inFlight.current.has(key)) return;
     inFlight.current.add(key);
     setAsking(key);
@@ -77,7 +82,7 @@ export function ContractSectionList({
   }
 
   function moreSections() {
-    ask(SECTIONS, () => loadContractSections(token, sections.length), (page) => {
+    ask(SECTIONS, () => loadSections(sections.length), (page) => {
       setSections((shown) => [...shown, ...page.sections]);
       setLines((shown) => ({ ...shown, ...Object.fromEntries(page.sections.map((section) => [section.id, []])) }));
     });
@@ -85,7 +90,7 @@ export function ContractSectionList({
 
   function moreLines(section: PublicContractSection) {
     const shown = lines[section.id] ?? [];
-    ask(section.id, () => loadContractSectionLines(token, section.id, shown.length), (page) =>
+    ask(section.id, () => loadSectionLines(section.id, shown.length), (page) =>
       setLines((current) => ({ ...current, [section.id]: [...(current[section.id] ?? []), ...page.lines] })),
     );
   }
@@ -106,28 +111,17 @@ export function ContractSectionList({
     const remaining = summary.line_count - shown.length;
     const busy = pending && asking === summary.id;
     return (
-      <Card key={summary.id}>
+      <Card key={summary.id} flat={flat}>
         <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b px-4 py-2">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
             <h2 className="text-body font-semibold">{text(summary.title_ar, summary.title_en)}</h2>
-            <span className="font-mono tabular-nums text-body" dir="ltr">{formatMoney(summary.section_subtotal, locale)}</span>
+            <span className="whitespace-nowrap font-mono tabular-nums text-body" dir="ltr">{formatMoney(summary.section_subtotal, locale)}</span>
           </div>
           {shown.length > 0 && (
-            <table className="w-full text-body">
-              <tbody>
+            <table className="block w-full text-body [@container(min-width:36rem)]:table">
+              <tbody className="block [@container(min-width:36rem)]:table-row-group">
                 {shown.map((line) => (
-                  <tr key={line.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">
-                      {line.item_code && <span className="me-2 text-muted-foreground" dir="ltr">{line.item_code}</span>}
-                      {text(line.description_ar, line.description_en)}
-                      {line.provisional && <span className="ms-2 text-caption text-muted-foreground">{t('provisional')}</span>}
-                    </td>
-                    <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {formatQuantity(line.qty, locale)} {line.unit}
-                    </td>
-                    <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.unit_price, locale)}</td>
-                    <td className="px-4 py-2 text-end font-mono tabular-nums" dir="ltr">{formatMoney(line.line_total, locale)}</td>
-                  </tr>
+                  <ContractLineRow key={line.id} line={line} />
                 ))}
               </tbody>
             </table>
@@ -148,7 +142,8 @@ export function ContractSectionList({
 
   const listBusy = pending && asking === SECTIONS;
   return (
-    <>
+    // The width the line rows measure (./line-row.tsx).
+    <div className="space-y-4 [container-type:inline-size]">
       {sections.map(section)}
       {sections.length < sectionCount && (
         <div className="space-y-2 text-center">
@@ -159,6 +154,6 @@ export function ContractSectionList({
           {problemOf(SECTIONS)}
         </div>
       )}
-    </>
+    </div>
   );
 }

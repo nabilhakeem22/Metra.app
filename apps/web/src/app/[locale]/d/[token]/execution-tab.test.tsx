@@ -14,6 +14,7 @@ import { messageAt, messagesFor, renderWithIntl, type TestLocale } from '@/test/
 
 vi.mock('server-only', () => ({}));
 vi.mock('./execution-actions', () => ({}));
+vi.mock('./contract-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),
@@ -149,15 +150,32 @@ describe('the sections (H4 notes: change orders the client can no longer answer)
 });
 
 describe.each<TestLocale>(['ar-EG', 'en'])('the contract card once the signing window has closed (%s, H4 follow-up F1)', (locale) => {
-  it('says signing closed in the studio-move tone, as the hero does, and offers nothing to sign', () => {
+  it('says signing closed in the studio-move tone, as the hero does, and offers nothing to sign, only to read it (H6.2)', () => {
     show(locale, homeOf('signing_closed'));
     const contract = document.getElementById('contract') as HTMLElement;
     const chip = contract.querySelector('[data-tone]') as HTMLElement;
     expect(chip.textContent).toBe(messageAt(locale, 'delivery.contract.status.signingClosed'));
     expect(chip.getAttribute('data-tone')).toBe('waiting');
     expect(contract.textContent).not.toContain(messageAt(locale, 'delivery.contract.status.issued'));
-    expect(within(contract).queryAllByRole('button')).toHaveLength(0);
+    const buttons = within(contract).queryAllByRole('button');
+    expect(buttons.map((button) => button.textContent)).toEqual([messageAt(locale, 'delivery.contract.document.show')]);
     expect(within(contract).queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe.each<TestLocale>(['ar-EG', 'en'])('the full contract on the card (%s, H6.2)', (locale) => {
+  it.each(['sign_contract', 'signing_closed', 'works_in_progress'] as const)('%s: an issued or signed contract offers its document, closed', (reason) => {
+    show(locale, homeOf(reason));
+    const toggle = within(document.getElementById('contract') as HTMLElement).getByRole('button', {
+      name: messageAt(locale, 'delivery.contract.document.show'),
+    });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById('home-contract-document')).toBeNull();
+  });
+
+  it.each(['terminated', 'preparing_contract'] as const)('%s: no document to open', (reason) => {
+    show(locale, homeOf(reason));
+    expect(within(document.getElementById('contract') as HTMLElement).queryAllByRole('button')).toHaveLength(0);
   });
 });
 

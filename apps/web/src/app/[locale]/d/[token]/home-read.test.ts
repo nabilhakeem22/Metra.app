@@ -81,7 +81,7 @@ describe('reads per view', () => {
     expect(db.calls).toEqual(['app_home_by_token']);
   });
 
-  it('the Execution tab while a contract awaits signature is still one call in this step', async () => {
+  it('the Execution tab while a contract awaits signature is still one call: the document is read on the client tap (H6.2)', async () => {
     answer('execution', homePayload('sign_contract'));
     await readHomeView('tok', 'execution');
     expect(db.calls).toEqual(['app_home_by_token']);

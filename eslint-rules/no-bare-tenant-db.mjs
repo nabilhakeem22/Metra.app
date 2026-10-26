@@ -325,6 +325,10 @@ const SDF_CALLER_ALLOWLIST = [
   // Client home DB step C: the home's Execution tab (app_home_by_token), by the
   // same delivery token, no session; it embeds the execution card above.
   'apps/web/src/lib/client-home/read.ts',
+  // The home's contract document, its sections and their lines
+  // (app_home_contract_by_token and its two pages): the same delivery token,
+  // each calling the /c function with the contract's stored hash.
+  'apps/web/src/lib/client-home/contract.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

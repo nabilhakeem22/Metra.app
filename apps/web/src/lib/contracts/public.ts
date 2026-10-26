@@ -5,6 +5,7 @@ import 'server-only';
 // cost/margin column, so nothing here can leak the firm's cost.
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import type { PortalFailure } from '@/lib/share/portal-act-failure';
 import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
@@ -18,6 +19,31 @@ const MAX_LINE_OFFSET = 100_000;
 
 /** The furthest a "show more sections" may start: past the BOQ caps, never a real contract. */
 const MAX_SECTION_OFFSET = 100_000;
+
+/** One "show more sections" answer of a client page; `gone` as for the lines below. */
+export type ContractSectionsAnswer =
+  | { ok: true; page: PublicSectionsPage }
+  | { ok: false; error: 'gone' }
+  | { ok: false; error: 'too_many' }
+  | ({ ok: false } & PortalFailure);
+
+/** One "show more lines" answer of a client page. `gone` is uniform: a forged
+ *  section id, an unknown token and a withdrawn contract cannot be told apart. */
+export type ContractSectionLinesAnswer =
+  | { ok: true; page: PublicSectionLinesPage }
+  | { ok: false; error: 'gone' }
+  | { ok: false; error: 'too_many' }
+  | ({ ok: false } & PortalFailure);
+
+/** A "show more sections" start the SQL may be asked for: a whole number in range. */
+export function isSectionOffset(offset: unknown): offset is number {
+  return typeof offset === 'number' && Number.isInteger(offset) && offset >= 0 && offset <= MAX_SECTION_OFFSET;
+}
+
+/** A "show more lines" start the SQL may be asked for: a whole number in range. */
+export function isLineOffset(offset: unknown): offset is number {
+  return typeof offset === 'number' && Number.isInteger(offset) && offset >= 0 && offset <= MAX_LINE_OFFSET;
+}
 
 /**
  * The snapshot is the page's opening (DB step B caps it in SQL): the first 50
@@ -47,8 +73,7 @@ export async function getContractByToken(
  */
 export async function getContractSectionsByToken(rawToken: string, offset: unknown): Promise<PublicSectionsPage | null> {
   const token = normalizeRawToken(rawToken);
-  if (!token) return null;
-  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_SECTION_OFFSET) return null;
+  if (!token || !isSectionOffset(offset)) return null;
   const hash = hashShareToken(token);
   return readSdfJson<PublicSectionsPage>(
     sql`select public.app_contract_sections_by_token(${hash}, ${offset}::int) as data`,
@@ -66,10 +91,7 @@ export async function getContractSectionLinesByToken(
   offset: unknown,
 ): Promise<PublicSectionLinesPage | null> {
   const token = normalizeRawToken(rawToken);
-  if (!token || typeof sectionId !== 'string' || !isUuid(sectionId)) return null;
-  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_LINE_OFFSET) {
-    return null;
-  }
+  if (!token || typeof sectionId !== 'string' || !isUuid(sectionId) || !isLineOffset(offset)) return null;
   const hash = hashShareToken(token);
   return readSdfJson<PublicSectionLinesPage>(
     sql`select public.app_contract_section_lines_by_token(${hash}, ${sectionId}::uuid, ${offset}::int) as data`,

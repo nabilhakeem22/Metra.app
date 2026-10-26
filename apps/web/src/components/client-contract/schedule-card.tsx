@@ -2,19 +2,21 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
-import type { PublicContract } from '@/lib/contracts/public-types';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { milestoneAmounts } from '@/lib/execution/money/milestone-amounts';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 
 /**
- * The payment schedule the client signs with the contract, each row with what
- * it bills: the SAME `milestoneAmounts` the payment requests are issued with,
- * on the contract value, the last row taking the rounding remainder.
+ * The payment schedule the client signs with the contract, on /c and in the
+ * client home, each row with what it bills: the SAME `milestoneAmounts` the
+ * payment requests are issued with, on the contract value, the last row taking
+ * the rounding remainder. A row's share keeps its distance from its amount,
+ * and an amount never breaks from its currency. `flat` as for the section list.
  */
-export function ScheduleCard({ contract }: { contract: PublicContract }) {
-  const t = useTranslations('contracts.ack.schedule');
+export function ContractScheduleCard({ contract, flat = false }: { contract: ContractDocument; flat?: boolean }) {
+  const t = useTranslations('portal.contract.schedule');
   const locale = useLocale();
   const rows = contract.payment_schedule.map((row) => ({
     labelAr: row.label_ar,
@@ -27,7 +29,7 @@ export function ScheduleCard({ contract }: { contract: PublicContract }) {
   const amounts = milestoneAmounts(rows, contract.original_value, contract.tax_amount);
 
   return (
-    <Card>
+    <Card flat={flat}>
       <CardContent className="space-y-2 py-4">
         <h2 className="text-body font-semibold">{t('title')}</h2>
         <table className="w-full text-body">
@@ -35,10 +37,10 @@ export function ScheduleCard({ contract }: { contract: PublicContract }) {
             {rows.map((row, index) => (
               <tr key={row.sortOrder} className="border-b last:border-0">
                 <td className="py-2">{pickLocale(row, 'label', locale).value}</td>
-                <td className="py-2 text-muted-foreground" dir="ltr">
+                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" dir="ltr">
                   {row.basis === 'percent' ? formatPercent(row.value, locale) : null}
                 </td>
-                <td className="py-2 text-end font-mono tabular-nums" dir="ltr">
+                <td className="whitespace-nowrap py-2 text-end font-mono tabular-nums" dir="ltr">
                   {formatMoney(amounts[index].amount, locale)}
                 </td>
               </tr>

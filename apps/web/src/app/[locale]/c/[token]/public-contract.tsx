@@ -4,16 +4,17 @@ import { Check, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ContractScheduleCard } from '@/components/client-contract/schedule-card';
+import { ContractSectionList } from '@/components/client-contract/section-list';
+import { ContractTotalsCard } from '@/components/client-contract/totals-card';
 import { Centered } from '@/components/share/link-page-parts';
 import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { PublicContract } from '@/lib/contracts/public-types';
+import { loadContractSectionLines, loadContractSections } from './actions';
 import { contractDecidedKey } from './contract-outcome';
-import { ContractSectionList } from './contract-section-list';
-import { ContractTotalsCard } from './contract-totals-card';
-import { ScheduleCard } from './schedule-card';
 import { useContractAck } from './use-contract-ack';
 
 export function PublicContractView({
@@ -54,10 +55,15 @@ export function PublicContractView({
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
       </header>
 
-      <ContractSectionList token={token} sections={contract.sections} sectionCount={contract.section_count} />
+      <ContractSectionList
+        sections={contract.sections}
+        sectionCount={contract.section_count}
+        loadSections={(offset) => loadContractSections(token, offset)}
+        loadSectionLines={(sectionId, offset) => loadContractSectionLines(token, sectionId, offset)}
+      />
 
       <ContractTotalsCard contract={contract} />
-      <ScheduleCard contract={contract} />
+      <ContractScheduleCard contract={contract} />
 
       {decided ? (
         <Card>
