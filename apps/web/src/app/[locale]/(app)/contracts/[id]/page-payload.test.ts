@@ -4,7 +4,9 @@ import { contractPagePayload } from './page-payload';
 
 // A4 security S1: a role that reads only the payments (project manager,
 // accountant) gets the slim header in the page's flight data, and none of the
-// contract: no client, no terms, no scope, no penalty, no money.
+// contract: no client, no terms, no scope, no penalty, no money. The project
+// manager also opens the change-order register (H7.3 F1), and with it gets the
+// two rates its charges are worked out with, nothing else.
 
 const DETAIL: ContractPageDetail = {
   id: 'c-1',
@@ -58,26 +60,48 @@ const DETAIL: ContractPageDetail = {
 const HEADER_KEYS = ['createdAt', 'id', 'number', 'sourceBoqId', 'status', 'titleAr', 'titleEn'];
 const CONTRACT_ONLY_KEYS = Object.keys(DETAIL).filter((key) => !HEADER_KEYS.includes(key));
 
+/** What is serialised into the page: no key and no value of the contract's own fields but `allowed`. */
+function expectNothingOfTheContractBut(payload: ReturnType<typeof contractPagePayload>, allowed: readonly string[]) {
+  const serialised = JSON.stringify(payload);
+  const keysOf = (value: unknown): string[] =>
+    typeof value === 'object' && value !== null ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)]) : [];
+  const keys = keysOf(JSON.parse(serialised));
+  const hidden = CONTRACT_ONLY_KEYS.filter((key) => !allowed.includes(key));
+  for (const key of hidden) expect(keys, key).not.toContain(key);
+  const shown = [...Object.values(payload.header), ...allowed.map((key) => DETAIL[key as keyof ContractPageDetail])];
+  for (const key of hidden) {
+    const value = DETAIL[key as keyof ContractPageDetail];
+    if (typeof value === 'string' && !shown.includes(value)) expect(serialised, key).not.toContain(value);
+  }
+}
+
 describe('contractPagePayload', () => {
-  it('gives a payments-only role the slim header and nothing of the contract', () => {
-    const payload = contractPagePayload(DETAIL, { seeContract: false });
+  it('gives a payments-only role (the accountant) the slim header and nothing of the contract', () => {
+    const payload = contractPagePayload(DETAIL, { seeContract: false, seeRegister: false });
     expect(payload.detail).toBeNull();
+    expect(payload.variationChargeRates).toBeNull();
     expect(Object.keys(payload.header).sort()).toEqual(HEADER_KEYS);
-    // What is serialised into the page: no key and no value of the contract's own fields.
-    const serialised = JSON.stringify(payload);
-    const keysOf = (value: unknown): string[] =>
-      typeof value === 'object' && value !== null ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)]) : [];
-    const keys = keysOf(JSON.parse(serialised));
-    for (const key of CONTRACT_ONLY_KEYS) expect(keys, key).not.toContain(key);
-    for (const key of CONTRACT_ONLY_KEYS) {
-      const value = DETAIL[key as keyof ContractPageDetail];
-      if (typeof value === 'string' && !Object.values(payload.header).includes(value)) expect(serialised, key).not.toContain(value);
-    }
+    expectNothingOfTheContractBut(payload, []);
+  });
+
+  it('gives the project manager, who opens the change-order register, its two charge rates and nothing more (H7.3 F1)', () => {
+    const payload = contractPagePayload(DETAIL, { seeContract: false, seeRegister: true });
+    expect(payload.detail).toBeNull();
+    expect(payload.variationChargeRates).toEqual({ taxRate: '14.0000', supervisionPct: '10.0000' });
+    expect(Object.keys(payload.header).sort()).toEqual(HEADER_KEYS);
+    expectNothingOfTheContractBut(payload, ['taxRate', 'supervisionPct']);
+  });
+
+  it('gives no charge rates on a proposal contract: its register shows the net change alone', () => {
+    const payload = contractPagePayload({ ...DETAIL, sourceBoqId: null }, { seeContract: false, seeRegister: true });
+    expect(payload.variationChargeRates).toBeNull();
+    expectNothingOfTheContractBut(payload, []);
   });
 
   it('gives a role that reads the contract the whole detail', () => {
-    const payload = contractPagePayload(DETAIL, { seeContract: true });
+    const payload = contractPagePayload(DETAIL, { seeContract: true, seeRegister: true });
     expect(payload.detail).toBe(DETAIL);
+    expect(payload.variationChargeRates).toEqual({ taxRate: '14.0000', supervisionPct: '10.0000' });
     expect(payload.header).toEqual({
       id: 'c-1',
       number: 7,

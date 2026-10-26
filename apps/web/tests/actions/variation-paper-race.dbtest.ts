@@ -111,19 +111,18 @@ describe('paper decision versus the client deciding online', () => {
   });
 
   it('both at the same moment, again and again: exactly one decision and one event, the loser answered cleanly', async () => {
-    const winners = new Set<string>();
     for (let round = 0; round < 12; round += 1) {
       const { order, rawToken } = await issuedOrder();
-      // The paper core makes more round trips before its lock than the client's
-      // one call, so the client is held back a little in some rounds and each
-      // side wins some of them.
+      // The client is held back a little in some rounds to vary the meeting
+      // point. Which side wins depends on the database's latency (the paper
+      // core makes more round trips before its lock), so only the invariant is
+      // asserted, never a winner; the orderings are pinned by the tests above.
       const [paper, online] = await Promise.all([
         recordVariationDecisionOnPaperCore(owner, { variationOrderId: order.id, decision: 'approve', decidedOn: TODAY }),
         new Promise((done) => setTimeout(done, (round % 4) * 15)).then(() =>
           respondToVariationByToken(rawToken, { decision: 'reject', actorName: 'Client' }),
         ),
       ]);
-      winners.add(paper.ok ? 'paper' : 'online');
       const decisions = await decisionsOf(order.id);
       expect(decisions, `round ${String(round)}`).toHaveLength(1);
       if (paper.ok) {
@@ -137,7 +136,6 @@ describe('paper decision versus the client deciding online', () => {
         expect(decisions[0]).toEqual({ kind: 'rejected', channel: 'client', paper: false });
       }
     }
-    expect([...winners].sort()).toEqual(['online', 'paper']);
   });
 
   it('two studio members recording at once: one lands, the other answers variation_not_issued', async () => {

@@ -17,13 +17,13 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
-import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
 import { holdContract } from '@/lib/execution/final-account/gate';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
-import { dayBeforeIssue } from '@/lib/validation/day-field';
+import { dayBeforeVariationIssue } from '@/lib/validation/day-field';
 import { readPaperDecision, type TypedPaperDecision } from '../decide-on-paper-input';
 import { isContractActive } from '../lifecycle-rules';
+import { mayRecordVariationDecisionOnPaper } from '../paper-access';
 import { variationIssuedOnInCairo } from '../queries/issued-on';
 
 export interface RecordVariationDecisionOnPaperInput extends TypedPaperDecision {
@@ -31,11 +31,6 @@ export interface RecordVariationDecisionOnPaperInput extends TypedPaperDecision 
 }
 
 type PaperOutcome = 'approved' | 'rejected';
-
-/** Owner, admin or project manager: who stands in for the client's decision, as for a paper signature. */
-export function mayRecordVariationDecisionOnPaper(role: OrgContext['role']): boolean {
-  return ENDING_DECIDERS.includes(role);
-}
 
 /**
  * The flip, under the locks the client's own decision takes, in its order: the
@@ -70,7 +65,7 @@ async function decideIssuedVariation(
   // A draft may be deleted between the two reads; nothing else ever is.
   if (!locked) fail('record_not_found');
   if (locked.status !== 'issued') fail('variation_not_issued');
-  const beforeIssue = dayBeforeIssue(decidedOn, await variationIssuedOnInCairo(tx, variationOrderId));
+  const beforeIssue = dayBeforeVariationIssue(decidedOn, await variationIssuedOnInCairo(tx, variationOrderId));
   if (beforeIssue) failFields({ decidedOn: beforeIssue });
   const flipped = await tx
     .update(variationOrders)

@@ -28,10 +28,13 @@ const FIRST_FIELD = [
  * title with a close button, the fields, and a footer that stays in view with
  * Cancel and Save. It is a real `<form>`, so Enter in a field submits; only a
  * submit while `pending` does nothing, because Save is never disabled to say
- * "not yet": pressing it is how a person learns what is missing. A refusal that
- * belongs to no single field (`formError`) is said above the footer. Opening
- * puts the caret in the first field; each new `invalidAttempt` puts it in the
- * first refused one.
+ * "not yet": pressing it is how a person learns what is missing. While a save
+ * is pending nothing closes the sheet (Cancel, the close button, Escape or a
+ * click outside): closing would not stop the save, and its answer would land
+ * unseen. A refusal that belongs to no single field (`formError`) is said
+ * above the footer. Opening puts the caret in the first field; each new
+ * `invalidAttempt` puts it in the first refused one. A sheet opened without a
+ * Radix trigger says where the caret goes back to on close (`onCloseAutoFocus`).
  */
 export function FormSheet({
   open,
@@ -45,6 +48,7 @@ export function FormSheet({
   pending,
   formError,
   invalidAttempt = 0,
+  onCloseAutoFocus,
   children,
 }: {
   open: boolean;
@@ -58,6 +62,7 @@ export function FormSheet({
   pending: boolean;
   formError?: string | null;
   invalidAttempt?: number;
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -69,6 +74,11 @@ export function FormSheet({
     onSubmit();
   }
 
+  function changeOpen(next: boolean): void {
+    if (pending && !next) return;
+    onOpenChange(next);
+  }
+
   function focusFirstField(event: Event): void {
     const field = formRef.current?.querySelector<HTMLElement>(FIRST_FIELD);
     if (!field) return;
@@ -77,16 +87,17 @@ export function FormSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={changeOpen}>
       <SheetContent
         side="end"
         className="w-full gap-0 p-0 sm:max-w-md"
         onOpenAutoFocus={focusFirstField}
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <div className="flex items-center gap-2 px-4 pb-2 pt-4">
           <SheetTitle className="text-title">{title}</SheetTitle>
           <SheetClose asChild>
-            <IconButton type="button" aria-label={closeLabel} className="ms-auto">
+            <IconButton type="button" aria-label={closeLabel} className="ms-auto" disabled={pending}>
               <X className="size-4" aria-hidden />
             </IconButton>
           </SheetClose>
@@ -104,7 +115,7 @@ export function FormSheet({
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="secondary" disabled={pending} onClick={() => changeOpen(false)}>
                 {cancelLabel}
               </Button>
               <Button type="submit" variant="default" disabled={pending}>

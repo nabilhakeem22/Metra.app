@@ -12,7 +12,7 @@ import { getContractPageExecution } from '@/lib/execution/queries/facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
-import { mayRecordVariationDecisionOnPaper } from '@/lib/variations/lifecycle';
+import { mayRecordVariationDecisionOnPaper } from '@/lib/variations/paper-access';
 import { listVariations } from '@/lib/variations/queries';
 import { ContractDetailClient } from './contract-detail-client';
 import { contractPagePayload } from './page-payload';
@@ -33,6 +33,7 @@ export default async function ContractDetailPage({
     seeMeasurements: mayReadMeasurements(ctx.role),
     readsCosts: mayReadCostEntries(ctx.role),
     seeCostSheet: mayOpenCostSheet(ctx.role),
+    decidesVariationsOnPaper: mayRecordVariationDecisionOnPaper(ctx.role),
   };
   if (!access.seeContract && !access.seeBilling) notFound();
   const { id } = await params;
@@ -42,7 +43,8 @@ export default async function ContractDetailPage({
   const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const tabs = contractTabsFor(detail, access);
-  // A proposal contract has no execution tab: nothing on it is a billing role's.
+  // A proposal contract has no execution tab: nothing on it is a billing role's,
+  // and only its change orders are a project manager's.
   if (tabs.length === 0) notFound();
   const variations = tabs.includes('variations') ? await listVariations(ctx, { contractId: id }) : [];
   // Only an execution contract has a schedule (at most 12 rows) and, once
@@ -60,7 +62,9 @@ export default async function ContractDetailPage({
 
   const canManage = can(ctx.role, 'contracts_generate', 'update');
   const canIssue = can(ctx.role, 'contracts_issue', 'approve');
-  const canDraftVariation = can(ctx.role, 'variations_draft', 'create');
+  // Drafting picks the contract's own lines, so it needs the contract itself:
+  // a project manager reads the register for its paper answers alone.
+  const canDraftVariation = access.seeContract && can(ctx.role, 'variations_draft', 'create');
   const canPriceVariation = can(ctx.role, 'variations_price', 'approve');
 
   return (
@@ -70,7 +74,7 @@ export default async function ContractDetailPage({
         description={t(`detailSubtitle.${contractSubtitle(detail, execution?.stage ?? null)}`)}
       />
       <ContractDetailClient
-        {...contractPagePayload(detail, access)}
+        {...contractPagePayload(detail, { seeContract: access.seeContract, seeRegister: tabs.includes('variations') })}
         openingSections={openingSections}
         variations={variations}
         schedule={schedule}
@@ -84,7 +88,7 @@ export default async function ContractDetailPage({
         canIssue={canIssue}
         canDraftVariation={canDraftVariation}
         canPriceVariation={canPriceVariation}
-        canDecideVariationOnPaper={mayRecordVariationDecisionOnPaper(ctx.role)}
+        canDecideVariationOnPaper={access.decidesVariationsOnPaper}
       />
     </div>
   );

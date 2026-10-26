@@ -36,6 +36,9 @@ export const FIELD_CODE_PARAMS = {
   // A day before the document it records existed (a paper signature dated
   // before the contract was issued); `date` is that issue day, DD/MM/YYYY.
   date_before_issue: ['date'],
+  // The same for a change order: a client's paper answer dated before the
+  // order was issued; `date` is the order's issue day, DD/MM/YYYY.
+  date_before_variation_issue: ['date'],
   // A figure typed with more decimals than it is kept to (a rate past 4
   // decimals), refused rather than silently cut.
   too_many_decimals: ['max'],

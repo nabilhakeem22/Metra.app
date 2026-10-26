@@ -149,7 +149,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true, seeRegister: true })}
         openingSections={{ sections: [section(2, [])], hasMore: false }}
         variations={[]}
         schedule={null}
@@ -179,7 +179,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
       const detail = { id: 'k-1', status: 'signed', originalValue: '1', revisedValue: '1', signed: { on: '2026-10-15', via } };
       const { unmount } = renderWithIntl(
         <ContractDetailClient
-          {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
+          {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true, seeRegister: true })}
           openingSections={{ sections: [], hasMore: false }}
           variations={[]}
           schedule={null}
@@ -254,7 +254,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     const detail = { id: 'k-1', status: 'issued', originalValue: '1', revisedValue: '1', signed: null };
     renderWithIntl(
       <ContractDetailClient
-        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true })}
+        {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true, seeRegister: true })}
         openingSections={null}
         variations={[]}
         schedule={null}

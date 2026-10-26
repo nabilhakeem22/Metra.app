@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { formatMoneyExact } from '@/lib/format/money';
+import { formatMoney } from '@/lib/format/money';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractFinishDate } from './contract-finish-date';
@@ -118,7 +118,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
 
   const table = (rows: VariationListRow[]) =>
     renderWithIntl(
-      <VariationTable variations={rows} chargeRates={RATES} canPriceVariation={false} canDecideOnPaper={false} pending={false} m={(v) => v} act={() => {}} />,
+      <VariationTable variations={rows} chargeRates={RATES} canPriceVariation={false} canDecideOnPaper={false} pending={false} m={(v) => formatMoney(v, locale)} act={() => {}} />,
       { locale },
     );
   /** A days sentence, recognised by the words its message opens with in this locale. */
@@ -137,17 +137,20 @@ describe.each<TestLocale>(['en', 'ar-EG'])('change-order execution polish (%s)',
   test('each order of an execution contract says its works, VAT, supervision and total (D4a)', () => {
     table([row()]);
     for (const figure of ['10000', '1400', '1000', '12400']) {
-      expect(screen.getAllByText(formatMoneyExact(figure, locale)).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(formatMoney(figure, locale)).length).toBeGreaterThan(0);
     }
     expect(screen.getByText(at('variations.charge.supervision'))).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/[٠-٩]/);
   });
 
-  test('a 4-decimal net change shows exact parts that add up to the total as shown (F4)', () => {
-    table([row({ netDelta: '1000.0043' })]);
-    for (const figure of ['1000.0043', '140.0006', '100.0004', '1240.0053']) {
-      expect(screen.getByText(formatMoneyExact(figure, locale))).toBeTruthy();
+  test('every part is in the register\'s 2-decimal money format, as the Payments tab bills it, never 3 decimals (H7.3 boy-scout)', () => {
+    // 28,792.80 of works: VAT 4,030.992 and the total 35,703.072 to the stored scale.
+    table([row({ netDelta: '28792.8000' })]);
+    for (const figure of ['28792.80', '4030.99', '2879.28', '35703.07']) {
+      expect(screen.getAllByText(formatMoney(figure, locale)).length).toBeGreaterThan(0);
     }
+    // The third decimal of VAT (4,030.992) and of the total (35,703.072) is not shown.
+    for (const third of ['992', '072']) expect(document.body.textContent).not.toContain(third);
   });
 
   test('the days are worded by status: approved adds, open would add, rejected says nothing (F2)', () => {

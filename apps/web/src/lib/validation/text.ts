@@ -63,9 +63,15 @@ export function visibleText(value: string | null | undefined): string | null {
 // eslint-disable-next-line no-control-regex -- matching control characters is the point
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
 
-/** True when `text` holds a control character (a paste out of another app). */
-export function hasControlCharacter(text: string): boolean {
-  return CONTROL_CHARACTERS.test(text);
+/** A UTF-16 surrogate half without its partner: no character at all, and
+ *  Postgres refuses it in jsonb (an audit row), so a write would fail. Read
+ *  per code unit (no `u` flag), the only way a lone half is visible. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+/** True when `text` holds what no box should: a control character (a paste
+ *  out of another app) or a lone surrogate half. */
+export function hasUnprintableCharacter(text: string): boolean {
+  return CONTROL_CHARACTERS.test(text) || LONE_SURROGATE.test(text);
 }
 
 /**

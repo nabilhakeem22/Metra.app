@@ -3,7 +3,7 @@
 // ./field-rules: a form's pre-check and the server core call the same rule.
 import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from './field-rules';
-import { clean, countCharacters, hasControlCharacter } from './text';
+import { clean, countCharacters, hasUnprintableCharacter } from './text';
 
 /** Nothing but whitespace was typed. */
 export function requiredText(value: string | null | undefined): FieldError | null {
@@ -12,13 +12,14 @@ export function requiredText(value: string | null | undefined): FieldError | nul
 
 /**
  * A free-text box, once trimmed: `unprintable` when it holds a control
- * character (a paste out of another app), `too_long` past `max` characters
- * (code points, the unit Postgres counts). Exactly `max` is valid.
+ * character (a paste out of another app) or a lone surrogate half, `too_long`
+ * past `max` characters (code points, the unit Postgres counts). Exactly `max`
+ * is valid.
  */
 export function boundedText(value: string | null | undefined, max: number): FieldError | null {
   const trimmed = clean(value);
   if (trimmed === null) return null;
-  if (hasControlCharacter(trimmed)) return { code: 'unprintable' };
+  if (hasUnprintableCharacter(trimmed)) return { code: 'unprintable' };
   return countCharacters(trimmed) > max ? { code: 'too_long', params: { max } } : null;
 }
 

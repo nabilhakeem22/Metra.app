@@ -3,7 +3,7 @@
 // so the message under the field is the one the server would have sent.
 import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
 import { readMoney, type ReadMoneyOptions } from '@/lib/money/read';
-import { clean, countCharacters, hasControlCharacter } from './text';
+import { clean, countCharacters, hasUnprintableCharacter } from './text';
 
 /** One typed value as it is stored, or the refusal under its field. */
 export type FieldRead<T> = { ok: true; value: T } | { ok: false; error: FieldError };
@@ -26,11 +26,11 @@ export function readMoneyField(
   return { ok: false, error: { code: negative ? 'not_negative' : 'not_a_number' } };
 }
 
-/** An optional free-text box: trimmed, empty is null, a control character or
+/** An optional free-text box: trimmed, empty is null, an unprintable character or
  *  past `max` characters refused. */
 export function readOptionalText(value: string | null | undefined, max: number): FieldRead<string | null> {
   const trimmed = clean(value);
-  if (trimmed !== null && hasControlCharacter(trimmed)) return { ok: false, error: { code: 'unprintable' } };
+  if (trimmed !== null && hasUnprintableCharacter(trimmed)) return { ok: false, error: { code: 'unprintable' } };
   if (trimmed !== null && countCharacters(trimmed) > max) {
     return { ok: false, error: { code: 'too_long', params: { max } } };
   }

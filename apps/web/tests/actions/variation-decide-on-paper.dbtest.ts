@@ -205,14 +205,23 @@ describe('recordVariationDecisionOnPaperCore', () => {
     expect(await statusOf(id)).toBe('issued');
   });
 
-  it('refuses a day before the Cairo issue day under its box, and takes the issue day itself', async () => {
+  it('refuses a note holding a lone surrogate half under its box, never as a failed write (F8)', async () => {
+    const { order } = await issuedOrder();
+    expect(
+      await recordVariationDecisionOnPaperCore(ctx.owner!, { variationOrderId: order.id, decision: 'approve', decidedOn: TODAY, note: 'x\ud800y' }),
+    ).toEqual({ ok: false, error: 'check_fields', fields: { note: { code: 'unprintable' } } });
+    expect(await statusOf(order.id)).toBe('issued');
+    expect(await decisionsOf(order.id)).toEqual([]);
+  });
+
+  it('refuses a day before the order\'s Cairo issue day under its box, naming the change order (F2), and takes the issue day itself', async () => {
     const contract = await seedExecutionContract(orgId, { state: 'signed' });
     const order = await seedVariation(orgId, contract, 'issued');
     // 00:30 in Cairo on Oct 5 is still Oct 4 in UTC: the Cairo day decides.
     await issuedAt(order.id, '2026-10-05 00:30+03');
     expect(
       await recordVariationDecisionOnPaperCore(ctx.owner!, { variationOrderId: order.id, decision: 'approve', decidedOn: '2026-10-04' }),
-    ).toEqual({ ok: false, error: 'check_fields', fields: { decidedOn: { code: 'date_before_issue', params: { date: '05/10/2026' } } } });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { decidedOn: { code: 'date_before_variation_issue', params: { date: '05/10/2026' } } } });
     expect(await statusOf(order.id)).toBe('issued');
     expect(
       await recordVariationDecisionOnPaperCore(ctx.owner!, { variationOrderId: order.id, decision: 'approve', decidedOn: '2026-10-05' }),

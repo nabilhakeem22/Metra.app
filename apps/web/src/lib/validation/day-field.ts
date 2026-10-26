@@ -50,11 +50,17 @@ export function readRecordedDay(raw: unknown, todayInCairo: string): FieldRead<s
   return read;
 }
 
-/**
- * A day before its contract was issued, as the refusal under the day
- * (`date_before_issue`, the issue day as the app shows every date), or null.
- * Both `YYYY-MM-DD`.
- */
+/** `code` under the day when it is before `issuedOn`, said with the issue day as the app shows every date. */
+function dayBefore(code: 'date_before_issue' | 'date_before_variation_issue', day: string, issuedOn: string): FieldError | null {
+  return day < issuedOn ? { code, params: { date: formatDate(issuedOn, 'en') } } : null;
+}
+
+/** A day before its contract was issued (`date_before_issue`), or null. Both `YYYY-MM-DD`. */
 export function dayBeforeIssue(day: string, issuedOn: string): FieldError | null {
-  return day < issuedOn ? { code: 'date_before_issue', params: { date: formatDate(issuedOn, 'en') } } : null;
+  return dayBefore('date_before_issue', day, issuedOn);
+}
+
+/** A day before its change order was issued (`date_before_variation_issue`), or null. Both `YYYY-MM-DD`. */
+export function dayBeforeVariationIssue(day: string, issuedOn: string): FieldError | null {
+  return dayBefore('date_before_variation_issue', day, issuedOn);
 }

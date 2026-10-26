@@ -87,7 +87,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
     renderWithIntl(
       <ContractDetailClient
-        {...contractPagePayload(DETAIL, { seeContract: true })}
+        {...contractPagePayload(DETAIL, { seeContract: true, seeRegister: true })}
         openingSections={{ sections: [], hasMore: false }}
         variations={[]}
         schedule={null}
