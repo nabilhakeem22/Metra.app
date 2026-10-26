@@ -2,6 +2,8 @@ import 'server-only';
 import { designEngagements, type DesignEngagementState } from '@metra/db';
 import { asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { EntryPhase } from '@/lib/flow/types';
+import { entryPhaseOf } from './entry-phase';
 import { deliveriesCountedTowardCap } from '../delivery-slot';
 import { TERMINAL_STATES } from '../states';
 
@@ -16,9 +18,18 @@ export interface ProjectDeliverySummary {
   id: string;
   number: number;
   state: DesignEngagementState;
+  /** 'execution' for a LIGHT delivery: the client page of an execution contract (ruling D14). */
+  entryPhase: EntryPhase;
   titleAr: string | null;
   titleEn: string | null;
   createdAt: string;
+}
+
+/** A summary row as selected. */
+type SummaryRow = Omit<ProjectDeliverySummary, 'entryPhase' | 'createdAt'> & { entryPhase: string; createdAt: Date };
+
+function summaryOf({ entryPhase, createdAt, ...row }: SummaryRow): ProjectDeliverySummary {
+  return { ...row, entryPhase: entryPhaseOf(entryPhase), createdAt: createdAt.toISOString() };
 }
 
 /**
@@ -41,6 +52,7 @@ export function getEngagementByProject(
         id: designEngagements.id,
         number: designEngagements.number,
         state: designEngagements.state,
+        entryPhase: designEngagements.entryPhase,
         titleAr: designEngagements.titleAr,
         titleEn: designEngagements.titleEn,
         createdAt: designEngagements.createdAt,
@@ -54,8 +66,7 @@ export function getEngagementByProject(
     // Delivery overall when every one is terminal.
     const current =
       rows.find((row) => !TERMINAL_STATES.has(row.state)) ?? rows[0] ?? null;
-    if (!current) return null;
-    return { ...current, createdAt: current.createdAt.toISOString() };
+    return current && summaryOf(current);
   });
 }
 
@@ -86,6 +97,7 @@ export function getDeliveriesByProjects(
         id: designEngagements.id,
         number: designEngagements.number,
         state: designEngagements.state,
+        entryPhase: designEngagements.entryPhase,
         titleAr: designEngagements.titleAr,
         titleEn: designEngagements.titleEn,
         createdAt: designEngagements.createdAt,
@@ -108,7 +120,7 @@ export function getDeliveriesByProjects(
       if (existing && !TERMINAL_STATES.has(existing.state)) continue;
       if (existing && TERMINAL_STATES.has(row.state)) continue;
       const { projectId, ...summary } = row;
-      result[projectId] = { ...summary, createdAt: row.createdAt.toISOString() };
+      result[projectId] = summaryOf(summary);
     }
 
     return result;

@@ -74,7 +74,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('"how to pay" quotes the buttons it n
   it("names the label of the execution card's button and the design fee's, which are the same", () => {
     const label = messageAt(locale, 'delivery.execution.claim');
     expect(messageAt(locale, 'delivery.payments.claim')).toBe(label);
-    expect(messageAt(locale, 'delivery.payments.instructions.body')).toContain(label);
+    expect(messageAt(locale, 'delivery.payments.instructions.body.design')).toContain(label);
+    expect(messageAt(locale, 'delivery.payments.instructions.body.execution')).toContain(label);
   });
 });
 

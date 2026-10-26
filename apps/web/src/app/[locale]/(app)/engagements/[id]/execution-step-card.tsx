@@ -21,7 +21,8 @@ export type ExecutionStepCardProps = Pick<
 
 // The cockpit's STEP CARD AT EXECUTION: the same shared card the design phase
 // wears, now on the execution phase. Its band holds the finished design folded
-// into one line, then the five execution steps with whose move each is; its
+// into one line (none for a light delivery, which had no design), then the five
+// execution steps with whose move each is; its
 // body names the ONE next action (lib/execution/stage.ts) and offers it, with
 // "Record costs" and "Record measurements" beside it. A client payment claim
 // left on the finished design is still dismissed here, as it was before.
@@ -37,12 +38,14 @@ export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCard
       chrome={resolveCommandCardChrome(card.status)}
       rail={
         <>
-          <DesignSummaryLine
-            summary={designSummary}
-            status={card.status}
-            pending={card.pending}
-            onOpenTab={card.onOpenTab}
-          />
+          {designSummary && (
+            <DesignSummaryLine
+              summary={designSummary}
+              status={card.status}
+              pending={card.pending}
+              onOpenTab={card.onOpenTab}
+            />
+          )}
           <ExecutionPhaseRail view={buildPhaseView(EXECUTION_PHASE, location, 'studio')} />
         </>
       }

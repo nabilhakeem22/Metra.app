@@ -4,7 +4,8 @@ import { ensureClientHomeCore } from '@/lib/client-home/ensure';
 import { getHomeByToken } from '@/lib/client-home/read';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
-import { countProjectDeliveries } from '@/lib/engagements/queries/by-project';
+import { countProjectDeliveries, getDeliveriesByProjects, getEngagementByProject } from '@/lib/engagements/queries/by-project';
+import { getEngagementHeader } from '@/lib/engagements/queries/header';
 import { getExecutionFacts } from '@/lib/execution/queries/facts';
 import { hashShareToken } from '@/lib/share/token';
 import type { OrgContext } from '@/lib/db/context';
@@ -141,6 +142,26 @@ describe('ensureClientHomeCore: the light delivery (AC26)', () => {
     expect(await deliveriesOf(older.projectId)).toHaveLength(0);
   });
 
+  it('a terminated contract is refused in its own words, and nothing is created (H4 follow-up F5)', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'signed' });
+    await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [contract.contractId]);
+    expect(await ensureClientHomeCore(owner, { contractId: contract.contractId })).toMatchObject({ ok: false, error: 'contract_terminated' });
+    expect(await deliveriesOf(contract.projectId)).toHaveLength(0);
+  });
+
+  it('an upper-case contract id finds the same home as the lower-case one (H4 follow-up 5)', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'issued' });
+    const upper = await ensured(owner, contract.contractId.toUpperCase());
+    expect(upper.link).toEqual(expect.any(String));
+    expect(await ensured(owner, contract.contractId)).toEqual(upper);
+    expect(await deliveriesOf(contract.projectId)).toHaveLength(1);
+    const [audit] = await ownerQuery<{ contract_id: string }>(
+      `select after ->> 'contract_id' as contract_id from public.audit_log where org_id = $1 and entity_id = $2 limit 1`,
+      [orgId, upper.engagementId],
+    );
+    expect(audit.contract_id).toBe(contract.contractId);
+  });
+
   it('a project manager may not issue contracts, so is refused before anything is read', async () => {
     const contract = await seedExecutionContract(orgId, { state: 'issued' });
     expect(await ensureClientHomeCore(manager, { contractId: contract.contractId })).toEqual({ ok: false, error: 'forbidden' });
@@ -165,6 +186,35 @@ describe('ensureClientHomeCore: the link (AC27)', () => {
     expect(view.home.execution.location).toMatchObject({ reason: 'sign_contract', step: 'signature', whoseMove: 'client' });
     expect(view.home.execution.contract).toMatchObject({ id: contract.contractId, status: 'issued', signingOpen: true });
     expect(view.home.codeChannel).toEqual({ hint: 'c•••@e•••.com' });
+    // A light delivery has no design tab: no tab opens the Execution tab, and its design tab sends the page there (H4 follow-up 1).
+    expect((await readHomeView(first.link as string, null)).tab).toBe('execution');
+    expect(await readHomeView(first.link as string, 'design')).toEqual({ tab: 'redirect', to: 'execution' });
+  });
+
+  it('a link that has lapsed is renewed: the old one stays dead, the new one opens the home (H4 follow-up 2)', async () => {
+    const contract = await seedExecutionContract(orgId, { state: 'issued' });
+    const first = await ensured(owner, contract.contractId);
+    await ownerQuery(`update public.design_engagements set share_expires_at = now() - interval '1 day' where id = $1`, [first.engagementId]);
+    expect(await getHomeByToken(first.link as string)).toEqual({ status: 'not_found' });
+
+    const renewed = await ensured(owner, contract.contractId);
+    expect(renewed.engagementId).toBe(first.engagementId);
+    expect(renewed.link).toEqual(expect.any(String));
+    expect(renewed.link).not.toBe(first.link);
+    const [row] = await ownerQuery<{ token_hash: string; share_expires_at: Date | null }>(
+      `select token_hash, share_expires_at from public.design_engagements where id = $1`,
+      [first.engagementId],
+    );
+    expect(row).toEqual({ token_hash: hashShareToken(renewed.link as string), share_expires_at: null });
+    expect((await getHomeByToken(renewed.link as string)).status).toBe('ok');
+    expect(await getHomeByToken(first.link as string)).toEqual({ status: 'not_found' });
+    // The next request shows the renewed link again; it renews nothing.
+    expect((await ensured(owner, contract.contractId)).link).toBe(renewed.link);
+    const links = await ownerQuery<{ link: string }>(
+      `select after ->> 'link' as link from public.audit_log where org_id = $1 and entity_id = $2 order by created_at, id`,
+      [orgId, first.engagementId],
+    );
+    expect(links.map((audit) => audit.link)).toEqual(['minted', 'renewed', 'shown']);
   });
 
   it('without the link secret: an existing link cannot be shown, and the core says so instead of replacing it', async () => {
@@ -180,7 +230,12 @@ describe('the light delivery in the studio (AC28, ruling D14)', () => {
     const contract = await seedExecutionContract(orgId, { state: 'issued' });
     const home = await ensured(owner, contract.contractId);
     expect((await getExecutionFacts(owner, home.engagementId)).contract).toMatchObject({ id: contract.contractId, status: 'issued' });
+    // The cockpit header says so too, so it folds no design into a summary line (H4 follow-up F2).
+    expect(await getEngagementHeader(owner, home.engagementId)).toMatchObject({ state: 'execution', entryPhase: 'execution' });
     expect(await countProjectDeliveries(owner, contract.projectId)).toBe(0);
+    // The project panel knows it for the client page it is, never a design delivery (H4 follow-up F3).
+    expect(await getEngagementByProject(owner, contract.projectId)).toMatchObject({ id: home.engagementId, entryPhase: 'execution' });
+    expect((await getDeliveriesByProjects(owner, [contract.projectId]))[contract.projectId]).toMatchObject({ entryPhase: 'execution' });
     for (let index = 0; index < 2; index += 1) {
       const created = await createEngagementCore(owner, { clientId: contract.clientId, projectId: contract.projectId, titleEn: `Design ${String(index)}` });
       expect(created.ok).toBe(true);

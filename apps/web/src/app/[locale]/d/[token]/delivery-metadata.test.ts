@@ -24,9 +24,9 @@ describe('deliveryMetadata', () => {
     ['ar-EG', 'شقة الزمالك · ديوان', 'ديوان'],
     ['en', 'Zamalek flat · Diwan Studio', 'Diwan Studio'],
   ] as const)('%s: project and studio, in the page language', (locale, title, firm) => {
-    const metadata = deliveryMetadata({ status: 'ok', delivery: DELIVERY }, locale, translator(locale));
+    const metadata = deliveryMetadata({ status: 'ok', delivery: DELIVERY }, 'design', locale, translator(locale));
     expect(metadata.title).toEqual({ absolute: title });
-    expect(metadata.description).toBe(messageAt(locale, 'delivery.meta.description').replace('{firm}', firm));
+    expect(metadata.description).toBe(messageAt(locale, 'delivery.meta.description.design').replace('{firm}', firm));
     expect(metadata.robots).toEqual({ index: false, follow: false });
     // The studio's account numbers are text to copy, never auto-linked.
     expect(metadata.formatDetection).toEqual({ telephone: false, email: false, address: false });
@@ -34,8 +34,14 @@ describe('deliveryMetadata', () => {
     expect(JSON.stringify(metadata)).not.toContain(messageAt(locale, 'meta.description'));
   });
 
+  it.each(['ar-EG', 'en'] as const)('%s: the Execution tab describes the project, never a design project (H4 follow-up F7)', (locale) => {
+    const metadata = deliveryMetadata({ status: 'ok', delivery: DELIVERY }, 'execution', locale, translator(locale));
+    expect(metadata.description).toBe(messageAt(locale, 'delivery.meta.description.execution').replace('{firm}', locale === 'en' ? 'Diwan Studio' : 'ديوان'));
+    expect(metadata.description).not.toMatch(/design|تصميم/i);
+  });
+
   it('with no project title it is the studio alone', () => {
-    const metadata = deliveryMetadata({ status: 'ok', delivery: { ...DELIVERY, titleAr: null, titleEn: null } }, 'en', translator('en'));
+    const metadata = deliveryMetadata({ status: 'ok', delivery: { ...DELIVERY, titleAr: null, titleEn: null } }, 'design', 'en', translator('en'));
     expect(metadata.title).toEqual({ absolute: 'Diwan Studio' });
   });
 
@@ -43,7 +49,7 @@ describe('deliveryMetadata', () => {
     ['not_found', 'notFound'],
     ['read_failed', 'readFailed'],
   ] as const)('%s: the notice, in فصحى', (status, notice) => {
-    const metadata = deliveryMetadata({ status }, 'ar-EG', translator('ar-EG'));
+    const metadata = deliveryMetadata({ status }, 'design', 'ar-EG', translator('ar-EG'));
     expect(metadata.title).toEqual({ absolute: messageAt('ar-EG', `delivery.${notice}.title`) });
     expect(metadata.description).toBe(messageAt('ar-EG', `delivery.${notice}.body`));
   });

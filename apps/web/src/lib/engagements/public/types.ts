@@ -5,6 +5,7 @@
 // COST-BLIND BY CONSTRUCTION: there is no cost, margin, build-cost, internal note
 // or raw machine-state field anywhere below. The SDF omits them; this type is the
 // second wall, because a field that does not exist here cannot be rendered.
+import type { EntryPhase } from '@/lib/flow/types';
 import type { ConceptLetter } from '../concept-letter';
 import type { DocumentAccess } from '../document-access';
 import type { MilestoneProgress } from '../journey-map';
@@ -38,6 +39,9 @@ export interface PublicDelivery {
   milestone: MilestoneProgress;
   /** The single "what needs you now" hero. Derived server-side (no raw state). */
   hero: HeroView;
+  /** 'execution' for a LIGHT delivery (the client page of an execution
+   *  contract, with no design phase): its page has no design tab. */
+  entryPhase: EntryPhase;
   offPlan: boolean;
   titleAr: string | null;
   titleEn: string | null;

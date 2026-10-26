@@ -48,6 +48,7 @@ function fixture(whoseMove: WhoseMove, updatedAt: string) {
   const dashboardRow: DashboardDelivery = { ...shared, whoseMove };
   const header = {
     ...shared,
+    entryPhase: 'design' as const,
     number: 14,
     titleAr: null,
     titleEn: 'Villa',

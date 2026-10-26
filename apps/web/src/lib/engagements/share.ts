@@ -11,7 +11,7 @@
 // client share links) and run inside mutateInOrg's RLS tx, so a caller can only
 // ever touch a delivery in their own org.
 import { designEngagements, type MetraDb } from '@metra/db';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -26,25 +26,49 @@ function canonicalEngagementId(engagementId: string): string {
 }
 
 /**
- * The FIRST share link of a delivery, inside the caller's RLS transaction and
- * gate. Atomic admission gate: sets token_hash only while it is still null (a
- * concurrent second mint finds 0 rows). The RAW token, or null when no row was
- * gated (the delivery is foreign or absent, or already has a link). Only the
- * hash and the nonce are stored; the token can be re-derived later only while
+ * Write a fresh link on the delivery row, inside the caller's RLS transaction
+ * and gate, while `admits` still holds for it (an atomic admission gate: a
+ * concurrent writer that changed the row first leaves 0 rows here). The RAW
+ * token, or null when no row was admitted (the delivery is foreign or absent,
+ * or `admits` no longer holds). Only the hash and the nonce are stored, in the
+ * SAME statement, so the 0056 trigger keeps the nonce (it clears one only when
+ * the writer left it as was); the token can be re-derived later only while
  * SHARE_LINK_SECRET is set (without it the nonce is null and the token is
- * unrecoverable, as before). `share_expires_at` stays null: the link is durable
- * and revocable, never hard-expiring while active. The client home's first
- * link (lib/client-home/ensure.ts) is minted here too.
+ * unrecoverable, as before). `share_expires_at` is cleared: the link is
+ * durable and revocable, never hard-expiring while active.
  */
-export async function mintFirstDeliveryLink(tx: MetraDb, engagementId: string): Promise<string | null> {
-  const id = canonicalEngagementId(engagementId);
+async function writeFreshDeliveryLink(tx: MetraDb, id: string, admits?: SQL): Promise<string | null> {
   const { raw, hash, nonce } = mintDeliveryLinkToken(id);
-  const gated = await tx
+  const written = await tx
     .update(designEngagements)
     .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
-    .where(and(eq(designEngagements.id, id), isNull(designEngagements.tokenHash)))
+    .where(and(eq(designEngagements.id, id), admits))
     .returning({ id: designEngagements.id });
-  return gated[0] ? raw : null;
+  return written[0] ? raw : null;
+}
+
+/**
+ * The FIRST share link of a delivery (writeFreshDeliveryLink, admitted only
+ * while token_hash is still null). The client home's first link
+ * (lib/client-home/ensure.ts) is minted here too.
+ */
+export async function mintFirstDeliveryLink(tx: MetraDb, engagementId: string): Promise<string | null> {
+  return writeFreshDeliveryLink(tx, canonicalEngagementId(engagementId), isNull(designEngagements.tokenHash));
+}
+
+/**
+ * A fresh link in place of one that has LAPSED (its share_expires_at passed),
+ * the rotation rotateDeliveryLinkCore makes, admitted only while the old link
+ * is still lapsed: the link the client holds is dead already, so nothing live
+ * is replaced. The client home's link (lib/client-home/ensure.ts) is renewed
+ * here.
+ */
+export async function renewLapsedDeliveryLink(tx: MetraDb, engagementId: string): Promise<string | null> {
+  return writeFreshDeliveryLink(
+    tx,
+    canonicalEngagementId(engagementId),
+    and(isNotNull(designEngagements.tokenHash), lte(designEngagements.shareExpiresAt, sql`now()`)),
+  );
 }
 
 /**
@@ -100,15 +124,8 @@ export async function rotateDeliveryLinkCore(
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
       const id = canonicalEngagementId(engagementId);
-      const { raw, hash, nonce } = mintDeliveryLinkToken(id);
-      // The nonce is written in the SAME statement as the hash, so the 0056
-      // trigger keeps it (it clears a nonce only when the writer left it as was).
-      const updated = await tx
-        .update(designEngagements)
-        .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
-        .where(eq(designEngagements.id, id))
-        .returning({ id: designEngagements.id });
-      if (!updated[0]) fail('engagement_not_found');
+      const raw = await writeFreshDeliveryLink(tx, id);
+      if (raw === null) fail('engagement_not_found');
       await audit({
         entity: 'design_engagement',
         entityId: id,

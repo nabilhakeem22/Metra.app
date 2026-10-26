@@ -8,6 +8,8 @@ export type ExecutionActionCode =
   | 'boq_not_issued'
   // The contract's client home is not at execution, or shows another contract.
   | 'client_home_unavailable'
+  // A terminated contract has no client home to open.
+  | 'contract_terminated'
   // The BOQ cannot be re-issued while a live contract stands on it.
   | 'boq_has_contract'
   | 'delivery_not_in_execution'

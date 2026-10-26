@@ -19,7 +19,8 @@ import { useExecutionHeadline } from './use-execution-headline';
 /**
  * The Execution tab's HERO: the shared step card (components/flow/step-card.tsx)
  * on the client's side. Its band holds the five execution steps, the client's
- * names for them; its body says whose move it is, the ONE thing the client is
+ * names for them (on a phone, the compact rail: the steps' marks and the
+ * current step's name); its body says whose move it is, the ONE thing the client is
  * told now (./use-execution-headline.ts) and the one act that answers it:
  * opening the section where it is done, or writing to the studio on WhatsApp
  * when only the studio can help. A change order whose link lapsed is said
@@ -39,7 +40,7 @@ export function ExecutionHero({
 }) {
   const t = useTranslations('delivery.home');
   const tFlow = useTranslations('delivery.flow.execution');
-  const tBar = useTranslations('delivery.studioBar');
+  const tBar = useTranslations('delivery.studioBar.execution');
   const locale = useLocale();
   const { location } = execution;
   const headline = useExecutionHeadline(execution, firmName, locale);
@@ -50,10 +51,11 @@ export function ExecutionHero({
   return (
     <StepCard
       chrome={commandCardChromeForTone(tone)}
-      rail={<PhaseRail view={buildPhaseView(EXECUTION_PHASE, location, 'client')} labels={labels} icons={EXECUTION_STEP_ICON} />}
+      rail={<PhaseRail view={buildPhaseView(EXECUTION_PHASE, location, 'client')} labels={labels} icons={EXECUTION_STEP_ICON} compactBelowSm />}
     >
       <div className="space-y-3" data-client-reason={location.reason}>
-        <StatusChip tone={tone} label={t(`move.${clientMoveKey(location)}`, { studio: firmName })} />
+        {/* It names the studio, whose name may be long: it wraps rather than run past the card. */}
+        <StatusChip tone={tone} label={t(`move.${clientMoveKey(location)}`, { studio: firmName })} className="max-w-full whitespace-normal" />
         <h2 className="text-heading font-semibold leading-tight text-balance">{headline}</h2>
         {execution.lapsedVariationCount > 0 && (
           <p className="text-body text-muted-foreground">

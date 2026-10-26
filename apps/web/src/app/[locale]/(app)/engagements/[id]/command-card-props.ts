@@ -19,8 +19,8 @@ import type { RunAction } from './use-engagement-action';
 export interface ExecutionCockpit {
   /** The BOQ contract's derived stage, its next action and what this role may do. */
   view: ExecutionCardView;
-  /** What is still open on the finished design, for the line it folds into. */
-  designSummary: DesignSummary;
+  /** What is still open on the finished design, for the line it folds into; null for a light delivery, which had no design. */
+  designSummary: DesignSummary | null;
 }
 
 /**

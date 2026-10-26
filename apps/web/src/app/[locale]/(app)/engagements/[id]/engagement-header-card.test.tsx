@@ -35,6 +35,7 @@ const header: EngagementHeader = {
   projectNameEn: 'Tower',
   projectNameAr: null,
   state: 'design_3d',
+  entryPhase: 'design',
   designFee: '100000.0000',
   offPlan: true,
   asBuiltDue: true,

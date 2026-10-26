@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { cache } from 'react';
 import { homeNamesSource } from '@/lib/client-home/names';
-import { requestedFocus, requestedTab } from '@/lib/client-home/tab';
+import { homeHref, requestedFocus, requestedTab } from '@/lib/client-home/tab';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { deliveryMetadata, type DeliveryTranslator, type NamedRead } from './delivery-metadata';
 import { ExecutionTabView } from './execution-tab';
 import { readHomeView } from './home-read';
@@ -12,6 +14,19 @@ import { PublicDeliveryView } from './public-delivery';
 const readView = cache(readHomeView);
 
 type PageSearch = Promise<Record<string, string | string[] | undefined>>;
+
+/**
+ * The view of the tab the URL asks for. A link to a tab the delivery does not
+ * have (a light delivery's design tab) is sent to the tab it does have. The
+ * route's loading skeleton has streamed by then, so Next redirects in the page
+ * (its router, with a refresh tag for no script) rather than with a 307, and
+ * never with a cached 308.
+ */
+async function renderedView(locale: string, token: string, tab: string | string[] | undefined) {
+  const view = await readView(token, requestedTab(tab));
+  if (view.tab === 'redirect') redirect(`/${locale}${homeHref(tokenPathSegment(token), view.to)}`);
+  return view;
+}
 
 // Durable client share link — private to the recipient. Never indexed, and titled
 // in the client's own words (./delivery-metadata.ts).
@@ -24,9 +39,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, token } = await params;
   const t = await getTranslations({ locale, namespace: 'delivery' });
-  const view = await readView(token, requestedTab((await searchParams).tab));
+  const view = await renderedView(locale, token, (await searchParams).tab);
   const named: NamedRead = view.tab === 'execution' ? { status: 'ok', delivery: homeNamesSource(view.home) } : view.read;
-  return deliveryMetadata(named, locale, t as unknown as DeliveryTranslator);
+  return deliveryMetadata(named, view.tab, locale, t as unknown as DeliveryTranslator);
 }
 
 // The client's ONE page, the delivery link: NO session, NO (app) shell/nav, never
@@ -40,15 +55,15 @@ export default async function PublicDeliveryPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ token: string }>;
+  params: Promise<{ locale: string; token: string }>;
   searchParams: PageSearch;
 }) {
-  const { token } = await params;
+  const { locale, token } = await params;
   // The download route bounces every failure back here with ?document=unavailable —
   // one flag, no detail, so the notice can never tell the client (or a prober)
   // WHICH failure occurred.
   const { document, tab, focus } = await searchParams;
-  const view = await readView(token, requestedTab(tab));
+  const view = await renderedView(locale, token, tab);
   if (view.tab === 'execution') {
     return <ExecutionTabView token={token} home={view.home} focus={requestedFocus(focus)} />;
   }

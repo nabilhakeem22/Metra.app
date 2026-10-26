@@ -28,11 +28,12 @@ vi.mock('@/lib/db/client', () => ({
 const { readHomeView } = await import('./home-read');
 
 /** A design snapshot app_delivery_by_token could answer, in the state given. */
-function designSnapshot(state: string): Record<string, unknown> {
+function designSnapshot(state: string, entryPhase = 'design'): Record<string, unknown> {
   return {
     id: '00000000-0000-4000-8000-0000000000d1',
     number: 12,
     state,
+    entry_phase: entryPhase,
     off_plan: false,
     title_ar: 'فيلا',
     title_en: 'Villa',
@@ -51,6 +52,14 @@ function answer(design: string | null, home: Record<string, unknown> | null) {
   db.answers = {
     app_delivery_by_token: design === null ? null : designSnapshot(design),
     app_home_by_token: home,
+  };
+}
+
+/** A LIGHT delivery (entry_phase 'execution'): born at execution, with no design behind it. */
+function answerLight(home: Record<string, unknown>) {
+  db.answers = {
+    app_delivery_by_token: designSnapshot('execution', 'execution'),
+    app_home_by_token: { ...home, delivery: { ...(home.delivery as object), entry_phase: 'execution' } },
   };
 }
 
@@ -104,6 +113,19 @@ describe('reads per view', () => {
     answer(null, null);
     expect(await readHomeView('tok', 'execution')).toEqual({ tab: 'design', read: { status: 'not_found' } });
     expect(db.calls).toEqual(['app_home_by_token']);
+  });
+
+  it('a light delivery with no tab opens its Execution tab: two calls, as any delivery at execution', async () => {
+    answerLight(homePayload('sign_contract'));
+    const view = await readHomeView('tok', null);
+    expect(view.tab).toBe('execution');
+    expect(db.calls).toEqual(['app_delivery_by_token', 'app_home_by_token']);
+  });
+
+  it('a light delivery has no design tab: asked for it, ONE call and the page is sent to the Execution tab (H4 follow-up 1)', async () => {
+    answerLight(homePayload('works_in_progress'));
+    expect(await readHomeView('tok', 'design')).toEqual({ tab: 'redirect', to: 'execution' });
+    expect(db.calls).toEqual(['app_delivery_by_token']);
   });
 
   it('the Execution tab asked of a delivery still in design opens its design tab', async () => {

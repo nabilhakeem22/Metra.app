@@ -15,6 +15,11 @@ import { WhoseMoveChip } from './whose-move-chip';
 // (the Arabic design phase needs about 870px) it scrolls sideways instead of
 // letting the labels run into each other. Logical CSS only, so the rail mirrors
 // in ar-EG RTL without a second layout.
+//
+// COMPACT BELOW sm (`compactBelowSm`, the client's phone): five names do not fit
+// in a phone's card, and a name clipped to "Contr" is one nobody can read. So
+// below sm each step keeps its bar and its mark, its name is left to screen
+// readers, and the CURRENT step's name is said once, in full, under the rail.
 
 /** What a step says under its name: who holds it, and one quiet line. Both translated. */
 export interface StepNote {
@@ -30,6 +35,8 @@ export interface PhaseRailProps {
   icons: Readonly<Record<string, LucideIcon>>;
   /** Per step key, the whose-move chip and caption drawn under its name (from md up). */
   notes?: Readonly<Record<string, StepNote>>;
+  /** Below the sm breakpoint, the compact rail: marks only, and the current step named once under it. */
+  compactBelowSm?: boolean;
 }
 
 /** A closed phase (abandoned, terminated) mutes every step: none of it is reached any more. */
@@ -61,10 +68,17 @@ function required<T>(entries: Readonly<Record<string, T>>, key: string, what: st
 }
 
 /**
+ * The name a compact rail leaves to screen readers below sm (640px). Not
+ * `max-sm:`: the config's raw `coarse` screen turns Tailwind's max-* variants
+ * off, so the query is written out.
+ */
+const COMPACT_HIDDEN = '[@media(max-width:639.98px)]:sr-only';
+
+/**
  * The gate the job is AT gets the warn accent: that is the difference between
  * "the work before it is in progress" and "it is done and the money is owed".
  */
-function GateMarker({ label, here }: { label: string; here: boolean }) {
+function GateMarker({ label, here, compact }: { label: string; here: boolean; compact: boolean }) {
   return (
     <li className="flex flex-none flex-col gap-1.5" aria-current={here ? 'step' : undefined}>
       <span
@@ -74,7 +88,7 @@ function GateMarker({ label, here }: { label: string; here: boolean }) {
       <span
         className={`whitespace-nowrap text-caption font-bold leading-tight ltr:font-mono ltr:uppercase ltr:tracking-[0.06em] ${
           here ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-faint)]'
-        }`}
+        } ${compact ? COMPACT_HIDDEN : ''}`}
       >
         {label}
       </span>
@@ -88,12 +102,14 @@ function StepSegment({
   label,
   Icon,
   note,
+  compact,
 }: {
   step: StepView;
   status: SegmentStatus;
   label: string;
   Icon: LucideIcon;
   note: StepNote | undefined;
+  compact: boolean;
 }) {
   return (
     <li
@@ -117,7 +133,7 @@ function StepSegment({
             shrinks to make it fit. */}
         <span
           data-rail-label
-          className="line-clamp-2 min-w-0 text-caption leading-tight md:line-clamp-none md:whitespace-nowrap"
+          className={`line-clamp-2 min-w-0 text-caption leading-tight md:line-clamp-none md:whitespace-nowrap ${compact ? COMPACT_HIDDEN : ''}`}
           title={label}
         >
           {label}
@@ -138,13 +154,17 @@ function StepSegment({
   );
 }
 
-export function PhaseRail({ view, labels, icons, notes }: PhaseRailProps) {
-  return (
+export function PhaseRail({ view, labels, icons, notes, compactBelowSm = false }: PhaseRailProps) {
+  const rail = (
     <ol className="flex items-stretch gap-1.5 overflow-x-auto pb-0.5">
       {view.steps.map((step) => (
         <Fragment key={step.key}>
           {step.gateBefore && (
-            <GateMarker label={required(labels, step.gateBefore, 'label')} here={view.atGate === step.gateBefore} />
+            <GateMarker
+              label={required(labels, step.gateBefore, 'label')}
+              here={view.atGate === step.gateBefore}
+              compact={compactBelowSm}
+            />
           )}
           <StepSegment
             step={step}
@@ -152,9 +172,22 @@ export function PhaseRail({ view, labels, icons, notes }: PhaseRailProps) {
             label={required(labels, step.key, 'label')}
             Icon={required(icons, step.key, 'icon')}
             note={notes?.[step.key]}
+            compact={compactBelowSm}
           />
         </Fragment>
       ))}
     </ol>
+  );
+  if (!compactBelowSm) return rail;
+  return (
+    <div>
+      {rail}
+      {/* aria-hidden: each step already names itself to a screen reader. */}
+      {view.currentStep && (
+        <p data-rail-current-name aria-hidden className="mt-2 text-caption font-bold leading-tight text-brand-ink sm:hidden">
+          {required(labels, view.currentStep, 'label')}
+        </p>
+      )}
+    </div>
   );
 }

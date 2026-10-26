@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { createTranslator } from 'next-intl';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { HomeFocus } from '@/lib/client-home/tab';
 import type { HomeAtExecution } from '@/lib/client-home/types';
 import { CLIENT_EXECUTION_REASONS, type ClientExecutionReason } from '@/lib/flow/locate/execution-client';
 import { bidiIsolate } from '@/lib/format/bidi';
@@ -30,8 +31,8 @@ function homeOf(reason: ClientExecutionReason, entryPhase: 'design' | 'execution
   return { ...home, execution: home.execution };
 }
 
-const show = (locale: TestLocale, home: HomeAtExecution) =>
-  renderWithIntl(<ExecutionTabView token="tok-1" home={home} focus={null} />, { locale });
+const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null) =>
+  renderWithIntl(<ExecutionTabView token="tok-1" home={home} focus={focus} />, { locale });
 
 /** The headline each reason says, built from the catalogue with the fixture's facts. */
 function expectedHeadline(locale: TestLocale, reason: ClientExecutionReason): string {
@@ -144,5 +145,106 @@ describe('the sections (H4 notes: change orders the client can no longer answer)
     const signed = document.getElementById('contract') as HTMLElement;
     expect(signed.textContent).toContain('03/10/2026');
     expect(signed.textContent).toContain('14/03/2027');
+  });
+});
+
+describe.each<TestLocale>(['ar-EG', 'en'])('the contract card once the signing window has closed (%s, H4 follow-up F1)', (locale) => {
+  it('says signing closed in the studio-move tone, as the hero does, and offers nothing to sign', () => {
+    show(locale, homeOf('signing_closed'));
+    const contract = document.getElementById('contract') as HTMLElement;
+    const chip = contract.querySelector('[data-tone]') as HTMLElement;
+    expect(chip.textContent).toBe(messageAt(locale, 'delivery.contract.status.signingClosed'));
+    expect(chip.getAttribute('data-tone')).toBe('waiting');
+    expect(contract.textContent).not.toContain(messageAt(locale, 'delivery.contract.status.issued'));
+    expect(within(contract).queryAllByRole('button')).toHaveLength(0);
+    expect(within(contract).queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe('a ?focus= link (H4 follow-up F4: an unknown focus is ignored)', () => {
+  const REQUEST = '00000000-0000-4000-8000-0000000000a1';
+  const ELSEWHERE = '00000000-0000-4000-8000-000000000099';
+  const scrolled: string[] = [];
+  const original = Element.prototype.scrollIntoView;
+  beforeEach(() => {
+    scrolled.length = 0;
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this.id);
+    };
+  });
+  afterEach(() => {
+    Element.prototype.scrollIntoView = original;
+  });
+
+  it('opens on the contract, and on a request the page lists', () => {
+    const contract = show('en', homeOf('pay_request'), { section: 'contract' });
+    contract.unmount();
+    show('en', homeOf('pay_request'), { section: 'request', id: REQUEST });
+    expect(scrolled).toEqual(['contract', `request-${REQUEST}`]);
+  });
+
+  it('leaves the page at its top for a request it does not list, and for a change order (none is listed by id)', () => {
+    const unknownRequest = show('en', homeOf('pay_request'), { section: 'request', id: ELSEWHERE });
+    unknownRequest.unmount();
+    show('en', homeOf('decide_change_order'), { section: 'variation', id: ELSEWHERE });
+    expect(document.getElementById('change-orders')).not.toBeNull();
+    expect(scrolled).toEqual([]);
+  });
+});
+
+describe.each<TestLocale>(['ar-EG', 'en'])('the Execution tab speaks of the studio, never of a design (%s, H4 follow-up 4 and F7)', (locale) => {
+  const DESIGN_WORDS = /design|تصميم|مصمم/i;
+
+  /** Everything the page says, to the eye and to a screen reader, and what its links would send. */
+  function everythingSaid(container: HTMLElement): string[] {
+    const said = [container.textContent ?? ''];
+    for (const element of container.querySelectorAll('*')) {
+      for (const name of ['aria-label', 'title', 'href']) {
+        const value = element.getAttribute(name);
+        if (value) said.push(decodeURIComponent(value));
+      }
+    }
+    return said;
+  }
+
+  it.each(CLIENT_EXECUTION_REASONS)('a light delivery on %s', (reason) => {
+    const home = homeOf(reason, 'execution');
+    const money = home.execution.money;
+    // The studio's own account holder name is the studio's data, not the page's words.
+    const neutral = money?.paymentDetails ? { ...money, paymentDetails: { ...money.paymentDetails, bankAccountHolder: 'Noon' } } : money;
+    const { container } = show(locale, { ...home, execution: { ...home.execution, money: neutral } });
+    for (const text of everythingSaid(container)) expect(text).not.toMatch(DESIGN_WORDS);
+  });
+
+  it('the WhatsApp message, from the studio bar and from the hero, names the project and its reference', () => {
+    const { container } = show(locale, homeOf('signing_closed'));
+    const message = encodeURIComponent(messageAt(locale, 'delivery.studioBar.execution.whatsappText').replace('{ref}', 'DE-2026-0012'));
+    const whatsapp = [...container.querySelectorAll('a[href^="https://wa.me/"]')].map((link) => link.getAttribute('href'));
+    expect(whatsapp).toEqual([`https://wa.me/201000000002?text=${message}`, `https://wa.me/201000000002?text=${message}`]);
+  });
+
+  it("the payment words the claim answers with are the studio's too", () => {
+    for (const key of ['requests.void', 'confirmBody', 'claimNotified', 'error.busy', 'earlierClaims.row']) {
+      expect(messageAt(locale, `delivery.execution.${key}`)).not.toMatch(DESIGN_WORDS);
+    }
+    for (const key of ['not_active', 'reference', 'token_expired', 'token_invalid']) {
+      expect(messageAt(locale, `portal.errors.${key}`)).not.toMatch(DESIGN_WORDS);
+    }
+    expect(messageAt(locale, 'delivery.notFound.body')).not.toMatch(DESIGN_WORDS);
+  });
+});
+
+describe('the hero on a phone (H4 follow-ups 3 and F8)', () => {
+  it('draws the compact rail, the current step named once under it', () => {
+    const { container } = show('en', homeOf('sign_contract'));
+    const hero = container.querySelector('[data-client-reason]')!.closest('section') as HTMLElement;
+    expect(hero.querySelector('[data-rail-current-name]')?.textContent).toBe(messageAt('en', 'delivery.flow.execution.signature'));
+  });
+
+  it('lets the whose-move chip wrap, so a long studio name is never cut off', () => {
+    const { container } = show('ar-EG', homeOf('signing_closed'));
+    const chip = container.querySelector('[data-client-reason] [data-tone]') as HTMLElement;
+    expect(chip.className.split(' ')).toContain('whitespace-normal');
+    expect(chip.className.split(' ')).not.toContain('whitespace-nowrap');
   });
 });

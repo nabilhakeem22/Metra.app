@@ -9,12 +9,18 @@ import 'server-only';
 // phase stays one call, as it was, and a delivery at `execution` reached by a
 // link without a tab reads the home as well (two calls, as the construction
 // page did). The links the studio hands out for the Execution tab name it.
+// A LIGHT delivery (entry_phase 'execution') has no design phase, so it has no
+// design tab: without a tab it opens the Execution tab, and a link to its
+// design tab is sent there instead.
 import { getHomeByToken } from '@/lib/client-home/read';
 import type { HomeTab } from '@/lib/client-home/tab';
 import type { HomeAtExecution, PortalHome } from '@/lib/client-home/types';
 import { getDeliveryByToken, type DeliveryReadResult } from '@/lib/engagements/public';
 
-type HomeView = { tab: 'design'; read: DeliveryReadResult } | { tab: 'execution'; home: HomeAtExecution };
+type HomeView =
+  | { tab: 'design'; read: DeliveryReadResult }
+  | { tab: 'execution'; home: HomeAtExecution }
+  | { tab: 'redirect'; to: HomeTab };
 
 /** The Execution tab's view of a home, or null when the delivery is not at execution. */
 function atExecution(home: PortalHome): HomeView | null {
@@ -41,6 +47,9 @@ async function executionView(token: string): Promise<HomeView> {
 export async function readHomeView(token: string, requested: HomeTab | null): Promise<HomeView> {
   if (requested === 'execution') return executionView(token);
   const read = await getDeliveryByToken(token);
+  if (read.status === 'ok' && read.delivery.entryPhase === 'execution') {
+    return requested === 'design' ? { tab: 'redirect', to: 'execution' } : executionView(token);
+  }
   const inExecution = read.status === 'ok' && read.delivery.stageKey === 'construction';
   if (requested === 'design' || !inExecution) return { tab: 'design', read };
   const home = await getHomeByToken(token);

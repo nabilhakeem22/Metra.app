@@ -15,18 +15,24 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { ActionError, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { DELIVERY_LINK_GATE, readLiveDeliveryLink } from '@/lib/engagements/share-reveal';
-import { mintFirstDeliveryLink } from '@/lib/engagements/share';
-import { can } from '@/lib/permissions/can';
+import { readLiveDeliveryLink } from '@/lib/engagements/share-reveal';
+import { mintFirstDeliveryLink, renewLapsedDeliveryLink } from '@/lib/engagements/share';
 import { isUuid } from '@/lib/uuid';
-import type { ClientHomeLinkReason } from './types';
+import type { ClientHomeLink, ClientHomeLinkReason } from './types';
 
-interface ClientHome {
-  engagementId: string;
-  /** The RAW token of the home's live link (never logged), or null with `linkReason`. */
-  link: string | null;
-  linkReason?: ClientHomeLinkReason;
-}
+/** The home, and its live link (the RAW token, never logged) or why the studio cannot be shown one. */
+type ClientHome = { engagementId: string } & ClientHomeLink;
+
+/**
+ * Who may open a contract's client home: whoever issues contracts (owner and
+ * admin), in the interior flow. Every such role may also share delivery links
+ * (DELIVERY_LINK_GATE; ./ensure-gate.test.ts pins it), so the home's link is
+ * always theirs to see.
+ */
+export const CLIENT_HOME_GATE = { capability: 'contracts_issue', action: 'approve', flow: 'interior' } as const;
+
+/** How the home's link came to be handed back, for the audit row. */
+type LinkIssued = 'shown' | 'minted' | 'renewed';
 
 /** The contract statuses a client home shows, and so the ones it is made for. */
 const HOME_CONTRACT_STATUSES: ReadonlySet<string> = new Set(['issued', 'signed']);
@@ -41,6 +47,7 @@ async function loadContractBoq(tx: MetraDb, contractId: string) {
     'record_not_found',
   );
   if (contract.sourceBoqId === null) fail('contract_not_execution');
+  if (contract.status === 'terminated') fail('contract_terminated');
   if (!HOME_CONTRACT_STATUSES.has(contract.status)) fail('contract_not_issued');
   return requireInOrg(
     tx,
@@ -114,55 +121,57 @@ async function requireHomeShows(tx: MetraDb, engagementId: string, contractId: s
   if (home?.state !== 'execution' || home.contract_id !== contractId) fail('client_home_unavailable');
 }
 
-/** The link-reveal and first-mint refusals that leave the home without a link to hand back. */
+/** The link-reveal refusals that leave the home without a link to hand back. */
 const UNSHOWN_LINK: ReadonlySet<string> = new Set(['delivery_links_not_configured', 'delivery_link_unrecoverable']);
 
 /**
- * The home's live link, re-derived; minted as its first link when it has none.
- * Only a role that may share delivery links sees one (DELIVERY_LINK_GATE).
+ * The home's live link, re-derived. A home with no live link gets one: its
+ * first, or a fresh one in place of a link that has lapsed (the client's old
+ * link is dead anyway). A link written meanwhile by someone else is
+ * `engagement_state_conflict` (try again: it is then the live one).
  */
-async function homeLink(tx: MetraDb, ctx: OrgContext, engagementId: string): Promise<Omit<ClientHome, 'engagementId'> & { minted: boolean }> {
-  if (!can(ctx.role, DELIVERY_LINK_GATE.capability, DELIVERY_LINK_GATE.action)) {
-    return { link: null, linkReason: 'not_allowed', minted: false };
-  }
+async function homeLink(tx: MetraDb, engagementId: string): Promise<ClientHomeLink & { issued: LinkIssued | null }> {
   try {
-    return { link: (await readLiveDeliveryLink(tx, engagementId)).raw, minted: false };
+    return { link: (await readLiveDeliveryLink(tx, engagementId)).raw, issued: 'shown' };
   } catch (error) {
     if (!(error instanceof ActionError)) throw error;
-    if (UNSHOWN_LINK.has(error.code)) return { link: null, linkReason: error.code as ClientHomeLinkReason, minted: false };
+    if (UNSHOWN_LINK.has(error.code)) return { link: null, linkReason: error.code as ClientHomeLinkReason, issued: null };
     if (error.code !== 'delivery_link_not_shared') throw error;
   }
   const minted = await mintFirstDeliveryLink(tx, engagementId);
-  // A link that exists but has lapsed is not first: only a Replace from the delivery page renews it.
-  return minted === null ? { link: null, linkReason: 'delivery_link_unrecoverable', minted: false } : { link: minted, minted: true };
+  if (minted !== null) return { link: minted, issued: 'minted' };
+  const renewed = await renewLapsedDeliveryLink(tx, engagementId);
+  if (renewed === null) fail('engagement_state_conflict');
+  return { link: renewed, issued: 'renewed' };
 }
 
 /**
  * The client home of one BOQ contract, issued or signed. The home is the
  * delivery the BOQ was generated for, else the light delivery of the BOQ's
  * project and client, else a new light delivery. Its link is the live one,
- * minted first when it has none, for a role that may share links; otherwise
- * `link` is null and `linkReason` says why. Owner and admin
- * (`contracts_issue` approve), the interior flow. Audited on the delivery as an
- * `issue`, as the share cores are.
+ * minted or renewed when it has none (homeLink); when it cannot be shown,
+ * `link` is null and `linkReason` says why. CLIENT_HOME_GATE. Audited on the
+ * delivery as an `issue`, as the share cores are.
  */
 export async function ensureClientHomeCore(
   ctx: OrgContext,
   input: { contractId: string },
 ): Promise<ActionResult & { data?: ClientHome }> {
-  return mutateInOrg(ctx, { capability: 'contracts_issue', action: 'approve', flow: 'interior' }, async (tx, audit) => {
+  return mutateInOrg(ctx, CLIENT_HOME_GATE, async (tx, audit) => {
     if (!isUuid(input.contractId)) fail('record_not_found');
-    const boq = await loadContractBoq(tx, input.contractId);
+    // The id as the database answers it (lower case), so the home's contract compares equal.
+    const contractId = input.contractId.toLowerCase();
+    const boq = await loadContractBoq(tx, contractId);
     const existing = boq.engagementId ?? (await findLightHome(tx, boq.projectId, boq.clientId));
     const home = existing ? { id: existing, created: false } : await insertLightHome(tx, ctx, boq.projectId, boq.clientId);
-    await requireHomeShows(tx, home.id, input.contractId);
-    const { minted, ...link } = await homeLink(tx, ctx, home.id);
+    await requireHomeShows(tx, home.id, contractId);
+    const { issued, ...link } = await homeLink(tx, home.id);
     await audit({
       entity: 'design_engagement',
       entityId: home.id,
       action: 'issue',
       before: { home: home.created ? null : 'existing' },
-      after: { contract_id: input.contractId, home: home.created ? 'created' : 'existing', link: minted ? 'minted' : (link.linkReason ?? 'shown') },
+      after: { contract_id: contractId, home: home.created ? 'created' : 'existing', link: issued ?? link.linkReason },
     });
     return { engagementId: home.id, ...link };
   });

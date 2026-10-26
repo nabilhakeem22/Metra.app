@@ -73,7 +73,7 @@ export function ExecutionPayments({
         )}
       </section>
       <ExecutionEarlierClaims claims={claim.execution.earlierClaims} money={money} />
-      {claim.execution.paymentDetails && <PaymentInstructions details={claim.execution.paymentDetails} />}
+      {claim.execution.paymentDetails && <PaymentInstructions details={claim.execution.paymentDetails} phase="execution" />}
       <ExecutionReceipts receipts={claim.execution.receipts} truncated={claim.execution.receiptsTruncated} money={money} />
       <ConfirmActDialog
         open={asking !== null}

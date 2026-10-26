@@ -96,7 +96,7 @@ export function PaymentsCard({
       ) : (
         <SettledNote />
       )}
-      {details && awaitsPayment && <PaymentInstructions details={details} />}
+      {details && awaitsPayment && <PaymentInstructions details={details} phase="design" />}
       <ul>
         {overview.rows.map((row) => (
           <PaymentScheduleRow

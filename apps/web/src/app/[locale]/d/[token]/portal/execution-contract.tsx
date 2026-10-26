@@ -4,22 +4,15 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Link } from '@/i18n/routing';
+import { contractChip } from '@/lib/client-home/contract-chip';
 import { homeHref } from '@/lib/client-home/tab';
 import type { HomeExecution } from '@/lib/client-home/types';
-import type { PortalContractStatus } from '@/lib/engagements/public/execution-types';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-import type { StatusTone } from '@/lib/ui/status-tone';
 import { DocumentNumber } from './document-number';
 import { formatPortalMoney } from './portal-money';
-
-const STATUS_TONE: Readonly<Record<PortalContractStatus, StatusTone>> = {
-  issued: 'yourMove',
-  signed: 'done',
-  terminated: 'neutral',
-};
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -56,6 +49,7 @@ export function ExecutionContract({
   const day = (date: string) => bidiIsolate(formatDate(date, locale));
   const { contract, money } = execution;
   const title = pickLocale(money?.contract, 'title', locale).value;
+  const chip = contract && contractChip(contract);
 
   return (
     <section id="contract" aria-labelledby="home-contract-title" className="space-y-2 rounded-panel border bg-background p-4 shadow-sm">
@@ -63,7 +57,7 @@ export function ExecutionContract({
         <h2 id="home-contract-title" className="text-body font-semibold">
           {t('title')}
         </h2>
-        {contract && <StatusChip tone={STATUS_TONE[contract.status]} label={t(`status.${contract.status}`)} />}
+        {chip && <StatusChip tone={chip.tone} label={t(`status.${chip.key}`)} />}
       </div>
       {contract ? (
         <>

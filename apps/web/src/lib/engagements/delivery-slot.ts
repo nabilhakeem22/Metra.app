@@ -6,6 +6,7 @@
 import { designEngagements, type MetraDb } from '@metra/db';
 import { and, count, eq, inArray, ne, type SQL } from 'drizzle-orm';
 import { failFields } from '@/lib/actions/field-errors';
+import { PROJECT_DELIVERY_CAP } from './project-delivery-offer';
 import { ACTIVE_STATES } from './states';
 
 // The non-terminal (in-flight) states a Delivery can occupy — materialized once for
@@ -13,12 +14,6 @@ import { ACTIVE_STATES } from './states';
 // TERMINAL state (closed_design_only / execution / abandoned) has left its Project
 // and does NOT block a fresh start.
 const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
-
-// Lifetime cap: a Project may hold at most TWO NON-abandoned deliveries over its
-// life (the original + one extension). Abandoned deliveries are ignored by the
-// count (owner decision) — a project with 1 real + N abandoned rows can still
-// start its extension.
-const PROJECT_DELIVERY_CAP = 2;
 
 /**
  * The deliveries a project's lifetime cap counts: not abandoned, and not a LIGHT

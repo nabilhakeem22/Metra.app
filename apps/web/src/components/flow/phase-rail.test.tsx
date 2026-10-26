@@ -4,7 +4,9 @@ import { JOURNEY_MILESTONES } from '@/lib/engagements/journey-map';
 import { SPINE_NODES } from '@/lib/engagements/stage-spine';
 import { buildPhaseView } from '@/lib/flow/build-view';
 import { DESIGN_PHASE } from '@/lib/flow/phases/design';
+import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { EXECUTION_STEP_ICON } from './execution-step-icons';
 import { PhaseRail } from './phase-rail';
 
 const LOCALES: TestLocale[] = ['ar-EG', 'en'];
@@ -100,6 +102,35 @@ describe('PhaseRail', () => {
       expect(chip.parentElement!.className).toMatch(/(^| )hidden( |$)/);
       expect(chip.parentElement!.className).toMatch(/(^| )md:flex( |$)/);
     }
+  });
+
+  // H4 follow-up 3: at 390 px five client names were clipped to "Contr" and "Signa".
+  describe.each(LOCALES)('the compact variant below sm (%s)', (locale) => {
+    const PHONE_ONLY_SR = '[@media(max-width:639.98px)]:sr-only';
+    const labels = Object.fromEntries(EXECUTION_PHASE.steps.map((step) => [step.key, messageAt(locale, `delivery.flow.execution.${step.key}`)]));
+
+    test('leaves every step name to screen readers on a phone, and names the current step once, in full, under the rail', () => {
+      const view = buildPhaseView(EXECUTION_PHASE, { step: 'signature', whoseMove: 'client', status: 'active' }, 'client');
+      const { container } = renderWithIntl(<PhaseRail view={view} labels={labels} icons={EXECUTION_STEP_ICON} compactBelowSm />, { locale });
+      const names = [...container.querySelectorAll('[data-rail-label]')];
+      expect(names.map((name) => name.textContent)).toEqual(Object.values(labels));
+      for (const name of names) expect(name.className.split(' ')).toContain(PHONE_ONLY_SR);
+      const current = container.querySelector('[data-rail-current-name]')!;
+      expect(current.textContent).toBe(labels.signature);
+      expect(current.getAttribute('aria-hidden')).toBe('true');
+      expect(current.className.split(' ')).toContain('sm:hidden');
+    });
+
+    test('says no current name once nothing is current, and the full rail is unchanged', () => {
+      const settled = buildPhaseView(EXECUTION_PHASE, { step: 'settled', whoseMove: null, status: 'complete' }, 'client');
+      const compact = renderWithIntl(<PhaseRail view={settled} labels={labels} icons={EXECUTION_STEP_ICON} compactBelowSm />, { locale });
+      expect(compact.container.querySelector('[data-rail-current-name]')).toBeNull();
+      compact.unmount();
+      const active = buildPhaseView(EXECUTION_PHASE, { step: 'works', whoseMove: 'site', status: 'active' }, 'client');
+      const { container } = renderWithIntl(<PhaseRail view={active} labels={labels} icons={EXECUTION_STEP_ICON} />, { locale });
+      expect(container.querySelector('[data-rail-current-name]')).toBeNull();
+      for (const name of container.querySelectorAll('[data-rail-label]')) expect(name.className).not.toContain('sr-only');
+    });
   });
 
   test('refuses to draw a step it has no name for', () => {

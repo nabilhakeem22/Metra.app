@@ -15,8 +15,8 @@ type Shown = { link: string } | { reason: ClientHomeLinkReason } | { error: stri
  * The contract page's "Client page" control (an issued or signed BOQ
  * contract, for a role that issues contracts): one tap opens the client's home
  * for this contract, creating it when no delivery stands behind the BOQ, and
- * shows its Execution tab link to copy and send. A role that may not share
- * links, or a link that cannot be shown, is told why instead. The await is
+ * shows its Execution tab link to copy and send. A link that cannot be shown
+ * is told why instead. The await is
  * wrapped, so a rejected action never strands the spinner. Egyptian copy.
  */
 export function ClientPageControl({ contractId }: { contractId: string }) {
@@ -31,7 +31,7 @@ export function ClientPageControl({ contractId }: { contractId: string }) {
       try {
         const res = await openClientHome(contractId);
         if (!res.ok) setShown({ error: describeFailure(res, te) });
-        else setShown(res.link ? { link: res.link } : { reason: res.linkReason ?? 'not_allowed' });
+        else setShown(res.link === null ? { reason: res.linkReason } : { link: res.link });
       } catch (rejection) {
         setShown({ error: describeRejection(rejection, te) });
       }

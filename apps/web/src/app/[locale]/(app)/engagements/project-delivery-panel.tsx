@@ -7,24 +7,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from '@/i18n/routing';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
+import { projectDeliveryOffer } from '@/lib/engagements/project-delivery-offer';
 import type { ProjectDeliverySummary } from '@/lib/engagements/queries';
-import { isTerminal } from '@/lib/engagements/states';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { EngagementCreateForm } from './engagement-create-form';
 import { StateBadge } from './state-badge';
 
 /**
  * The through-project entry point to a Delivery (Slice C2 + C2-hardening). Rendered
- * on the project overview; renders four states from the serialized `delivery`
- * summary + `deliveryCount` (the project's NON-abandoned delivery count):
+ * on the project overview from the serialized `delivery` summary + `deliveryCount`
+ * (the project's COUNTED deliveries: abandoned and light ones are not), and what
+ * it offers is lib/engagements/project-delivery-offer.ts:
  *   (a) an ACTIVE delivery -> "Open delivery" (its DE number + stage badge), no CTA
  *       (a project holds at most one in-flight delivery);
- *   (b) no delivery -> "Start delivery" (opens the locked create form);
- *   (c) a TERMINAL delivery below the lifetime cap (`deliveryCount < 2`) ->
- *       "Open delivery" (the terminal one) + a "Start extension" CTA (the SAME
- *       locked create form — original + one extension);
- *   (d) a TERMINAL delivery at the cap (`deliveryCount >= 2`) -> "Open delivery",
- *       no CTA, and the at-limit note.
+ *   (b) no counted delivery yet (none at all, or only a terminal light or
+ *       abandoned one) -> "Start delivery" (opens the locked create form);
+ *   (c) a TERMINAL delivery and one counted -> "Open delivery" (the terminal
+ *       one) + a "Start extension" CTA (the SAME locked create form — original +
+ *       one extension);
+ *   (d) the cap used -> "Open delivery", no CTA, and the at-limit note.
+ * A light delivery is headed as the client page of the execution contract,
+ * never as a design delivery.
  * `clientId`/`projectId` fix the locked form; the create path is the SAME
  * `createEngagement` action, so the interior entitlement + capability gates still
  * fire server-side and the cap is re-checked atomically there.
@@ -63,14 +66,9 @@ export function ProjectDeliveryPanel({
       ).value
     : '';
 
-  const terminal = delivery ? isTerminal(delivery.state) : false;
-  // A terminal delivery below the cap may start the project's ONE extension;
-  // at/above the cap it is locked (owner rule: at most two NON-abandoned deliveries).
-  const canExtend = terminal && deliveryCount < 2;
-  const atLimit = terminal && deliveryCount >= 2;
-  // The locked create form powers both "Start delivery" (no delivery yet) and
-  // "Start extension" (a terminal delivery below the cap) — one C2 create path.
-  const canCreate = canStartDelivery && (!delivery || canExtend);
+  const offer = projectDeliveryOffer(delivery, deliveryCount);
+  // The locked create form powers both "Start delivery" and "Start extension" — one C2 create path.
+  const canCreate = canStartDelivery && offer.create !== null;
 
   return (
     <Card
@@ -87,7 +85,7 @@ export function ProjectDeliveryPanel({
             aria-hidden
           />
           <div className="min-w-0">
-            <p className="text-caption text-muted-foreground">{t('heading')}</p>
+            <p className="text-caption text-muted-foreground">{t(offer.heading)}</p>
             {delivery ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-body" dir="ltr">
@@ -99,7 +97,7 @@ export function ProjectDeliveryPanel({
             ) : (
               <p className="mt-1 text-body text-muted-foreground">{t('none')}</p>
             )}
-            {atLimit && (
+            {offer.atLimit && (
               <p className="mt-1 text-caption text-muted-foreground">{t('atLimit')}</p>
             )}
           </div>
@@ -117,7 +115,7 @@ export function ProjectDeliveryPanel({
           {canCreate && (
             <Button variant={delivery ? 'secondary' : 'default'} onClick={() => setCreating(true)}>
               <Plus className="size-4" aria-hidden />
-              {delivery ? t('extend') : tStart('startDelivery')}
+              {offer.create === 'extend' ? t('extend') : tStart('startDelivery')}
             </Button>
           )}
         </div>

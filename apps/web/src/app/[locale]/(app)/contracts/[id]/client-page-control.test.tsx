@@ -31,8 +31,8 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the client page control (%s)', (loca
     expect(screen.getByRole('button', { name: messageAt(locale, 'contracts.clientPage.copy') })).toBeTruthy();
   });
 
-  it.each(['not_allowed', 'delivery_links_not_configured', 'delivery_link_unrecoverable'] as const)('says why there is no link: %s', async (reason) => {
-    actions.openClientHome.mockResolvedValue({ ok: true, linkReason: reason });
+  it.each(['delivery_links_not_configured', 'delivery_link_unrecoverable'] as const)('says why there is no link: %s', async (reason) => {
+    actions.openClientHome.mockResolvedValue({ ok: true, link: null, linkReason: reason });
     await press(locale);
     expect(screen.getByRole('status').textContent).toBe(messageAt(locale, `contracts.clientPage.reason.${reason}`));
   });

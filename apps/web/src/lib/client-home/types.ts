@@ -65,10 +65,13 @@ export interface PortalHome {
 
 /**
  * Why the studio is not handed the home's link (lib/client-home/ensure.ts): the
- * caller may not share links, or the link cannot be shown (no secret to
- * re-derive it with, or a link that cannot be re-derived or renewed).
+ * link cannot be shown (no secret to re-derive it with, or a live link that
+ * cannot be re-derived).
  */
-export type ClientHomeLinkReason = 'not_allowed' | 'delivery_links_not_configured' | 'delivery_link_unrecoverable';
+export type ClientHomeLinkReason = 'delivery_links_not_configured' | 'delivery_link_unrecoverable';
+
+/** The home's link as the studio is handed it, or why there is none. */
+export type ClientHomeLink = { link: string; linkReason?: never } | { link: null; linkReason: ClientHomeLinkReason };
 
 /** A home whose Execution tab can be shown: the delivery is at `execution`. */
 export type HomeAtExecution = PortalHome & { execution: HomeExecution };

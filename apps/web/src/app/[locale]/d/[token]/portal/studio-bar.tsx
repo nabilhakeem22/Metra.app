@@ -29,7 +29,7 @@ export function StudioBar({
   deliveryRef: string;
   token: string;
   locale: string;
-  /** The tab the page shows, kept by the language switch; null for the current phase. */
+  /** The tab the page shows, kept by the language switch and named in the studio's contact words; null for the current phase. */
   tab: HomeTab | null;
   wide?: boolean;
 }) {
@@ -40,7 +40,12 @@ export function StudioBar({
         <p className="ms-1 min-w-0 flex-1 truncate font-semibold leading-tight">
           <bdi>{firmName}</bdi>
         </p>
-        <StudioContact phone={firm.phone} whatsappDigits={firm.whatsappDigits} deliveryRef={deliveryRef} />
+        <StudioContact
+          phone={firm.phone}
+          whatsappDigits={firm.whatsappDigits}
+          deliveryRef={deliveryRef}
+          phase={tab === 'execution' ? 'execution' : 'design'}
+        />
         <LanguageSwitch token={token} locale={locale} tab={tab} />
       </div>
     </header>
