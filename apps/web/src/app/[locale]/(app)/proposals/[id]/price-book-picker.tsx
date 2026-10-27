@@ -6,16 +6,14 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AnchoredLayer } from '@/components/ui/anchored-layer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ListboxOption } from '@/components/ui/listbox-option';
 import { useOutsidePointerDown } from '@/hooks/use-outside-pointer-down';
-import { cn } from '@/lib/utils';
 import type { CostItemOption } from './builder-model';
-import { pickerList } from './price-book-picker-model';
+import { optionIdOf, pickerList } from './price-book-picker-model';
+import { PriceBookPickerOptions } from './price-book-picker-options';
 import { PriceBookPickerStatus } from './price-book-picker-status';
 import type { SectionOption } from './section-combobox';
 import { usePriceBookSearch } from './use-price-book-search';
 
-const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}`;
 /** The panel's width (w-96), less on a narrow screen. */
 const PANEL_WIDTH = 384;
 /** The tallest the whole panel gets (search box, list, status line) before it scrolls. */
@@ -94,7 +92,6 @@ export function PriceBookPicker({
     }
   }
 
-  let position = -1;
   return (
     <div ref={rootRef}>
       <Button
@@ -135,40 +132,15 @@ export function PriceBookPicker({
             }}
             onKeyDown={onKeyDown}
           />
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={t('fromPriceBook')}
-            aria-busy={answer.stale}
-            className={cn('mt-2 max-h-72 overflow-auto', answer.stale && 'opacity-60')}
-          >
-            {list.groups.map((group) => (
-              <li key={group.sectionId ?? 'other'} role="presentation">
-                <p className="px-2 pb-1 pt-2 text-caption font-medium text-muted-foreground">{group.title ?? t('priceBookOther')}</p>
-                <ul role="presentation">
-                  {group.entries.map((entry) => {
-                    position += 1;
-                    const index = position;
-                    return (
-                      <ListboxOption
-                        key={entry.item.id}
-                        id={optionIdOf(listId, index)}
-                        active={index === active}
-                        className="items-baseline justify-between gap-3 px-2"
-                        onPick={() => pick(entry.item)}
-                        onHover={() => setActive(index)}
-                      >
-                        <span>{entry.name}</span>
-                        <span className="shrink-0 text-caption text-muted-foreground" dir="ltr">
-                          {entry.item.code}
-                        </span>
-                      </ListboxOption>
-                    );
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ul>
+          <PriceBookPickerOptions
+            list={list}
+            listId={listId}
+            active={active}
+            stale={answer.stale}
+            onPick={pick}
+            onHover={setActive}
+            t={t}
+          />
           <PriceBookPickerStatus answer={answer} matched={list.matched} hidden={list.hidden} />
         </AnchoredLayer>
       )}
