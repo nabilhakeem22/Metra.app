@@ -1,5 +1,6 @@
 // "Your verification code": the one-time code a CLIENT asked for on their
-// project page, before an act that binds them ("I paid"). Server-side, no
+// project page, before an act that binds them ("I paid", signing the
+// execution contract). Server-side, no
 // next-intl context, so the copy is inlined. CLIENT register: Arabic is فصحى,
 // like every client-facing delivery surface. Latin digits, no dash, the
 // existing shell (no branding change).
@@ -19,7 +20,7 @@ import { emailShell } from './shell';
 export interface ClientCodeEmailInput {
   code: string;
   purpose: CodePurpose;
-  /** The request's PR number, or the delivery's DE number for a design instalment. */
+  /** The request's PR number, the contract's C number, or the delivery's DE number for a design instalment. */
   documentNumber: string;
   studioName: string;
   /** The client's project page, where the code is typed. */
@@ -32,12 +33,16 @@ const VALID_MINUTES = 10;
 
 /** What the code is for, in the client's words. */
 function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): string {
-  if (purpose === 'claim_request') {
-    return ar ? `لتأكيد إبلاغك بسداد مطالبة الدفع ${documentNumber}` : `to confirm that you paid payment request ${documentNumber}`;
+  switch (purpose) {
+    case 'claim_request':
+      return ar ? `لتأكيد إبلاغك بسداد مطالبة الدفع ${documentNumber}` : `to confirm that you paid payment request ${documentNumber}`;
+    case 'claim_design_payment':
+      return ar
+        ? `لتأكيد إبلاغك بسداد دفعة من أتعاب التصميم في المشروع ${documentNumber}`
+        : `to confirm that you paid a design fee instalment on ${documentNumber}`;
+    case 'sign_contract':
+      return ar ? `لتوقيع عقد التنفيذ ${documentNumber}` : `to sign execution contract ${documentNumber}`;
   }
-  return ar
-    ? `لتأكيد إبلاغك بسداد دفعة من أتعاب التصميم في المشروع ${documentNumber}`
-    : `to confirm that you paid a design fee instalment on ${documentNumber}`;
 }
 
 export function clientCodeEmailTemplate(input: ClientCodeEmailInput): EmailContent {

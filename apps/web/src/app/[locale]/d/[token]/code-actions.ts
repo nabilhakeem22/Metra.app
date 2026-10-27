@@ -8,7 +8,7 @@ import {
   logCodeUnsentNotMarked,
 } from '@/lib/client-home/code-log';
 import { issueClientCodeByToken, markClientCodeUnsentByToken, newClientCode, type CodeIssueResult } from '@/lib/client-home/codes';
-import { homePaymentHref } from '@/lib/client-home/tab';
+import { homeCodeActHref } from '@/lib/client-home/tab';
 import { claimableMilestoneOf } from '@/lib/engagements/claimable-milestones';
 import { sendClientCodeEmail } from '@/lib/email/client-code';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
@@ -33,16 +33,15 @@ import { isUuid } from '@/lib/uuid';
 
 const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
 
-/** The act's target as the database keys it, or null when it cannot name one. */
+/** The act's target as the database keys it (a request's or a contract's id lower-cased, a milestone kind), or null when it cannot name one. */
 function targetOf(purpose: CodePurpose, target: unknown): string | null {
-  if (purpose === 'claim_request') return isUuid(target) ? target.toLowerCase() : null;
-  return claimableMilestoneOf(target);
+  if (purpose === 'claim_design_payment') return claimableMilestoneOf(target);
+  return isUuid(target) ? target.toLowerCase() : null;
 }
 
 /** The client's page the email links back to: the act itself, open on its code box (H5 functional F1). */
-function actUrlOf(origin: string, locale: string, rawToken: string, purpose: CodePurpose, target: string): string {
-  const instalment = purpose === 'claim_design_payment' ? claimableMilestoneOf(target) : null;
-  return `${origin}/${locale}${homePaymentHref(tokenPathSegment(rawToken), instalment ? { instalment } : { requestId: target })}`;
+function actUrlOf(origin: string, locale: string, rawToken: string, act: { purpose: CodePurpose; target: string }): string {
+  return `${origin}/${locale}${homeCodeActHref(tokenPathSegment(rawToken), act)}`;
 }
 
 /**
@@ -63,7 +62,7 @@ async function emailCode(
     purpose: act.purpose,
     documentNumber: issued.documentNumber,
     studioName: pickLocale(issued.studio, 'name', locale).value,
-    homeUrl: actUrlOf(link.origin, locale, link.rawToken, act.purpose, act.target),
+    homeUrl: actUrlOf(link.origin, locale, link.rawToken, act),
     locale,
   });
   if (sent.sent) return true;
@@ -84,8 +83,9 @@ async function markUnsent(rawToken: string, challengeId: string, purpose: CodePu
 
 /**
  * Public (no-session): email the client a one-time code for ONE act on their
- * home. `purpose` and `target` name the act (a payment request's id, or a
- * design-fee milestone kind); a code is good for that act only, for ten
+ * home. `purpose` and `target` name the act (a payment request's id, a
+ * design-fee milestone kind, or the execution contract's id for signing it);
+ * a code is good for that act only, for ten
  * minutes and five tries, and only the newest one works. A client with no
  * address on file is `no_channel`; an act that cannot be taken now is
  * `not_available`; either way nothing is written or sent. `send_failed` is

@@ -101,6 +101,20 @@ describe('a code that is made and sent', () => {
     });
   });
 
+  it('links a signing code email to the signing of the contract on the Execution tab, keyed by the id lower-cased (H6.2)', async () => {
+    db.issueClientCodeByToken.mockResolvedValue({ ...ISSUED, documentNumber: 'C-2026-0004' });
+    await requestClientCode(TOKEN, { purpose: 'sign_contract', target: REQUEST.toUpperCase() });
+    expect(db.issueClientCodeByToken.mock.calls[0][1]).toMatchObject({ purpose: 'sign_contract', target: REQUEST });
+    expect(sender.sendClientCodeEmail.mock.calls[0][0]).toMatchObject({
+      purpose: 'sign_contract',
+      documentNumber: 'C-2026-0004',
+      homeUrl: `https://metra.example/ar-EG/d/${TOKEN}?tab=execution&focus=sign:${REQUEST}`,
+    });
+    expect((db.issueClientCodeByToken.mock.calls[0][1] as { codeHash: string }).codeHash).toBe(
+      createHash('sha256').update(`sign_contract:${REQUEST}:${sentCode()}`).digest('hex'),
+    );
+  });
+
   it('raises the alarm when the code crossed half the platform day, and only then (R2)', async () => {
     expect((await requestClientCode(TOKEN, { purpose: 'claim_request', target: REQUEST })).ok).toBe(true);
     expect(logs).not.toContain('ALERT');
@@ -170,7 +184,9 @@ describe('refusals', () => {
 
   it('an act this build takes no code for, or a target that names none, is not_available with no round trip', async () => {
     for (const input of [
-      { purpose: 'sign_contract', target: REQUEST },
+      { purpose: 'decide_variation', target: REQUEST },
+      { purpose: 'sign_contract', target: 'not-a-uuid' },
+      { purpose: 'sign_contract', target: 'deposit' },
       { purpose: 'claim_request', target: 'not-a-uuid' },
       { purpose: 'claim_design_payment', target: '' },
       { purpose: 'claim_design_payment', target: 'retainer' },

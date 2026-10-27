@@ -48,6 +48,14 @@ describe('clientCodeEmailTemplate', () => {
     expect(email.text).toContain('to confirm that you paid a design fee instalment on DE-2026-0012');
   });
 
+  it('names the execution contract a signing code is for, in both registers', () => {
+    const sign = (locale: string) =>
+      clientCodeEmailTemplate({ code: '123456', purpose: 'sign_contract', documentNumber: 'C-2026-0004', studioName: 'Diwan', homeUrl: HOME, locale });
+    expect(sign('ar-EG').text).toContain('لتوقيع عقد التنفيذ C-2026-0004');
+    expect(sign('en').text).toContain('to sign execution contract C-2026-0004');
+    for (const locale of ['ar-EG', 'en']) expect(sign(locale).text).not.toMatch(DASH);
+  });
+
   it('links only to the client\'s own project page', () => {
     for (const locale of ['ar-EG', 'en']) {
       expect(hrefsOf(render(locale).html)).toEqual([HOME.replace('&', '&amp;')]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homeHref, homePaymentHref, requestedFocus, requestedTab } from './tab';
+import { homeCodeActHref, homeHref, requestedFocus, requestedTab } from './tab';
 
 const ID = '0F8FAD5B-D9CB-469F-A165-70867728950E';
 
@@ -14,10 +14,11 @@ describe('requestedTab', () => {
 });
 
 describe('requestedFocus', () => {
-  it('opens the contract, one change order or one request by its id', () => {
+  it('opens the contract, one change order, one request or the signing of one contract by its id', () => {
     expect(requestedFocus('contract')).toEqual({ section: 'contract' });
     expect(requestedFocus(`variation:${ID}`)).toEqual({ section: 'variation', id: ID.toLowerCase() });
     expect(requestedFocus(`request:${ID}`)).toEqual({ section: 'request', id: ID.toLowerCase() });
+    expect(requestedFocus(`sign:${ID}`)).toEqual({ section: 'sign', id: ID.toLowerCase() });
   });
 
   it('opens a design-fee instalment the client can claim, by its kind (the link of a code email, H5 F1)', () => {
@@ -39,6 +40,10 @@ describe('requestedFocus', () => {
       'instalment:Deposit',
       'instalment:deposit:x',
       `instalment:${ID}`,
+      'sign:',
+      'sign:not-a-uuid',
+      `sign:${ID}:x`,
+      'sign:deposit',
     ]) {
       expect({ value, focus: requestedFocus(value) }).toEqual({ value, focus: null });
     }
@@ -52,14 +57,19 @@ describe('homeHref', () => {
   });
 });
 
-describe('homePaymentHref', () => {
-  it('opens one payment on its tab: a request on the Execution tab, an instalment on the design tab', () => {
-    expect(homePaymentHref('tok', { requestId: ID.toLowerCase() })).toBe(`/d/tok?tab=execution&focus=request:${ID.toLowerCase()}`);
-    expect(homePaymentHref('tok', { instalment: 'gate_a' })).toBe('/d/tok?tab=design&focus=instalment:gate_a');
+describe('homeCodeActHref', () => {
+  const id = ID.toLowerCase();
+
+  it('opens one act on its tab: a request and a signing on the Execution tab, an instalment on the design tab', () => {
+    expect(homeCodeActHref('tok', { purpose: 'claim_request', target: id })).toBe(`/d/tok?tab=execution&focus=request:${id}`);
+    expect(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'gate_a' })).toBe('/d/tok?tab=design&focus=instalment:gate_a');
+    expect(homeCodeActHref('tok', { purpose: 'sign_contract', target: id })).toBe(`/d/tok?tab=execution&focus=sign:${id}`);
   });
 
   it('reads back as the focus it names', () => {
-    const href = homePaymentHref('tok', { requestId: ID.toLowerCase() });
-    expect(requestedFocus(new URL(href, 'https://x.invalid').searchParams.get('focus') ?? undefined)).toEqual({ section: 'request', id: ID.toLowerCase() });
+    const focusOf = (href: string) => requestedFocus(new URL(href, 'https://x.invalid').searchParams.get('focus') ?? undefined);
+    expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_request', target: id }))).toEqual({ section: 'request', id });
+    expect(focusOf(homeCodeActHref('tok', { purpose: 'sign_contract', target: id }))).toEqual({ section: 'sign', id });
+    expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'deposit' }))).toEqual({ section: 'instalment', kind: 'deposit' });
   });
 });

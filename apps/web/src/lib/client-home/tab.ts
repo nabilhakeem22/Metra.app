@@ -2,13 +2,14 @@
 // open on. PURE and server-safe (a plain module, never 'use client', so the
 // server page and the client view import the same values).
 //
-// `/[locale]/d/[token]?tab=design|execution&focus=contract|variation:<id>|request:<id>|instalment:<kind>`:
+// `/[locale]/d/[token]?tab=design|execution&focus=contract|variation:<id>|request:<id>|instalment:<kind>|sign:<id>`:
 // a missing or unknown `tab` means the delivery's current phase; an unknown
 // `focus` is ignored. `request:` and `instalment:` open that payment's "I've
-// made this payment" with its code box: the link a code email carries (H5
-// functional F1).
+// made this payment", and `sign:` the contract's signing, with its code box:
+// the link a code email carries (H5 functional F1).
 import { claimableMilestoneOf, type ClaimableMilestoneKind } from '@/lib/engagements/claimable-milestones';
 import { isUuid } from '@/lib/uuid';
+import type { CodePurpose } from './code-answers';
 
 const HOME_TABS = ['design', 'execution'] as const;
 
@@ -19,7 +20,11 @@ export type HomeFocus =
   | { section: 'contract' }
   | { section: 'variation'; id: string }
   | { section: 'request'; id: string }
+  | { section: 'sign'; id: string }
   | { section: 'instalment'; kind: ClaimableMilestoneKind };
+
+/** The focuses that name a uuid, lower-cased as the page's ids are. */
+const ID_SECTIONS = ['variation', 'request', 'sign'] as const;
 
 /** A query value as Next hands it over: one string, a repeated key's list, or nothing. */
 type QueryValue = string | string[] | undefined;
@@ -43,8 +48,8 @@ export function requestedFocus(value: QueryValue): HomeFocus | null {
     return kind ? { section, kind } : null;
   }
   if (!isUuid(id)) return null;
-  if (section === 'variation' || section === 'request') return { section, id: id.toLowerCase() };
-  return null;
+  const idSection = ID_SECTIONS.find((known) => known === section);
+  return idSection ? { section: idSection, id: id.toLowerCase() } : null;
 }
 
 /** A home URL's path and query for one tab, as the tab strip and the language switch link it. */
@@ -52,13 +57,21 @@ export function homeHref(tokenSegment: string, tab: HomeTab | null): string {
   return tab ? `/d/${tokenSegment}?tab=${tab}` : `/d/${tokenSegment}`;
 }
 
+/** The tab each code-checked act lives on, and the focus that opens it. */
+const CODE_ACT_FOCUS: Readonly<Record<CodePurpose, { tab: HomeTab; focus: string }>> = {
+  claim_request: { tab: 'execution', focus: 'request' },
+  claim_design_payment: { tab: 'design', focus: 'instalment' },
+  sign_contract: { tab: 'execution', focus: 'sign' },
+};
+
 /**
- * The home URL that opens ONE payment's "I've made this payment" on its code
- * box, on the tab it lives on: what a code email links to, so the client back
- * from their mail types the code there (H5 functional F1).
+ * The home URL that opens ONE code-checked act on its code box, on the tab it
+ * lives on: a payment's "I've made this payment" or the contract's signing.
+ * What a code email links to, so the client back from their mail types the
+ * code there (H5 functional F1). `target` is the act's subject as the code
+ * was made for it: a request's or a contract's id, an instalment's kind.
  */
-export function homePaymentHref(tokenSegment: string, payment: { requestId: string } | { instalment: ClaimableMilestoneKind }): string {
-  return 'requestId' in payment
-    ? `${homeHref(tokenSegment, 'execution')}&focus=request:${payment.requestId}`
-    : `${homeHref(tokenSegment, 'design')}&focus=instalment:${payment.instalment}`;
+export function homeCodeActHref(tokenSegment: string, act: { purpose: CodePurpose; target: string }): string {
+  const { tab, focus } = CODE_ACT_FOCUS[act.purpose];
+  return `${homeHref(tokenSegment, tab)}&focus=${focus}:${act.target}`;
 }
