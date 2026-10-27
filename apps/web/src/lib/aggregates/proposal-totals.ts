@@ -69,7 +69,7 @@ function floorDiv(a: bigint, b: bigint): bigint {
  * roundHalfAwayFromZero(-n, d) === -roundHalfAwayFromZero(n, d). For n >= 0 this
  * equals the old half-up (toward +inf), so non-negative money is unchanged.
  */
-function roundHalfAwayFromZero(n: bigint, d: bigint): bigint {
+export function roundHalfAwayFromZero(n: bigint, d: bigint): bigint {
   if (n >= 0n) return floorDiv(2n * n + d, 2n * d);
   return -floorDiv(2n * -n + d, 2n * d);
 }
