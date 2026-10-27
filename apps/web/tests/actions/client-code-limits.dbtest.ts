@@ -15,8 +15,9 @@ import { closeFixture, seedOrg, teardown } from './fixture';
 //    evidence and stays;
 //  - round 2 M1 (from S5): 15 wrong tries on one target in an hour, over all
 //    its codes, refuse a NEW code for it until the hour has passed, with the
-//    exact wait; a code already sent keeps its own five tries, so whoever
-//    holds only the link cannot lock the client out of the code in the mail.
+//    exact wait. Since DB step D only the target's newest code is checked
+//    (H5 functional F1), so every guess lands on the code just sent, and
+//    each code still has its own five tries.
 
 const orgIds: string[] = [];
 let studioA: string;
@@ -114,6 +115,15 @@ describe('R5: codes are purged 90 days after they expired', () => {
     expect(await codesOf(home.delivery.id)).toHaveLength(2);
   });
 
+  it('step D: a code never SENT (marked used by its own id) goes with the purge 90 days after it expired, like an unused one', async () => {
+    const old = await seedPastCodes(studioA, 1, '120 days');
+    const [unsent] = await codesOf(old.delivery.id);
+    await tamper(`update public.client_verification_codes set consumed_at = expires_at - interval '1 minute', result_ref = id where id = $1`, [unsent.id]);
+    const home = await seedHome(studioB);
+    expect((await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId)).answer.status).toBe('ok');
+    expect(await codesOf(old.delivery.id)).toEqual([]);
+  });
+
   it('round 2 L2: a USED code is evidence: 120 days past expiry it survives the purge and a direct delete, an unused one goes', async () => {
     const old = await seedPastCodes(studioA, 2, '120 days');
     const [used, unused] = await codesOf(old.delivery.id);
@@ -128,56 +138,59 @@ describe('R5: codes are purged 90 days after they expired', () => {
   });
 });
 
-/** `count` codes sent to sign the home's contract, 61 s apart: the first is the oldest. */
-async function requestSignCodes(home: Home, count: number) {
+/** Five wrong answers to the target's newest code, as a holder of the link alone can give: the tries left after each. */
+async function spendFiveWrongTries(home: Home, code: { code: string }) {
+  const wrong = code.code === '000000' ? '111111' : '000000';
+  const left: Array<number | undefined> = [];
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    left.push((await signWithCode(home.delivery.tokenHash, home.contract.contractId, wrong)).attempts_left);
+  }
+  return left;
+}
+
+/**
+ * `count` codes sent to sign the home's contract, 61 s apart (the first is the
+ * oldest), each spent by five wrong tries before the next is asked for: only
+ * the newest code is ever checked (DB step D, H5 F1), so a guess always lands
+ * on the code just sent.
+ */
+async function requestAndBurnSignCodes(home: Home, count: number) {
   const issued = [];
   for (let index = 0; index < count; index += 1) {
     if (index > 0) await ageCodes(home.delivery.id, 61);
     const code = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     expect(code.answer.status).toBe('ok');
+    expect(await spendFiveWrongTries(home, code)).toEqual([4, 3, 2, 1, 0]);
     issued.push(code);
   }
   return issued;
 }
 
-/** Five wrong answers to one code, as a holder of the link alone can give: the tries left after each. */
-async function spendFiveWrongTries(home: Home, code: { challengeId: string; code: string }) {
-  const wrong = code.code === '000000' ? '111111' : '000000';
-  const left: Array<number | undefined> = [];
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    left.push((await signWithCode(home.delivery.tokenHash, home.contract.contractId, code.challengeId, wrong)).attempts_left);
-  }
-  return left;
-}
-
 describe('round 2 M1: 15 wrong tries on one target an hour refuse NEW codes only', () => {
-  it('a link holder spends 15 tries over three codes: the client\'s right code from the 4th mail still signs', async () => {
+  it('three codes burnt by a link holder: each is locked, even its right code; a 4th code is refused for the target', async () => {
     const home = await seedHome(studioA);
     const target = home.contract.contractId;
-    const issued = await requestSignCodes(home, 4);
-    for (const code of issued.slice(0, 3)) {
-      expect(await spendFiveWrongTries(home, code)).toEqual([4, 3, 2, 1, 0]);
-      expect(await signWithCode(home.delivery.tokenHash, target, code.challengeId, code.code)).toEqual({ code: 'code_locked' });
-    }
-    expect(await signWithCode(home.delivery.tokenHash, target, issued[3].challengeId, issued[3].code)).toEqual({ code: 'ok' });
+    const issued = await requestAndBurnSignCodes(home, 3);
+    expect(await signWithCode(home.delivery.tokenHash, target, issued[2].code)).toEqual({ code: 'code_locked' });
+    await ageCodes(home.delivery.id, 61);
+    const refused = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
+    expect(refused).toMatchObject({ status: 'too_many', limit: 'target_tries' });
     const contract = await ownerQuery<{ status: string }>(`select status::text from public.contracts where id = $1`, [target]);
-    expect(contract).toEqual([{ status: 'signed' }]);
+    expect(contract).toEqual([{ status: 'issued' }]);
   });
 
   it('refuses a new code with the exact wait, then the hour reopens', async () => {
     const home = await seedHome(studioA);
     const target = home.contract.contractId;
-    for (const code of await requestSignCodes(home, 4)) {
-      expect(await spendFiveWrongTries(home, code)).toEqual([4, 3, 2, 1, 0]);
-    }
+    await requestAndBurnSignCodes(home, 3);
+    await ageCodes(home.delivery.id, 61);
     const refused = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
-    expect(refused.status).toBe('too_many');
-    // 20 tries over codes made 183, 122, 61 and 0 s ago (plus the real seconds
-    // the calls took): the oldest leaving the hour still leaves 15, the second
-    // leaving it leaves 10, so the wait ends when the code made 122 s ago is an
-    // hour old. The oldest alone would have answered 3600 - 183.
-    expect(refused.retry_after_seconds).toBeGreaterThan(3600 - 122 - 30);
-    expect(refused.retry_after_seconds).toBeLessThanOrEqual(3600 - 122 + 1);
+    expect(refused).toMatchObject({ status: 'too_many', limit: 'target_tries' });
+    // 15 tries over codes made 183, 122 and 61 s ago (plus the real seconds the
+    // calls took): the wait ends when the code that made 15, the oldest, is an
+    // hour old.
+    expect(refused.retry_after_seconds).toBeGreaterThan(3600 - 183 - 30);
+    expect(refused.retry_after_seconds).toBeLessThanOrEqual(3600 - 183 + 1);
     await ageCodes(home.delivery.id, (refused.retry_after_seconds as number) - 3);
     const almost = (await requestCode(home.delivery.tokenHash, 'sign_contract', target)).answer;
     expect(almost.status).toBe('too_many');

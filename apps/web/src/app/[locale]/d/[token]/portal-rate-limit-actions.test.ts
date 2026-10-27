@@ -40,7 +40,7 @@ vi.mock('@/lib/engagements/public/execution', () => writes);
 vi.mock('@/lib/client-home/code-acts', () => writes);
 vi.mock('@/lib/client-home/codes', () => ({
   issueClientCodeByToken: writes.issueClientCodeByToken,
-  newClientCode: () => ({ challengeId: 'c', code: '000000', codeHash: 'h' }),
+  newClientCode: () => ({ code: '000000', codeHash: 'h' }),
 }));
 vi.mock('@/lib/http/request-origin', () => ({ resolveRequestOrigin: async () => 'https://example.invalid' }));
 
@@ -57,6 +57,7 @@ const SEEN = { romIssuedAt: BAND_SEEN, rendersIssuedAt: '2026-10-02T09:00:00.000
 type Act = [name: string, call: () => Promise<unknown>, write: keyof typeof writes, refused: unknown];
 const TOO_MANY_OUTCOME = { kind: 'error', error: 'too_many' };
 const TOO_MANY_RESULT = { ok: false, error: 'too_many', studioNotified: false };
+const LINK_BRAKE = { ok: false, error: 'too_many', retryAfterSeconds: 60, limit: 'link_minute' };
 const ACTS: Act[] = [
   ['chooseDeliveryConcept', () => review.chooseDeliveryConcept(TOKEN, DOCUMENT_ID, 1), 'chooseConceptAndNotify', TOO_MANY_OUTCOME],
   ['respondToDeliveryConcept', () => review.respondToDeliveryConcept(TOKEN, 'approve_concept'), 'respondToConceptAndNotify', TOO_MANY_OUTCOME],
@@ -66,23 +67,23 @@ const ACTS: Act[] = [
   ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', TOO_MANY_OUTCOME],
   [
     'claimDesignPaymentInHome',
-    () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', challengeId: DOCUMENT_ID, code: '123456' }),
+    () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', code: '123456' }),
     'claimDesignPaymentWithCodeByToken',
-    TOO_MANY_RESULT,
+    { ...LINK_BRAKE, studioNotified: false },
   ],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_RESULT],
   // H5: the client's "I paid" on a payment request, with its code, and the code request itself.
   [
     'claimRequestInHome',
-    () => execution.claimRequestInHome(TOKEN, { requestId: DOCUMENT_ID, challengeId: DOCUMENT_ID, code: '123456' }),
+    () => execution.claimRequestInHome(TOKEN, { requestId: DOCUMENT_ID, code: '123456' }),
     'claimRequestWithCodeByToken',
-    { ok: false, error: 'too_many' },
+    LINK_BRAKE,
   ],
   [
     'requestClientCode',
     () => codes.requestClientCode(TOKEN, { purpose: 'claim_request', target: DOCUMENT_ID }),
     'issueClientCodeByToken',
-    { ok: false, error: 'too_many', retryAfterSeconds: 60 },
+    LINK_BRAKE,
   ],
 ];
 
@@ -105,8 +106,8 @@ describe('the act budget on every portal server action', () => {
 
   it('the budget is per link, shared by every act of that link', async () => {
     for (let index = 0; index < PORTAL_ACT_CEILING; index += 1) await review.acknowledgeDeliveryHandover(TOKEN);
-    const claim = { milestoneKind: 'deposit', challengeId: DOCUMENT_ID, code: '123456' };
-    expect(await portal.claimDesignPaymentInHome(TOKEN, claim)).toEqual(TOO_MANY_RESULT);
+    const claim = { milestoneKind: 'deposit', code: '123456' };
+    expect(await portal.claimDesignPaymentInHome(TOKEN, claim)).toEqual({ ...LINK_BRAKE, studioNotified: false });
     expect(await portal.claimDesignPaymentInHome('another-link', claim)).toEqual({ ok: true, already: false, studioNotified: true });
   });
 });

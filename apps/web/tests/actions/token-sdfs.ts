@@ -84,11 +84,12 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   { name: 'app_home_contract_sections_by_token', args: 'text, uuid, integer' },
   { name: 'app_home_contract_section_lines_by_token', args: 'text, uuid, uuid, integer' },
   { name: 'app_home_variations_by_token', args: 'text' },
-  { name: 'app_home_code_issue_by_token', args: 'text, uuid, text, text, text, text, text' },
-  { name: 'app_home_contract_ack_by_token', args: 'text, uuid, uuid, text, text, text, text, text' },
-  { name: 'app_home_variation_respond_by_token', args: 'text, uuid, text, uuid, text, text, text, text' },
-  { name: 'app_home_claim_request_by_token', args: 'text, uuid, uuid, text, text, text, text, text' },
-  { name: 'app_home_claim_design_payment_by_token', args: 'text, text, uuid, text, text, text, text, text' },
+  { name: 'app_home_code_issue_by_token', args: 'text, text, text, text, text, text' },
+  { name: 'app_home_code_unsent_by_token', args: 'text, uuid' },
+  { name: 'app_home_contract_ack_by_token', args: 'text, uuid, text, text, text, text, text' },
+  { name: 'app_home_variation_respond_by_token', args: 'text, uuid, text, text, text, text, text' },
+  { name: 'app_home_claim_request_by_token', args: 'text, uuid, text, text, text, text, text' },
+  { name: 'app_home_claim_design_payment_by_token', args: 'text, text, text, text, text, text, text' },
   { name: 'app_client_home_target_by_token', args: 'text, text' },
 ];
 

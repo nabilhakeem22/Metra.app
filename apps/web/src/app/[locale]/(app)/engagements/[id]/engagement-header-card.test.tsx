@@ -20,6 +20,8 @@ const actions = vi.hoisted(() => ({
   emailDeliveryReminder: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
+// The client link dialog's reset of the client's codes (H5) is a server action: never reached here.
+vi.mock('@/lib/client-home/actions', () => ({ resetClientCodes: vi.fn() }));
 
 const en = (path: string) => messageAt('en', path);
 
@@ -50,6 +52,7 @@ const header: EngagementHeader = {
   renderManifestHash: null,
   rendersReadyAt: null,
   clientExpected: null,
+  clientHasEmail: true,
   createdAt: '2026-04-01T00:00:00.000Z',
   updatedAt: '2026-06-10T00:00:00.000Z',
 };

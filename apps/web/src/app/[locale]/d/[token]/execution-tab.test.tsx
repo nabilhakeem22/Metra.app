@@ -247,7 +247,25 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the Execution tab speaks of the stud
       expect(messageAt(locale, `delivery.execution.${key}`)).not.toMatch(DESIGN_WORDS);
     }
     // The code panel the claim opens (H5) is shared with the design tab, so it names neither phase.
-    for (const key of ['intro', 'introOnFile', 'sent', 'noChannel', 'error.busy', 'error.requestBusy', 'error.send_failed', 'error.too_many']) {
+    for (const key of [
+      'intro',
+      'introOnFile',
+      'haveCode',
+      'sent',
+      'typing',
+      'typingOnFile',
+      'noChannel',
+      'error.busy',
+      'error.requestBusy',
+      'error.send_failed',
+      'tooMany.spacing',
+      'tooMany.target',
+      'tooMany.delivery',
+      'tooMany.studio',
+      'tooMany.service',
+      'tooMany.link',
+      'tooMany.claims',
+    ]) {
       expect(messageAt(locale, `delivery.code.${key}`)).not.toMatch(DESIGN_WORDS);
     }
     for (const key of ['not_active', 'reference', 'token_expired', 'token_invalid']) {

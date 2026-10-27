@@ -7,6 +7,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { deliveryPortalUrl, requestLocaleOrDefault } from '@/lib/engagements/portal-url';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import { ensureClientHomeCore } from './ensure';
+import { resetClientCodesCore, type CodesReset } from './reset-codes';
 import type { ClientHomeLink } from './types';
 
 /**
@@ -31,4 +32,17 @@ export async function openClientHome(
   const home = res.data;
   if (home.link === null) return { ok: true, link: null, linkReason: home.linkReason };
   return { ok: true, link: `${deliveryPortalUrl(origin, await requestLocaleOrDefault(), home.link)}?tab=execution` };
+}
+
+/**
+ * Server-action wrapper for {@link resetClientCodesCore}: the client's
+ * one-time codes on this delivery start over (owner or admin), and how many
+ * codes still in the client's mail it voided. Revalidates the shell on
+ * success. Never throws to the client.
+ */
+export async function resetClientCodes(engagementId: string): Promise<ActionResult & { data?: CodesReset }> {
+  const ctx = await requireOrg();
+  const res = await resetClientCodesCore(ctx, engagementId);
+  if (res.ok) refreshApp();
+  return res;
 }

@@ -2379,7 +2379,8 @@
         "abandoned": {
           "headline": "This delivery was abandoned"
         }
-      }
+      },
+      "noEmailPayment": "The client has no email on file, so they cannot report a payment online. Add their email on the client's page."
     },
     "spine": {
       "proposal": "Proposal",
@@ -2881,6 +2882,16 @@
         "title": "Revoke the client link?",
         "body": "The client can no longer open this delivery with it. Sharing again creates a new link.",
         "confirm": "Revoke link"
+      },
+      "codes": {
+        "title": "The client's verification codes",
+        "hint": "If the client cannot get a new code today, reset their codes: the codes already sent stop working, and they can ask for a new one at once.",
+        "reset": "Reset the client's codes",
+        "confirm": {
+          "title": "Reset the client's codes?",
+          "body": "Any code already in the client's email stops working, and they can ask for a new one at once."
+        },
+        "done": "The client's codes were reset. They can ask for a new code now."
       }
     },
     "notFound": {
@@ -3341,18 +3352,31 @@
     "code": {
       "intro": "We will send a 6-digit verification code to {hint}.",
       "introOnFile": "We will send a 6-digit verification code to the email {studio} has on file for you.",
+      "haveCode": "I already have a code",
       "send": "Send the code",
       "sent": "We sent the code to {hint}. It is valid for 10 minutes.",
+      "typing": "Type the code from the latest email we sent to {hint}.",
+      "typingOnFile": "Type the code from the latest email we sent to the address {studio} has on file for you.",
       "label": "Verification code",
       "resend": "Send a new code",
       "resendIn": "You can ask for a new code in {time}.",
       "noChannel": "{studio} has no email address for you, so you cannot report this payment online right now. Ask {studio} to add your email, or tell {studio} directly that you paid so they can record it.",
       "wait": {
         "minutes": "{minutes, plural, one {1 minute} other {{minutesText} minutes}}",
-        "hours": "{hours, plural, one {1 hour} other {{hoursText} hours}}"
+        "hours": "{hours, plural, one {1 hour} other {{hoursText} hours}}",
+        "hoursAndMinutes": "{hours} and {minutes}"
+      },
+      "tooMany": {
+        "spacing": "A code was sent for this payment a moment ago. You can ask for a new one in {wait}.",
+        "target": "Too many codes were asked for this payment. You can ask for a new one in {wait}.",
+        "delivery": "Your page has reached its daily limit of codes. You can ask for a new one in {wait}, or ask {studio} to reset your codes.",
+        "studio": "{studio} has reached its daily limit of codes. You can ask for a new one in {wait}.",
+        "service": "The service has reached its daily limit of codes. You can ask for a new one in {wait}.",
+        "link": "Too many attempts from this page in the last minute. Try again in {wait}.",
+        "claims": "Many payments were reported on this contract in the last hour. Try again in {wait}."
       },
       "error": {
-        "code_wrong": "{left, plural, =0 {That code is not right, and it has no tries left. Ask for a new code.} one {That code is not right. 1 try left for this code.} other {That code is not right. {leftText} tries left for this code.}}",
+        "code_wrong": "{left, plural, =0 {That code is not right, and it has no tries left. Ask for a new code.} one {That code is not right (only the code in the latest email works). 1 try left.} other {That code is not right (only the code in the latest email works). {leftText} tries left.}}",
         "code_incomplete": "Type the six digits from the email.",
         "code_locked": "This code was entered wrongly 5 times and no longer works. Ask for a new code.",
         "code_expired": "This code has expired. Ask for a new code.",
@@ -3360,7 +3384,6 @@
         "code_unknown": "This code is not for this step. Ask for a new code.",
         "busy": "This could not be recorded right now. Try again in a moment; your code still works.",
         "requestBusy": "The page is being updated, so no code was sent. Try again in a moment.",
-        "too_many": "Too many codes were asked for. You can ask for a new one in {wait}.",
         "send_failed": "The code could not be sent right now. Contact {studio}."
       }
     }

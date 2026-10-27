@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { StepCard } from '@/components/flow/step-card';
+import { designMoveIsClientPayment } from '@/lib/engagements/no-email-notice';
 import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardActionError } from './command-card-action-error';
@@ -15,6 +16,7 @@ import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
 import { EngagementStageSpine } from './engagement-stage-spine';
 import { ExecutionStepCard } from './execution-step-card';
+import { NoEmailNotice } from './no-email-notice';
 
 // The cockpit COMMAND CARD: the single "what's next" surface, as a stacked card.
 // COMPOSITION ONLY: it wears the shared step card (components/flow/step-card.tsx)
@@ -64,6 +66,12 @@ function DesignStepCard(props: EngagementCommandCardProps) {
         review={{ state, clientDecision: preview.clientDecision }}
         awaitingReplyCount={props.awaitingReplyCount}
       />
+
+      {!closed && !props.clientHasEmail && designMoveIsClientPayment(view) && (
+        <div className="mb-4">
+          <NoEmailNotice />
+        </div>
+      )}
 
       {closed && props.canResolveClaims && (
         <CommandCardClosedClaims

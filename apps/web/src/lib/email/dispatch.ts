@@ -5,16 +5,21 @@ import 'server-only';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { runtimeSecret } from '@/lib/cf/secrets';
 import { EMAIL_TIMEOUT_MS, withDeadline } from '@/lib/http/deadlines';
-import { isTransientResendError } from './resend-failure';
+import { isTransientResendError, resendRefusalOf, type ResendRefusal } from './resend-failure';
 
 /**
  * What became of one email. `transient` (only when not sent): a timeout, a
- * throw, a network failure or a 5xx, as opposed to a 4xx refusal or a missing
- * configuration (resend-failure.ts); the automation's breaker counts only these.
+ * throw, a network failure, a 5xx or a 429, as opposed to another 4xx refusal
+ * or a missing configuration (resend-failure.ts); the automation's breaker
+ * counts only these. `refusal` (only when Resend answered an error): its HTTP
+ * status and error name, so a log line can tell an unverified domain (403)
+ * from a rate limit (429) or a bad payload (422). Never the address or the
+ * body.
  */
 export interface EmailDispatchResult {
   sent: boolean;
   transient?: boolean;
+  refusal?: ResendRefusal;
 }
 
 /** One email, fully built: the address and the rendered content. */
@@ -57,7 +62,7 @@ export async function dispatchEmail(
       label,
     );
     if (!res.error) return { sent: true };
-    return { sent: false, transient: isTransientResendError(res.error) };
+    return { sent: false, transient: isTransientResendError(res.error), refusal: resendRefusalOf(res.error) };
   } catch (err) {
     console.error(`${label} failed:`, loggableFailure(err));
     return { sent: false, transient: true };

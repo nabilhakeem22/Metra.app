@@ -15,7 +15,6 @@ const actions = vi.hoisted(() => ({ claimDesignPaymentInHome: vi.fn() }));
 vi.mock('../actions', () => actions);
 const codeActions = vi.hoisted(() => ({ requestClientCode: vi.fn() }));
 vi.mock('../code-actions', () => codeActions);
-const CHALLENGE = '22222222-2222-4222-8222-222222222222';
 vi.mock('../review-actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -40,8 +39,20 @@ function claimable(milestoneKind: string, amountRemaining: string, hasPendingCla
   return { milestoneKind, amountRemaining, hasPendingClaim, claimedAt: null };
 }
 
-function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en') {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />, { locale });
+function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en', openOn: string | null = null) {
+  return renderWithIntl(
+    <PaymentsCard
+      token="tok"
+      schedule={MIDWAY}
+      claim={claim}
+      details={null}
+      receipts={[]}
+      receiptsTruncated={false}
+      studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }}
+      openOn={openOn}
+    />,
+    { locale },
+  );
 }
 
 const claimButtons = (locale: TestLocale) =>
@@ -62,7 +73,7 @@ async function claimAndConfirm(locale: TestLocale = 'en') {
 beforeEach(() => {
   actions.claimDesignPaymentInHome.mockReset();
   codeActions.requestClientCode.mockReset();
-  codeActions.requestClientCode.mockResolvedValue({ ok: true, challengeId: CHALLENGE, hint: 'c•••@e•••.com', resendAfterSeconds: 60 });
+  codeActions.requestClientCode.mockResolvedValue({ ok: true, hint: 'c•••@e•••.com', resendAfterSeconds: 60 });
   router.refresh.mockReset();
 });
 
@@ -95,13 +106,42 @@ describe('the payment claim', () => {
     await claimAndConfirm();
     expect(codeActions.requestClientCode).toHaveBeenCalledWith('tok', { purpose: 'claim_design_payment', target: 'gate_b' });
     expect(actions.claimDesignPaymentInHome).toHaveBeenCalledTimes(1);
-    expect(actions.claimDesignPaymentInHome).toHaveBeenCalledWith('tok', { milestoneKind: 'gate_b', challengeId: CHALLENGE, code: '042917' });
+    expect(actions.claimDesignPaymentInHome).toHaveBeenCalledWith('tok', { milestoneKind: 'gate_b', code: '042917' });
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(claimButtons('en')).toHaveLength(0);
     expect(container.textContent).toContain(AWAITING('en'));
     // The action did not say the studio heard about it, so the card does not either.
     expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
+  });
+
+  it("F1: the email's link opens that instalment's claim on the code box; the typed code claims with no request", async () => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: true });
+    renderCard(GATE_B, 'en', 'gate_b');
+    const dialog = await confirmDialog();
+    expect(dialog.textContent).toContain(messageAt('en', 'delivery.code.typingOnFile').replace('{studio}', 'Diwan Studio'));
+    fireEvent.change(within(dialog).getByLabelText(messageAt('en', 'delivery.code.label')), { target: { value: '424242' } });
+    await answerDialog('en', 'confirm');
+    await act(async () => {});
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+    expect(actions.claimDesignPaymentInHome).toHaveBeenCalledWith('tok', { milestoneKind: 'gate_b', code: '424242' });
+  });
+
+  it('F1: a link to an instalment that cannot be claimed any more opens nothing and says nothing changed', () => {
+    renderCard(GATE_B, 'en', 'balance');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText(messageAt('en', 'delivery.payments.changed'))).toBeNull();
+  });
+
+  it('weak spot 5: a client learnt to have no address sees no Confirm, only the way to the studio', async () => {
+    codeActions.requestClientCode.mockResolvedValue({ ok: false, error: 'no_channel' });
+    renderCard(GATE_B);
+    fireEvent.click(claimButtons('en')[0]);
+    const dialog = await confirmDialog();
+    fireEvent.click(within(dialog).getByRole('button', { name: messageAt('en', 'delivery.code.send') }));
+    await act(async () => {});
+    expect(dialog.textContent).toContain(messageAt('en', 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(within(dialog).queryByRole('button', { name: messageAt('en', 'delivery.actions.confirm') })).toBeNull();
   });
 
   it('says the team was notified only when the claim really reached the studio', async () => {

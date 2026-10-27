@@ -1,10 +1,10 @@
 // Client home (DB step C) DB-test fixture: homes (a design delivery at
 // `execution`, or a LIGHT one born there), the client's address on file, and
 // direct calls of the home's token functions with exactly the arguments the
-// app will pass: never a raw code, only sha256(challengeId:code). Not a test
-// file. Rows are written over the BYPASSRLS connection; teardown is
+// app will pass: never a raw code, only sha256(purpose:target:code). Not a
+// test file. Rows are written over the BYPASSRLS connection; teardown is
 // fixture.ts's.
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { createSql } from '@metra/db';
 import { mintShareToken } from '@/lib/share/token';
 import { seedBillableContract, type BilledContract } from './execution-billing-fixture';
@@ -13,9 +13,9 @@ import { seedDelivery, type SeededDelivery } from './delivery-execution-fixture'
 
 export type CodePurpose = 'sign_contract' | 'decide_variation' | 'claim_request' | 'claim_design_payment';
 
-/** What the app stores and sends for a code: the hash binds the code to its challenge. */
-export function codeHashOf(challengeId: string, code: string): string {
-  return createHash('sha256').update(`${challengeId}:${code}`).digest('hex');
+/** What the app stores and sends for a code: the hash binds the code to the act it is for. */
+export function codeHashOf(purpose: CodePurpose, target: string, code: string): string {
+  return createHash('sha256').update(`${purpose}:${target}:${code}`).digest('hex');
 }
 
 /** A six-digit code as the app makes one. */
@@ -84,86 +84,92 @@ export async function seedPrimaryContact(orgId: string, clientId: string, email:
 
 export interface IssueAnswer {
   status: string;
+  challenge_id?: string;
+  limit?: string;
   email?: string;
   hint?: string;
   resend_after_seconds?: number;
   retry_after_seconds?: number;
-  platform_day_half?: boolean;
+  platform_day_half_crossed?: boolean;
   studio?: { name_ar: string | null; name_en: string | null };
   document?: { prefix: string; number: number; year: number };
 }
 
 export interface RequestedCode {
+  /** The code's row, as the database answered it (for the server only; '' when no code was made). */
   challengeId: string;
   code: string;
   answer: IssueAnswer;
 }
 
-/** The app's code request: a fresh challenge id and code, only their hash passed. */
+/** The app's code request: a fresh code, only its hash passed. */
 export async function requestCode(
   tokenHash: string | null,
-  purpose: string,
+  purpose: CodePurpose,
   target: string | null,
-  extra: { ip?: string | null; ua?: string | null } = {},
+  extra: { ip?: string | null; ua?: string | null; code?: string } = {},
 ): Promise<RequestedCode> {
-  const challengeId = randomUUID();
-  const code = newCode();
+  const code = extra.code ?? newCode();
   const [row] = await ownerQuery<{ answer: IssueAnswer }>(
-    `select public.app_home_code_issue_by_token($1, $2::uuid, $3, $4, $5, $6, $7) as answer`,
-    [tokenHash, challengeId, purpose, target, codeHashOf(challengeId, code), extra.ip ?? null, extra.ua ?? null],
+    `select public.app_home_code_issue_by_token($1, $2, $3, $4, $5, $6) as answer`,
+    [tokenHash, purpose, target, codeHashOf(purpose, target ?? '', code), extra.ip ?? null, extra.ua ?? null],
   );
-  return { challengeId, code, answer: row.answer };
+  return { challengeId: row.answer.challenge_id ?? '', code, answer: row.answer };
+}
+
+/** The app's mark after a send that failed: the code spends no day limit. */
+export async function markUnsent(tokenHash: string, challengeId: string): Promise<string> {
+  const [row] = await ownerQuery<{ answer: string }>(`select public.app_home_code_unsent_by_token($1, $2::uuid) as answer`, [
+    tokenHash,
+    challengeId,
+  ]);
+  return row.answer;
 }
 
 export interface ActAnswer {
   code: string;
   attempts_left?: number;
+  limit?: string;
+  retry_after_seconds?: number;
 }
 
 /** Sign the home's contract with a code. */
 export async function signWithCode(
   tokenHash: string,
   contractId: string,
-  challengeId: string,
   code: string,
   extra: { name?: string; pdfHash?: string } = {},
 ): Promise<ActAnswer> {
   const [row] = await ownerQuery<{ answer: ActAnswer }>(
-    `select public.app_home_contract_ack_by_token($1, $2::uuid, $3::uuid, $4, $5, '127.0.0.1', 'vitest', $6) as answer`,
-    [tokenHash, contractId, challengeId, codeHashOf(challengeId, code), extra.name ?? 'Client Name', extra.pdfHash ?? 'f'.repeat(64)],
+    `select public.app_home_contract_ack_by_token($1, $2::uuid, $3, $4, '127.0.0.1', 'vitest', $5) as answer`,
+    [tokenHash, contractId, codeHashOf('sign_contract', contractId, code), extra.name ?? 'Client Name', extra.pdfHash ?? 'f'.repeat(64)],
   );
   return row.answer;
 }
 
 /** Approve or reject one change order of the home's contract with a code. */
-export async function decideWithCode(
-  tokenHash: string,
-  variationId: string,
-  decision: string,
-  challengeId: string,
-  code: string,
-): Promise<ActAnswer> {
+export async function decideWithCode(tokenHash: string, variationId: string, decision: string, code: string): Promise<ActAnswer> {
   const [row] = await ownerQuery<{ answer: ActAnswer }>(
-    `select public.app_home_variation_respond_by_token($1, $2::uuid, $3, $4::uuid, $5, 'Client Name', '127.0.0.1', 'vitest') as answer`,
-    [tokenHash, variationId, decision, challengeId, codeHashOf(challengeId, code)],
+    `select public.app_home_variation_respond_by_token($1, $2::uuid, $3, $4, 'Client Name', '127.0.0.1', 'vitest') as answer`,
+    [tokenHash, variationId, decision, codeHashOf('decide_variation', variationId, code)],
   );
   return row.answer;
 }
 
 /** "I paid" on one payment request of the home's contract with a code. */
-export async function claimRequestWithCode(tokenHash: string, requestId: string, challengeId: string, code: string): Promise<ActAnswer> {
+export async function claimRequestWithCode(tokenHash: string, requestId: string, code: string): Promise<ActAnswer> {
   const [row] = await ownerQuery<{ answer: ActAnswer }>(
-    `select public.app_home_claim_request_by_token($1, $2::uuid, $3::uuid, $4, null, 'Client Name', '127.0.0.1', 'vitest') as answer`,
-    [tokenHash, requestId, challengeId, codeHashOf(challengeId, code)],
+    `select public.app_home_claim_request_by_token($1, $2::uuid, $3, null, 'Client Name', '127.0.0.1', 'vitest') as answer`,
+    [tokenHash, requestId, codeHashOf('claim_request', requestId, code)],
   );
   return row.answer;
 }
 
 /** "I paid" on one design-fee instalment with a code. */
-export async function claimDesignWithCode(tokenHash: string, milestoneKind: string, challengeId: string, code: string): Promise<ActAnswer> {
+export async function claimDesignWithCode(tokenHash: string, milestoneKind: string, code: string): Promise<ActAnswer> {
   const [row] = await ownerQuery<{ answer: ActAnswer }>(
-    `select public.app_home_claim_design_payment_by_token($1, $2, $3::uuid, $4, null, 'Client Name', '127.0.0.1', 'vitest') as answer`,
-    [tokenHash, milestoneKind, challengeId, codeHashOf(challengeId, code)],
+    `select public.app_home_claim_design_payment_by_token($1, $2, $3, null, 'Client Name', '127.0.0.1', 'vitest') as answer`,
+    [tokenHash, milestoneKind, codeHashOf('claim_design_payment', milestoneKind, code)],
   );
   return row.answer;
 }

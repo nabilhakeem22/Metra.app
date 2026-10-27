@@ -20,6 +20,8 @@ vi.mock('@/lib/engagements/actions', () => ({
   rotateDeliveryLink: vi.fn(),
   revokeDeliveryLink: vi.fn(),
 }));
+// The client link dialog's reset of the client's codes (H5) is a server action: never reached here.
+vi.mock('@/lib/client-home/actions', () => ({ resetClientCodes: vi.fn() }));
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const STATUS_KINDS = ['yourMove', 'confirmPayment', 'waitingClient', 'stalled', 'delivered', 'abandoned'];
@@ -68,6 +70,7 @@ function fixture(whoseMove: WhoseMove, updatedAt: string) {
     renderManifestHash: null,
     rendersReadyAt: null,
     clientExpected: null,
+    clientHasEmail: true,
     createdAt: '2026-05-01T00:00:00.000Z',
   } satisfies EngagementHeader;
   return { listRow, dashboardRow, header };

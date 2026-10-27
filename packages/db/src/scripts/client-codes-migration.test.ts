@@ -8,24 +8,24 @@ import { withoutSqlComments } from './rls-catalogue';
 // 0064 pattern it must keep, pinned so an edit cannot quietly undo them. The
 // rehearsal in docs/DEPLOY.md measures them live.
 //
-//   * ALL-OR-NONE LOCKS. client_verification_codes is taken with
-//     `LOCK TABLE ... NOWAIT` in a subtransaction, retried with a short sleep
-//     within one 3 s budget, so the migration never queues behind a code act.
+//   * ALL-OR-NONE LOCKS. design_engagements and client_verification_codes are
+//     taken with `LOCK TABLE ... NOWAIT` in one subtransaction, retried with a
+//     short sleep within one 3 s budget, so the migration never queues behind
+//     a page read or a code act.
 //   * A PLAIN BUILD. `db:migrate` runs the batch in one transaction, where
 //     CREATE INDEX CONCURRENTLY cannot run.
-//   * EXPAND ONLY. One index; no row, policy or grant.
+//   * EXPAND ONLY. One nullable column with no default (catalogue only) and
+//     one index; no row, policy or grant.
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
-const sql = withoutSqlComments(
-  readFileSync(resolve(here, '../../migrations/0066_client_codes_purge_index.sql'), 'utf8'),
-).replace(/\r\n/g, '\n');
+const sql = withoutSqlComments(readFileSync(resolve(here, '../../migrations/0066_client_codes_step_d.sql'), 'utf8')).replace(/\r\n/g, '\n');
 
-describe('0066 takes its lock all or none', () => {
-  const lockBlock = sql.slice(0, sql.indexOf('CREATE INDEX'));
+describe('0066 takes its locks all or none', () => {
+  const lockBlock = sql.slice(0, sql.indexOf('ALTER TABLE'));
 
-  it('names the one existing table, in SHARE mode, before the index build', () => {
+  it('names the two existing tables, in the order the client home reads them, before any statement', () => {
     const targets = [...lockBlock.matchAll(/'public\.(\w+):([A-Z ]+)'/g)].map((match) => `${match[1]} ${match[2]}`);
-    expect(targets).toEqual(['client_verification_codes SHARE']);
+    expect(targets).toEqual(['design_engagements ACCESS EXCLUSIVE', 'client_verification_codes SHARE']);
   });
 
   it('never waits for a lock: every LOCK TABLE is NOWAIT, and no lock_timeout is set for one', () => {
@@ -44,10 +44,11 @@ describe('0066 takes its lock all or none', () => {
     expect(attempt).toMatch(/PERFORM pg_sleep\(0\.01 \+ random\(\) \* 0\.03\)/);
   });
 
-  it('builds the index inside the locked block, plainly (a migration runs in a transaction)', () => {
-    const build = sql.slice(sql.indexOf('CREATE INDEX'), sql.indexOf('END $$;'));
-    expect(build).toContain(
-      'CREATE INDEX client_verification_codes_unused_created_idx\n    ON public.client_verification_codes USING btree (created_at) WHERE consumed_at is null;',
+  it('adds the reset column and builds the index inside the locked block, plainly (a migration runs in a transaction)', () => {
+    const body = sql.slice(sql.indexOf('ALTER TABLE'), sql.indexOf('END $$;'));
+    expect(body).toContain('ALTER TABLE public.design_engagements ADD COLUMN client_codes_reset_at timestamp with time zone;');
+    expect(body).toContain(
+      'CREATE INDEX client_verification_codes_unused_created_idx\n    ON public.client_verification_codes USING btree (created_at) WHERE consumed_at is null or result_ref = id;',
     );
     expect(sql).not.toMatch(/CONCURRENTLY/i);
     expect(sql.slice(sql.indexOf('END $$;') + 'END $$;'.length).trim()).toBe('');
@@ -55,9 +56,10 @@ describe('0066 takes its lock all or none', () => {
 });
 
 describe('0066 only expands', () => {
-  it('writes no row, policy or grant', () => {
+  it('writes no row, policy or grant, and the column has no default (no row is rewritten)', () => {
     expect(sql).not.toMatch(/\b(UPDATE|INSERT|DELETE)\s/i);
     expect(sql).not.toMatch(/\bcreate\s+policy\b/i);
     expect(sql).not.toMatch(/\bgrant\b/i);
+    expect(sql).not.toMatch(/\bDEFAULT\b/i);
   });
 });

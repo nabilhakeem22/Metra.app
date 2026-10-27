@@ -17,6 +17,8 @@ const actions = vi.hoisted(() => ({
   revokeDeliveryLink: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
+const codes = vi.hoisted(() => ({ resetClientCodes: vi.fn() }));
+vi.mock('@/lib/client-home/actions', () => codes);
 
 const en = (path: string) => messageAt('en', path);
 
@@ -113,5 +115,46 @@ describe('the client link dialog', () => {
     });
     expect(screen.getByRole('button', { name: en('delivery.share.shareCta') })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe("H5: reset the client's codes, in the client link dialog", () => {
+  const ar = (path: string) => messageAt('ar-EG', path);
+
+  test('once shared: it asks first, resets this delivery once, and says the client can ask again (Egyptian copy)', async () => {
+    codes.resetClientCodes.mockResolvedValue({ ok: true, data: { voided: 1 } });
+    renderWithIntl(<ClientLinkDialog engagementId="e-1" initialShared />, { locale: 'ar-EG' });
+    act(() => revealDeliveryShareLink());
+    await screen.findByRole('dialog');
+    expect(screen.getByText(ar('delivery.share.codes.hint'))).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: ar('delivery.share.codes.reset') }));
+    expect(codes.resetClientCodes).not.toHaveBeenCalled();
+    expect(await screen.findByText(ar('delivery.share.codes.confirm.body'))).toBeTruthy();
+    const confirms = screen.getAllByRole('button', { name: ar('delivery.share.codes.reset') });
+    await act(async () => {
+      fireEvent.click(confirms[confirms.length - 1]);
+    });
+    expect(codes.resetClientCodes).toHaveBeenCalledTimes(1);
+    expect(codes.resetClientCodes).toHaveBeenCalledWith('e-1');
+    expect(screen.getByText(ar('delivery.share.codes.done'))).toBeTruthy();
+  });
+
+  test('a refusal is said in the dialog; with no link shared there is no reset', async () => {
+    codes.resetClientCodes.mockResolvedValue({ ok: false, error: 'forbidden' });
+    const { unmount } = renderWithIntl(<ClientLinkDialog engagementId="e-1" initialShared />, { locale: 'en' });
+    act(() => revealDeliveryShareLink());
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.share.codes.reset') }));
+    await screen.findByText(en('delivery.share.codes.confirm.body'));
+    const confirms = screen.getAllByRole('button', { name: en('delivery.share.codes.reset') });
+    await act(async () => {
+      fireEvent.click(confirms[confirms.length - 1]);
+    });
+    expect(screen.getByRole('alert').textContent).toBe(en('errors.forbidden'));
+    unmount();
+    renderWithIntl(<ClientLinkDialog engagementId="e-1" initialShared={false} />, { locale: 'en' });
+    act(() => revealDeliveryShareLink());
+    await screen.findByRole('dialog');
+    expect(screen.queryByRole('button', { name: en('delivery.share.codes.reset') })).toBeNull();
   });
 });

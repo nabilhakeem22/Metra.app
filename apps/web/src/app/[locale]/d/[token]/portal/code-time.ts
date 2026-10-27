@@ -1,17 +1,17 @@
 // How the code panel says a wait. PURE and CLIENT-SAFE. Latin digits only.
 
-/** A resend countdown, `M:SS`, from whole seconds (never below 0:00). */
-export function countdownText(seconds: number): string {
-  const whole = Math.max(0, Math.ceil(seconds));
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
-}
-
 /**
- * A limit's wait, rounded UP so the client never comes back early: minutes
- * under two hours, else hours. `unit` picks the plural copy
- * (`delivery.code.wait.minutes` or `.hours`), `count` its number.
+ * A wait as the panel words it (H5 functional F4): under an hour a ticking
+ * `M:SS` clock; from an hour on, whole hours and minutes, rounded UP to the
+ * minute so the client never comes back early (never "1319:54").
  */
-export function waitUnit(seconds: number): { unit: 'minutes' | 'hours'; count: number } {
-  const minutes = Math.max(1, Math.ceil(seconds / 60));
-  return minutes < 120 ? { unit: 'minutes', count: minutes } : { unit: 'hours', count: Math.ceil(minutes / 60) };
+export type WaitParts = { kind: 'clock'; text: string } | { kind: 'hours'; hours: number; minutes: number };
+
+const HOUR = 3600;
+
+export function waitParts(seconds: number): WaitParts {
+  const whole = Math.max(0, Math.ceil(seconds));
+  if (whole < HOUR) return { kind: 'clock', text: `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}` };
+  const minutes = Math.ceil(whole / 60);
+  return { kind: 'hours', hours: Math.floor(minutes / 60), minutes: minutes % 60 };
 }

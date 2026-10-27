@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { isRequestClaimable } from '@/lib/engagements/public/execution-requests';
 import type { PortalExecution } from '@/lib/engagements/public/execution-types';
 import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
@@ -54,7 +55,8 @@ function withClaimShown(execution: PortalExecution, requestId: string): PortalEx
 /**
  * The behaviour behind the Execution tab's "I've made this payment", with a
  * one-time code (OD2 strict). A tap opens the claim: the request and the amount
- * still due, and the code panel (./use-client-code.ts). Only Confirm sends
+ * still due, and the code panel (./use-client-code.ts); `openOn` (a code
+ * email's link) opens that request's claim on the code box at once. Only Confirm sends
  * `claimRequestInHome`, with the typed code, one at a time, its await wrapped
  * so a rejected action can never strand the spinner. The amount is the
  * server's, so none is sent. A wrong, spent or expired code is said in the
@@ -76,6 +78,7 @@ export function useExecutionClaim(
   initial: PortalExecution,
   onChanged: () => void,
   channel: KnownCodeChannel,
+  openOn: string | null,
 ): ExecutionClaim {
   const [execution, setExecution] = useState(initial);
   const [readFromPage, setReadFromPage] = useState(initial);
@@ -84,7 +87,10 @@ export function useExecutionClaim(
     setExecution(initial);
   }
   const [pending, startTransition] = useTransition();
-  const [askingId, setAskingId] = useState<string | null>(null);
+  // A code email's link opens its request's claim at once, while it can still be claimed.
+  const [askingId, setAskingId] = useState(() =>
+    initial.requests.some((request) => request.id === openOn && isRequestClaimable(request)) ? openOn : null,
+  );
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [notifiedIds, setNotifiedIds] = useState<ReadonlySet<string>>(new Set());
   const [failure, setFailure] = useState<ExecutionClaim['failure']>(null);
@@ -95,7 +101,7 @@ export function useExecutionClaim(
     setAskingId(null);
     onChanged();
   }
-  const code = useClientCode(token, 'claim_request', askingId, channel, gone);
+  const code = useClientCode(token, 'claim_request', askingId, channel, gone, openOn);
 
   /** One read of the payments, or null when it failed: the rows then keep what they show. */
   async function readAgain(): Promise<PortalExecution | null> {

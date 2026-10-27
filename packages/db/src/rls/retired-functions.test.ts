@@ -100,3 +100,59 @@ describe('the unbound home contract page reads stay dropped (step D)', () => {
     expect(rlsFile('roles.sql')).not.toMatch(signature);
   });
 });
+
+// Client codes DB step D (H5 functional F1) DROPS the forms of the code
+// request, the code check and the four code-checked acts that took a code id
+// from the browser: the new forms check a code by its act's target. Each old
+// argument list appears exactly once, in its DROP, right before the CREATE of
+// the new form, and nowhere else (roles.sql too), so no re-run of apply-rls
+// can bring one back.
+describe('the code functions that took a code id stay dropped (step D)', () => {
+  const RETIRED = [
+    {
+      name: 'app_home_code_issue_by_token',
+      oldArguments: 'text, uuid, text, text, text, text, text',
+      createOpening: 'create or replace function public.app_home_code_issue_by_token(\n  p_hash text,\n  p_purpose text,',
+    },
+    {
+      name: 'app_client_code_check',
+      oldArguments: 'uuid, uuid, uuid, text, text, text',
+      createOpening: 'create or replace function public.app_client_code_check(\n  p_engagement_id uuid,\n  p_org_id uuid,\n  p_purpose text,',
+    },
+    {
+      name: 'app_home_contract_ack_by_token',
+      oldArguments: 'text, uuid, uuid, text, text, text, text, text',
+      createOpening: 'create or replace function public.app_home_contract_ack_by_token(\n  p_hash text,\n  p_contract_id uuid,\n  p_code_hash text,',
+    },
+    {
+      name: 'app_home_variation_respond_by_token',
+      oldArguments: 'text, uuid, text, uuid, text, text, text, text',
+      createOpening:
+        'create or replace function public.app_home_variation_respond_by_token(\n  p_hash text,\n  p_variation_id uuid,\n  p_decision text,\n  p_code_hash text,',
+    },
+    {
+      name: 'app_home_claim_request_by_token',
+      oldArguments: 'text, uuid, uuid, text, text, text, text, text',
+      createOpening: 'create or replace function public.app_home_claim_request_by_token(\n  p_hash text,\n  p_request_id uuid,\n  p_code_hash text,',
+    },
+    {
+      name: 'app_home_claim_design_payment_by_token',
+      oldArguments: 'text, text, uuid, text, text, text, text, text',
+      createOpening:
+        'create or replace function public.app_home_claim_design_payment_by_token(\n  p_hash text,\n  p_milestone_kind text,\n  p_code_hash text,',
+    },
+  ];
+
+  /** The old signature in any spelling: case, quotes, spaces and line breaks. */
+  const signatureOf = (name: string, oldArguments: string) =>
+    new RegExp(`"?${name}"?\\s*\\(\\s*${oldArguments.split(', ').join('\\s*,\\s*')}\\s*\\)`, 'gi');
+
+  it.each(RETIRED)('$name($oldArguments): once, in its DROP right before the new CREATE, and in no other statement', ({ name, oldArguments, createOpening }) => {
+    const sql = rlsFile('functions/75-client-home.sql');
+    const drop = `drop function if exists public.${name}(${oldArguments});`;
+    expect(sql.indexOf(`${drop}\n${createOpening}`), 'the drop right before the new create').toBeGreaterThan(-1);
+    const mentions = RLS_APPLY_ORDER.flatMap((file) => [...rlsFile(file).matchAll(signatureOf(name, oldArguments))].map(() => file));
+    expect(mentions).toEqual(['functions/75-client-home.sql']);
+    expect(rlsFile('roles.sql')).not.toMatch(signatureOf(name, oldArguments));
+  });
+});

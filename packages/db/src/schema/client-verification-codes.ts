@@ -17,22 +17,30 @@ import { sameOrgFk } from './org-ref';
 
 /**
  * One one-time code a client asked for on their home (0065, DB step C), bound
- * to (delivery, purpose, target). The app makes the code and its challenge id
- * (`id`), emails the code, and the database keeps only `code_hash` =
- * sha256(`id:code`); the raw code is never stored.
+ * to (delivery, purpose, target). The app makes the code, emails it, and the
+ * database keeps only `code_hash` = sha256(`purpose:target:code`); the raw
+ * code is never stored. A code is checked by its target, never by its id
+ * (DB step D, H5 functional F1): the NEWEST live code of the target is the one
+ * that works, so a client who reloaded the page can still type it.
  *
  * Written ONLY by the client home's definer functions (rls/functions/
  * 75-client-home.sql): metra_app may read every column but `code_hash`, and
  * write none (rls/roles.sql). trg_client_verification_codes_guarded admits
  * only a wrong try (`attempts` + 1) or the one consumption (`consumed_at` and
  * `result_ref` together, once), and a delete only from the delivery's cascade
- * or of a code never used that expired more than 90 days ago (the issue
- * function's purge). A used code is evidence of the act it gated and stays.
+ * or of a code never used (or never sent) that expired more than 90 days ago
+ * (the issue function's purge). A used code is evidence of the act it gated
+ * and stays.
  *
  * `destination_hash` is sha256 of the lower-cased address the code went to and
  * `destination_hint` what the client was shown of it: evidence of where the
  * code went, without the address. `result_ref` is the row the act wrote (the
- * contract_events, variation_order_events or claim id).
+ * contract_events, variation_order_events or claim id), or the code's OWN id
+ * when its email was never sent (DB step D, H5 reliability R1): such a code
+ * authorises nothing and counts toward no day limit, only toward the 60 s
+ * spacing of its target. (The mark is a consumption, not a column: a new
+ * column here would fail the grant read-back of the database code undo (0)
+ * of the step D runbook puts back.)
  */
 export const clientVerificationCodes = pgTable(
   'client_verification_codes',
@@ -91,10 +99,11 @@ export const clientVerificationCodes = pgTable(
     ),
     // The platform's daily ceiling counts every studio's codes of the last day.
     index('client_verification_codes_created_idx').on(t.createdAt),
-    // The issue function's purge of codes never used (0066, DB step D): it
-    // reaches them without walking past the used ones, which stay as evidence.
+    // The issue function's purge of codes never used or never sent (0066, DB
+    // step D): it reaches them without walking past the used ones, which stay
+    // as evidence.
     index('client_verification_codes_unused_created_idx')
       .on(t.createdAt)
-      .where(sql`consumed_at is null`),
+      .where(sql`consumed_at is null or result_ref = id`),
   ],
 );

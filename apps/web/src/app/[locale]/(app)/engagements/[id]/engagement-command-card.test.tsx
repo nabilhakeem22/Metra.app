@@ -95,6 +95,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canResolveClaims: true,
     canShare: true,
     canUpload: true,
+    clientHasEmail: true,
     canSetOffPlan: false,
     offPlan: false,
     feeSplitPrefill: null,
@@ -213,6 +214,18 @@ describe('the ending choice at execution_decision', () => {
     expect(button('engagements.hero.logPaymentAdvance')).toBeNull();
     expect(button('engagements.command.ending.chooseDesignOnly.cta')).toBeNull();
     expect(button('engagements.hero.advance')).toBeNull();
+  });
+
+  test('H5: the balance waits on a client with no email on file: one line says they cannot report the payment online', () => {
+    const notice = (clientHasEmail: boolean, preview: EngagementGatePreview) => {
+      const { container, unmount } = renderWithIntl(<EngagementCommandCard {...props({ preview, clientHasEmail })} />);
+      const text = container.querySelector('[data-no-email-notice]')?.textContent ?? null;
+      unmount();
+      return text;
+    };
+    expect(notice(false, choicePreview(false))).toBe(ar('engagements.command.noEmailPayment'));
+    expect(notice(true, choicePreview(false))).toBeNull();
+    expect(notice(false, choicePreview(true))).toBeNull();
   });
 
   test('the record-only form calls recordPayment, never logPaymentAndAdvance', async () => {

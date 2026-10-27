@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { countdownText, waitUnit } from './code-time';
+import { waitParts } from './code-time';
 
 describe('the code panel\'s waits', () => {
-  it('counts down M:SS, never below 0:00', () => {
-    expect(countdownText(60)).toBe('1:00');
-    expect(countdownText(42.2)).toBe('0:43');
-    expect(countdownText(5)).toBe('0:05');
-    expect(countdownText(-3)).toBe('0:00');
+  it('counts down M:SS under an hour, never below 0:00', () => {
+    expect(waitParts(60)).toEqual({ kind: 'clock', text: '1:00' });
+    expect(waitParts(42.2)).toEqual({ kind: 'clock', text: '0:43' });
+    expect(waitParts(5)).toEqual({ kind: 'clock', text: '0:05' });
+    expect(waitParts(3599)).toEqual({ kind: 'clock', text: '59:59' });
+    expect(waitParts(-3)).toEqual({ kind: 'clock', text: '0:00' });
   });
 
-  it('rounds a limit\'s wait up: minutes under two hours, else hours', () => {
-    expect(waitUnit(1)).toEqual({ unit: 'minutes', count: 1 });
-    expect(waitUnit(61)).toEqual({ unit: 'minutes', count: 2 });
-    expect(waitUnit(119 * 60)).toEqual({ unit: 'minutes', count: 119 });
-    expect(waitUnit(120 * 60)).toEqual({ unit: 'hours', count: 2 });
-    expect(waitUnit(22.5 * 3600)).toEqual({ unit: 'hours', count: 23 });
+  it('says an hour or more in hours and minutes, rounded up to the minute (never 1319:54, H5 F4)', () => {
+    expect(waitParts(3600)).toEqual({ kind: 'hours', hours: 1, minutes: 0 });
+    expect(waitParts(3601)).toEqual({ kind: 'hours', hours: 1, minutes: 1 });
+    expect(waitParts(1319 * 60 + 54)).toEqual({ kind: 'hours', hours: 22, minutes: 0 });
+    expect(waitParts(80_999)).toEqual({ kind: 'hours', hours: 22, minutes: 30 });
   });
 });

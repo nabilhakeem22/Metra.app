@@ -215,6 +215,11 @@ grant select (
 -- trg_design_engagements_token_nonce, which needs no grant: a trigger's own
 -- assignment to NEW is not checked against the caller's column privileges.
 --
+-- `client_codes_reset_at` (0066, client codes DB step D) is NOT in the list:
+-- only the definer app_client_codes_reset (functions/75-client-home.sql)
+-- writes it, after checking the caller is an owner or admin, so no studio path
+-- can stamp it by hand.
+--
 -- The REVOKE removes the earlier table-level UPDATE on already-provisioned
 -- databases; on a fresh one it is a no-op. It must come BEFORE the column grant
 -- and cannot come after, for TWO reasons that point the same way. A table-level
@@ -656,16 +661,20 @@ grant execute on function public.app_home_contract_section_lines_by_token(text, 
 revoke execute on function public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer) from public;
 grant execute on function public.app_home_variations_by_token(text) to metra_app;
 revoke execute on function public.app_home_variations_by_token(text) from public;
-grant execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) to metra_app;
-revoke execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) from public;
-grant execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) to metra_app;
-revoke execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) from public;
-grant execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) to metra_app;
-revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) from public;
-grant execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) to metra_app;
-revoke execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) from public;
-grant execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) to metra_app;
-revoke execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_code_issue_by_token(text, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_code_issue_by_token(text, text, text, text, text, text) from public;
+grant execute on function public.app_home_contract_ack_by_token(text, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_contract_ack_by_token(text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_variation_respond_by_token(text, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text) from public;
+grant execute on function public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text) from public;
+grant execute on function public.app_home_code_unsent_by_token(text, uuid) to metra_app;
+revoke execute on function public.app_home_code_unsent_by_token(text, uuid) from public;
+grant execute on function public.app_client_codes_reset(uuid) to metra_app;
+revoke execute on function public.app_client_codes_reset(uuid) from public;
 grant execute on function public.app_client_home_target_by_token(text, text) to metra_app;
 revoke execute on function public.app_client_home_target_by_token(text, text) from public;
 revoke execute on function public.app_payment_request_due(uuid, uuid) from public;
@@ -684,8 +693,8 @@ revoke execute on function public.app_client_code_destination(uuid, uuid) from p
 revoke execute on function public.app_client_code_destination(uuid, uuid) from metra_app;
 revoke execute on function public.app_email_hint(text) from public;
 revoke execute on function public.app_email_hint(text) from metra_app;
-revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from public;
-revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from metra_app;
+revoke execute on function public.app_client_code_check(uuid, uuid, text, text, text) from public;
+revoke execute on function public.app_client_code_check(uuid, uuid, text, text, text) from metra_app;
 revoke execute on function public.app_client_code_refusal(text) from public;
 revoke execute on function public.app_client_code_refusal(text) from metra_app;
 revoke execute on function public.app_client_code_consume(uuid, uuid) from public;
@@ -927,25 +936,27 @@ begin
       );
       execute format('revoke execute on function public.app_home_variations_by_token(text) from %I', r);
       execute format(
-        'revoke execute on function public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text) from %I',
+        'revoke execute on function public.app_home_code_issue_by_token(text, text, text, text, text, text) from %I',
         r
       );
       execute format(
-        'revoke execute on function public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text) from %I',
+        'revoke execute on function public.app_home_contract_ack_by_token(text, uuid, text, text, text, text, text) from %I',
         r
       );
       execute format(
-        'revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text) from %I',
+        'revoke execute on function public.app_home_variation_respond_by_token(text, uuid, text, text, text, text, text) from %I',
         r
       );
       execute format(
-        'revoke execute on function public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text) from %I',
+        'revoke execute on function public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text) from %I',
         r
       );
       execute format(
-        'revoke execute on function public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text) from %I',
+        'revoke execute on function public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text) from %I',
         r
       );
+      execute format('revoke execute on function public.app_home_code_unsent_by_token(text, uuid) from %I', r);
+      execute format('revoke execute on function public.app_client_codes_reset(uuid) from %I', r);
       execute format('revoke execute on function public.app_client_home_target_by_token(text, text) from %I', r);
       execute format('revoke execute on function public.app_payment_request_due(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_engagement_milestone_due(uuid, text) from %I', r);
@@ -955,7 +966,7 @@ begin
       execute format('revoke execute on function public.app_home_contract(text) from %I', r);
       execute format('revoke execute on function public.app_client_code_destination(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_email_hint(text) from %I', r);
-      execute format('revoke execute on function public.app_client_code_check(uuid, uuid, uuid, text, text, text) from %I', r);
+      execute format('revoke execute on function public.app_client_code_check(uuid, uuid, text, text, text) from %I', r);
       execute format('revoke execute on function public.app_client_code_refusal(text) from %I', r);
       execute format('revoke execute on function public.app_client_code_consume(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_terminated_at(uuid, uuid) from %I', r);

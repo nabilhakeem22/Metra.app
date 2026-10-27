@@ -77,7 +77,7 @@ describe('sendProposalEmail', () => {
 
     secrets.RESEND_API_KEY = 're-test-key';
     send.mockResolvedValue({ error: { message: 'domain not verified' } });
-    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false, transient: false });
+    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false, transient: false, refusal: { statusCode: null, name: null } });
 
     send.mockRejectedValue(new Error('network'));
     await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false, transient: true });

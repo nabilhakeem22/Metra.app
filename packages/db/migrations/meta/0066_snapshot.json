@@ -1,5 +1,5 @@
 {
-  "id": "72c66e96-22a1-499e-a7e6-75c5d2122884",
+  "id": "d1bf4136-f5e7-4295-86bf-fc90e78d7a87",
   "prevId": "0d735a61-89a0-42fc-b1a2-3d3868aa7d9e",
   "version": "7",
   "dialect": "postgresql",
@@ -9617,6 +9617,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'design'"
+        },
+        "client_codes_reset_at": {
+          "name": "client_codes_reset_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -14190,7 +14196,7 @@
             }
           ],
           "isUnique": false,
-          "where": "consumed_at is null",
+          "where": "consumed_at is null or result_ref = id",
           "concurrently": false,
           "method": "btree",
           "with": {}

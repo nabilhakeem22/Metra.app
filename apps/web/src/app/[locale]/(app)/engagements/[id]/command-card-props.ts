@@ -57,6 +57,8 @@ export interface EngagementCommandCardProps {
   canResolveClaims: boolean;
   canShare: boolean;
   canUpload: boolean;
+  /** Has the client an email a one-time code could go to (the header's flag): without one, a payment the client owes cannot be reported online. */
+  clientHasEmail: boolean;
   canSetOffPlan: boolean;
   offPlan: boolean;
   /** The fee form's opening split at `created`; null elsewhere. */
