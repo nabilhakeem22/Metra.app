@@ -119,6 +119,46 @@ hreflang links and the noindex exemption all read it.
   names the variable (usually the whole meta tag was pasted). Blank means no
   tag.
 
+### Security headers: who owns which
+
+Every page response carries the same security headers, from ONE module, on two
+paths:
+
+- **Worker responses** get them in the middleware (`src/middleware.ts`), the one
+  hook that also adds the noindex header. The values, and which of three
+  profiles a path gets, live in `src/lib/http/security-headers.ts`; the CSP
+  directives live in `src/lib/http/content-security-policy.ts`.
+  - `page`: HSTS (`max-age=31536000; includeSubDomains`), `nosniff`,
+    `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
+    a `Permissions-Policy`, an ENFORCED CSP and a Report-Only CSP.
+  - `token_page` (`/c`, `/d`, `/invite`, `/p`, `/v` and everything under them):
+    the same, with `Referrer-Policy: no-referrer`, so the token in the path never
+    rides a Referer header to another site.
+  - `file` (a client-page picture or document): HSTS, `nosniff`, `DENY` and
+    `no-referrer` only. No CSP: `object-src 'none'` on an inline PDF risks
+    Chrome's PDF viewer.
+- **Static assets** (`/`, the landing and login pages, `/_next/static`, icons)
+  never reach the Worker. The `/*` block at the top of `apps/web/public/_headers`
+  carries the same `page` set. `src/test/static-headers.test.ts` fails if that
+  block differs from the module, or if any other block sets one of its header
+  names (Cloudflare comma-joins a header two matching rules both set, which
+  would break the policy).
+- **`/api/*`** is outside the middleware. The Public API adds `cache-control:
+  no-store` and `x-content-type-options: nosniff` to every answer itself.
+
+**The CSP is two policies on purpose (owner decision D1).** The enforced one has
+only the four directives that cannot break a Next app (`frame-ancestors 'none';
+base-uri 'self'; object-src 'none'; form-action 'self'`). The full fetch policy
+is `Content-Security-Policy-Report-Only`, with no report endpoint: a violation
+only shows in the browser console. Once a console walk of every flow and a week
+of real use show none, the follow-up moves it into the enforced header (one
+constant plus the `_headers` line). Rolling back an enforced directive is the
+same edit the other way.
+
+**Never add a security header in `next.config.mjs` `headers()`.** OpenNext gives
+those PRIORITY over middleware headers, so a global `Referrer-Policy` there
+would silently overwrite the token routes' `no-referrer`.
+
 ### Two things that were fixed to get here
 
 History, so the setup is not accidentally reverted.
@@ -382,6 +422,91 @@ If you do it anyway:
 Signed links a paid client opens live 300 seconds, so after a link is replaced
 or revoked a document URL minted just before still works for up to five
 minutes (accepted, Round C S4).
+
+## Go-live security: what the app does, and the owner steps
+
+The go-live security PR closed these app-side. Nothing here runs by itself:
+every owner step below is done by hand, once.
+
+**What the app now does**
+
+- **Sign-in codes are throttled before Supabase is called.** Supabase sees the
+  Worker's address, not the visitor's, so its own per-IP limits act as one
+  global bucket. Two Workers Rate Limiting bindings are the per-person control
+  (`apps/web/src/lib/auth/otp-throttle.ts`, ceilings in `wrangler.jsonc` only):
+  `AUTH_OTP_IP_RATE_LIMITER` (namespace 1007, 10 per 60 s per step and caller
+  IP, an IPv6 caller by its /64) and `AUTH_OTP_IDENTIFIER_RATE_LIMITER`
+  (namespace 1008, 5 per 60 s per step and address; the key is a sha256 prefix,
+  never the address). Past either: 429 `otp_rate_limited` with `retry-after: 60`.
+  Like every binding it counts per data centre, and a binding **missing** on
+  Cloudflare makes sign-in answer 500, by design.
+- **Daily email caps per studio** (`apps/web/src/lib/email/daily-caps.ts`,
+  owner decision D4): 20 team invite emails and 60 client emails (proposal sends
+  plus delivery reminder emails) per rolling 24 hours, counted from rows the app
+  already writes. The cap gates the EMAIL: an invite, a resend or a proposal send
+  still happens and its link is shown to copy. Only the delivery reminder, where
+  the email is the action, refuses with "today's email limit". A count that fails
+  lets the email go (logged).
+- **Session cookies** are HttpOnly, SameSite=Lax, Path=/, Secure in production,
+  and live **30 days, rolling** (owner decision D2): every token refresh
+  rewrites them, so only 30 days without a visit forces a new sign-in.
+  `@supabase/ssr` 0.5.2 forces 400 days whatever its options say, so the
+  attributes are imposed in our own `setAll`
+  (`apps/web/src/lib/supabase/session-cookie.ts`). Existing sessions pick them up
+  on their next refresh.
+- **The BOQ template** needs `boq_build:create` and leaves the unit cost blank
+  for anyone who may not see margin; its cells are formula-guarded.
+- **PDF renders cannot reach the network** (only `data:` and `about:` requests).
+- **Internal document links** live 300 seconds.
+- **Acceptance records** keep the IP Cloudflare saw (`cf-connecting-ip`), never a
+  forwarded hop the client wrote.
+- **Version preview URLs are off** (`preview_urls: false`); workers.dev stays on,
+  it is the production origin.
+
+**Owner steps** (in this order where it matters):
+
+1. **Hyperdrive caching: already off; record only.** Config
+   `acc17973ea6847328d6b523bb54953f0` has `caching.disabled: true` (checked Oct
+   27 2026). It must stay off: tenant isolation rides on per-transaction
+   settings that no cache key can see. If the config is ever re-created:
+   `npx wrangler hyperdrive update acc17973ea6847328d6b523bb54953f0 --caching-disabled`.
+2. **Bucket size limit** (Supabase SQL editor; safe to run twice):
+   ```sql
+   update storage.buckets set file_size_limit = 52428800 where id = 'metra-files';
+   select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'metra-files';
+   -- expect: metra-files | false | 52428800 | null
+   ```
+   Dashboard equivalent: Storage, `metra-files`, Edit bucket, Restrict file
+   upload size = 50 MB. Do NOT set `allowed_mime_types` here (see the optional
+   task above for why). Until this is done, the Worker logs
+   `files bucket has no file size limit` once per isolate on the first upload.
+   The limit bounds one object, not one studio: on the Free plan about twenty
+   50 MB files fill the whole project.
+3. **Supabase Auth rate limits** (Dashboard, Authentication, Rate Limits). First
+   read the `ip` column of recent sign-ins in the Auth logs: if a handful of
+   Cloudflare addresses carry everyone, Supabase's per-IP buckets are global.
+   Then set sign-ups and sign-ins 150 per 5 minutes, token verifications 150 per
+   5 minutes, emails sent 100 per hour.
+4. **Supabase Auth settings**: email OTP expiry 600 s, OTP length 6, the email
+   template sends `{{ .Token }}`, and the phone provider OFF unless SMS is really
+   used (otherwise spend caps and geo-permissions limited to Egypt).
+5. **After the deploy**: Cloudflare dashboard, Workers, `metra-web`, Settings,
+   Domains and Routes: Preview URLs disabled, workers.dev enabled. Then
+   Settings, Bindings: `AUTH_OTP_IP_RATE_LIMITER` and
+   `AUTH_OTP_IDENTIFIER_RATE_LIMITER` are listed (`wrangler deploy` creates them
+   from `wrangler.jsonc`; nothing to create by hand).
+6. **Turnstile, once its PR exists, in THIS order: (a) add the widget in the
+   Cloudflare dashboard for the Worker's host, mode Managed; (b) add the Actions
+   variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; (c) merge and deploy that PR;
+   (d) only then, Supabase, Authentication, Attack Protection: enable CAPTCHA,
+   provider Turnstile, paste the secret key. Doing (d) before (c) breaks every
+   sign-in.**
+7. **Supabase Pro before the first paying studio.** On Free, 1 GB of storage and
+   5 GB of egress are shared by every studio, and there is no per-studio quota
+   yet.
+8. **When a custom domain arrives** (its own PR): `workers_dev: false`, update
+   `NEXT_PUBLIC_APP_URL` and the cron `APP_ORIGIN`, then the zone's HSTS, Always
+   Use HTTPS and minimum TLS 1.2.
 
 ## Supabase Free plan: no Storage image transformations
 
