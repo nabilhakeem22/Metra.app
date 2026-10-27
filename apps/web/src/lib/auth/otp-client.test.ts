@@ -29,6 +29,22 @@ describe('otp-client', () => {
     expect(JSON.parse(init.body as string)).toEqual({ channel: 'email', identifier: 'mona@firm.example' });
   });
 
+  it('without a Turnstile token the send body is exactly what it was: no captchaToken key (AC15)', async () => {
+    fetchMock.mockResolvedValue(json({ ok: true }));
+    await sendEmailOtp('mona@firm.example', undefined);
+    expect(fetchMock.mock.calls[0]![1].body).toBe('{"channel":"email","identifier":"mona@firm.example"}');
+  });
+
+  it('carries the Turnstile token in the send body, by email and by phone', async () => {
+    fetchMock.mockImplementation(async () => json({ ok: true }));
+    await sendEmailOtp('mona@firm.example', 'tok-1');
+    await sendPhoneOtp('+201001234567', 'tok-2');
+    expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string))).toEqual([
+      { channel: 'email', identifier: 'mona@firm.example', captchaToken: 'tok-1' },
+      { channel: 'phone', identifier: '+201001234567', captchaToken: 'tok-2' },
+    ]);
+  });
+
   it('names the channel and the code for each call', async () => {
     fetchMock.mockImplementation(async () => json({ ok: true }));
     await sendPhoneOtp('+201001234567');

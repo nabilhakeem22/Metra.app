@@ -15,7 +15,6 @@ const ROW_COLUMNS = {
   nameAr: costItems.nameAr,
   sectionId: costItems.sectionId,
   unit: costItems.unit,
-  defaultUnitCost: costItems.defaultUnitCost,
   defaultUnitPrice: costItems.defaultUnitPrice,
   taxCode: costItems.taxCode,
   etaItemCode: costItems.etaItemCode,
@@ -24,7 +23,15 @@ const ROW_COLUMNS = {
   marketItemId: costItems.marketItemId,
 };
 
-type PriceBookRow = Pick<CostItem, keyof typeof ROW_COLUMNS>;
+/**
+ * The unit cost, or SQL null for a caller who may not see margin
+ * (`resolveSeeMargin`): a hidden cost is never read, so it can reach neither
+ * the page's HTML nor its RSC payload.
+ */
+const costColumn = (withCost: boolean) =>
+  withCost ? costItems.defaultUnitCost : sql<string | null>`null::text`;
+
+type PriceBookRow = Pick<CostItem, keyof typeof ROW_COLUMNS> & { defaultUnitCost: string | null };
 
 export interface PriceBookPage {
   rows: PriceBookRow[];
@@ -45,12 +52,13 @@ export interface PriceBookPage {
  * row-level security every row pays is paid once per page, not once per count.
  * Items under a retired section are never listed (they have no heading).
  */
-async function readPage(tx: MetraDb, view: PriceBookView, locale: string, page: number) {
+async function readPage(tx: MetraDb, view: PriceBookView, locale: string, page: number, withCost: boolean) {
   const ranked = rankedSections(tx, locale);
   return tx
     .with(ranked)
     .select({
       ...ROW_COLUMNS,
+      defaultUnitCost: costColumn(withCost),
       sectionMatched: sql<number>`(count(*) over (partition by ${costItems.sectionId}))::int`,
       matched: sql<number>`(count(*) over ())::int`,
     })
@@ -72,15 +80,17 @@ async function readPage(tx: MetraDb, view: PriceBookView, locale: string, page: 
  * One page of the studio's price book, filtered, searched and ordered in the
  * database. A page past the end (an item retired meanwhile, an old link) is
  * read again as the last page; nothing matching asks whether the book is empty.
+ * The cost comes back only `withCost` (resolveSeeMargin).
  */
-export function listPriceBookPage(ctx: OrgContext, view: PriceBookView, locale: string): Promise<PriceBookPage> {
+export function listPriceBookPage(ctx: OrgContext, view: PriceBookView, locale: string, withCost: boolean): Promise<PriceBookPage> {
   return withOrgContext(ctx, async (tx) => {
+    const read = (page: number) => readPage(tx, view, locale, page, withCost);
     let page = view.page;
-    let found = await readPage(tx, view, locale, page);
+    let found = await read(page);
     if (found.length === 0 && page > 1) {
-      const [last] = await readPage(tx, view, locale, 1);
+      const [last] = await read(1);
       page = last ? Math.ceil(last.matched / PRICE_BOOK_PAGE_SIZE) : 1;
-      found = last ? await readPage(tx, view, locale, page) : [];
+      found = last ? await read(page) : [];
     }
     if (found.length === 0) {
       const [anyItem] = await tx.select({ id: costItems.id }).from(costItems).limit(1);

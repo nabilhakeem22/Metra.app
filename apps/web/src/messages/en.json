@@ -9,8 +9,10 @@
   },
   "landing": {
     "seo": {
-      "title": "Project & cost control for interior-design studios",
-      "description": "Metra runs interior-design studios through every stage of a fit-out (proposals, approvals, payment gates, and handoff) with every pound traceable from quote to invoice. Bilingual and EGP-native."
+      "title": "Metra · Software for interior design and fit-out studios in Egypt",
+      "description": "Metra is Arabic-first software for interior design and fit-out studios in Egypt: proposals and BOQs, contracts, payment requests, change orders and a private link where the client follows their project.",
+      "ogImageAlt": "Metra: Arabic-first software for interior design and fit-out studios",
+      "ogHeadline": "From quote to handover, in one system."
     },
     "nav": {
       "primaryLabel": "Primary",
@@ -116,6 +118,11 @@
     "footer": {
       "label": "Footer",
       "copyright": "© Metra"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page may have moved or been removed. You can go back to the home page.",
+      "cta": "Back to the home page"
     }
   },
   "meta": {
@@ -145,7 +152,12 @@
   "shell": {
     "menu": "Menu",
     "userMenu": "User menu",
-    "role": "Role"
+    "role": "Role",
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page does not exist, or you do not have access to it. Go back to your dashboard and carry on from there.",
+      "cta": "Back to the dashboard"
+    }
   },
   "login": {
     "signInTitle": "Sign in",
@@ -507,6 +519,7 @@
       "not_a_number": "That is not a number. Use digits, with a dot for decimals, like 1250.50.",
       "not_negative": "This cannot be below zero. Enter 0 or more.",
       "email_format": "That email does not look right. Write it like name@example.com.",
+      "phone_format": "That phone number does not look right. Write it in digits, like +20 100 123 4567.",
       "no_longer_exists": "That choice no longer exists; it may have been deleted. Pick another one.",
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting.",
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
@@ -534,9 +547,13 @@
     "invite_not_found": "This invitation link is not valid; it may have been used or cancelled. Ask the person who invited you for a new link.",
     "otp_verify_failed": "That code is wrong or has expired. Type the newest code we sent, or ask for a new one.",
     "otp_rate_limited": "Too many codes were requested. Wait a minute, then ask for a new one.",
+    "otp_verify_rate_limited": "Too many tries. Wait a minute, then type the code again.",
     "rate_limited": "Too many requests in a short time. Wait a minute, then try again.",
+    "daily_email_cap_reached": "Your studio has reached today's email limit. Try again tomorrow, or copy the link and send it yourself.",
     "otp_sms_unavailable": "We cannot send text messages right now. Sign in with your email instead.",
     "otp_email_unavailable": "We cannot send email to this address yet. Sign in with your phone number, or contact us.",
+    "otp_captcha_pending": "We are still checking this browser. Finish the check if one appears, wait a few seconds and try again.",
+    "otp_captcha_failed": "The security check did not pass. Wait a few seconds and try again. If it keeps happening, refresh the page or try another browser.",
     "immutable": "This record is locked, so it cannot be changed. Refresh the page to see its current state.",
     "code_required": "A code is required. Type a short code, like PB-101.",
     "code_taken": "Another item already uses this code. Choose a different code.",
@@ -3422,6 +3439,7 @@
         "not_a_number": "This is not a number. Please use digits, with a dot for decimals, such as 1250.50.",
         "not_negative": "This cannot be below zero. Please enter 0 or more.",
         "email_format": "This email address does not look right. Please write it like name@example.com.",
+        "phone_format": "This phone number does not look right. Please write it in digits, like +20 100 123 4567.",
         "no_longer_exists": "This choice is no longer available. Please choose another one.",
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting.",
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",

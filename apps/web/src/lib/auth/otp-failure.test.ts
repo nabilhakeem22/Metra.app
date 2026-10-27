@@ -56,6 +56,7 @@ describe('otpSendFailure', () => {
     ['sms_send_failed', 'otp_sms_unavailable'],
     ['email_address_not_authorized', 'otp_email_unavailable'],
     ['email_provider_disabled', 'otp_email_unavailable'],
+    ['captcha_failed', 'otp_captcha_failed'],
   ])('%s is %s', (code, answer) => {
     expect(otpSendFailure('send', supabaseError(code, 400), 'email')).toEqual({ ok: false, error: answer });
   });
@@ -95,9 +96,13 @@ describe('otpVerifyFailure', () => {
     });
   });
 
-  it('too many attempts is otp_rate_limited', () => {
+  it('captcha_failed is not a verify answer: verify is never challenged', () => {
+    expect(otpVerifyFailure('verify', supabaseError('captcha_failed', 400)).error).toBe('generic');
+  });
+
+  it('too many checks is otp_verify_rate_limited: the code held is still good, so type it again (F6)', () => {
     expect(otpVerifyFailure('verify', supabaseError('over_request_rate_limit', 429)).error).toBe(
-      'otp_rate_limited',
+      'otp_verify_rate_limited',
     );
   });
 });

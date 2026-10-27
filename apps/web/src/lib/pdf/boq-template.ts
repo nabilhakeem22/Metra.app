@@ -6,6 +6,7 @@ import { hasLineDiscounts } from '@/lib/boqs/line-discounts';
 import { esc } from '@/lib/pdf/html';
 import { boqLinesTableHtml, boqTotalsHtml, type BoqLayout } from './boq-template-parts';
 import { fontFaceCss } from './template';
+import { PDF_CSP_META } from './render-request-policy';
 
 /**
  * Bill of Quantities PDF — the document the client actually receives.
@@ -56,6 +57,7 @@ export async function buildBoqHtml(
 <html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
+${PDF_CSP_META}
 <style>
   ${await fontFaceCss()}
   * { box-sizing: border-box; }

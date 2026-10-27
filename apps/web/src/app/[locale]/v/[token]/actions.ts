@@ -1,7 +1,7 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
+import { requestProvenance } from '@/lib/share/request-provenance';
 import { respondToVariationByToken, type RespondError } from '@/lib/variations/public';
 
 /** The client's answer: the decision's outcome, or an act that never landed. */
@@ -19,11 +19,10 @@ export async function respondToVariation(
   actorName?: string,
 ): Promise<VariationAnswer> {
   return answered('respondToVariation', (failure) => ({ ok: false as const, ...failure }), async () => {
-    const h = await headers();
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 45) || null;
-    const ua = h.get('user-agent')?.slice(0, 512) || null;
+    // The edge-trusted client IP (cf-connecting-ip), capped, for the audit trail.
+    const { ip, userAgent } = await requestProvenance();
     // Directly invokable: a non-string name is no name, never a throw.
     const name = (typeof actorName === 'string' ? actorName.trim().slice(0, 120) : '') || null;
-    return respondToVariationByToken(token, { decision, actorName: name, ip, userAgent: ua });
+    return respondToVariationByToken(token, { decision, actorName: name, ip, userAgent });
   });
 }

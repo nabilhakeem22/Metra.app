@@ -32,11 +32,13 @@ const SEND_ANSWERS: Readonly<Record<string, (channel: OtpChannel) => ActionResul
   sms_send_failed: () => err('otp_sms_unavailable'),
   email_address_not_authorized: () => err('otp_email_unavailable'),
   email_provider_disabled: () => err('otp_email_unavailable'),
+  // The Turnstile token was missing, invalid, expired or already used (Supabase CAPTCHA on).
+  captcha_failed: () => err('otp_captcha_failed'),
 };
 
 /** A wrong code and an expired one are one answer: Supabase says otp_expired for both (D8). */
 const VERIFY_ANSWERS: Readonly<Record<string, () => ActionResult>> = {
-  ...Object.fromEntries(RATE_LIMITED.map((code) => [code, () => err('otp_rate_limited')])),
+  ...Object.fromEntries(RATE_LIMITED.map((code) => [code, () => err('otp_verify_rate_limited')])),
   otp_expired: () => fieldsFailed({ token: { code: 'otp_verify_failed' } }),
 };
 

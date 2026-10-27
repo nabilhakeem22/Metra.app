@@ -12,12 +12,19 @@ import { loadSourceGraph, SRC_ROOT, srcRelative, type SourceGraph } from './sour
 //   fails on `dynamic = 'error'`) or drags the database chunk into the page.
 // This walks every module the two pages and their layouts load.
 
-/** The pre-rendered pages and the layouts that wrap them. */
+/**
+ * The pre-rendered pages and the layouts that wrap them, the pre-rendered
+ * robots.txt and sitemap.xml, and the 404 (rendered in the Worker for any
+ * unknown path, so it must stay this cheap too).
+ */
 const STATIC_PAGE_ENTRIES = [
   'app/[locale]/layout.tsx',
   'app/[locale]/page.tsx',
   'app/[locale]/(auth)/layout.tsx',
   'app/[locale]/(auth)/login/page.tsx',
+  'app/robots.ts',
+  'app/sitemap.ts',
+  'app/[locale]/not-found.tsx',
 ];
 
 /** Packages a static page must never load. */
@@ -55,7 +62,7 @@ function staticPageOffences(graph: SourceGraph, entries: readonly string[] = STA
   });
 }
 
-describe('the static landing and login pages', () => {
+describe('the static landing and login pages, robots.txt, sitemap.xml and the 404', () => {
   const graph = loadSourceGraph();
 
   it('every entry exists', () => {

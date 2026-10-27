@@ -47,9 +47,10 @@ the flag unset ships nothing and reports nothing.
 ### Static pages are served before the Worker
 
 On the Workers Free plan every Worker request may use 10 ms of CPU, and a
-request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`
-and `/en/login` never reach the Worker: they are static assets, which
-Cloudflare serves before the Worker runs, at no CPU cost.
+request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`,
+`/en/login`, `/robots.txt`, `/sitemap.xml` and the icons never reach the
+Worker: they are static assets, which Cloudflare serves before the Worker runs,
+at no CPU cost.
 
 - `/` is `apps/web/public/index.html`, a tiny page that picks the locale in the
   browser (the `NEXT_LOCALE` cookie, then the browser's languages, then
@@ -59,6 +60,12 @@ Cloudflare serves before the Worker runs, at no CPU cost.
   (OpenNext does not). It runs after the OpenNext build in both workflows and
   fails the build if a page stopped being static. A manual build without it
   still works, but the Worker renders those pages again, 1102s and all.
+- `robots.txt` and `sitemap.xml` are pre-rendered route handlers
+  (`app/robots.ts`, `app/sitemap.ts`). Next writes their bodies to
+  `.next/server/app/robots.txt.body` and `.next/server/app/sitemap.xml.body`,
+  and the same script copies them to `.open-next/assets`. This matters more
+  than CPU: a `robots.txt` that answers 1102 or 5xx makes Google pause crawling
+  the whole site.
 
 Three rules keep this working:
 
@@ -76,6 +83,91 @@ Three rules keep this working:
 3. **Keep both pages free of request-time APIs** (`cookies()`, `headers()`, the
    Supabase server client). They export `dynamic = 'error'`, so the build fails
    rather than quietly rendering them per request.
+
+### Search engines: what may be indexed
+
+Only the two landing pages, `/ar-EG` and `/en`, are indexable. The list lives
+in `apps/web/src/lib/seo/indexable-pages.ts`, and the sitemap, the landing's
+hreflang links and the noindex exemption all read it.
+
+- **Noindex everywhere else.** The middleware sets `X-Robots-Tag: noindex,
+  nofollow` on every response it returns except the landing pages
+  (`src/lib/middleware/response-headers.ts`), the 404 and the redirects
+  included. The login pages are static assets the middleware never sees, so
+  `apps/web/public/_headers` sets the same header on them. Every private page
+  also carries the robots meta (`src/test/private-metadata-coverage.test.ts`).
+- **robots.txt has two groups.** Every crawler, AI crawlers included, may read
+  the landing pages and none may read `/api/` or a signed-in section. Googlebot
+  and Bingbot may also fetch the client links (`/c`, `/d`, `/invite`, `/p`,
+  `/v`): they then see the noindex and drop a leaked link from the index. The
+  login pages stay crawlable for the same reason. A new top-level route folder
+  fails `src/app/robots.test.ts` until it is added to
+  `src/lib/seo/private-paths.ts`.
+- **The sitemap date** is `LANDING_LAST_MODIFIED` in `indexable-pages.ts`, never
+  the build time. Bump it in the PR that changes the landing copy.
+- **Every absolute URL comes from `NEXT_PUBLIC_APP_URL`** (canonical, hreflang,
+  `og:image`, sitemap, robots). Moving to a custom domain needs no code change:
+  add it as a Workers Custom Domain on `metra-web`, set the
+  `NEXT_PUBLIC_APP_URL` Actions variable to it, deploy, then update the Supabase
+  Auth Site URL and redirect URLs. Add the new hostname to the Turnstile widget
+  BEFORE switching (see "Go-live security", owner step 6).
+- **Search Console and Bing verification.** Set the optional Actions variables
+  `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` and/or
+  `NEXT_PUBLIC_BING_SITE_VERIFICATION` to the token alone (the `content` value
+  of the meta tag the console shows you), then deploy. The tag goes into the
+  landing pages and into `/`. A token outside `[A-Za-z0-9_-]`, or shorter than
+  10 or longer than 100 characters, fails the build on purpose, and the error
+  names the variable (usually the whole meta tag was pasted). Blank means no
+  tag.
+
+### Security headers: who owns which
+
+Every page response carries the same security headers, from ONE module, on two
+paths:
+
+- **Worker responses** get them in the middleware (`src/middleware.ts`), the one
+  hook that also adds the noindex header. The values, and which of three
+  profiles a path gets, live in `src/lib/http/security-headers.ts`; the CSP
+  directives live in `src/lib/http/content-security-policy.ts`.
+  - `page`: HSTS (`max-age=31536000; includeSubDomains`), `nosniff`,
+    `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
+    a `Permissions-Policy`, an ENFORCED CSP and a Report-Only CSP.
+  - `token_page` (`/c`, `/d`, `/invite`, `/p`, `/v` and everything under them):
+    the same, with `Referrer-Policy: no-referrer`, so the token in the path never
+    rides a Referer header to another site.
+  - `file` (a client-page picture or document): HSTS, `nosniff`, `DENY` and
+    `no-referrer` only. No CSP: `object-src 'none'` on an inline PDF risks
+    Chrome's PDF viewer.
+- **Static assets** (`/`, the landing and login pages, `/_next/static`, icons)
+  never reach the Worker. The `/*` block at the top of `apps/web/public/_headers`
+  carries the same `page` set. `src/test/static-headers.test.ts` fails if that
+  block differs from the module, or if any other block sets one of its header
+  names (Cloudflare comma-joins a header two matching rules both set, which
+  would break the policy).
+- **`/api/*`** is outside the middleware. The Public API adds `cache-control:
+  no-store` and `x-content-type-options: nosniff` to every answer itself.
+
+**The CSP is two policies on purpose (owner decision D1).** The enforced one has
+only the four directives that cannot break a Next app (`frame-ancestors 'none';
+base-uri 'self'; object-src 'none'; form-action 'self'`). The full fetch policy
+is `Content-Security-Policy-Report-Only`, with no report endpoint: a violation
+only shows in the browser console. Once a console walk of every flow and a week
+of real use show none, the follow-up moves it into the enforced header (one
+constant plus the `_headers` line). Rolling back an enforced directive is the
+same edit the other way. Only the login pages' Report-Only `script-src` and
+`frame-src` name `https://challenges.cloudflare.com`: the sign-in Turnstile
+widget's `api.js` and its iframe (`src/lib/auth/turnstile.ts`). They are static
+assets, so the `/:locale/login` block of `public/_headers` detaches the `/*`
+Report-Only policy and sets its own; every other page and asset omits the
+origin.
+
+**Never give the login pages `Referrer-Policy: no-referrer`.** Turnstile checks
+the hostname that embeds the widget; the login keeps
+`strict-origin-when-cross-origin` (the `/*` block of `public/_headers`).
+
+**Never add a security header in `next.config.mjs` `headers()`.** OpenNext gives
+those PRIORITY over middleware headers, so a global `Referrer-Policy` there
+would silently overwrite the token routes' `no-referrer`.
 
 ### Two things that were fixed to get here
 
@@ -106,7 +198,7 @@ History, so the setup is not accidentally reverted.
 Auto-deploy is already on; what follows is the recovery procedure, not a to-do.
 In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 
-#### Variables tab → New repository variable (7)
+#### Variables tab → New repository variable (7, plus 3 optional)
 
 | Name | Value |
 |------|-------|
@@ -116,6 +208,9 @@ In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 | `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
 | `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
 | `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | optional: the Search Console token alone (see "Search engines" above) |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | optional: the Bing Webmaster `msvalidate.01` token alone |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | optional: the Turnstile SITE key (never the secret); blank = no widget. Once Supabase CAPTCHA is on it is REQUIRED: removing it stops every email sign-in |
 | `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
 
 #### Secrets tab → New repository secret (1)
@@ -338,6 +433,167 @@ If you do it anyway:
 Signed links a paid client opens live 300 seconds, so after a link is replaced
 or revoked a document URL minted just before still works for up to five
 minutes (accepted, Round C S4).
+
+## Go-live security: what the app does, and the owner steps
+
+The go-live security PR closed these app-side. Nothing here runs by itself:
+every owner step below is done by hand, once.
+
+**What the app now does**
+
+- **Sign-in codes are throttled before Supabase is called.** Supabase sees the
+  Worker's address, not the visitor's, so its own per-IP limits act as one
+  global bucket. Two Workers Rate Limiting bindings are the per-person control
+  (`apps/web/src/lib/auth/otp-throttle.ts`, ceilings in `wrangler.jsonc` only):
+  `AUTH_OTP_IP_RATE_LIMITER` (namespace 1007, 10 per 60 s per step and caller
+  IP, an IPv6 caller by its /64) and `AUTH_OTP_IDENTIFIER_RATE_LIMITER`
+  (namespace 1008, 15 per 60 s per step and address; the key is a sha256 prefix,
+  never the address). Past either: 429 `otp_rate_limited` with `retry-after: 60`
+  (`otp_verify_rate_limited` on a code check: "type the code again", since the
+  code held is still good). Send and verify are separate buckets. The
+  per-address ceiling stays above the per-IP one, so one source alone cannot
+  lock a named address out of sign-in. The address or phone is made canonical
+  once (lower-case address; phone as `+` and its digits, dropping only spaces,
+  dashes, dots and brackets), and that one string is both the bucket key and
+  what Supabase receives. A phone with anything else in it (a letter O for a
+  zero, `ext 9`) is refused as `phone_format` and never sent.
+  Like every binding it counts per data centre, and a binding **missing** on
+  Cloudflare makes sign-in answer 500, by design.
+- **Sign-in sends carry a Turnstile token** (security test T3), once the
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` Actions variable is set. The login page shows
+  a Managed widget, interaction-only (most people see nothing), and each send
+  (Resend included) takes a fresh single-use token. Our route only passes it to
+  Supabase (`options.captchaToken`); Supabase checks it with the secret key in
+  its own dashboard, so a script calling Supabase's `/auth/v1/otp` directly is
+  challenged too. The Worker holds no Turnstile secret and never calls
+  siteverify. Supabase refusing the token answers `otp_captcha_failed`; a
+  Turnstile outage fails CLOSED (the referenced `generic`), and signed-in
+  sessions are unaffected. Verify sends no token: Supabase does not challenge
+  it. Without the variable there is no widget, no script, and the send body is
+  exactly what it was. The login page stays a static asset: the key is inlined
+  into its client chunk at build time.
+  **Local dev:** Cloudflare's always-pass test key `1x00000000000000000000AA`
+  shows the widget locally, but once CAPTCHA is on in Supabase its dummy token
+  is refused by the shared project. To sign in from `next dev` against the
+  shared project, use the real site key with `localhost` added to the widget
+  (owner decision D4).
+- **Daily email caps per studio** (`apps/web/src/lib/email/daily-caps.ts`,
+  owner decision D4): 20 team invite emails and 60 client emails (proposal sends
+  plus delivery reminder emails) per rolling 24 hours, counted from rows the app
+  already writes. The cap gates the EMAIL: an invite, a resend or a proposal send
+  still happens and its link is shown to copy. Only the delivery reminder, where
+  the email is the action, refuses with "today's email limit". The cap is a lock:
+  a request that cannot take it within the 5 s lock timeout answers "busy, try
+  again" and writes and sends nothing. Only a count that fails lets the email go
+  (logged).
+- **Session cookies** are HttpOnly, SameSite=Lax, Path=/, Secure in production,
+  and live **30 days, rolling** (owner decision D2): every token refresh
+  rewrites them, so only 30 days without a visit forces a new sign-in.
+  `@supabase/ssr` 0.5.2 forces 400 days whatever its options say, so the
+  attributes are imposed in our own `setAll`
+  (`apps/web/src/lib/supabase/session-cookie.ts`). Existing sessions pick them up
+  on their next refresh.
+- **The BOQ template** needs `boq_build:create` and leaves the unit cost blank
+  for anyone who may not see margin; its cells are formula-guarded.
+- **PDF renders cannot reach the network** (only `data:` and `about:` requests).
+- **Internal document links** live 300 seconds.
+- **Acceptance records** keep the IP Cloudflare saw (`cf-connecting-ip`), never a
+  forwarded hop the client wrote.
+- **Version preview URLs are off** (`preview_urls: false`); workers.dev stays on,
+  it is the production origin.
+
+**Owner steps** (in this order where it matters):
+
+1. **Hyperdrive caching: already off; record only.** Config
+   `acc17973ea6847328d6b523bb54953f0` has `caching.disabled: true` (checked Oct
+   27 2026). It must stay off: tenant isolation rides on per-transaction
+   settings that no cache key can see. If the config is ever re-created:
+   `npx wrangler hyperdrive update acc17973ea6847328d6b523bb54953f0 --caching-disabled`.
+2. **Bucket size limit** (Supabase SQL editor; safe to run twice):
+   ```sql
+   update storage.buckets set file_size_limit = 52428800 where id = 'metra-files';
+   select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'metra-files';
+   -- expect: metra-files | false | 52428800 | null
+   ```
+   Dashboard equivalent: Storage, `metra-files`, Edit bucket, Restrict file
+   upload size = 50 MB. Do NOT set `allowed_mime_types` here (see the optional
+   task above for why). Until this is done, the Worker logs
+   `files bucket has no file size limit` once per isolate on the first upload.
+   The limit bounds one object, not one studio: on the Free plan about twenty
+   50 MB files fill the whole project.
+3. **Supabase Auth rate limits** (Dashboard, Authentication, Rate Limits). First
+   read the `ip` column of recent sign-ins in the Auth logs: if a handful of
+   Cloudflare addresses carry everyone, Supabase's per-IP buckets are global.
+   Then set sign-ups and sign-ins 150 per 5 minutes, token verifications 150 per
+   5 minutes, emails sent 100 per hour. That 100 per hour is the cap of
+   Supabase's built-in mailer, for the whole project: one source sending codes
+   to different addresses can use it up in about ten minutes, and then nobody
+   can sign in by email (security test T3). Custom SMTP (Resend) raises it; the
+   real fix is Turnstile (step 6), a go-live blocker.
+4. **Supabase Auth settings**: email OTP expiry 600 s, OTP length 6, the email
+   template sends `{{ .Token }}`, and the phone provider OFF unless SMS is really
+   used (otherwise spend caps and geo-permissions limited to Egypt).
+5. **After the deploy**: Cloudflare dashboard, Workers, `metra-web`, Settings,
+   Domains and Routes: Preview URLs disabled, workers.dev enabled. Then
+   Settings, Bindings: `AUTH_OTP_IP_RATE_LIMITER` and
+   `AUTH_OTP_IDENTIFIER_RATE_LIMITER` are listed (`wrangler deploy` creates them
+   from `wrangler.jsonc`; nothing to create by hand).
+6. **Turnstile (T3), in EXACTLY this order.** Enabling CAPTCHA in Supabase
+   before the deploy, or shipping a build without the site key while it is on,
+   stops every email sign-in.
+   1. **Cloudflare dashboard, Turnstile, Add widget.** Name `Metra sign-in`.
+      Hostnames: `metra-web.nabil-hakeem22.workers.dev` only (never
+      `workers.dev` on its own; `localhost` only if you sign in from local dev,
+      D4). Widget Mode **Managed**, Pre-clearance **No**, Create. Copy the
+      **Site Key** and the **Secret Key** somewhere private. The secret goes
+      ONLY into Supabase (step 6.5): never into GitHub, wrangler or a chat.
+   2. **GitHub, the repo, Settings, Secrets and variables, Actions, Variables.**
+      New repository variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = the **Site
+      Key**. A secret-shaped value fails the build on purpose, naming the
+      variable.
+      If the build fails naming this variable, the **Secret** was pasted by
+      mistake: the variable is stored in plain text and its value shows in the
+      Actions logs, so treat the secret as burned. Delete the variable's value,
+      rotate the secret key on the Turnstile widget (dashboard, the widget,
+      Rotate secret key), paste the new secret into Supabase (step 6.5), then
+      set the variable to the Site Key.
+   3. **Merge and deploy the Turnstile PR.** Watch the deploy workflow go green.
+   4. **Smoke test, CAPTCHA still OFF in Supabase:** open `/ar-EG/login` in a
+      private window on a phone (or 390 px DevTools) and sign in end to end; in
+      DevTools, Network, the `send` request body contains `captchaToken`;
+      Console: no Turnstile error (code 110200 means the hostname is missing
+      from the widget). Wait at least 10 minutes after the deploy before step
+      6.5, so login tabs opened before it have reloaded.
+   5. **Supabase dashboard, Authentication, Attack Protection** (older
+      dashboards: Settings, Bot and Abuse Protection): Enable CAPTCHA
+      protection, provider **Turnstile by Cloudflare**, paste the **Secret
+      Key**, Save. No `wrangler secret put` is needed: the Worker never holds
+      the secret.
+   6. **(Optional, recommended) Custom SMTP (Resend)** in Supabase Auth, to lift
+      the built-in mailer's 100 emails per hour (T3).
+   7. **Smoke test, CAPTCHA ON:** email sign-in end to end in both locales
+      (phone too, if SMS is on). The verify step must succeed. Then
+      ```bash
+      curl -s -X POST https://metra-web.nabil-hakeem22.workers.dev/api/auth/otp/send \
+        -H "origin: https://metra-web.nabil-hakeem22.workers.dev" \
+        -H "content-type: application/json" \
+        -d '{"channel":"email","identifier":"<your address>"}'
+      ```
+      must answer `{"ok":false,"error":"otp_captcha_failed"}`, and no email
+      arrives.
+   8. **Rollback, if step 6.7 fails:** turn CAPTCHA OFF in Supabase (instant),
+      and send the lead the exact failure (send or verify). Never remove the
+      GitHub variable while CAPTCHA is on: that stops every email sign-in.
+   9. **Custom domain, later:** add the new hostname to the same widget BEFORE
+      switching DNS or `NEXT_PUBLIC_APP_URL`. The keys do not change and no
+      redeploy is needed for Turnstile.
+7. **Supabase Pro before the first paying studio.** On Free, 1 GB of storage and
+   5 GB of egress are shared by every studio, and there is no per-studio quota
+   yet.
+8. **When a custom domain arrives** (its own PR): add the new hostname to the
+   Turnstile widget BEFORE switching (step 6.9), then `workers_dev: false`,
+   update `NEXT_PUBLIC_APP_URL` and the cron `APP_ORIGIN`, then the zone's HSTS,
+   Always Use HTTPS and minimum TLS 1.2.
 
 ## Supabase Free plan: no Storage image transformations
 

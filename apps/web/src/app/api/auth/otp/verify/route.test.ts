@@ -46,11 +46,17 @@ describe('POST /api/auth/otp/verify', () => {
     expect(dynamic).toBe('force-dynamic');
   });
 
-  it('a member lands on the dashboard, with the session cookies written', async () => {
+  it('a member lands on the dashboard, with the session cookies written hardened (S5)', async () => {
     expect(await verify(EMAIL_CODE)).toEqual({ status: 200, body: { ok: true, next: '/dashboard' } });
     expect(doubles.supabaseAuth.verifyOtp).toHaveBeenCalledWith({ email: 'mona@firm.example', token: '123456', type: 'email' });
     expect(doubles.withUserContext).toHaveBeenCalledWith('user-1', expect.any(Function));
-    expect(doubles.writtenCookies).toEqual(doubles.SESSION_COOKIES);
+    expect(doubles.writtenCookies).toEqual(doubles.WRITTEN_SESSION_COOKIES);
+  });
+
+  it('a captchaToken in the body never reaches Supabase: verify is not challenged (AC8)', async () => {
+    const body = JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '123456', captchaToken: 'tok' });
+    expect((await verify(body)).body).toEqual({ ok: true, next: '/dashboard' });
+    expect(doubles.supabaseAuth.verifyOtp.mock.calls[0]![0]).toStrictEqual({ email: 'mona@firm.example', token: '123456', type: 'email' });
   });
 
   it('a user without a workspace lands on onboarding', async () => {
@@ -62,7 +68,7 @@ describe('POST /api/auth/otp/verify', () => {
     doubles.withUserContext.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
     expect(await verify(EMAIL_CODE)).toEqual({ status: 200, body: { ok: true, next: '/dashboard' } });
     expect(logged).toHaveBeenCalledWith('resolvePostLoginPath failed:', expect.anything());
-    expect(doubles.writtenCookies).toEqual(doubles.SESSION_COOKIES);
+    expect(doubles.writtenCookies).toEqual(doubles.WRITTEN_SESSION_COOKIES);
   });
 
   it('a verify with no user in its answer goes to the dashboard and is logged', async () => {

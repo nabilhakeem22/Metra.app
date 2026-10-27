@@ -44,9 +44,18 @@ export async function createSignedObjectUrl(
 }
 
 /**
- * Returns a time-limited signed download URL for a file, but ONLY if the file
- * belongs to the caller's org — the lookup runs under RLS, so an org-B context
- * cannot resolve (and therefore cannot sign) an org-A file.
+ * How long an internal (studio) signed download link lives: 5 minutes (S10,
+ * go-live security). Every caller mints on click and opens the link at once, and
+ * Storage checks the token when the download STARTS, so a long file still
+ * finishes. A leaked link (history, a shared screen) is dead minutes later.
+ */
+export const INTERNAL_SIGNED_URL_TTL_SECONDS = 300;
+
+/**
+ * Returns a signed download URL for a file, valid for
+ * INTERNAL_SIGNED_URL_TTL_SECONDS, but ONLY if the file belongs to the caller's
+ * org: the lookup runs under RLS, so an org-B context cannot resolve (and
+ * therefore cannot sign) an org-A file.
  *
  * `download` is the name the browser saves as, and passing it is what makes
  * Storage answer `Content-Disposition: attachment` instead of serving the bytes
@@ -56,7 +65,7 @@ export async function createSignedObjectUrl(
 export async function getSignedUrl(
   ctx: OrgContext,
   fileId: string,
-  opts: { ttlSeconds?: number; download?: string } = {},
+  opts: { download?: string } = {},
 ): Promise<string> {
   const rows = await withOrgContext(ctx, (tx) =>
     tx
@@ -70,7 +79,7 @@ export async function getSignedUrl(
     throw new Error('File not found in this org');
   }
 
-  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, opts.ttlSeconds ?? 3600, {
+  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, INTERNAL_SIGNED_URL_TTL_SECONDS, {
     download: opts.download,
   });
 }

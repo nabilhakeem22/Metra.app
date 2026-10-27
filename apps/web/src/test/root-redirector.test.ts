@@ -39,10 +39,17 @@ describe('the "/" locale redirector (public/index.html)', () => {
     expect(context.LOCALE_COOKIE_NAME).toBe(LOCALE_COOKIE_NAME);
   });
 
-  it('declares the default locale document and both hreflang alternates', () => {
+  it('declares the default locale document with a title', () => {
     expect(html).toContain(`<html lang="${routing.defaultLocale}" dir="rtl">`);
-    expect(html).toContain(`<link rel="canonical" href="/${routing.defaultLocale}">`);
-    for (const locale of LOCALES) expect(html).toContain(`<link rel="alternate" hreflang="${locale}" href="/${locale}">`);
+    expect(html).toContain('<title>ميترا · Metra</title>');
+  });
+
+  // A JS redirector cannot carry a canonical or hreflang consistent with where
+  // it sends a crawler (an English Googlebot lands on /en), and relative
+  // hreflang links are invalid anyway. The landing pages carry them instead.
+  it('declares no canonical and no hreflang alternates', () => {
+    expect(html).not.toMatch(/rel="canonical"/);
+    expect(html).not.toMatch(/hreflang=/);
   });
 
   it.each<[string, Visit, string]>([

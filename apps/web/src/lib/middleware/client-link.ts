@@ -37,9 +37,3 @@ export function clientLinkResponse(request: NextRequest, locale: Locale): NextRe
   }
   return response;
 }
-
-/** Keep a share token in the path from riding a Referer header to another origin. */
-export function withNoReferrer(response: NextResponse): NextResponse {
-  response.headers.set('Referrer-Policy', 'no-referrer');
-  return response;
-}

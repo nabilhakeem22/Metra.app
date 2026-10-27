@@ -32,9 +32,13 @@ const ALL_CODES: ActionCode[] = [
   'invite_not_found',
   'otp_verify_failed',
   'otp_rate_limited',
+  'otp_verify_rate_limited',
   'rate_limited',
+  'daily_email_cap_reached',
   'otp_sms_unavailable',
   'otp_email_unavailable',
+  'otp_captcha_failed',
+  'otp_captcha_pending',
   'immutable',
   'code_required',
   'code_taken',
@@ -226,6 +230,13 @@ describe('problem+json envelope', () => {
     expect(res.headers.get('retry-after')).toBe('60');
     const json = (await res.json()) as { status: number };
     expect(json.status).toBe(429);
+  });
+
+  it('is never cached and never sniffed (go-live security)', () => {
+    for (const res of [problemResponse('internal'), problemFromActionCode('forbidden'), problemResponse('rate-limited', { headers: { 'retry-after': '60' } })]) {
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    }
   });
 });
 

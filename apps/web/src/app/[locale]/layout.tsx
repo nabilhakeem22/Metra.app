@@ -4,7 +4,7 @@ import { Manrope, Tajawal } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
-import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
+import { dirFor, isLocale } from '@/i18n/routing';
 import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '../globals.css';
@@ -46,6 +46,14 @@ export async function generateMetadata({
       template: `%s · ${siteName}`,
     },
     description: t('description'),
+    // Static files in public/, so a favicon probe never reaches the Worker.
+    icons: {
+      icon: [
+        { url: '/favicon.ico', sizes: '48x48' },
+        { url: '/icon.svg', type: 'image/svg+xml' },
+      ],
+      apple: '/apple-touch-icon.png',
+    },
   };
 }
 
@@ -57,7 +65,7 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  if (!LOCALES.includes(locale as Locale)) {
+  if (!isLocale(locale)) {
     notFound();
   }
   // The locale from the path, so a page can be pre-rendered without reading the
