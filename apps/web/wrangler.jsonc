@@ -9,6 +9,11 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
+  // workers.dev stays ON: it is the production origin until a custom domain
+  // arrives (then false, with NEXT_PUBLIC_APP_URL and the cron APP_ORIGIN).
+  "workers_dev": true,
+  // Version preview URLs OFF: they would serve old builds with production secrets.
+  "preview_urls": false,
   // Assets-first is LOAD-BEARING: the landing and login pages are pre-rendered
   // HTML served before the Worker runs. Never set run_worker_first or
   // not_found_handling here (src/test/wrangler-assets.test.ts, docs/DEPLOY.md).
@@ -16,7 +21,10 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Runtime Postgres reaches Supabase through Hyperdrive (pooling + edge cache).
+  // Runtime Postgres reaches Supabase through Hyperdrive, for pooling only. Query
+  // caching is DISABLED on this config (caching.disabled true, checked Oct 27
+  // 2026) and must stay off: tenant isolation rides on per-transaction GUCs that
+  // no cache key can see (src/test/wrangler-hostnames.test.ts).
   // `id` is the real `metra-db` Hyperdrive config (Supabase session pooler,
   // aws-1-eu-west-1, :5432). `localConnectionString` is ONLY used by `wrangler
   // dev` local emulation and MUST point at a throwaway local Postgres, never the
