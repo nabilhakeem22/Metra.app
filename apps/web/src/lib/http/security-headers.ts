@@ -10,7 +10,8 @@ import { ENFORCED_CSP, reportOnlyCsp } from './content-security-policy';
 //   - lib/seo/robots-header.ts (SEO): X-Robots-Tag, not touched here;
 //   - src/middleware.ts: the ONE hook applying both to every Worker page response;
 //   - public/_headers: the ONE static-asset file; its `/*` block must equal
-//     STATIC_ASSET_SECURITY_HEADERS (src/test/static-headers.test.ts).
+//     STATIC_ASSET_SECURITY_HEADERS, and its login block must carry
+//     LOGIN_ASSET_REPORT_ONLY_CSP (src/test/static-headers.test.ts).
 // /api/* is not covered (the middleware matcher excludes it); the Public API's
 // own two headers are in lib/api/errors.ts.
 //
@@ -52,6 +53,10 @@ export function securityHeadersFor(profile: SecurityHeaderProfile, extraOrigins:
 
 /** securityHeadersFor('page', []): what the public/_headers block for /* must say. */
 export const STATIC_ASSET_SECURITY_HEADERS: Readonly<Record<string, string>> = securityHeadersFor('page', []);
+
+/** The Report-Only policy of the static login pages, the only pages with the Turnstile widget (the
+ *  /:locale/login block of public/_headers detaches the /* copy and sets this one). */
+export const LOGIN_ASSET_REPORT_ONLY_CSP = reportOnlyCsp([], { turnstile: true });
 
 /** The Supabase project origin (inlined at build), or none when unset or unparsable; never a throw. */
 function supabaseOrigins(): string[] {

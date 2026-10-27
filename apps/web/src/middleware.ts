@@ -45,11 +45,12 @@ async function routeResponse(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Everything except API routes and Next's own files, so every response the
-  // Worker renders, a missing file's 404 included (/nope.png, /og/x.png), gets
-  // the security and noindex headers. The files public/ ships never reach it on
+  // Everything except the API and Next's own files, matched as whole path
+  // segments (/apix, /api-docs.html and /_nextfoo are ours to 404 with headers),
+  // so every response the Worker renders, a missing file's 404 included
+  // (/nope.png, /og/x.png), gets the security and noindex headers. The files public/ ships never reach it on
   // Cloudflare: they are static assets, served before the Worker runs (and
   // public/_headers gives them the static set). src/middleware-matcher.test.ts
   // compiles this with Next's own matcher.
-  matcher: ['/((?!api|_next|_vercel).*)'],
+  matcher: ['/((?!api(?:/|$)|_next/|_vercel/).*)'],
 };

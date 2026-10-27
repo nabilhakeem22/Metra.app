@@ -64,6 +64,11 @@ describe('withSecurityHeaders', () => {
     expect(response.headers.get('content-security-policy-report-only')).toBe(reportOnlyCsp(['https://ref.supabase.co']));
   });
 
+  it.each(['/en/dashboard', '/en/login', '/ar-EG/d/abc', '/nope.png'])('gives %s no Turnstile origin: only the static login assets use the widget', (path) => {
+    const policy = withSecurityHeaders(NextResponse.next(), path).headers.get('content-security-policy-report-only');
+    expect(policy).not.toContain('challenges.cloudflare.com');
+  });
+
   it('replaces a header a branch already set, never comma-joins it', () => {
     const response = NextResponse.next();
     response.headers.set('Referrer-Policy', 'no-referrer');

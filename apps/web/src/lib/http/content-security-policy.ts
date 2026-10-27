@@ -19,7 +19,8 @@ import { TURNSTILE_ORIGIN } from '@/lib/auth/turnstile';
 // blob: images are logo previews; data: fonts are the proposal preview's srcDoc
 // iframe, which inherits this policy; 'unsafe-inline' scripts are the Next RSC
 // payload and the public/index.html locale redirector. The Turnstile origin in
-// script-src and frame-src is the sign-in widget's api.js and its iframe.
+// script-src and frame-src is the sign-in widget's api.js and its iframe; only
+// the login pages use it, so only their policy carries it ({ turnstile: true }).
 
 /** Enforced now: cannot break a Next app with inline scripts. frame-ancestors only works when enforced. */
 export const ENFORCED_CSP = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'";
@@ -29,16 +30,18 @@ interface Directive {
   sources: string;
   /** Takes the extra origins (the Supabase project) after its own sources. */
   extraOrigins?: true;
+  /** Takes the Turnstile origin, for the login pages only. */
+  turnstile?: true;
 }
 
 const REPORT_ONLY_DIRECTIVES: readonly Directive[] = [
   { name: 'default-src', sources: "'self'" },
-  { name: 'script-src', sources: `'self' 'unsafe-inline' ${TURNSTILE_ORIGIN}` },
+  { name: 'script-src', sources: "'self' 'unsafe-inline'", turnstile: true },
   { name: 'style-src', sources: "'self' 'unsafe-inline'" },
   { name: 'img-src', sources: "'self' data: blob:", extraOrigins: true },
   { name: 'font-src', sources: "'self' data:" },
   { name: 'connect-src', sources: "'self'", extraOrigins: true },
-  { name: 'frame-src', sources: `'self' ${TURNSTILE_ORIGIN}` },
+  { name: 'frame-src', sources: "'self'", turnstile: true },
   { name: 'worker-src', sources: "'self'" },
   { name: 'manifest-src', sources: "'self'" },
   { name: 'base-uri', sources: "'self'" },
@@ -47,8 +50,8 @@ const REPORT_ONLY_DIRECTIVES: readonly Directive[] = [
 ];
 
 /** Report-Only until D1 flips it. extraOrigins = [Supabase origin] on Worker pages, [] on static assets. */
-export function reportOnlyCsp(extraOrigins: readonly string[]): string {
-  return REPORT_ONLY_DIRECTIVES.map(({ name, sources, extraOrigins: takesExtra }) =>
-    [name, sources, ...(takesExtra ? extraOrigins : [])].join(' '),
+export function reportOnlyCsp(extraOrigins: readonly string[], { turnstile = false }: { turnstile?: boolean } = {}): string {
+  return REPORT_ONLY_DIRECTIVES.map(({ name, sources, extraOrigins: takesExtra, turnstile: takesTurnstile }) =>
+    [name, sources, ...(takesTurnstile && turnstile ? [TURNSTILE_ORIGIN] : []), ...(takesExtra ? extraOrigins : [])].join(' '),
   ).join('; ');
 }

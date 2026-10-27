@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest';
 // with a dot, so a dotted page path (/en/d/xxxx.yyyy) rendered with no security
 // or noindex header, and framed; then it skipped public/'s files by pattern, so
 // a MISSING /nope.png still did. It now skips only Next's own files and the
-// API. The files public/ ships are static assets on Cloudflare, served before
+// API, each as a WHOLE path segment (L1: /apix and /_nextfoo are not the API or
+// Next's). The files public/ ships are static assets on Cloudflare, served before
 // the Worker (src/test/wrangler-assets.test.ts); in next dev and next start
 // they come after the middleware, which must pass them through untouched. The
 // matcher is compiled here by Next's own function, exactly as the build
@@ -62,7 +63,7 @@ describe('the middleware matcher (T6, F3)', () => {
     },
   );
 
-  it.each(['/_next/static/chunks/main.js', '/_next/image', '/api/v1/projects', '/api/auth/otp/send'])('skips %s', (path) => {
+  it.each(['/_next/static/chunks/main.js', '/_next/image', '/_vercel/insights/script.js', '/api', '/api/', '/api/v1/projects', '/api/auth/otp/send'])('skips %s', (path) => {
     expect(runsMiddleware(path)).toBe(false);
   });
 
@@ -75,11 +76,25 @@ describe('the middleware matcher (T6, F3)', () => {
     '/en/projects/x.y',
     '/en/d/picture.png',
     '/nope.xyz',
+    '/apix',
+    '/api-docs.html',
+    '/apiary/x.png',
+    '/_nextfoo',
+    '/_vercel.png',
     '/en',
     '/en/dashboard',
   ])('runs on %s', (path) => {
     expect(runsMiddleware(path)).toBe(true);
   });
+
+  it.each(['/apix', '/api-docs.html', '/apiary/x.png', '/_nextfoo', '/_vercel.png'])(
+    'gives %s, a path that only starts like an excluded one, its 404 the page security set and noindex (L1)',
+    async (path) => {
+      const response = await middleware(new NextRequest(`https://app.test${path}`));
+      for (const [name, value] of pageHeaders('page')) expect(response.headers.get(name), name).toBe(value);
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    },
+  );
 
   it('gives a dotted token path the token-page security set and noindex', async () => {
     const response = await middleware(new NextRequest('https://app.test/en/d/xxxxxxx.yyyy'));

@@ -154,9 +154,12 @@ is `Content-Security-Policy-Report-Only`, with no report endpoint: a violation
 only shows in the browser console. Once a console walk of every flow and a week
 of real use show none, the follow-up moves it into the enforced header (one
 constant plus the `_headers` line). Rolling back an enforced directive is the
-same edit the other way. The Report-Only `script-src` and `frame-src` name
-`https://challenges.cloudflare.com`: the sign-in Turnstile widget's `api.js` and
-its iframe (`src/lib/auth/turnstile.ts`).
+same edit the other way. Only the login pages' Report-Only `script-src` and
+`frame-src` name `https://challenges.cloudflare.com`: the sign-in Turnstile
+widget's `api.js` and its iframe (`src/lib/auth/turnstile.ts`). They are static
+assets, so the `/:locale/login` block of `public/_headers` detaches the `/*`
+Report-Only policy and sets its own; every other page and asset omits the
+origin.
 
 **Never give the login pages `Referrer-Policy: no-referrer`.** Turnstile checks
 the hostname that embeds the widget; the login keeps
@@ -548,6 +551,12 @@ every owner step below is done by hand, once.
       New repository variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = the **Site
       Key**. A secret-shaped value fails the build on purpose, naming the
       variable.
+      If the build fails naming this variable, the **Secret** was pasted by
+      mistake: the variable is stored in plain text and its value shows in the
+      Actions logs, so treat the secret as burned. Delete the variable's value,
+      rotate the secret key on the Turnstile widget (dashboard, the widget,
+      Rotate secret key), paste the new secret into Supabase (step 6.5), then
+      set the variable to the Site Key.
    3. **Merge and deploy the Turnstile PR.** Watch the deploy workflow go green.
    4. **Smoke test, CAPTCHA still OFF in Supabase:** open `/ar-EG/login` in a
       private window on a phone (or 390 px DevTools) and sign in end to end; in

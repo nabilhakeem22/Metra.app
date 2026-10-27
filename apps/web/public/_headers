@@ -6,8 +6,10 @@
 # The /* block belongs to SECURITY: it must equal STATIC_ASSET_SECURITY_HEADERS
 # in src/lib/http/security-headers.ts, and no other block may set one of its
 # header names (Cloudflare comma-joins a header two matching rules both set).
-# Every other block belongs to SEO. The login pages are pre-rendered assets, so
-# their noindex is set here. No rule that sets X-Robots-Tag may match /, /ar-EG,
+# One exception: the login block detaches the /* Report-Only policy and sets
+# LOGIN_ASSET_REPORT_ONLY_CSP, the same policy plus the Turnstile origin, so
+# only the login pages allow the widget. Every other block belongs to SEO. The
+# login pages are pre-rendered assets, so their noindex is set here. No rule that sets X-Robots-Tag may match /, /ar-EG,
 # /en, /robots.txt or /sitemap.xml (src/test/static-headers.test.ts).
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
@@ -16,6 +18,8 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()
   Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
 /:locale/login
   X-Robots-Tag: noindex, nofollow
+  ! Content-Security-Policy-Report-Only
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'

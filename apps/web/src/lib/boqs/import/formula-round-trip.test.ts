@@ -43,6 +43,14 @@ describe('the template formula guard', () => {
     expect(reimported("'-5 with apostrophe").ok[0]?.description).toBe("'-5 with apostrophe");
   });
 
+  it.each([[' '], ['\u00a0'], ['\n'], ['\ufeff'], [' \n ']])(
+    'gives back an apostrophe typed after leading whitespace %j, the importer trimming the name first',
+    (lead) => {
+      expect(reimported(`${lead}'-=,x`).ok[0]?.description).toBe("'-=,x");
+      expect(reimported(`${lead}=HYPERLINK("http://x")`).ok[0]?.description).toBe(FORMULA_NAME);
+    },
+  );
+
   it('reads a guarded number cell as the number', () => {
     const { grid } = decodeCsv("Description,Unit,Qty,Unit price\r\nWalls,sqm,'-2,10\r\n");
     const result = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));
