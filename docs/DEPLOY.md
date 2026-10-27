@@ -5251,7 +5251,7 @@ Why this order, one sentence each:
 
 | Object | Change |
 |---|---|
-| `design_engagements` | one column, `client_codes_reset_at` (empty on every row, no default): when an owner or admin last reset the client's one-time codes on that delivery. Written only by `app_client_codes_reset` below; `metra_app` may not update it |
+| `design_engagements` | one column, `client_codes_reset_at` (empty on every row, no default): when an owner or admin last reset the client's one-time codes on that delivery. Written only by `app_client_codes_reset` below; `metra_app` may not update it (it holds the table's SELECT and INSERT, as on every other column of this table) |
 | `client_verification_codes` | one partial index, `client_verification_codes_unused_created_idx` (the codes never used, or never sent, by when they were made): the code request removes such codes 90 days after they expired, and reads them through it without walking past the used ones, which stay as evidence |
 | `app_home_code_issue_by_token` | a new form without the code id the app used to make (the old one is dropped). The limits: 60 s and 5 an hour for one payment, 15 wrong tries on its codes in an hour, **10 codes a delivery a day** (counted from the studio's last reset), 25 a studio a day and 80 across the platform; a code whose email failed counts only toward its payment's 60 s. A refusal names the limit that fired; a lock wait on any table answers `busy`. Its `ok` answer carries, for the server only, the code's row, the studio's two names, the document's number and whether this code is the one that took the platform's day to half its 80 |
 | `app_client_code_check` (internal) | a new form: it checks the code against the NEWEST code of the payment it is for (a client back from the email, or after a reload, can still type it) |
@@ -5670,6 +5670,84 @@ Leave the database alone: the older Worker runs on it (see THE ORDER).
 **(2) The column and the index:** never needed (neither changes an answer).
 If the lead ever wants them gone, it is a new migration, never a hand edit
 here.
+
+**Rehearsed** (the H5 fix round, Oct 27). Every command and SQL block above
+was run as written, at `52ac1ae4` (the branch at `209e8057`, this runbook
+before this note), on a local PostgreSQL 17 database (UTF8) built in
+production's own order: Supabase's API roles and default grants simulated
+first; then `main`'s database code at `0f9cb2db` (`db:migrate`,
+`db:apply-rls`, `seed`); DB step S from `992bca1e`; DB step B's
+`db:apply-rls` from `65c78473`; DB step C from `bab6de80` (`npm ci`,
+`db:migrate`, then `main`'s own `db:apply-rls`) and `assert-schema-applied`;
+then data written by `main`'s own cores (three studios: deliveries at every
+execution stage, a client's claim, change orders approved, internal and
+expired, a final account, a termination, contracts no delivery stands behind)
+and a bulk of ten studios: 2,023 contracts, 21 deliveries, 66 migrations, no
+code. The runs used a fresh clone standing in for `merta-main` (its own
+`npm ci`, `origin` on GitHub): the PowerShell cut from this section with
+three substitutions only (the checkout path, the Desktop path, and the
+connection set in the session in place of `.env`), the SQL from the saved
+copy, each block on its own.
+
+- Steps 1 to 4 printed exactly what they say. Step 1's guards printed only the
+  `docs/DEPLOY.md` line and the three 0066 files, and the saved copy equals
+  the branch's runbook (line endings aside). Step 2 read 66 and
+  1792976742588; 0, 0, 0 and 3; 0 and 0; 81 and 15; 35 MB. Step 3 printed the
+  two migrate notices, the four apply-rls notices, the two verified lines
+  (102 functions) and the six `assert-schema-applied` lines, and exited 0.
+  Step 4 read 67 and 1793044397504; 1, 1, 5 and 0; 1, 9, 9, 0 and 0; true,
+  true and false; 0 and 0; 81 and 15; 36 MB.
+- A catalogue comparison (every function body with its settings and grants,
+  policy, trigger, table and column grant, constraint, index and RLS flag)
+  from step C to step D found exactly the changes under *What it changes*:
+  nine function forms gone (the code request, the code check, the four acts,
+  the two page reads, and the guard trigger's old body) and eleven present
+  (their new forms, the new guard body, `app_home_code_unsent_by_token` and
+  `app_client_codes_reset`), the grants `metra_app` only and the code check
+  nobody's; the new column under the table's existing grants (`metra_app`
+  SELECT and INSERT, Supabase's `service_role` as on every column, no UPDATE
+  for `metra_app`); one index; nothing else.
+- A second step 3 printed `Migrations applied.`, the four notices and the
+  eight `does not exist, skipping` ones in the order step 3 lists them, the
+  same verified and `assert-schema-applied` lines, and changed nothing in the
+  catalogue.
+- **The migration's lock race, on purpose.** A writer holding the codes table
+  (ROW EXCLUSIVE, an open insert) for 10 s against step 3: the two 55P03
+  lines naming `public.client_verification_codes:SHARE`, exit 1, nothing run
+  after them; step 2 (a) still 66, step 2 (b) still 0, 0, 0 and 3. The block
+  run again after the writer ended applied 0066 and printed what step 3 says.
+- **apply-rls's lock race, on purpose.** A reader holding the codes table for
+  30 s while step 3 ran: 0066 applied, then `policies/36-client-home.sql`
+  lost three times (55P03, retried after 2 s and 4 s), the two failure lines,
+  exit 1, `assert-schema-applied` skipped; in between, step 2 (b) read 1, 1,
+  5 and 0. `db:apply-rls` then `assert-schema-applied` run again after the
+  reader ended exited 0 (the four notices and the eight skipping ones), and
+  the catalogue was identical to a clean run's.
+- **Undo (0)**, from the saved copy: `bab6de80`'s `db:apply-rls` printed the
+  four notices and step C's two verified lines (100 functions), and exited 0;
+  part 2 returned no rows; step 2 (b) read 1, 1, 0 and 3, step 2 (d) 81 and
+  15; and the catalogue equalled step C's but for the column and the index
+  0066 keeps.
+- **Forward again** (step 1, then the forward-again block: `db:apply-rls`,
+  then `assert-schema-applied`): the four notices, the two verified lines and
+  the six `assert-schema-applied` lines of step 3, exit 0; step 2 (b) 1, 1, 5
+  and 0, step 4 (c) and (d) as before, 81 and 15; and a catalogue identical
+  to the first forward's. Step 6 (3) then put the checkout back on `main`.
+- **The current code on the step D database:** `main`'s (`bab6de80`) own
+  isolation gate passed 60 of 60, and its action tests 1,762 of 1,814, on a
+  copy of this step D database. Every one of the 52 failures is a test of the
+  database objects step D changes, not of an app path: 50 call the code
+  request, the four code acts or the two page reads directly in SQL in their
+  old forms (42883: the forms step D drops, which no code on `main` calls) or
+  pin the list and the count of those functions; one runs `main`'s own
+  `roles.sql`, which grants on the old forms (42883); and one fails the same
+  way on the step C database (checked again on a copy of it: it checks a
+  Supabase default grant that the simulated roles add and `roles.sql` does
+  not manage). No contract, change
+  order, delivery, payment, claim, final account or measurement test of the
+  shipped code failed.
+- **This branch's own tests** on a fresh database replayed as CI builds it:
+  the isolation gate passed 60 of 60 and the action tests 1,858 of 1,858.
 
 ## Monthly market bulletin
 
