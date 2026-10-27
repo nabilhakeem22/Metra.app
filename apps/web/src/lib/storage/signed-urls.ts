@@ -53,8 +53,9 @@ export const INTERNAL_SIGNED_URL_TTL_SECONDS = 300;
 
 /**
  * Returns a signed download URL for a file, valid for
- * INTERNAL_SIGNED_URL_TTL_SECONDS, but ONLY if the file belongs to the caller's org — the lookup runs under RLS, so an org-B context
- * cannot resolve (and therefore cannot sign) an org-A file.
+ * INTERNAL_SIGNED_URL_TTL_SECONDS, but ONLY if the file belongs to the caller's
+ * org: the lookup runs under RLS, so an org-B context cannot resolve (and
+ * therefore cannot sign) an org-A file.
  *
  * `download` is the name the browser saves as, and passing it is what makes
  * Storage answer `Content-Disposition: attachment` instead of serving the bytes

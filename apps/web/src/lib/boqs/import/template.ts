@@ -51,8 +51,8 @@ export const TEMPLATE_UNITS = BOQ_UNITS;
  * One cell: formula-guarded first (lib/import/formula-guard.ts: a price-book
  * name starting with `=` must not run in Excel), then RFC 4180 quoting: wrap
  * when the value contains a delimiter, a quote or a newline, and double any
- * quote inside. Without it a description containing a comma — which most of
- * them do — silently becomes two columns.
+ * quote inside. Without it a description containing a comma (most of them
+ * do) silently becomes two columns.
  */
 function csvCell(value: string): string {
   const guarded = neutralizeFormula(value);
