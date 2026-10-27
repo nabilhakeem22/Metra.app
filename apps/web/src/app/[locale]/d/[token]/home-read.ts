@@ -15,7 +15,7 @@ import 'server-only';
 // A LIGHT delivery (entry_phase 'execution') has no design phase, so it has no
 // design tab: without a tab it opens the Execution tab, and a link to its
 // design tab is sent there instead.
-import { readSigningDocument } from '@/lib/client-home/contract';
+import { readSigningDocument } from '@/lib/client-home/contract-signing';
 import { getHomeByToken } from '@/lib/client-home/read';
 import type { HomeTab } from '@/lib/client-home/tab';
 import type { HomeAtExecution, HomeExecution, PortalHome } from '@/lib/client-home/types';

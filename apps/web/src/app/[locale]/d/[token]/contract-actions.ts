@@ -34,7 +34,10 @@ const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
  * (./code-actions.ts). The hash of what is signed is the server's own, over
  * the contract /c shows; the browser never sends one. The database signs,
  * uses the code up and tells the studio in one transaction. Captures the
- * client IP and user agent for the signature's provenance.
+ * client IP and user agent for the signature's provenance. That read comes
+ * first, so a link that shows no contract to sign any more (revoked, expired,
+ * no longer at execution) answers `contract_inactive`, as a replaced or ended
+ * contract does, never the link's own refusal (functional F2).
  */
 export async function signContractInHome(
   token: string,

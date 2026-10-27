@@ -3,7 +3,9 @@
 // unknown, busy, a limit) is the code panel's (./use-client-code.ts) and never
 // reaches here, and a missing name is the name box's. The online signing
 // window closed is said in its own words; a contract that is not the home's
-// any more (replaced, ended) is `wrong_state`, the page then showing where it
+// any more (replaced, ended), or a link that shows none to sign (revoked,
+// expired, no longer at execution: the server's snapshot read answers first,
+// `contract_inactive`), is `wrong_state`, the page then showing where it
 // stands; the rest are the shared portal failures every link page says.
 import type { Translate } from '@/lib/actions/error-message';
 import type { SignContractAnswer } from '@/lib/client-home/code-answers';

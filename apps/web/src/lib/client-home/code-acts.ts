@@ -18,8 +18,9 @@ import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import { codeAnswerOf } from './code-act-answer';
 import { typedCode, type CodeAnswer, type CodePurpose, type SignContractAnswer } from './code-answers';
+import { logCodeActBusy } from './code-log';
 import { clientCodeHash } from './codes';
-import { getHomeContractPayloadHash } from './contract';
+import { readContractToSign } from './contract-signing';
 import { busyOnLockRefusal } from './lock-refusal';
 import { signerNameOf } from './signer-name';
 
@@ -49,7 +50,7 @@ function provenCodeOf(rawToken: string, proof: CodeProof): ProvenCode | CodeAnsw
  * The act. `act` builds the call from the token's hash and the code's (bound
  * to `purpose` and `target`, the act's subject as the database keys it). A
  * lock refusal from the database rolled the act back whole: `busy`, the code
- * unused (H5 reliability R4).
+ * unused (H5 reliability R4). The wrapper's own `busy` is logged too (H6.2 R-L6).
  */
 async function runProvenAct(
   proven: ProvenCode,
@@ -57,9 +58,11 @@ async function runProvenAct(
   act: (tokenHash: string, codeHash: string) => SQL,
 ): Promise<CodeAnswer> {
   const query = act(hashShareToken(proven.token), clientCodeHash(bound.purpose, bound.target, proven.code));
-  return busyOnLockRefusal('codeAct', { ok: false, error: 'busy' } as const, async () =>
-    codeAnswerOf(await readSdfJson<unknown>(query, { write: true })),
-  );
+  return busyOnLockRefusal('codeAct', { ok: false, error: 'busy' } as const, async () => {
+    const answer = codeAnswerOf(await readSdfJson<unknown>(query, { write: true }));
+    if (!answer.ok && answer.error === 'busy') logCodeActBusy(bound.purpose);
+    return answer;
+  });
 }
 
 /** The checks no round trip is spent on, then the act. */
@@ -113,13 +116,14 @@ export async function claimDesignPaymentWithCodeByToken(
 
 /**
  * Sign the home's execution contract `contractId`, with a code and the name
- * the client typed (one line, at most 120 characters). A contract id that is
- * not a uuid is `wrong_target` and no name is `name_required`, before any
- * round trip. The document's hash is the server's own, over the home's whole
- * snapshot as /c computes it (./contract.ts): when the home's contract is no
- * longer that one the act is not sent (`contract_inactive`). The database
- * checks the code, signs, uses the code up and tells the studio in one
- * transaction.
+ * the client typed (./signer-name.ts). A contract id that is not a uuid is
+ * `wrong_target` and no name is `name_required`, before any round trip. Then
+ * the home's snapshot is read (./contract-signing.ts), and the act is sent only
+ * for the contract still awaiting signature, with the server's own hash. Else:
+ * signed already, `already`; not the home's contract, or no contract to sign
+ * (a dead link, a delivery no longer at execution), `contract_inactive`; the
+ * read failed, `busy` (nothing was sent). The database checks the code,
+ * signs, uses the code up and tells the studio in one transaction.
  */
 export async function signContractWithCodeByToken(
   rawToken: string,
@@ -131,8 +135,11 @@ export async function signContractWithCodeByToken(
   if (name === null) return { ok: false, error: 'name_required' };
   const proven = provenCodeOf(rawToken, input);
   if ('ok' in proven) return proven;
-  const pdfHash = await getHomeContractPayloadHash(proven.token, contractId);
-  if (pdfHash === null) return { ok: false, error: 'contract_inactive' };
+  const toSign = await readContractToSign(proven.token, contractId);
+  if (toSign.kind === 'read_failed') return { ok: false, error: 'busy' };
+  if (toSign.kind === 'not_this') return { ok: false, error: 'contract_inactive' };
+  if (toSign.kind === 'signed') return { ok: true, already: true };
+  const { pdfHash } = toSign;
   return runProvenAct(proven, { purpose: 'sign_contract', target: contractId }, (tokenHash, codeHash) =>
     sql`select public.app_home_contract_ack_by_token(
       ${tokenHash}, ${contractId}::uuid, ${codeHash}, ${name}, ${input.ip}, ${input.userAgent}, ${pdfHash}

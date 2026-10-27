@@ -1,9 +1,9 @@
 import 'server-only';
-// What a code request writes to the log (read with `wrangler tail` or Workers
-// Logs). Each line is built from a WHITELIST of fields that describe the
-// request's shape: the purpose and the refusal, the limit that fired and its
-// wait, the email provider's status. Never the token or its hash, the address,
-// the hint, the code or the client's IP.
+// What a code request or a code-checked act writes to the log (read with
+// `wrangler tail` or Workers Logs). Each line is built from a WHITELIST of
+// fields that describe the request's shape: the purpose and the refusal, the
+// limit that fired and its wait, the email provider's status. Never the token
+// or its hash, the address, the hint, the code or the client's IP.
 import type { ResendRefusal } from '@/lib/email/resend-failure';
 import type { CodeLimit, CodePurpose } from './code-answers';
 
@@ -13,6 +13,11 @@ export function logCodeRequestRefused(
   refusal: { kind: 'too_many'; limit: CodeLimit; retryAfterSeconds: number } | { kind: 'busy' },
 ): void {
   console.warn('client code request refused:', { purpose, refusal: refusal.kind, ...(refusal.kind === 'too_many' ? { limit: refusal.limit, retryAfterSeconds: refusal.retryAfterSeconds } : {}) });
+}
+
+/** A code-checked act its token function answered `busy` (a held row): frequent ones mean a stuck studio transaction (H6.2 R-L6). */
+export function logCodeActBusy(purpose: CodePurpose): void {
+  console.warn('client code act refused:', { purpose, refusal: 'busy' });
 }
 
 /**

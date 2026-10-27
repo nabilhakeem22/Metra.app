@@ -36,7 +36,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
  * (./contract-document.tsx). While it waits for the client's signature, its
  * document is open with the page and the client signs it here, with a
  * one-time code (./contract-issued-step.tsx); what the signing came to is said
- * here and still stands after the page is read again. فصحى copy, Latin digits.
+ * here and still stands after the page is read again, while the page still
+ * shows that contract. فصحى copy, Latin digits.
  */
 export function ExecutionContract({
   token,
@@ -54,10 +55,12 @@ export function ExecutionContract({
 }) {
   const t = useTranslations('delivery.contract');
   const locale = useLocale();
-  const [signNotice, setSignNotice] = useState<SignNotice | null>(null);
+  // Kept with the contract it was said about: a page read again naming another contract never shows it (functional F1).
+  const [said, setSaid] = useState<{ contractId: string; notice: SignNotice } | null>(null);
   const awaitingSignature = execution.location.reason === 'sign_contract';
   const day = (date: string) => bidiIsolate(formatDate(date, locale));
   const { contract, money } = execution;
+  const signNotice = said !== null && said.contractId === contract?.id ? said.notice : null;
   const title = pickLocale(money?.contract, 'title', locale).value;
   const chip = contract && contractChip(contract);
 
@@ -107,7 +110,7 @@ export function ExecutionContract({
               awaitingSignature={awaitingSignature}
               signing={signing}
               noticeShown={signNotice !== null}
-              onNotice={setSignNotice}
+              onNotice={(notice) => setSaid(notice && { contractId: contract.id, notice })}
             />
           )}
           <ContractSignNotice notice={signNotice} studio={firmName} />

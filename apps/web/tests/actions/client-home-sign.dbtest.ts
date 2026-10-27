@@ -35,16 +35,20 @@ vi.hoisted(() => {
 import { acknowledgeContract } from '@/app/[locale]/c/[token]/actions';
 import { requestClientCode } from '@/app/[locale]/d/[token]/code-actions';
 import { signContractInHome } from '@/app/[locale]/d/[token]/contract-actions';
+import { todayInCairo } from '@/lib/automation/clock';
 import { getHomeByToken } from '@/lib/client-home/read';
+import { getContractPage } from '@/lib/contracts/queries';
 import { contractPayloadHash } from '@/lib/contracts/public';
 import type { PublicContract } from '@/lib/contracts/public-types';
+import { getExecutionFacts } from '@/lib/execution/queries/facts';
 import { mintShareToken } from '@/lib/share/token';
 import { codesOf, holdLock, seedHome, seedLightHome, type Home } from './client-home-fixture';
 import { closeExecutionFixture, ownerQuery, seedClientProject, seedExecutionContract, tamper } from './execution-fixture';
-import { closeFixture, seedOrg, teardown } from './fixture';
+import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 const orgIds: string[] = [];
 let orgId: string;
+let ownerId: string;
 let printed: string;
 
 beforeAll(() => {
@@ -61,6 +65,7 @@ beforeEach(async () => {
   sdfCalls.queries.length = 0;
   const seeded = await seedOrg({ owners: 1, members: [{ role: 'admin' }, { role: 'project_manager' }, { role: 'accountant' }] });
   orgId = seeded.orgId;
+  ownerId = seeded.ownerIds[0];
   orgIds.push(orgId);
 });
 
@@ -118,7 +123,7 @@ async function contractState(contractId: string) {
   return { ...row, events: row.events ?? [] };
 }
 
-/** Signs as AC12 says, for any home: the act, the event, the hash, the code, the studio told, and a replay. */
+/** Signs as AC12 says, for any home: the act, the event, the hash, the code, the studio told, and a replay (signed already, F3). */
 async function expectSignedOnce(home: Home) {
   const expectedHash = contractPayloadHash(await snapshotOfC(home.contract.contractId));
   const { code } = await askForCode(home);
@@ -129,7 +134,10 @@ async function expectSignedOnce(home: Home) {
   const [stored] = await codesOf(home.delivery.id);
   expect(stored.consumed_at).not.toBeNull();
   expect(stored.result_ref).toBe(signed.events[0].id);
-  expect(await sign(home, code)).toEqual({ ok: false, error: 'code_used' });
+  // Fix round F3: the snapshot read before the act already shows it signed, so the act is not sent.
+  sdfCalls.queries.length = 0;
+  expect(await sign(home, code)).toEqual({ ok: true, already: true });
+  expect(JSON.stringify(sdfCalls.queries)).not.toContain('app_home_contract_ack_by_token');
   expect((await contractState(home.contract.contractId)).events).toHaveLength(1);
 }
 
@@ -161,8 +169,18 @@ describe('the signing code (AC11, AC17)', () => {
 });
 
 describe('signing with the code (AC12 to AC17)', () => {
-  it('AC12: the right code and a name sign once, as /c would hash it, the code used by the event, the studio told; a replay is code_used', async () => {
+  it('AC12: the right code and a name sign once, as /c would hash it, the code used by the event, the studio told; a replay is already, with no act sent (F3)', async () => {
     await expectSignedOnce(await seedHome(orgId));
+  });
+
+  it('fix round F4: the studio sees the name the client signed with, on the contract page and in the cockpit', async () => {
+    const home = await seedHome(orgId);
+    const { code } = await askForCode(home);
+    expect(await sign(home, code)).toEqual({ ok: true, already: false });
+    const owner = ctxFor(orgId, ownerId, 'owner');
+    const signed = { on: todayInCairo(new Date()), via: 'online', signerName: SIGNED_AS };
+    expect((await getContractPage(owner, home.contract.contractId, true))?.signed).toEqual(signed);
+    expect((await getExecutionFacts(owner, home.delivery.id)).signed).toEqual(signed);
   });
 
   it('AC17: a LIGHT delivery signs the same way', async () => {
