@@ -44,5 +44,6 @@ export default defineConfig({
     // named .test.tsx, whether or not it contains JSX.
     environment: 'node',
     environmentMatchGlobs: [['**/*.test.tsx', 'happy-dom']],
+    setupFiles: [resolve(dir, 'tests/setup/block-resend-network.ts')],
   },
 });
