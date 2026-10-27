@@ -67,9 +67,9 @@ import type { TablePrivilege } from './roles-grants';
  * for.
  *
  * THE VALUE IS THE PRIVILEGE THAT MUST NOT BE THERE, and it is written down
- * rather than derived. The comparison in ./verify-rls-narrowed-grants.ts is against
- * roles.sql, which follows whatever roles.sql says — so an edit that re-granted `delete on boqs` would
- * move BOTH sides and stay green. This list does not move. It is the invariant;
+ * rather than derived. The comparison in ./verify-rls-narrowed-grants.ts is
+ * against roles.sql, which follows whatever roles.sql says — so an edit that
+ * re-granted `delete on boqs` would move BOTH sides and stay green. This list does not move. It is the invariant;
  * roles.sql is the implementation of it.
  */
 export const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
