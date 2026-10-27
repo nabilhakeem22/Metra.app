@@ -57,7 +57,7 @@ function EditSheet() {
 function renderTable(locale: TestLocale, column: PriceBookMarketColumn) {
   const rows = [item('linked', 'm-1'), item('own', null)];
   renderWithIntl(
-    <PriceBookTable groups={[{ section: SECTION, rows, matched: 2 }]} market={column} canManage={false} pending={false} onEdit={() => {}} onToggleActive={() => {}} />,
+    <PriceBookTable groups={[{ section: SECTION, rows, matched: 2 }]} market={column} canManage={false} showsCost pending={false} onEdit={() => {}} onToggleActive={() => {}} />,
     { locale },
   );
 }
@@ -156,6 +156,7 @@ function PageAfterLinks() {
         market={{ bulletin: BULLETIN, refs: linkedTo ? { tile: TILE } : {} }}
         sections={[SECTION]}
         canManage
+        showsCost
       />
     </>
   );

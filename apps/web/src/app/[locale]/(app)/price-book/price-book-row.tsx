@@ -11,7 +11,7 @@ import { MarketPriceCell } from './market-price-cell';
 import type { PriceBookItem } from './types';
 
 /**
- * One price book item: code, name, unit, cost, price, status, the Market cell
+ * One price book item: code, name, unit, cost (`showsCost`), price, status, the Market cell
  * while a bulletin is published (`showsMarket`), and the edit and
  * (de)activate actions for a role that may change the book.
  */
@@ -20,6 +20,7 @@ export function PriceBookRow({
   showsMarket,
   marketRef,
   canManage,
+  showsCost,
   pending,
   onEdit,
   onToggleActive,
@@ -29,6 +30,7 @@ export function PriceBookRow({
   /** The item's market reference; undefined when it is not linked (or the item is no longer published). */
   marketRef: MarketPriceRef | undefined;
   canManage: boolean;
+  showsCost: boolean;
   pending: boolean;
   onEdit: (item: PriceBookItem) => void;
   onToggleActive: (item: PriceBookItem) => void;
@@ -45,9 +47,11 @@ export function PriceBookRow({
       </td>
       <td className="px-4 py-2">{name}</td>
       <td className="px-4 py-2 text-muted-foreground">{t(`units.${item.unit}`)}</td>
-      <td className="px-4 py-2 text-end" dir="ltr">
-        {formatMoney(item.defaultUnitCost, locale)}
-      </td>
+      {showsCost && (
+        <td className="px-4 py-2 text-end" dir="ltr">
+          {formatMoney(item.defaultUnitCost, locale)}
+        </td>
+      )}
       <td className="px-4 py-2 text-end" dir="ltr">
         {formatMoney(item.defaultUnitPrice, locale)}
       </td>

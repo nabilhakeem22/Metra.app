@@ -22,6 +22,8 @@ export interface PriceBookClientProps {
   market: PriceBookMarketColumn;
   sections: SectionOption[];
   canManage: boolean;
+  /** Whether the reader may see margin: the Cost column is left out when not. */
+  showsCost: boolean;
 }
 
 /** The section select's "every section" value; the URL leaves ?section out instead. */
@@ -31,7 +33,7 @@ const ALL_SECTIONS = 'all';
  * One page of the price book (the server filtered, searched and paged it), its
  * toolbar and its pager. Every filter is in the URL (use-price-book-navigation).
  */
-export function PriceBookClient({ view, book, market, sections, canManage }: PriceBookClientProps) {
+export function PriceBookClient({ view, book, market, sections, canManage, showsCost }: PriceBookClientProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PriceBookItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -107,6 +109,7 @@ export function PriceBookClient({ view, book, market, sections, canManage }: Pri
           groups={groups}
           market={market}
           canManage={canManage}
+          showsCost={showsCost}
           pending={actions.pending}
           onEdit={(item) => {
             setEditing(item);

@@ -39,7 +39,9 @@ export function costItemFormOf(item: PriceBookItem): CostItemFormState {
     nameAr: item.nameAr ?? '',
     sectionId: item.sectionId,
     unit: item.unit,
-    defaultUnitCost: item.defaultUnitCost,
+    // Only owner/admin edit (price_book create), and both always see margin
+    // (canSeeMargin), so the cost is present whenever this form opens.
+    defaultUnitCost: item.defaultUnitCost ?? '',
     defaultUnitPrice: item.defaultUnitPrice,
     taxCode: item.taxCode ?? '',
     etaItemCode: item.etaItemCode ?? '',

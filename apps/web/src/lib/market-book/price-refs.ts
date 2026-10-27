@@ -17,7 +17,8 @@ import { marketVariance } from './variance';
 export interface MarketColumnRow {
   id: string;
   unit: CostItemUnit;
-  defaultUnitCost: string;
+  /** Null for a caller who may not see margin: the column then shows no variance. */
+  defaultUnitCost: string | null;
   marketItemId: string | null;
 }
 

@@ -41,7 +41,7 @@ beforeEach(() => {
 describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale) => {
   async function load(data: { book: 'ready' | 'preparing' | 'unpublished'; sections: number; items: number }) {
     priceBook.loadMarketPriceBook.mockResolvedValue({ ok: true, data });
-    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage showsCost />, { locale });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') }));
     });
@@ -68,7 +68,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale)
   });
 
   it('offers no load to a studio member who cannot manage the book', () => {
-    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage={false} />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} market={{ bulletin: null, refs: {} }} sections={[]} canManage={false} showsCost />, { locale });
     expect(screen.queryByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') })).toBeNull();
   });
 });

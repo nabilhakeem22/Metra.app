@@ -14,6 +14,7 @@ export function PriceBookTable({
   groups,
   market,
   canManage,
+  showsCost,
   pending,
   onEdit,
   onToggleActive,
@@ -22,6 +23,8 @@ export function PriceBookTable({
   /** The Market column: shown only once a bulletin is published (market plan AC 18). */
   market: PriceBookMarketColumn;
   canManage: boolean;
+  /** The Cost column, only for a reader who may see margin. */
+  showsCost: boolean;
   pending: boolean;
   onEdit: (item: PriceBookItem) => void;
   onToggleActive: (item: PriceBookItem) => void;
@@ -67,9 +70,7 @@ export function PriceBookTable({
                     <th className="px-4 py-2 text-start font-medium">
                       {t('table.unit')}
                     </th>
-                    <th className="px-4 py-2 text-end font-medium">
-                      {t('table.cost')}
-                    </th>
+                    {showsCost && <th className="px-4 py-2 text-end font-medium">{t('table.cost')}</th>}
                     <th className="px-4 py-2 text-end font-medium">
                       {t('table.price')}
                     </th>
@@ -88,6 +89,7 @@ export function PriceBookTable({
                       showsMarket={market.bulletin !== null}
                       marketRef={market.refs[item.id]}
                       canManage={canManage}
+                      showsCost={showsCost}
                       pending={pending}
                       onEdit={onEdit}
                       onToggleActive={onToggleActive}
