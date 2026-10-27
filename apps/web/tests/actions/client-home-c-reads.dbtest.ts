@@ -1,10 +1,9 @@
 import * as React from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// H6.3 (AC5): what one /c request reads, the layout then the page, as Next
-// runs them, against the real database. A redirect reads the home target
-// alone and the page (with its contract read) never runs; a link with no home
-// reads the target, then the contract. Every token function is counted at
+// H6.3 (AC5): what one /c request reads, against the real database. A
+// redirect reads the home target alone, never its contract; a link with no
+// home reads the target, then the contract. Every token function is counted at
 // lib/share/sdf-call (the real one, spied).
 
 const sdfCalls = vi.hoisted(() => ({ names: [] as string[] }));
@@ -19,10 +18,9 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
     },
   };
 });
-// The page is called, never rendered: its client view is not this test's subject.
+// The page is called, its view never rendered: the client view is not this test's subject.
 vi.mock('@/app/[locale]/c/[token]/public-contract', () => ({ PublicContractView: () => null }));
 
-import ContractTokenLayout from '@/app/[locale]/c/[token]/layout';
 import PublicContractPage from '@/app/[locale]/c/[token]/page';
 import type { OrgContext } from '@/lib/db/context';
 import { mintHomeLink } from './client-home-c-link-fixture';
@@ -51,20 +49,18 @@ afterAll(async () => {
   await closeFixture();
 });
 
-/** One /c request: the layout, then the page (never reached when the layout redirects). */
+/** One /c request, as the page answers it. */
 async function open(token: string) {
-  const params = Promise.resolve({ locale: 'en', token });
-  await ContractTokenLayout({ children: null, params });
   vi.stubGlobal('React', React); // the actions runner compiles JSX to React.createElement
   try {
-    await PublicContractPage({ params });
+    await PublicContractPage({ params: Promise.resolve({ locale: 'en', token }) });
   } finally {
     vi.unstubAllGlobals();
   }
 }
 
 describe('what each /c request reads (AC5)', () => {
-  it('the redirect reads the target alone; the page, and its contract read, never run', async () => {
+  it('the redirect reads the target alone, never the contract', async () => {
     const home = await seedHome(owner.orgId, 'issued');
     await mintHomeLink(owner, home);
     const thrown = await open(home.contract.rawToken as string).catch((error: unknown) => error);
