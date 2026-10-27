@@ -3,9 +3,10 @@ import { createTranslator } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeFocus } from '@/lib/client-home/tab';
 import type { HomeAtExecution } from '@/lib/client-home/types';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { CLIENT_EXECUTION_REASONS, type ClientExecutionReason } from '@/lib/flow/locate/execution-client';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { homePayload } from '@/test/client-home-payloads';
+import { CONTRACT_ID, homePayload } from '@/test/client-home-payloads';
 import { messageAt, messagesFor, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 
 // The client home's Execution tab (H4.2, AC15 and AC17): for every client
@@ -33,8 +34,28 @@ function homeOf(reason: ClientExecutionReason, entryPhase: 'design' | 'execution
   return { ...home, execution: home.execution };
 }
 
-const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null) =>
-  renderWithIntl(<ExecutionTabView token="tok-1" home={home} signingDocument={null} focus={focus} />, { locale });
+const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null, signingDocument: ContractDocument | null = null) =>
+  renderWithIntl(<ExecutionTabView token="tok-1" home={home} signingDocument={signingDocument} focus={focus} />, { locale });
+
+/** The document the page reads with a contract awaiting the client's signature. */
+const SIGNING_DOCUMENT = {
+  id: CONTRACT_ID,
+  source: 'boq',
+  discount_pct: '0.0000',
+  discount_amount: '0.0000',
+  taxable_base: '100000.0000',
+  tax_rate: '14.0000',
+  tax_amount: '14000.0000',
+  supervision_pct: '0.0000',
+  supervision_amount: '0.0000',
+  original_value: '100000.0000',
+  total: '114000.0000',
+  advance_pct: '0.0000',
+  retention_pct: '0.0000',
+  payment_schedule: [],
+  section_count: 0,
+  sections: [],
+} as ContractDocument;
 
 /** The headline each reason says, built from the catalogue with the fixture's facts. */
 function expectedHeadline(locale: TestLocale, reason: ClientExecutionReason): string {
@@ -137,11 +158,12 @@ describe('the sections (H4 notes: change orders the client can no longer answer)
     expect(document.getElementById('change-orders')).toBeNull();
   });
 
-  it('a contract waiting for a signature says where to sign it; a signed one says when and how', () => {
+  it('a contract waiting for a signature whose document could not be read says to refresh, with no signing; a signed one says when and how', () => {
     const { unmount } = show('en', homeOf('sign_contract'));
     const contract = document.getElementById('contract') as HTMLElement;
     expect(contract.textContent).toContain('C-2026-0004');
-    expect(contract.textContent).toContain(messageAt('en', 'delivery.contract.signWithLink').replace('{studio}', 'Noon Studio'));
+    expect(contract.textContent).toContain(messageAt('en', 'delivery.contract.sign.unavailable'));
+    expect(contract.querySelector('[data-sign-panel]')).toBeNull();
     unmount();
     show('en', homeOf('works_in_progress'));
     const signed = document.getElementById('contract') as HTMLElement;
@@ -161,6 +183,27 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the contract card once the signing w
     const buttons = within(contract).queryAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual([messageAt(locale, 'delivery.contract.document.show')]);
     expect(within(contract).queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe.each<TestLocale>(['ar-EG', 'en'])('signing the contract in the home (%s, H6.2)', (locale) => {
+  it('awaiting signature: the document is open with the page, the signing under it with the disclaimer of /c', () => {
+    show(locale, homeOf('sign_contract'), null, SIGNING_DOCUMENT);
+    const contract = document.getElementById('contract') as HTMLElement;
+    expect(document.getElementById('home-contract-document')?.hidden).toBe(false);
+    const panel = contract.querySelector(`#sign-${CONTRACT_ID}`) as HTMLElement;
+    expect(panel.textContent).toContain(messageAt(locale, 'delivery.contract.sign.intro'));
+    expect(panel.textContent).toContain(messageAt(locale, 'contracts.ack.notSignature'));
+    expect(within(panel).getByRole('button', { name: messageAt(locale, 'delivery.contract.sign.button') })).toBeTruthy();
+    expect(contract.textContent).not.toMatch(DASH);
+    expect(contract.textContent).not.toMatch(ARABIC_INDIC);
+  });
+
+  it('once the window has closed: the hero says signing_closed, the chip too, and there is no signing (AC5)', () => {
+    const { container } = show(locale, homeOf('signing_closed'));
+    expect(container.querySelector('[data-client-reason="signing_closed"]')).not.toBeNull();
+    expect(container.querySelector('#contract [data-tone]')?.textContent).toBe(messageAt(locale, 'delivery.contract.status.signingClosed'));
+    expect(container.querySelector('[data-sign-panel]')).toBeNull();
   });
 });
 
@@ -200,6 +243,14 @@ describe('a ?focus= link (H4 follow-up F4: an unknown focus is ignored)', () => 
     contract.unmount();
     show('en', homeOf('pay_request'), { section: 'request', id: REQUEST });
     expect(scrolled).toEqual(['contract', `request-${REQUEST}`]);
+  });
+
+  it('a code email for signing opens on the signing of the contract the page shows; another contract leaves the page at its top (AC9)', () => {
+    const signing = show('en', homeOf('sign_contract'), { section: 'sign', id: CONTRACT_ID }, SIGNING_DOCUMENT);
+    expect(document.getElementById(`sign-${CONTRACT_ID}`)).not.toBeNull();
+    signing.unmount();
+    show('en', homeOf('sign_contract'), { section: 'sign', id: ELSEWHERE }, SIGNING_DOCUMENT);
+    expect(scrolled).toEqual([`sign-${CONTRACT_ID}`]);
   });
 
   it('leaves the page at its top for a request it does not list, and for a change order (none is listed by id)', () => {
@@ -254,12 +305,12 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the Execution tab speaks of the stud
       'sent',
       'typing',
       'typingOnFile',
-      'noChannel',
+      'noChannel.payment',
       'error.busy',
       'error.requestBusy',
       'error.send_failed',
-      'tooMany.spacing',
-      'tooMany.target',
+      'tooMany.spacing.payment',
+      'tooMany.target.payment',
       'tooMany.delivery',
       'tooMany.studio',
       'tooMany.service',

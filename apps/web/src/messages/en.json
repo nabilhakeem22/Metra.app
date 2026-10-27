@@ -3331,7 +3331,6 @@
       },
       "expectedFinish": "Expected completion",
       "terminatedOn": "Ended on",
-      "signWithLink": "To sign the contract, open the contract link {studio} sent you.",
       "signingClosed": "The online signing period has ended. Contact {studio} to sign.",
       "none": "{studio} has not issued the execution contract yet.",
       "previousTerminated": "An earlier contract for this project was ended on {date}.",
@@ -3341,6 +3340,21 @@
         "hide": "Hide the contract",
         "gone": "This contract can no longer be shown here. Please refresh the page.",
         "loadFailed": "We could not load the contract. Please check your connection and try again."
+      },
+      "sign": {
+        "intro": "Review the contract above, then type your full name and sign it online. We will send you a verification code to confirm it.",
+        "nameLabel": "Your full name",
+        "nameRequired": "Please type your full name to sign the contract.",
+        "button": "Sign the contract",
+        "notSignature": "This is an electronic acknowledgement, not a binding signature.",
+        "confirmTitle": "Sign contract {number}",
+        "confirmBody": "You are signing contract {number} as {name}.",
+        "confirm": "Sign",
+        "signed": "The contract is signed, and {studio} has been told. Thank you.",
+        "already": "This contract is already signed.",
+        "signingClosed": "The online signing period for this contract has ended, so your signature was not recorded. Contact {studio}.",
+        "movedOn": "This contract can no longer be signed here. The page now shows where it stands.",
+        "unavailable": "We could not show the contract for signing just now. Please refresh the page."
       }
     },
     "changeOrders": {
@@ -3360,15 +3374,24 @@
       "label": "Verification code",
       "resend": "Send a new code",
       "resendIn": "You can ask for a new code in {time}.",
-      "noChannel": "{studio} has no email address for you, so you cannot report this payment online right now. Ask {studio} to add your email, or tell {studio} directly that you paid so they can record it.",
+      "noChannel": {
+        "payment": "{studio} has no email address for you, so you cannot report this payment online right now. Ask {studio} to add your email, or tell {studio} directly that you paid so they can record it.",
+        "signature": "{studio} has no email address for you, so the contract cannot be signed online yet. Ask {studio} to add your email, or sign it on paper with {studio}."
+      },
       "wait": {
         "minutes": "{minutes, plural, one {1 minute} other {{minutesText} minutes}}",
         "hours": "{hours, plural, one {1 hour} other {{hoursText} hours}}",
         "hoursAndMinutes": "{hours} and {minutes}"
       },
       "tooMany": {
-        "spacing": "A code was sent for this payment a moment ago. You can ask for a new one in {wait}.",
-        "target": "Too many codes were asked for this payment. You can ask for a new one in {wait}.",
+        "spacing": {
+          "payment": "A code was sent for this payment a moment ago. You can ask for a new one in {wait}.",
+          "signature": "A code to sign this contract was sent moments ago. You can ask for a new one in {wait}."
+        },
+        "target": {
+          "payment": "Too many codes were asked for this payment. You can ask for a new one in {wait}.",
+          "signature": "Many codes were asked for to sign this contract. You can ask for a new one in {wait}."
+        },
         "delivery": "Your page has reached its daily limit of codes. You can ask for a new one in {wait}, or ask {studio} to reset your codes.",
         "studio": "{studio} has reached its daily limit of codes. You can ask for a new one in {wait}.",
         "service": "The service has reached its daily limit of codes. You can ask for a new one in {wait}.",

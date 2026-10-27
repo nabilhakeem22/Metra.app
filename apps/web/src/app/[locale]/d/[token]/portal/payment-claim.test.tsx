@@ -140,7 +140,7 @@ describe('the payment claim', () => {
     const dialog = await confirmDialog();
     fireEvent.click(within(dialog).getByRole('button', { name: messageAt('en', 'delivery.code.send') }));
     await act(async () => {});
-    expect(dialog.textContent).toContain(messageAt('en', 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(dialog.textContent).toContain(messageAt('en', 'delivery.code.noChannel.payment').replaceAll('{studio}', 'Diwan Studio'));
     expect(within(dialog).queryByRole('button', { name: messageAt('en', 'delivery.actions.confirm') })).toBeNull();
   });
 
@@ -180,7 +180,7 @@ describe('the payment claim', () => {
     const dialog = await confirmDialog();
     fireEvent.click(within(dialog).getByRole('button', { name: messageAt('ar-EG', 'delivery.code.send') }));
     await act(async () => {});
-    expect(within(dialog).getByRole('status').textContent).toBe(messageAt('ar-EG', 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(within(dialog).getByRole('status').textContent).toBe(messageAt('ar-EG', 'delivery.code.noChannel.payment').replaceAll('{studio}', 'Diwan Studio'));
     expect(within(dialog).queryByLabelText(messageAt('ar-EG', 'delivery.code.label'))).toBeNull();
     expect(actions.claimDesignPaymentInHome).not.toHaveBeenCalled();
   });

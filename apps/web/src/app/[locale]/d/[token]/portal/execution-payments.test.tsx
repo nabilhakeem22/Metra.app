@@ -219,7 +219,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     show(locale, CARD, null);
     fireEvent.click(claimButtons(locale)[0]);
     const dialog = await confirmDialog();
-    expect(dialog.textContent).toContain(messageAt(locale, 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(dialog.textContent).toContain(messageAt(locale, 'delivery.code.noChannel.payment').replaceAll('{studio}', 'Diwan Studio'));
     expect(within(dialog).queryByRole('button', { name: messageAt(locale, 'delivery.code.send') })).toBeNull();
     expect(within(dialog).getByRole('link').getAttribute('href')).toMatch(/^https:\/\/wa\.me\/201001234567\?text=/);
     expect(within(dialog).queryByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') })).toBeNull();

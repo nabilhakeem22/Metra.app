@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { codeBoxValue, CODE_LENGTH, type CodeAnswer, type CodeLimit, type CodePurpose } from '@/lib/client-home/code-answers';
+import {
+  codeBoxValue,
+  CODE_LENGTH,
+  CODE_PURPOSE_ACT,
+  type CodeAnswer,
+  type CodeLimit,
+  type CodePurpose,
+} from '@/lib/client-home/code-answers';
 import { isSharedPortalError, UNCONFIRMED_WRITE, type ShownPortalFailure } from '@/lib/share/portal-failure';
 import { requestClientCode } from '../code-actions';
 
@@ -20,6 +27,8 @@ export type CodeNotice =
   | { error: 'portal'; failure: ShownPortalFailure };
 
 export interface ClientCode {
+  /** What the code is for, as the panel words its sentences about this act: a payment, or a signature. */
+  act: (typeof CODE_PURPOSE_ACT)[CodePurpose];
   /** The client has no address on file: no code can be sent, the panel says so. */
   noChannel: boolean;
   /** Where the code goes (or went), masked; null while the page does not know. */
@@ -222,6 +231,7 @@ export function useClientCode(
 
   const shownNotice = notice?.error === 'too_many' && noticeSeconds === 0 ? null : notice;
   return {
+    act: CODE_PURPOSE_ACT[purpose],
     noChannel: channel === null || learntNoChannel,
     hint: sentHint ?? (channel !== null && channel !== 'unknown' ? channel.hint : null),
     typing,

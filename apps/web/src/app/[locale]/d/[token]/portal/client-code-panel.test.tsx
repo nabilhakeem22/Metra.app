@@ -17,6 +17,7 @@ const HINT = 'c•••@e•••.com';
 
 function codeOf(fields: Partial<ClientCode> = {}): ClientCode {
   return {
+    act: 'payment',
     noChannel: false,
     hint: HINT,
     typing: false,
@@ -123,9 +124,9 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the code panel (%s)', (locale) => {
   });
 
   it.each<[CodeLimit, string]>([
-    ['target_spacing', 'spacing'],
-    ['target_hour', 'target'],
-    ['target_tries', 'target'],
+    ['target_spacing', 'spacing.payment'],
+    ['target_hour', 'target.payment'],
+    ['target_tries', 'target.payment'],
     ['delivery_day', 'delivery'],
     ['studio_day', 'studio'],
     ['platform_day', 'service'],
@@ -152,11 +153,24 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the code panel (%s)', (locale) => {
 
   it('no address on file: said plainly, the studio\'s WhatsApp, no box, no Send and no "I already have a code"', () => {
     const { container } = show(locale, codeOf({ noChannel: true }));
-    expect(screen.getByRole('status').textContent).toBe(text('noChannel').replaceAll('{studio}', 'Diwan Studio'));
+    expect(screen.getByRole('status').textContent).toBe(text('noChannel.payment').replaceAll('{studio}', 'Diwan Studio'));
     expect(screen.getByRole('link').getAttribute('href')).toBe('https://wa.me/201001234567?text=x');
     expect(screen.queryByRole('button', { name: text('send') })).toBeNull();
     expect(screen.queryByRole('button', { name: text('haveCode') })).toBeNull();
     expect(screen.queryByLabelText(text('label'))).toBeNull();
+    clean(container);
+  });
+
+  it('a signing code says its own words: the limits on this contract, and no address on file (H6.2)', () => {
+    const signing = (fields: Partial<ClientCode>) => show(locale, codeOf({ act: 'signature', ...fields }));
+    for (const [limit, key] of [['target_spacing', 'spacing'], ['target_hour', 'target']] as const) {
+      const { unmount } = signing({ notice: { error: 'too_many', limit }, noticeSeconds: 30, waitSeconds: 30 });
+      const words = text(`tooMany.${key}.signature`);
+      expect(screen.getByRole('alert').textContent?.startsWith(words.slice(0, words.indexOf('{wait}')))).toBe(true);
+      unmount();
+    }
+    const { container } = signing({ noChannel: true });
+    expect(screen.getByRole('status').textContent).toBe(text('noChannel.signature').replaceAll('{studio}', 'Diwan Studio'));
     clean(container);
   });
 });

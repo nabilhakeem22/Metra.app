@@ -13,7 +13,7 @@ import { describePortalFailure } from '@/lib/share/portal-failure';
 import { waitParts } from './code-time';
 import type { ClientCode, CodeNotice } from './use-client-code';
 
-/** The sentence each limit has (H5 functional F4): the client's own payment, their page, the studio, the service, the link, the contract. */
+/** The sentence each limit has (H5 functional F4): the client's own act, their page, the studio, the service, the link, the contract. */
 const LIMIT_COPY: Readonly<Record<CodeLimit, string>> = {
   target_spacing: 'spacing',
   target_hour: 'target',
@@ -24,6 +24,9 @@ const LIMIT_COPY: Readonly<Record<CodeLimit, string>> = {
   link_minute: 'link',
   claims_hour: 'claims',
 };
+
+/** The limits on the act's own subject: their sentence names it (this payment, this contract). */
+const ACT_LIMITS: ReadonlySet<CodeLimit> = new Set(['target_spacing', 'target_hour', 'target_tries']);
 
 /** A wait in words: a ticking M:SS under an hour, hours and minutes from an hour on (never "1319:54"). */
 function useWaitText() {
@@ -39,7 +42,7 @@ function useWaitText() {
 }
 
 /** The panel's sentence for what went wrong; a limit's names the limit and its wait as it runs. */
-function useNoticeText(studio: string) {
+function useNoticeText(studio: string, act: ClientCode['act']) {
   const t = useTranslations('delivery.code');
   const tErrors = useTranslations('portal.errors');
   const locale = useLocale();
@@ -50,8 +53,10 @@ function useNoticeText(studio: string) {
         return describePortalFailure(notice.failure, tErrors);
       case 'code_wrong':
         return t('error.code_wrong', pluralParams('left', 'leftText', notice.attemptsLeft, locale));
-      case 'too_many':
-        return t(`tooMany.${LIMIT_COPY[notice.limit]}`, { studio, wait: waitText(noticeSeconds) });
+      case 'too_many': {
+        const copy = LIMIT_COPY[notice.limit];
+        return t(ACT_LIMITS.has(notice.limit) ? `tooMany.${copy}.${act}` : `tooMany.${copy}`, { studio, wait: waitText(noticeSeconds) });
+      }
       default:
         return t(`error.${notice.error}`, { studio });
     }
@@ -59,16 +64,17 @@ function useNoticeText(studio: string) {
 }
 
 /**
- * The one-time code step of an act that binds the client ("I paid"), shared by
- * every such act: where the code will go, [Send the code] and [I already have
- * a code], then the six-digit box (Arabic-Indic digits become Latin as they
- * are typed) with a new code offered once the wait is over, and what went
- * wrong in the panel's own words. The box takes the code from the LATEST
- * email, whether it was asked for here or before a reload (H5 functional F1).
- * A client with no address on file is told so plainly, with the studio's
- * WhatsApp, and no box is shown: the studio records it instead. The act's own
- * Confirm is the caller's (it sends `code.proof()`). فصحى copy, Latin digits,
- * logical CSS only.
+ * The one-time code step of an act that binds the client ("I paid", signing
+ * the contract), shared by every such act and worded for it (`code.act`):
+ * where the code will go, [Send the code] and [I already have a code], then
+ * the six-digit box (Arabic-Indic digits become Latin as they are typed) with
+ * a new code offered once the wait is over, and what went wrong in the
+ * panel's own words. The box takes the code from the LATEST email, whether it
+ * was asked for here or before a reload (H5 functional F1). A client with no
+ * address on file is told so plainly, with the studio's WhatsApp, and no box
+ * is shown: the studio records the payment, or the contract is signed on
+ * paper, instead. The act's own Confirm is the caller's (it sends
+ * `code.proof()`). فصحى copy, Latin digits, logical CSS only.
  */
 export function ClientCodePanel({
   code,
@@ -84,14 +90,14 @@ export function ClientCodePanel({
   const tHome = useTranslations('delivery.home');
   const boxId = useId();
   const noticeId = useId();
-  const noticeText = useNoticeText(studioName);
+  const noticeText = useNoticeText(studioName, code.act);
   const waitText = useWaitText();
 
   if (code.noChannel) {
     return (
       <div className="space-y-3" data-code-panel="no_channel">
         <p role="status" className="text-body text-foreground">
-          {t('noChannel', { studio: studioName })}
+          {t(`noChannel.${code.act}`, { studio: studioName })}
         </p>
         {whatsappHref && (
           <Button asChild variant="secondary" className="min-h-11 w-full">

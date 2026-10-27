@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Link } from '@/i18n/routing';
 import { contractChip } from '@/lib/client-home/contract-chip';
@@ -10,11 +10,13 @@ import type { HomeExecution } from '@/lib/client-home/types';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
-import type { ContractDocument } from '@/lib/contracts/public-types';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { ContractDocumentDisclosure } from './contract-document';
+import { ContractIssuedStep, type ContractSigningFacts } from './contract-issued-step';
+import { ContractSignNotice } from './contract-sign-notice';
 import { DocumentNumber } from './document-number';
 import { formatPortalMoney } from './portal-money';
+import type { SignNotice } from './use-contract-signing';
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -31,28 +33,29 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
  * expected to finish, and when it ended if it did. Before the studio issues one,
  * it says so and, for a delivery that began with a design, links the design
  * record. An issued or signed contract opens in full on the client's tap
- * (./contract-document.tsx). While it waits for a signature, the client is
- * told where to sign it: the contract's own link the studio sent (signing
- * moves into this page with its one-time code in a later step). فصحى copy,
- * Latin digits.
+ * (./contract-document.tsx). While it waits for the client's signature, its
+ * document is open with the page and the client signs it here, with a
+ * one-time code (./contract-issued-step.tsx); what the signing came to is said
+ * here and still stands after the page is read again. فصحى copy, Latin digits.
  */
 export function ExecutionContract({
   token,
   execution,
   firmName,
   showsDesignRecord,
-  signingDocument,
+  signing,
 }: {
   token: string;
   execution: HomeExecution;
   firmName: string;
   /** The delivery began with a design, so its record is a tab of this page. */
   showsDesignRecord: boolean;
-  /** The contract awaiting the client's signature, read with the page (shown open), or null. */
-  signingDocument: ContractDocument | null;
+  signing: ContractSigningFacts;
 }) {
   const t = useTranslations('delivery.contract');
   const locale = useLocale();
+  const [signNotice, setSignNotice] = useState<SignNotice | null>(null);
+  const awaitingSignature = execution.location.reason === 'sign_contract';
   const day = (date: string) => bidiIsolate(formatDate(date, locale));
   const { contract, money } = execution;
   const title = pickLocale(money?.contract, 'title', locale).value;
@@ -90,13 +93,24 @@ export function ExecutionContract({
           </dl>
           {/* Keyed by the contract: a page read again naming another one never keeps the old document under it. */}
           {contract.status !== 'terminated' && (
-            <ContractDocumentDisclosure key={contract.id} token={token} contractId={contract.id} initial={signingDocument} />
+            <ContractDocumentDisclosure
+              key={contract.id}
+              token={token}
+              contractId={contract.id}
+              initial={awaitingSignature ? signing.document : null}
+            />
           )}
           {contract.status === 'issued' && (
-            <p className="rounded-item bg-muted/50 p-3 text-caption text-muted-foreground">
-              {t(contract.signingOpen ? 'signWithLink' : 'signingClosed', { studio: firmName })}
-            </p>
+            <ContractIssuedStep
+              token={token}
+              contract={contract}
+              awaitingSignature={awaitingSignature}
+              signing={signing}
+              noticeShown={signNotice !== null}
+              onNotice={setSignNotice}
+            />
           )}
+          <ContractSignNotice notice={signNotice} studio={firmName} />
         </>
       ) : (
         <p className="text-body text-muted-foreground">{t('none', { studio: firmName })}</p>

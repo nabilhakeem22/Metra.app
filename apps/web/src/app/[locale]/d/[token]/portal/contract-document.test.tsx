@@ -91,7 +91,8 @@ function RefreshedCard() {
   const [contractId, setContractId] = useState(CONTRACT_ID);
   nameContract = setContractId;
   const named = { ...execution, contract: execution.contract && { ...execution.contract, id: contractId } };
-  return <ExecutionContract token="tok" execution={named} firmName="Noon" showsDesignRecord={false} signingDocument={null} />;
+  const signing = { document: null, channel: null, studio: { name: 'Noon', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }, openOn: null, onChanged: () => {} };
+  return <ExecutionContract token="tok" execution={named} firmName="Noon" showsDesignRecord={false} signing={signing} />;
 }
 
 const LATER_LINES = { section_id: 's-2', offset: 0, line_count: 2, lines: [line(4, 'pcs', '42.0000'), line(5, 'roll', '3.5000')] };

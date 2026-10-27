@@ -23,8 +23,9 @@ import { useFocusSection } from './portal/use-focus-section';
  * design (a light delivery has only this tab), then the hero (where the
  * client stands and the one thing to do) and, in this order, the contract,
  * the change orders waiting for the client, and the payments. One column on a
- * phone, two from lg up. A `?focus=` link opens on its section, and a
- * request's opens its "I've made this payment" on the code box. فصحى copy,
+ * phone, two from lg up. A `?focus=` link opens on its section, a request's
+ * opens its "I've made this payment" on the code box, and a signing's
+ * (`sign:<id>`) has its code box ready for the client's [Sign]. فصحى copy,
  * Latin digits, logical CSS only; nothing here is a fact of the studio's own
  * (lib/client-home/types.ts).
  */
@@ -47,6 +48,7 @@ export function ExecutionTabView({
   const { execution } = home;
   const { firmName, title, clientName } = deliveryDisplayNames(homeNamesSource(home), locale);
   const startedWithDesign = home.delivery.entryPhase === 'design';
+  const studio = { name: firmName, whatsappDigits: home.firm.whatsappDigits, deliveryRef: home.delivery.documentNumber };
 
   return (
     <div className="client-portal min-h-screen">
@@ -84,7 +86,7 @@ export function ExecutionTabView({
                   onChanged={() => router.refresh()}
                   channel={home.codeChannel}
                   openOn={focus?.section === 'request' ? focus.id : null}
-                  studio={{ name: firmName, whatsappDigits: home.firm.whatsappDigits, deliveryRef: home.delivery.documentNumber }}
+                  studio={studio}
                 />
               </div>
             )}
@@ -96,7 +98,13 @@ export function ExecutionTabView({
                 execution={execution}
                 firmName={firmName}
                 showsDesignRecord={startedWithDesign}
-                signingDocument={signingDocument}
+                signing={{
+                  document: signingDocument,
+                  channel: home.codeChannel,
+                  studio,
+                  openOn: focus?.section === 'sign' ? focus.id : null,
+                  onChanged: () => router.refresh(),
+                }}
               />
             </div>
             {execution.openVariationCount > 0 && (
