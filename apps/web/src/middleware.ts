@@ -42,6 +42,10 @@ async function routeResponse(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Everything except API routes, static assets and files with an extension.
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // Everything except API routes, Next's own files and the files public/ ships
+  // (its asset folders, and top-level files by extension). A dotted path
+  // anywhere else (/en/d/x.y, /nope.xyz) is a page: it gets the security and
+  // noindex headers. src/middleware-matcher.test.ts compiles this with Next's
+  // own matcher and checks it against every file in public/.
+  matcher: ['/((?!api|_next|_vercel|fonts/|landing/|og/|[^/]+\\.(?:ico|png|svg|txt|xml|html|webmanifest)$).*)'],
 };
