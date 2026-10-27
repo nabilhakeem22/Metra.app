@@ -491,7 +491,11 @@ every owner step below is done by hand, once.
    read the `ip` column of recent sign-ins in the Auth logs: if a handful of
    Cloudflare addresses carry everyone, Supabase's per-IP buckets are global.
    Then set sign-ups and sign-ins 150 per 5 minutes, token verifications 150 per
-   5 minutes, emails sent 100 per hour.
+   5 minutes, emails sent 100 per hour. That 100 per hour is the cap of
+   Supabase's built-in mailer, for the whole project: one source sending codes
+   to different addresses can use it up in about ten minutes, and then nobody
+   can sign in by email (security test T3). Custom SMTP (Resend) raises it; the
+   real fix is Turnstile (step 6), a go-live blocker.
 4. **Supabase Auth settings**: email OTP expiry 600 s, OTP length 6, the email
    template sends `{{ .Token }}`, and the phone provider OFF unless SMS is really
    used (otherwise spend caps and geo-permissions limited to Egypt).
