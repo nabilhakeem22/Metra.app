@@ -44,7 +44,7 @@ describe('POST /api/auth/otp/send', () => {
 
   it('sends a phone code by SMS', async () => {
     expect(await send(JSON.stringify({ channel: 'phone', identifier: '+201001234567' }))).toEqual({ status: 200, body: { ok: true } });
-    expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledWith({ phone: '+201001234567' });
+    expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledWith({ phone: '+201001234567', options: { captchaToken: undefined } });
   });
 
   it.each<[string, Record<string, string | undefined>]>([

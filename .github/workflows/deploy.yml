@@ -59,6 +59,8 @@ jobs:
           # Search Console / Bing ownership tags (optional; blank = no tag).
           NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }}
           NEXT_PUBLIC_BING_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_BING_SITE_VERIFICATION }}
+          # The sign-in Turnstile site key (optional; blank = no widget; docs/DEPLOY.md).
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
         # Generate the gitignored CloudflareEnv typings before building. The
         # --env-interface/output flags MUST match local generation: plain
         # `wrangler types` emits a Cloudflare.Env/global Env shape, not the

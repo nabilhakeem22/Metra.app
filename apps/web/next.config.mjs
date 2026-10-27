@@ -1,5 +1,6 @@
 import createNextIntlPlugin from 'next-intl/plugin';
 import { BING_VARIABLE, GOOGLE_VARIABLE, verificationToken } from './scripts/site-verification-token.mjs';
+import { turnstileSiteKey } from './scripts/turnstile-site-key.mjs';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
@@ -19,6 +20,9 @@ if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.t
 // opaque digest on /ar-EG: the production build redacts errors thrown while
 // rendering. Same rule as the metadata and the post-build emit step.
 for (const variable of [GOOGLE_VARIABLE, BING_VARIABLE]) verificationToken(variable, process.env[variable]);
+// The sign-in Turnstile site key, by the same rule the login form reads it with:
+// a pasted secret key fails here, naming the variable, never echoing the value.
+turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

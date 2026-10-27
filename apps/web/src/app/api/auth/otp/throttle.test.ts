@@ -52,6 +52,22 @@ describe('the sign-in throttle on the routes', () => {
     expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledTimes(AUTH_OTP_IP_CEILING);
   });
 
+  it('charges a send that carries a Turnstile token like any other: past the IP ceiling, 429 and no Supabase (AC7)', async () => {
+    const withToken = (index: number) => JSON.stringify({ channel: 'email', identifier: `person${index}@firm.example`, captchaToken: 'tok' });
+    for (let index = 0; index < AUTH_OTP_IP_CEILING; index += 1) {
+      await send(otpPost('/api/auth/otp/send', withToken(index), { 'cf-connecting-ip': '203.0.113.9' }));
+    }
+    const refused = await send(otpPost('/api/auth/otp/send', withToken(99), { 'cf-connecting-ip': '203.0.113.9' }));
+    expect(refused.status).toBe(429);
+    expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledTimes(AUTH_OTP_IP_CEILING);
+  });
+
+  it('a malformed Turnstile token is refused before the throttle: no bucket is charged (AC4)', async () => {
+    const body = JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', captchaToken: '' });
+    expect((await send(otpPost('/api/auth/otp/send', body, { 'cf-connecting-ip': '203.0.113.9' }))).status).toBe(400);
+    for (const binding of Object.values(runtime.env)) expect((binding as ReturnType<typeof countingRateLimit>).limit).not.toHaveBeenCalled();
+  });
+
   it('answers the verify past the per-address ceiling, however typed and from any IP, with 429', async () => {
     const spellings = ['mona@firm.example', 'MONA@firm.example', ' mona@FIRM.example ', 'Mona@Firm.Example', 'mona@firm.example '];
     for (let index = 0; index < AUTH_OTP_IDENTIFIER_CEILING; index += 1) {
@@ -122,6 +138,8 @@ describe('one source cannot lock a named address out (fix round T4, T5)', () => 
     }
     const identifierBinding = runtime.env.AUTH_OTP_IDENTIFIER_RATE_LIMITER as ReturnType<typeof countingRateLimit>;
     expect(new Set(identifierBinding.limit.mock.calls.map(([options]) => options.key)).size).toBe(1);
-    expect(doubles.supabaseAuth.signInWithOtp.mock.calls.map(([options]) => options)).toEqual(spellings.map(() => ({ phone: '+201001234567' })));
+    expect(doubles.supabaseAuth.signInWithOtp.mock.calls.map(([options]) => options)).toEqual(
+      spellings.map(() => ({ phone: '+201001234567', options: { captchaToken: undefined } })),
+    );
   });
 });

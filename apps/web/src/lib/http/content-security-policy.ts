@@ -1,3 +1,5 @@
+import { TURNSTILE_ORIGIN } from '@/lib/auth/turnstile';
+
 // The Content Security Policy, as data (S6, go-live security). PURE, no Next
 // import: lib/http/security-headers.ts decides who gets it, public/_headers
 // carries the static-asset copy (src/test/static-headers.test.ts keeps them equal).
@@ -16,7 +18,8 @@
 // a signed upload URL, in img-src a paid client's lightbox 302 to a signed URL;
 // blob: images are logo previews; data: fonts are the proposal preview's srcDoc
 // iframe, which inherits this policy; 'unsafe-inline' scripts are the Next RSC
-// payload and the public/index.html locale redirector.
+// payload and the public/index.html locale redirector. The Turnstile origin in
+// script-src and frame-src is the sign-in widget's api.js and its iframe.
 
 /** Enforced now: cannot break a Next app with inline scripts. frame-ancestors only works when enforced. */
 export const ENFORCED_CSP = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'";
@@ -30,12 +33,12 @@ interface Directive {
 
 const REPORT_ONLY_DIRECTIVES: readonly Directive[] = [
   { name: 'default-src', sources: "'self'" },
-  { name: 'script-src', sources: "'self' 'unsafe-inline'" },
+  { name: 'script-src', sources: `'self' 'unsafe-inline' ${TURNSTILE_ORIGIN}` },
   { name: 'style-src', sources: "'self' 'unsafe-inline'" },
   { name: 'img-src', sources: "'self' data: blob:", extraOrigins: true },
   { name: 'font-src', sources: "'self' data:" },
   { name: 'connect-src', sources: "'self'", extraOrigins: true },
-  { name: 'frame-src', sources: "'self'" },
+  { name: 'frame-src', sources: `'self' ${TURNSTILE_ORIGIN}` },
   { name: 'worker-src', sources: "'self'" },
   { name: 'manifest-src', sources: "'self'" },
   { name: 'base-uri', sources: "'self'" },

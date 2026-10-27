@@ -109,7 +109,8 @@ hreflang links and the noindex exemption all read it.
   `og:image`, sitemap, robots). Moving to a custom domain needs no code change:
   add it as a Workers Custom Domain on `metra-web`, set the
   `NEXT_PUBLIC_APP_URL` Actions variable to it, deploy, then update the Supabase
-  Auth Site URL and redirect URLs.
+  Auth Site URL and redirect URLs. Add the new hostname to the Turnstile widget
+  BEFORE switching (see "Go-live security", owner step 6).
 - **Search Console and Bing verification.** Set the optional Actions variables
   `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` and/or
   `NEXT_PUBLIC_BING_SITE_VERIFICATION` to the token alone (the `content` value
@@ -153,7 +154,13 @@ is `Content-Security-Policy-Report-Only`, with no report endpoint: a violation
 only shows in the browser console. Once a console walk of every flow and a week
 of real use show none, the follow-up moves it into the enforced header (one
 constant plus the `_headers` line). Rolling back an enforced directive is the
-same edit the other way.
+same edit the other way. The Report-Only `script-src` and `frame-src` name
+`https://challenges.cloudflare.com`: the sign-in Turnstile widget's `api.js` and
+its iframe (`src/lib/auth/turnstile.ts`).
+
+**Never give the login pages `Referrer-Policy: no-referrer`.** Turnstile checks
+the hostname that embeds the widget; the login keeps
+`strict-origin-when-cross-origin` (the `/*` block of `public/_headers`).
 
 **Never add a security header in `next.config.mjs` `headers()`.** OpenNext gives
 those PRIORITY over middleware headers, so a global `Referrer-Policy` there
@@ -188,7 +195,7 @@ History, so the setup is not accidentally reverted.
 Auto-deploy is already on; what follows is the recovery procedure, not a to-do.
 In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 
-#### Variables tab → New repository variable (7, plus 2 optional)
+#### Variables tab → New repository variable (7, plus 3 optional)
 
 | Name | Value |
 |------|-------|
@@ -200,6 +207,7 @@ In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 | `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | optional: the Search Console token alone (see "Search engines" above) |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | optional: the Bing Webmaster `msvalidate.01` token alone |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | optional: the Turnstile SITE key (never the secret); blank = no widget. Once Supabase CAPTCHA is on it is REQUIRED: removing it stops every email sign-in |
 | `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
 
 #### Secrets tab → New repository secret (1)
@@ -448,6 +456,24 @@ every owner step below is done by hand, once.
   zero, `ext 9`) is refused as `phone_format` and never sent.
   Like every binding it counts per data centre, and a binding **missing** on
   Cloudflare makes sign-in answer 500, by design.
+- **Sign-in sends carry a Turnstile token** (security test T3), once the
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` Actions variable is set. The login page shows
+  a Managed widget, interaction-only (most people see nothing), and each send
+  (Resend included) takes a fresh single-use token. Our route only passes it to
+  Supabase (`options.captchaToken`); Supabase checks it with the secret key in
+  its own dashboard, so a script calling Supabase's `/auth/v1/otp` directly is
+  challenged too. The Worker holds no Turnstile secret and never calls
+  siteverify. Supabase refusing the token answers `otp_captcha_failed`; a
+  Turnstile outage fails CLOSED (the referenced `generic`), and signed-in
+  sessions are unaffected. Verify sends no token: Supabase does not challenge
+  it. Without the variable there is no widget, no script, and the send body is
+  exactly what it was. The login page stays a static asset: the key is inlined
+  into its client chunk at build time.
+  **Local dev:** Cloudflare's always-pass test key `1x00000000000000000000AA`
+  shows the widget locally, but once CAPTCHA is on in Supabase its dummy token
+  is refused by the shared project. To sign in from `next dev` against the
+  shared project, use the real site key with `localhost` added to the widget
+  (owner decision D4).
 - **Daily email caps per studio** (`apps/web/src/lib/email/daily-caps.ts`,
   owner decision D4): 20 team invite emails and 60 client emails (proposal sends
   plus delivery reminder emails) per rolling 24 hours, counted from rows the app
@@ -509,18 +535,53 @@ every owner step below is done by hand, once.
    Settings, Bindings: `AUTH_OTP_IP_RATE_LIMITER` and
    `AUTH_OTP_IDENTIFIER_RATE_LIMITER` are listed (`wrangler deploy` creates them
    from `wrangler.jsonc`; nothing to create by hand).
-6. **Turnstile, once its PR exists, in THIS order: (a) add the widget in the
-   Cloudflare dashboard for the Worker's host, mode Managed; (b) add the Actions
-   variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; (c) merge and deploy that PR;
-   (d) only then, Supabase, Authentication, Attack Protection: enable CAPTCHA,
-   provider Turnstile, paste the secret key. Doing (d) before (c) breaks every
-   sign-in.**
+6. **Turnstile (T3), in EXACTLY this order.** Enabling CAPTCHA in Supabase
+   before the deploy, or shipping a build without the site key while it is on,
+   stops every email sign-in.
+   1. **Cloudflare dashboard, Turnstile, Add widget.** Name `Metra sign-in`.
+      Hostnames: `metra-web.nabil-hakeem22.workers.dev` only (never
+      `workers.dev` on its own; `localhost` only if you sign in from local dev,
+      D4). Widget Mode **Managed**, Pre-clearance **No**, Create. Copy the
+      **Site Key** and the **Secret Key** somewhere private. The secret goes
+      ONLY into Supabase (step 6.5): never into GitHub, wrangler or a chat.
+   2. **GitHub, the repo, Settings, Secrets and variables, Actions, Variables.**
+      New repository variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = the **Site
+      Key**. A secret-shaped value fails the build on purpose, naming the
+      variable.
+   3. **Merge and deploy the Turnstile PR.** Watch the deploy workflow go green.
+   4. **Smoke test, CAPTCHA still OFF in Supabase:** open `/ar-EG/login` in a
+      private window on a phone (or 390 px DevTools) and sign in end to end; in
+      DevTools, Network, the `send` request body contains `captchaToken`;
+      Console: no Turnstile error (code 110200 means the hostname is missing
+      from the widget). Wait at least 10 minutes after the deploy before step
+      6.5, so login tabs opened before it have reloaded.
+   5. **Supabase dashboard, Authentication, Attack Protection** (older
+      dashboards: Settings, Bot and Abuse Protection): Enable CAPTCHA
+      protection, provider **Turnstile by Cloudflare**, paste the **Secret
+      Key**, Save. No `wrangler secret put` is needed: the Worker never holds
+      the secret.
+   6. **(Optional, recommended) Custom SMTP (Resend)** in Supabase Auth, to lift
+      the built-in mailer's 100 emails per hour (T3).
+   7. **Smoke test, CAPTCHA ON:** email sign-in end to end in both locales
+      (phone too, if SMS is on). The verify step must succeed. Then
+      ```bash
+      curl -s -X POST https://metra-web.nabil-hakeem22.workers.dev/api/auth/otp/send         -H "origin: https://metra-web.nabil-hakeem22.workers.dev"         -H "content-type: application/json"         -d '{"channel":"email","identifier":"<your address>"}'
+      ```
+      must answer `{"ok":false,"error":"otp_captcha_failed"}`, and no email
+      arrives.
+   8. **Rollback, if step 6.7 fails:** turn CAPTCHA OFF in Supabase (instant),
+      and send the lead the exact failure (send or verify). Never remove the
+      GitHub variable while CAPTCHA is on: that stops every email sign-in.
+   9. **Custom domain, later:** add the new hostname to the same widget BEFORE
+      switching DNS or `NEXT_PUBLIC_APP_URL`. The keys do not change and no
+      redeploy is needed for Turnstile.
 7. **Supabase Pro before the first paying studio.** On Free, 1 GB of storage and
    5 GB of egress are shared by every studio, and there is no per-studio quota
    yet.
-8. **When a custom domain arrives** (its own PR): `workers_dev: false`, update
-   `NEXT_PUBLIC_APP_URL` and the cron `APP_ORIGIN`, then the zone's HSTS, Always
-   Use HTTPS and minimum TLS 1.2.
+8. **When a custom domain arrives** (its own PR): add the new hostname to the
+   Turnstile widget BEFORE switching (step 6.9), then `workers_dev: false`,
+   update `NEXT_PUBLIC_APP_URL` and the cron `APP_ORIGIN`, then the zone's HSTS,
+   Always Use HTTPS and minimum TLS 1.2.
 
 ## Supabase Free plan: no Storage image transformations
 

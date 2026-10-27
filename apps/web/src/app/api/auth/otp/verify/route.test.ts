@@ -53,6 +53,12 @@ describe('POST /api/auth/otp/verify', () => {
     expect(doubles.writtenCookies).toEqual(doubles.WRITTEN_SESSION_COOKIES);
   });
 
+  it('a captchaToken in the body never reaches Supabase: verify is not challenged (AC8)', async () => {
+    const body = JSON.stringify({ channel: 'email', identifier: 'mona@firm.example', token: '123456', captchaToken: 'tok' });
+    expect((await verify(body)).body).toEqual({ ok: true, next: '/dashboard' });
+    expect(doubles.supabaseAuth.verifyOtp.mock.calls[0]![0]).toStrictEqual({ email: 'mona@firm.example', token: '123456', type: 'email' });
+  });
+
   it('a user without a workspace lands on onboarding', async () => {
     doubles.withUserContext.mockResolvedValueOnce([]);
     expect(await verify(EMAIL_CODE)).toEqual({ status: 200, body: { ok: true, next: '/onboarding' } });

@@ -37,6 +37,8 @@ const ALL_CODES: ActionCode[] = [
   'daily_email_cap_reached',
   'otp_sms_unavailable',
   'otp_email_unavailable',
+  'otp_captcha_failed',
+  'otp_captcha_pending',
   'immutable',
   'code_required',
   'code_taken',

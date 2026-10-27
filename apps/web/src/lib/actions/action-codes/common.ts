@@ -48,6 +48,11 @@ export type CommonActionCode =
   | 'daily_email_cap_reached'
   | 'otp_sms_unavailable'
   | 'otp_email_unavailable'
+  // Supabase refused the sign-in challenge token (lib/auth/otp-failure.ts), or
+  // the widget failed in the browser.
+  | 'otp_captcha_failed'
+  // Client only: the login form has no challenge token yet, so nothing was sent.
+  | 'otp_captcha_pending'
   | 'immutable'
   | 'code_required'
   | 'code_taken'

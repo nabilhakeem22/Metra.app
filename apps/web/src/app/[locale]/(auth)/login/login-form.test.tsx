@@ -74,6 +74,15 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
     expect(document.activeElement).toBe(identifier());
   });
 
+  test('a build without a Turnstile site key: no widget slot, no script, no token (AC15)', async () => {
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    renderLogin();
+    expect(screen.getByRole('status').previousElementSibling?.contains(identifier())).toBe(true);
+    await sendTo('mona@firm.example');
+    expect(actions.sendEmailOtp.mock.calls).toEqual([['mona@firm.example', undefined]]);
+    expect(document.querySelector('script[src*="challenges.cloudflare.com"]')).toBeNull();
+  });
+
   test('a malformed address is said under the box and never sent', async () => {
     renderLogin();
     await sendTo('mona@firm');

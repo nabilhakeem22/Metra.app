@@ -22,14 +22,18 @@ export function loginReturnOf(value: unknown): LoginReturn | undefined {
   return value === 'site' ? 'site' : undefined;
 }
 
-export interface OtpSendRequest {
+/** Who a sign-in code is for: both requests carry it. */
+export interface OtpIdentity {
   channel: OtpChannel;
   identifier: string;
 }
 
-export interface OtpVerifyRequest {
-  channel: OtpChannel;
-  identifier: string;
+export interface OtpSendRequest extends OtpIdentity {
+  /** The login page's Turnstile token; absent when the build has no site key. Supabase checks it (CAPTCHA on). */
+  captchaToken?: string;
+}
+
+export interface OtpVerifyRequest extends OtpIdentity {
   token: string;
   /** Present only when the sign-in began in the site app. */
   return?: LoginReturn;
@@ -40,6 +44,9 @@ export type OtpVerifyResult = ActionResult & { next?: PostLoginPath };
 
 /** A code is 6 digits; anything this long is not a code. */
 const MAX_TOKEN_LENGTH = 16;
+
+/** Cloudflare: a Turnstile token is at most 2048 characters. */
+export const MAX_CAPTCHA_TOKEN_LENGTH = 2048;
 
 function isChannel(value: unknown): value is OtpChannel {
   return value === 'email' || value === 'phone';
@@ -53,20 +60,35 @@ function fieldsOf(body: unknown): Record<string, unknown> | null {
   return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
 }
 
-/** The send request, or null when the body has the wrong shape. */
-export function parseOtpSendRequest(body: unknown): OtpSendRequest | null {
+/** Who the code is for, or null when the body has the wrong shape. Any other field is left behind. */
+function parseOtpIdentity(body: unknown): OtpIdentity | null {
   const fields = fieldsOf(body);
   if (!fields || !isChannel(fields.channel) || !isBoundedString(fields.identifier, MAX_IDENTIFIER_LENGTH)) return null;
   return { channel: fields.channel, identifier: fields.identifier };
 }
 
-/** The verify request, or null when the body has the wrong shape (a `return` other than 'site' included). */
+/**
+ * The send request, or null when the identity is malformed, or a captchaToken
+ * is present but not a non-empty string of at most 2048 characters.
+ */
+export function parseOtpSendRequest(body: unknown): OtpSendRequest | null {
+  const identity = parseOtpIdentity(body);
+  const captchaToken = fieldsOf(body)?.captchaToken;
+  if (!identity) return null;
+  if (captchaToken === undefined) return identity;
+  return isBoundedString(captchaToken, MAX_CAPTCHA_TOKEN_LENGTH) && captchaToken !== '' ? { ...identity, captchaToken } : null;
+}
+
+/**
+ * The verify request, or null when the body has the wrong shape (a `return`
+ * other than 'site' included). A captchaToken is never copied: verify is not challenged.
+ */
 export function parseOtpVerifyRequest(body: unknown): OtpVerifyRequest | null {
-  const send = parseOtpSendRequest(body);
+  const identity = parseOtpIdentity(body);
   const fields = fieldsOf(body);
   const token = fields?.token;
-  if (!send || !isBoundedString(token, MAX_TOKEN_LENGTH)) return null;
-  if (fields?.return === undefined) return { ...send, token };
+  if (!identity || !isBoundedString(token, MAX_TOKEN_LENGTH)) return null;
+  if (fields?.return === undefined) return { ...identity, token };
   const returnTo = loginReturnOf(fields.return);
-  return returnTo ? { ...send, token, return: returnTo } : null;
+  return returnTo ? { ...identity, token, return: returnTo } : null;
 }

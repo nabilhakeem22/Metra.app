@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react';
 import { useCountdown } from '@/hooks/use-countdown';
 import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { sendEmailOtp, sendPhoneOtp, verifyEmailOtp, verifyPhoneOtp } from '@/lib/auth/otp-client';
 import { loginReturnOf } from '@/lib/auth/otp-contract';
 import {
@@ -15,6 +15,7 @@ import {
   type OtpField,
 } from '@/lib/auth/otp-field-rules';
 import { signInErrorTranslator } from './sign-in-errors';
+import type { CaptchaPass } from './use-captcha';
 
 type Status = 'idle' | 'sending' | 'code-sent' | 'verifying' | 'error' | 'success';
 
@@ -25,9 +26,10 @@ const RESEND_SECONDS = 60;
  * refusal lands under its own box (the identifier, then the code); one that
  * belongs to no box (a rate limit, a provider that is off, a dropped
  * connection) goes to the status line. A rejected call leaves the busy state,
- * so the button never spins for ever.
+ * so the button never spins for ever. Every send (Resend included) takes a
+ * fresh challenge token from `takeCaptcha`; without one nothing is sent.
  */
-export function useOtpFlow() {
+export function useOtpFlow(takeCaptcha: () => CaptchaPass) {
   const te = useTranslations('errors');
   const tl = useTranslations('login');
   const router = useRouter();
@@ -57,10 +59,17 @@ export function useOtpFlow() {
 
   function send(): void {
     if (errors.applyLocal(otpIdentifierErrors(channel, identifier))) return;
+    // After the box check, so an empty box never spends a token.
+    const pass = takeCaptcha();
+    if (!pass.ok) {
+      errors.applyResult(err(pass.error));
+      setStatus('error');
+      return;
+    }
     setStatus('sending');
     startTransition(async () => {
       const sent = await attempt(() =>
-        channel === 'email' ? sendEmailOtp(identifier) : sendPhoneOtp(identifier),
+        channel === 'email' ? sendEmailOtp(identifier, pass.token) : sendPhoneOtp(identifier, pass.token),
       );
       if (!sent) return;
       setPhase('verify');

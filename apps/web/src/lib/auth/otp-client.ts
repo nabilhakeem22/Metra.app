@@ -38,12 +38,13 @@ async function postOtp<Result extends ActionResult>(path: string, request: OtpSe
   return body as Result;
 }
 
-export function sendEmailOtp(email: string): Promise<ActionResult> {
-  return postOtp(OTP_SEND_PATH, { channel: 'email', identifier: email });
+/** `captchaToken` is the Turnstile token; undefined (no site key) leaves it out of the body, exactly as before. */
+export function sendEmailOtp(email: string, captchaToken?: string): Promise<ActionResult> {
+  return postOtp(OTP_SEND_PATH, { channel: 'email', identifier: email, captchaToken });
 }
 
-export function sendPhoneOtp(phone: string): Promise<ActionResult> {
-  return postOtp(OTP_SEND_PATH, { channel: 'phone', identifier: phone });
+export function sendPhoneOtp(phone: string, captchaToken?: string): Promise<ActionResult> {
+  return postOtp(OTP_SEND_PATH, { channel: 'phone', identifier: phone, captchaToken });
 }
 
 /** `returnTo` is set when the sign-in began in the site app; undefined leaves `return` out of the body. */
