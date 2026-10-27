@@ -32,6 +32,9 @@ function fakeBrowser() {
     calls,
     requestHandlers,
     newPage: async () => ({
+      setJavaScriptEnabled: async (enabled: boolean) => {
+        calls.push(`setJavaScriptEnabled:${enabled}`);
+      },
       setRequestInterception: async (enabled: boolean) => {
         calls.push(`setRequestInterception:${enabled}`);
       },
@@ -101,9 +104,9 @@ describe('renderPdf: the network fence (S8)', () => {
     return browser;
   }
 
-  it('turns interception on and registers the handler before setContent', async () => {
+  it('turns JavaScript off, then interception on, and registers the handler, all before setContent (T7)', async () => {
     const { calls } = await renderedWithFence();
-    expect(calls).toEqual(['setRequestInterception:true', 'on:request', 'setContent']);
+    expect(calls).toEqual(['setJavaScriptEnabled:false', 'setRequestInterception:true', 'on:request', 'setContent']);
   });
 
   it('aborts an https request and logs its scheme only', async () => {

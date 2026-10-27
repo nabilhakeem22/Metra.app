@@ -52,13 +52,18 @@ async function settleRenderRequest(request: HTTPRequest): Promise<void> {
 }
 
 /**
- * The render's network fence (S8, go-live security): every request the page
- * makes is intercepted, and only inline data and about:blank go through. The
- * page has no reason to fetch anything (fonts are base64 @font-face), so an
- * injected `<img src=https://...>` is aborted instead of fetched. Puppeteer
- * never intercepts data: URLs, so the embedded fonts pay no round trip.
+ * The render page's fence, set before any content (S8, go-live security, and
+ * fix round T7). JavaScript is OFF: a template runs no script, so an injected
+ * one cannot open a WebSocket or anything else the interception never sees
+ * (the template's CSP meta, PDF_CSP_META, is the second lock).
+ * `document.fonts.ready` below is evaluated by puppeteer itself, which still
+ * works with page scripts off. Then every request the page makes is
+ * intercepted, and only inline data and about:blank go through: an injected
+ * `<img src=https://...>` is aborted instead of fetched. Puppeteer never
+ * intercepts data: URLs, so the embedded fonts pay no round trip.
  */
 async function fenceNetwork(page: Page): Promise<void> {
+  await page.setJavaScriptEnabled(false);
   await page.setRequestInterception(true);
   page.on('request', (request) => void settleRenderRequest(request));
 }

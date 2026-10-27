@@ -15,6 +15,7 @@ vi.mock('@/lib/cf/context', () => ({
 }));
 
 const { buildProposalHtml } = await import('./proposal-template');
+const { PDF_CSP_META } = await import('./render-request-policy');
 
 function detail(): ProposalDetail {
   return {
@@ -135,5 +136,10 @@ describe('buildProposalHtml — F6: the org name is escaped exactly once', () =>
     });
     expect(html).not.toContain('<script>x</script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('carries the PDF CSP right after its charset, before anything else (T7)', async () => {
+    const html = await buildProposalHtml(detail(), { ...opts, locale: 'en' });
+    expect(html).toContain(['<meta charset="utf-8" />', PDF_CSP_META, '<style>'].join('\n'));
   });
 });
