@@ -6,10 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const getBucket = vi.fn<() => Promise<{ data: unknown }>>();
-const createBucket = vi.fn<() => Promise<{ error: unknown }>>();
+const createBucket = vi.fn<(name: string, options: unknown) => Promise<{ error: unknown }>>();
+const updateBucket = vi.fn();
 vi.mock('@/lib/supabase/admin', () => ({
   createSupabaseAdminClient: () => ({
-    storage: { getBucket, createBucket },
+    storage: { getBucket, createBucket, updateBucket },
   }),
 }));
 vi.mock('@/lib/db/context', () => ({ withOrgContext: vi.fn() }));
@@ -23,7 +24,8 @@ async function freshStorage() {
 beforeEach(() => {
   getBucket.mockReset();
   createBucket.mockReset();
-  getBucket.mockResolvedValue({ data: { name: 'metra-files' } });
+  updateBucket.mockReset();
+  getBucket.mockResolvedValue({ data: { name: 'metra-files', file_size_limit: 52428800 } });
   createBucket.mockResolvedValue({ error: null });
 });
 
@@ -68,5 +70,35 @@ describe('ensureFilesBucket', () => {
     getBucket.mockResolvedValueOnce({ data: null });
     createBucket.mockResolvedValueOnce({ error: { message: 'Bucket already exists' } });
     await expect(ensureFilesBucket()).resolves.toBeUndefined();
+  });
+});
+
+describe('the files bucket size limit (S3)', () => {
+  it('creates a missing bucket private, with the 50 MB limit', async () => {
+    const { ensureFilesBucket } = await freshStorage();
+    getBucket.mockResolvedValueOnce({ data: null });
+    await ensureFilesBucket();
+    expect(createBucket).toHaveBeenCalledWith('metra-files', { public: false, fileSizeLimit: 52428800 });
+  });
+
+  it('logs an existing bucket without a limit once, and never changes it', async () => {
+    const { ensureFilesBucket } = await freshStorage();
+    getBucket.mockResolvedValue({ data: { name: 'metra-files', file_size_limit: null } });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await ensureFilesBucket();
+    await ensureFilesBucket();
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith('files bucket has no file size limit (runbook: docs/DEPLOY.md, storage limits)', { bucket: 'metra-files' });
+    expect(updateBucket).not.toHaveBeenCalled();
+    expect(createBucket).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('says nothing about a bucket that has its limit', async () => {
+    const { ensureFilesBucket } = await freshStorage();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await ensureFilesBucket();
+    expect(logged).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 });
