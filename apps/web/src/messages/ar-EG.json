@@ -1749,6 +1749,7 @@
     "originalValue": "القيمة الأصلية",
     "revisedValue": "القيمة المعدلة",
     "signedOn": "اتوقّع يوم {date} ({via, select, paper {ورقيًا} other {إلكترونيًا}})",
+    "signedOnBy": "اتوقّع إلكترونيًا يوم {date} باسم {name}",
     "value": "القيمة",
     "saveDraft": "حفظ كمسودة",
     "saved": "تم الحفظ",

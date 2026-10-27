@@ -98,6 +98,7 @@ function viewOf(flow: ExecutionFlowFacts, may = EVERYTHING): ExecutionCardView {
       boqId: 'b-1',
       contract: contract && { id: 'c-1', number: 7, createdAt: '2026-10-01T09:00:00.000Z', status: contract.status },
       nextInstalment: { labelAr: 'دفعة مقدمة', labelEn: 'Advance' },
+      signed: contract?.status === 'signed' ? { on: '2026-10-15', via: 'online', signerName: 'Hesham Adel' } : null,
     },
     { projectId: 'p-1', may },
   );
@@ -448,6 +449,22 @@ describe('the card at execution', () => {
     expect(locateExecutionForStudio(signing.flow).whoseMove).toBe('client');
     expect(notice(signing, false)).toBeNull();
     expect(notice(view('send_contract'), false)).toBeNull();
+  });
+
+  test.each<TestLocale>(['en', 'ar-EG'])('H6.2 F4: a signed contract says when, how, and the name the client signed with online (%s)', (locale) => {
+    const line = (cardView: ExecutionCardView) => {
+      const { container, unmount } = renderCard(cardView, { locale });
+      const text = container.querySelector('[data-contract-signed]')?.textContent ?? null;
+      unmount();
+      return text;
+    };
+    const named = messageAt(locale, 'contracts.signedOnBy').replace('{date}', '15/10/2026').replace('{name}', '⁨Hesham Adel⁩');
+    expect(line(view('send_milestone_request'))).toBe(named);
+    const paper = view('send_milestone_request');
+    expect(line({ ...paper, contract: paper.contract && { ...paper.contract, signed: { on: '2026-10-15', via: 'paper', signerName: null } } })).toBe(
+      locale === 'en' ? 'Signed on 15/10/2026 (on paper)' : 'اتوقّع يوم 15/10/2026 (ورقيًا)',
+    );
+    expect(line(view('record_signed_offline'))).toBeNull();
   });
 
   test('a client payment claim left on the finished design can still be dismissed, by a role that resolves claims', () => {

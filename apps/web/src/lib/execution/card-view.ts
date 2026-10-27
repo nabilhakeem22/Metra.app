@@ -2,10 +2,14 @@
 // action, the ids that action needs, and what this role may do about it.
 // PURE and CLIENT-SAFE (types and one assembly with no I/O): the server builds
 // it once, the card only renders it.
+import type { ContractSigning } from '@/lib/contracts/queries/detail-types';
 import type { ExecutionFlowFacts } from '@/lib/flow/locate/execution-facts';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { ExecutionCardFacts } from './flow-facts';
 import { executionStage, type ExecutionNextAction, type ExecutionStage } from './stage';
+
+/** What the cockpit's card is built from: the delivery's execution facts, and how its contract was signed. */
+export type ExecutionCockpitFacts = ExecutionCardFacts & { signed: ContractSigning | null };
 
 export interface ExecutionCardView {
   stage: ExecutionStage;
@@ -14,7 +18,8 @@ export interface ExecutionCardView {
   flow: ExecutionFlowFacts;
   projectId: string;
   boqId: string | null;
-  contract: { id: string; documentNumber: string } | null;
+  /** `signed`: when, how and (online) by what name the contract was signed; null before (H6.2 functional F4). */
+  contract: { id: string; documentNumber: string; signed: ContractSigning | null } | null;
   /** The schedule row the next payment request would bill, by its labels; null when none is next. */
   nextInstalment: { labelAr: string | null; labelEn: string | null } | null;
   may: {
@@ -36,7 +41,7 @@ export interface ExecutionCardView {
 }
 
 export function executionCardView(
-  card: ExecutionCardFacts,
+  card: ExecutionCockpitFacts,
   context: { projectId: string; may: ExecutionCardView['may'] },
 ): ExecutionCardView {
   const { stage, next } = executionStage(card.flow.stage);
@@ -50,6 +55,7 @@ export function executionCardView(
       ? {
           id: card.contract.id,
           documentNumber: formatDocNumber('C', card.contract.number, docYear(null, card.contract.createdAt)),
+          signed: card.signed,
         }
       : null,
     nextInstalment: card.nextInstalment,

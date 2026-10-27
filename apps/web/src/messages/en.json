@@ -1749,6 +1749,7 @@
     "originalValue": "Original value",
     "revisedValue": "Revised value",
     "signedOn": "Signed on {date} ({via, select, paper {on paper} other {online}})",
+    "signedOnBy": "Signed online on {date} by {name}",
     "value": "Value",
     "saveDraft": "Save draft",
     "saved": "Saved",

@@ -12,21 +12,29 @@ import 'server-only';
 // the same statement through its token function, so the cockpit and the
 // client derive their facts from one SQL (../flow-facts.ts).
 import { sql } from 'drizzle-orm';
+import { loadContractSigning } from '@/lib/contracts/queries/signing';
 import { loadScheduleRows, scheduleView, type ContractScheduleView } from '@/lib/contracts/schedule/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { contractStageFacts, executionCardFactsOf, type ExecutionCardFacts, type StagedContract } from '../flow-facts';
+import type { ExecutionCockpitFacts } from '../card-view';
+import { contractStageFacts, executionCardFactsOf, type StagedContract } from '../flow-facts';
 import { executionFlowSourceOf } from '../flow-source';
 import { executionStage, type ExecutionStage } from '../stage';
 import { loadMeasuredWorks } from './measured-works';
 import { loadContractMoneyFacts } from './money-facts';
 
-/** The execution card's facts for a delivery at `execution`. */
-export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promise<ExecutionCardFacts> {
+/**
+ * The execution card's facts for a delivery at `execution`, and, once its
+ * contract is signed, how (the studio sees the name an online signer typed,
+ * H6.2 functional F4): a second statement only then.
+ */
+export function getExecutionFacts(ctx: OrgContext, engagementId: string): Promise<ExecutionCockpitFacts> {
   return withOrgContext(ctx, async (tx) => {
     const rows = (await tx.execute(sql`select public.app_execution_flow_source(${engagementId}) as source`)) as unknown as Array<{
       source: unknown;
     }>;
-    return executionCardFactsOf(executionFlowSourceOf(rows[0].source));
+    const card = executionCardFactsOf(executionFlowSourceOf(rows[0].source));
+    const signed = card.contract?.status === 'signed' ? await loadContractSigning(tx, card.contract.id) : null;
+    return { ...card, signed };
   });
 }
 

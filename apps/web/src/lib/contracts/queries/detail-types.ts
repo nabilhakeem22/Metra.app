@@ -97,6 +97,8 @@ export interface ContractSigning {
   /** YYYY-MM-DD, the day in Cairo. */
   on: string;
   via: 'online' | 'paper';
+  /** The name the client typed to sign online; null on paper, or when none was typed (/c accepts none). */
+  signerName: string | null;
 }
 
 /** Everything about a contract but its sections. */

@@ -176,9 +176,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
     expect(lineReads.loadSectionLines).toHaveBeenCalledTimes(1);
   });
 
-  test('a signed contract says the Cairo day and the way it was signed (F4)', () => {
-    for (const via of ['paper', 'online'] as const) {
-      const detail = { id: 'k-1', status: 'signed', originalValue: '1', revisedValue: '1', signed: { on: '2026-10-15', via } };
+  test('a signed contract says the Cairo day and the way it was signed (F4), and the name an online signer typed (H6.2 F4)', () => {
+    for (const via of ['paper', 'online', 'named'] as const) {
+      const signed = via === 'named' ? { on: '2026-10-15', via: 'online', signerName: 'Hesham Adel' } : { on: '2026-10-15', via, signerName: null };
+      const detail = { id: 'k-1', status: 'signed', originalValue: '1', revisedValue: '1', signed };
       const { unmount } = renderWithIntl(
         <ContractDetailClient
           {...contractPagePayload(detail as unknown as ContractPageDetail, { seeContract: true, seeRegister: true })}
@@ -199,7 +200,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract lines, a page at a time (%s
         />,
         { locale },
       );
-      const said = { en: { paper: 'Signed on 15/10/2026 (on paper)', online: 'Signed on 15/10/2026 (online)' }, 'ar-EG': { paper: 'اتوقّع يوم 15/10/2026 (ورقيًا)', online: 'اتوقّع يوم 15/10/2026 (إلكترونيًا)' } };
+      const named = { en: 'Signed online on 15/10/2026 by ⁨Hesham Adel⁩', 'ar-EG': 'اتوقّع إلكترونيًا يوم 15/10/2026 باسم ⁨Hesham Adel⁩' };
+      const said = { en: { paper: 'Signed on 15/10/2026 (on paper)', online: 'Signed on 15/10/2026 (online)', named: named.en }, 'ar-EG': { paper: 'اتوقّع يوم 15/10/2026 (ورقيًا)', online: 'اتوقّع يوم 15/10/2026 (إلكترونيًا)', named: named['ar-EG'] } };
       expect(screen.getByText(said[locale][via])).toBeTruthy();
       unmount();
     }

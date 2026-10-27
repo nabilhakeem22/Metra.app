@@ -141,7 +141,7 @@ describe('recordContractSignedOfflineCore', () => {
     expect(await recordContractSignedOfflineCore(ctx.owner!, { contractId: id, signedOn: '2026-10-05' })).toMatchObject({ ok: true });
     expect(await trail(id)).toMatchObject({ status: 'signed', day: '2026-10-05' });
     // The contract page says the same Cairo day, and how (F4).
-    expect((await getContractPage(ctx.owner!, id, true))!.signed).toEqual({ on: '2026-10-05', via: 'paper' });
+    expect((await getContractPage(ctx.owner!, id, true))!.signed).toEqual({ on: '2026-10-05', via: 'paper', signerName: null });
   });
 
   it('says year 0 is not a day (never a 22008), and a null or non-object payload is malformed', async () => {

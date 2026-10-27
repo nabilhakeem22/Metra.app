@@ -1,5 +1,6 @@
 'use client';
 
+import { ContractSigningLine } from '@/components/contracts/contract-signing-line';
 import { StepCard, StepHeadline } from '@/components/flow/step-card';
 import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
 import { executionMoveIsClientPayment } from '@/lib/engagements/no-email-notice';
@@ -29,7 +30,8 @@ export type ExecutionStepCardProps = Pick<
 // "Record costs" and "Record measurements" beside it. A client payment claim
 // left on the finished design is still dismissed here, as it was before. While
 // the client owes a payment and has no email on file, one line says they
-// cannot report it online (./no-email-notice.tsx).
+// cannot report it online (./no-email-notice.tsx). Once the contract is
+// signed, one line says when and how, and the name an online signer typed.
 // Composition only: the copy is execution-step-copy.ts, the controls
 // command-card-execution.tsx, the rail execution-phase-rail.tsx.
 export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCardProps; execution: ExecutionCockpit }) {
@@ -59,6 +61,9 @@ export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCard
         <div>
           <StepHeadline eyebrow={copy.eyebrow} headline={copy.headline} hint={copy.hint} />
         </div>
+        {view.contract?.signed && (
+          <ContractSigningLine signed={view.contract.signed} className="block text-caption text-muted-foreground" />
+        )}
         {!card.clientHasEmail && executionMoveIsClientPayment(view.next, location.whoseMove) && <NoEmailNotice />}
         {view.next && copy.actionLabel && (
           <ExecutionNextAction view={view} kind={view.next.kind} label={copy.actionLabel} />

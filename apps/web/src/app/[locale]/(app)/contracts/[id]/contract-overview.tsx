@@ -1,14 +1,14 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import { ContractSigningLine } from '@/components/contracts/contract-signing-line';
 import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { ChargesForm } from './charges-form';
 import { ClientPageControl } from './client-page-control';
@@ -43,7 +43,6 @@ export function ContractOverview({
 }) {
   const t = useTranslations('contracts');
   const tc = useTranslations('common');
-  const locale = useLocale();
   const { confirm, dialog } = useConfirm();
   const revised = detail.revisedValue !== detail.originalValue;
   const execution = detail.sourceBoqId !== null;
@@ -78,11 +77,7 @@ export function ContractOverview({
               {t('revisedValue')}: <span dir="ltr">{m(detail.revisedValue)}</span>
             </span>
           )}
-          {detail.signed && (
-            <span className="text-muted-foreground">
-              {t('signedOn', { date: formatDate(detail.signed.on, locale), via: detail.signed.via })}
-            </span>
-          )}
+          {detail.signed && <ContractSigningLine signed={detail.signed} className="text-muted-foreground" />}
           {execution && (
             <ContractFinishDate endDate={detail.endDate} approvedExtensionDays={detail.approvedExtensionDays} />
           )}

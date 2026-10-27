@@ -54,7 +54,7 @@ const DETAIL: ContractPageDetail = {
   approvedExtensionDays: 0,
   totalCost: '70000.0000',
   totalMargin: '28000.0000',
-  signed: { on: '2026-10-20', via: 'paper' },
+  signed: { on: '2026-10-20', via: 'paper', signerName: null },
 };
 
 const HEADER_KEYS = ['createdAt', 'id', 'number', 'sourceBoqId', 'status', 'titleAr', 'titleEn'];
