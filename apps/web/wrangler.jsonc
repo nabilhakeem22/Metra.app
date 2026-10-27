@@ -91,7 +91,7 @@
   //     prefix of the canonical email or phone (the value Supabase receives);
   //     only charged once the IP bucket allowed the request. It MUST stay above
   //     the IP ceiling, so one source alone cannot lock a named address out
-  //     (src/test/otp-ceilings.test.ts).
+  //     (src/lib/cf/wrangler-ratelimits.test.ts).
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.

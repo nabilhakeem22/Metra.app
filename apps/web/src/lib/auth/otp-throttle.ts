@@ -19,7 +19,7 @@ import { consumeRateLimit, rateLimitBinding } from '@/lib/cf/rate-limit-binding'
 // Send and verify are separate buckets in both (the step prefixes the key).
 // The IP bucket is charged first, and only a request it allows charges the
 // identifier bucket. The identifier ceiling is ABOVE the IP ceiling (fix round
-// T4, src/test/wrangler-rate-limits.ts pins it), so one source alone can never
+// T4, src/lib/cf/wrangler-ratelimits.test.ts pins it), so one source alone can never
 // exhaust a named address's budget and lock its owner out.
 //
 // PER DATA CENTRE, NOT GLOBAL, like every binding. FAILURE MODES (owner
