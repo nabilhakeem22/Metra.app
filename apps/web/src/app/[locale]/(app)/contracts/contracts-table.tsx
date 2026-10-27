@@ -12,7 +12,7 @@ import { CONTRACT_STATUS_TONE } from '@/lib/ui/record-status-tones';
 
 // A cell with no client or project name shows a dash (an em dash, written as an
 // escape so the source carries none).
-const EMPTY_CELL = '—';
+const EMPTY_CELL = '\u2014';
 
 /** The contracts register: number (a link), client, project, status and original value. */
 export function ContractsTable({
