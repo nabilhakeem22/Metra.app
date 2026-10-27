@@ -1,6 +1,8 @@
 import 'server-only';
-import puppeteer from '@cloudflare/puppeteer';
+import puppeteer, { type HTTPRequest, type Page } from '@cloudflare/puppeteer';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { cfEnv } from '@/lib/cf/context';
+import { isAllowedRenderRequest, requestSchemeOf } from './render-request-policy';
 import { RendererBusyError } from './renderer-busy';
 
 export { RendererBusyError };
@@ -33,10 +35,39 @@ function looksBusy(error: unknown): boolean {
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** Lets a render request through only when the policy allows it (data:, about:). */
+async function settleRenderRequest(request: HTTPRequest): Promise<void> {
+  const url = request.url();
+  try {
+    if (isAllowedRenderRequest(url)) {
+      await request.continue();
+      return;
+    }
+    // The scheme only: a signed Storage URL carries its token in the query.
+    console.warn('pdf render blocked a request', { scheme: requestSchemeOf(url) });
+    await request.abort('blockedbyclient');
+  } catch (error) {
+    console.warn('pdf render request was not settled', loggableFailure(error));
+  }
+}
+
+/**
+ * The render's network fence (S8, go-live security): every request the page
+ * makes is intercepted, and only inline data and about:blank go through. The
+ * page has no reason to fetch anything (fonts are base64 @font-face), so an
+ * injected `<img src=https://...>` is aborted instead of fetched. Puppeteer
+ * never intercepts data: URLs, so the embedded fonts pay no round trip.
+ */
+async function fenceNetwork(page: Page): Promise<void> {
+  await page.setRequestInterception(true);
+  page.on('request', (request) => void settleRenderRequest(request));
+}
+
 async function renderOnce(html: string): Promise<Uint8Array> {
   const browser = await puppeteer.launch(cfEnv().BROWSER);
   try {
     const page = await browser.newPage();
+    await fenceNetwork(page);
     await page.setContent(html, {
       waitUntil: 'networkidle0',
       timeout: PAGE_TIMEOUT_MS,
