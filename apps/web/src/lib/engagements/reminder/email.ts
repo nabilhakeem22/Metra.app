@@ -7,7 +7,7 @@ import { failureOf } from '@/lib/actions/failure-of';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { dailyEmailCapReached } from '@/lib/email/daily-caps';
+import { claimDailyEmail } from '@/lib/email/daily-caps';
 import { sendDeliveryReminderEmail } from '@/lib/email/delivery-senders';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { deliveryPortalUrl, portalLocale } from '../portal-url';
@@ -22,7 +22,8 @@ import { readReminderRecipient } from './recipient';
  * readLiveDeliveryLink, `client_email_missing` (no address on the client or
  * its primary contact), `reminder_too_soon` (one went out within
  * REMINDER_EMAIL_COOLDOWN_MINUTES), `daily_email_cap_reached` (the studio's
- * daily client email cap, lib/email/daily-caps.ts: no audit row, no send),
+ * daily client email cap, claimed in the same transaction as the audit row it
+ * counts, lib/email/daily-caps.ts: no audit row, no send),
  * `reminder_email_failed` (Resend refused or did not answer within
  * EMAIL_TIMEOUT_MS).
  *
@@ -38,13 +39,13 @@ export async function emailDeliveryReminderCore(
 ): Promise<ActionResult> {
   const locale = portalLocale(input.locale);
   if (!locale) return err('malformed');
-  if (await dailyEmailCapReached(ctx, 'client_email')) return err('daily_email_cap_reached');
 
   const read = await mutateInOrg(ctx, DELIVERY_LINK_GATE, async (tx, audit) => {
     const link = await readLiveDeliveryLink(tx, input.engagementId, { activeOnly: true });
     const recipient = await readReminderRecipient(tx, ctx.orgId, link.clientId);
     if (!recipient.email) fail('client_email_missing');
     await refuseIfRemindedRecently(tx, input.engagementId);
+    if (!(await claimDailyEmail(tx, ctx.orgId, 'client_email'))) fail('daily_email_cap_reached');
     await audit({
       entity: 'design_engagement',
       entityId: input.engagementId,

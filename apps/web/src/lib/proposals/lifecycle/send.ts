@@ -9,7 +9,9 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
+import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
+import { claimDailyEmail } from '@/lib/email/daily-caps';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 
 /**
@@ -79,32 +81,42 @@ async function refuseBoqProposal(tx: MetraDb, proposalId: string): Promise<void>
   if (row?.kind === 'boq') fail('proposal_is_boq');
 }
 
+/** The whole send in one transaction: admission, the cap claim, the ledger row and the audit row. */
+async function sendInTransaction(
+  tx: MetraDb,
+  ctx: OrgContext,
+  proposalId: string,
+  audit: (entry: AuditEntry) => Promise<void>,
+): Promise<{ raw: string; emailAllowed: boolean }> {
+  await refuseBoqProposal(tx, proposalId);
+  const { raw, hash } = mintShareToken();
+  const { clientId } = await sendDraftProposal(tx, proposalId, hash, shareExpiryFromNow());
+  // Before the `sent` event it counts (lib/email/daily-caps.ts).
+  const emailAllowed = await claimDailyEmail(tx, ctx.orgId, 'client_email');
+  await recordSentEvent(tx, ctx, proposalId, clientId);
+  await audit({
+    entity: 'proposal',
+    entityId: proposalId,
+    action: 'issue',
+    before: { status: 'draft' },
+    after: { status: 'sent' },
+  });
+  return { raw, emailAllowed };
+}
+
+/**
+ * `data` is the raw share token (the action wrapper turns it into the public
+ * link). `emailAllowed` says whether the client email is within the studio's
+ * daily cap; the send itself never depends on it.
+ */
 export async function sendProposalCore(
   ctx: OrgContext,
   input: { id: string },
-): Promise<ActionResult & { data?: string }> {
-  return mutateInOrg(
+): Promise<ActionResult & { data?: string; emailAllowed?: boolean }> {
+  const { data: sent, ...outcome } = await mutateInOrg(
     ctx,
     { capability: 'proposals_send', action: 'approve' },
-    async (tx, audit) => {
-      await refuseBoqProposal(tx, input.id);
-      const { raw, hash } = mintShareToken();
-      const { clientId } = await sendDraftProposal(
-        tx,
-        input.id,
-        hash,
-        shareExpiryFromNow(),
-      );
-      await recordSentEvent(tx, ctx, input.id, clientId);
-      await audit({
-        entity: 'proposal',
-        entityId: input.id,
-        action: 'issue',
-        before: { status: 'draft' },
-        after: { status: 'sent' },
-      });
-      // The raw token — the action wrapper turns it into the public link.
-      return raw;
-    },
+    (tx, audit) => sendInTransaction(tx, ctx, input.id, audit),
   );
+  return sent ? { ...outcome, data: sent.raw, emailAllowed: sent.emailAllowed } : outcome;
 }
