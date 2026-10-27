@@ -115,7 +115,8 @@ hreflang links and the noindex exemption all read it.
   `NEXT_PUBLIC_BING_SITE_VERIFICATION` to the token alone (the `content` value
   of the meta tag the console shows you), then deploy. The tag goes into the
   landing pages and into `/`. A token outside `[A-Za-z0-9_-]`, or shorter than
-  10 or longer than 100 characters, fails the build on purpose. Blank means no
+  10 or longer than 100 characters, fails the build on purpose, and the error
+  names the variable (usually the whole meta tag was pasted). Blank means no
   tag.
 
 ### Two things that were fixed to get here

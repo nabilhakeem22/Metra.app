@@ -4,6 +4,10 @@ import { defineRouting } from 'next-intl/routing';
 export const LOCALES = ['ar-EG', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];
 
+export function isLocale(value: string): value is Locale {
+  return (LOCALES as readonly string[]).includes(value);
+}
+
 export const routing = defineRouting({
   locales: LOCALES,
   defaultLocale: 'ar-EG',

@@ -11,7 +11,7 @@ import { Pricing } from '@/components/landing/pricing';
 import { ProblemValue } from '@/components/landing/problem-value';
 import { StructuredData } from '@/components/landing/structured-data';
 import { TrustBand } from '@/components/landing/trust-band';
-import { LOCALES, type Locale } from '@/i18n/routing';
+import { isLocale, LOCALES, type Locale } from '@/i18n/routing';
 import { buildLandingMetadata } from '@/lib/seo/landing-metadata';
 import './landing.css';
 
@@ -32,10 +32,13 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  // Not a locale (/wp-login.php matches this route with locale = "wp-login.php"):
+  // the layout answers 404, so the page must not add an indexable canonical to it.
+  if (!isLocale(locale)) return {};
   const t = await getTranslations({ locale, namespace: 'landing.seo' });
   const tMeta = await getTranslations({ locale, namespace: 'meta' });
   return buildLandingMetadata({
-    locale: locale as Locale,
+    locale,
     title: t('title'),
     description: t('description'),
     siteName: tMeta('siteName'),

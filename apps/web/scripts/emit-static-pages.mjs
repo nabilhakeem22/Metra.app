@@ -22,6 +22,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BING_VARIABLE, GOOGLE_VARIABLE, verificationToken } from './site-verification-token.mjs';
 
 /** The pre-rendered routes (app/[locale]/page.tsx and (auth)/login/page.tsx, one per locale). */
 const STATIC_ROUTES = ['/ar-EG', '/en', '/ar-EG/login', '/en/login'];
@@ -32,13 +33,10 @@ const STATIC_FILES = [
   ['/sitemap.xml', 'sitemap.xml.body'],
 ];
 
-/** Equal to VERIFICATION_TOKEN in src/lib/seo/site-verification.ts (src/test/verification-regex.test.ts). */
-const VERIFICATION_TOKEN = /^[A-Za-z0-9_-]{10,100}$/;
-
 /** [env var, meta name] of each search engine's ownership tag. */
 const VERIFICATION_TAGS = [
-  ['NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION', 'google-site-verification'],
-  ['NEXT_PUBLIC_BING_SITE_VERIFICATION', 'msvalidate.01'],
+  [GOOGLE_VARIABLE, 'google-site-verification'],
+  [BING_VARIABLE, 'msvalidate.01'],
 ];
 
 /** The tags go right after this, in the "/" redirector page. */
@@ -78,12 +76,20 @@ function copyPrerendered(routes, route, source, target) {
   console.log(`copied ${route} ${statSync(target).size}`);
 }
 
+/** The trimmed token in the env var, or undefined when blank; bails on a malformed one. */
+function tokenOf(variable) {
+  try {
+    return verificationToken(variable, process.env[variable]);
+  } catch (cause) {
+    return bail(cause.message);
+  }
+}
+
 /** The verification meta tags the env asks for; bails on a malformed token. */
 function verificationTags() {
   return VERIFICATION_TAGS.flatMap(([variable, name]) => {
-    const token = process.env[variable]?.trim();
+    const token = tokenOf(variable);
     if (!token) return [];
-    if (!VERIFICATION_TOKEN.test(token)) bail(`${variable} is not a valid site-verification token`);
     return [`<meta name="${name}" content="${token}">`];
   });
 }

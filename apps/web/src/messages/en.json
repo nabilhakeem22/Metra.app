@@ -152,7 +152,12 @@
   "shell": {
     "menu": "Menu",
     "userMenu": "User menu",
-    "role": "Role"
+    "role": "Role",
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page does not exist, or you do not have access to it. Go back to your dashboard and carry on from there.",
+      "cta": "Back to the dashboard"
+    }
   },
   "login": {
     "signInTitle": "Sign in",

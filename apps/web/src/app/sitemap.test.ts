@@ -4,6 +4,9 @@ import sitemap from './sitemap';
 
 const SITE = 'https://metra.example';
 
+/** UTC+14, the furthest-ahead time zone: the day LANDING_LAST_MODIFIED is bumped has already begun there while it is still the day before in UTC (Cairo is UTC+3). */
+const FURTHEST_AHEAD_ZONE_MS = 14 * 3600_000;
+
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_APP_URL', SITE);
 });
@@ -36,7 +39,7 @@ describe('sitemap.xml', () => {
     expect(LANDING_LAST_MODIFIED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     const date = new Date(`${LANDING_LAST_MODIFIED}T00:00:00Z`);
     expect(date.toISOString().slice(0, 10)).toBe(LANDING_LAST_MODIFIED);
-    expect(date.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(date.getTime()).toBeLessThanOrEqual(Date.now() + FURTHEST_AHEAD_ZONE_MS);
   });
 
   it('marks both entries monthly at full priority', () => {
