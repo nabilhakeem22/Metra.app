@@ -32,6 +32,7 @@ const ALL_CODES: ActionCode[] = [
   'invite_not_found',
   'otp_verify_failed',
   'otp_rate_limited',
+  'otp_verify_rate_limited',
   'rate_limited',
   'daily_email_cap_reached',
   'otp_sms_unavailable',

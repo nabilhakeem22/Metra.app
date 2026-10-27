@@ -61,6 +61,7 @@ describe('the sign-in throttle on the routes', () => {
     }
     const refused = await verify(otpPost('/api/auth/otp/verify', verifyBody('MONA@FIRM.EXAMPLE'), { 'cf-connecting-ip': '192.0.2.77' }));
     expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({ ok: false, error: 'otp_verify_rate_limited' });
     expect(doubles.supabaseAuth.verifyOtp).toHaveBeenCalledTimes(AUTH_OTP_IDENTIFIER_CEILING);
   });
 

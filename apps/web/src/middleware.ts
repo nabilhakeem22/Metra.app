@@ -5,6 +5,7 @@ import { isPortalPicturePath } from './lib/engagements/portal-picture-path';
 import { withSecurityHeaders } from './lib/http/security-headers';
 import { clientLinkLocaleOf, clientLinkResponse } from './lib/middleware/client-link';
 import { responseHeadersFor } from './lib/middleware/response-headers';
+import { isUnlocalizedFilePath } from './lib/middleware/unlocalized-file';
 import { hasSupabaseAuthCookie } from './lib/supabase/auth-cookie';
 import { updateSession } from './lib/supabase/middleware';
 
@@ -15,9 +16,11 @@ const intlMiddleware = createIntlMiddleware(routing);
 // 1. A client-page picture is always fetched under one fixed locale segment, so
 //    it skips locale negotiation: it must never reset the visitor's locale
 //    cookie (lib/engagements/portal-picture-path.ts).
-// 2. A client link names its locale in the path and reads no session: the fast
+// 2. A file path outside any locale passes through with no locale redirect
+//    (lib/middleware/unlocalized-file.ts).
+// 3. A client link names its locale in the path and reads no session: the fast
 //    path forwards the locale and syncs the cookie (lib/middleware/client-link.ts).
-// 3. Everything else: i18n (locale detection + redirect), then the Supabase
+// 4. Everything else: i18n (locale detection + redirect), then the Supabase
 //    session refresh, only when there is a session cookie to refresh.
 // Every response then gets the path's headers: the security set
 // (lib/http/security-headers.ts: HSTS, frame and sniffing rules, the CSP, and
@@ -34,7 +37,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
 async function routeResponse(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  if (isPortalPicturePath(pathname)) return NextResponse.next();
+  if (isPortalPicturePath(pathname) || isUnlocalizedFilePath(pathname)) return NextResponse.next();
   const clientLinkLocale = clientLinkLocaleOf(pathname);
   if (clientLinkLocale) return clientLinkResponse(request, clientLinkLocale);
   const response = intlMiddleware(request);
@@ -42,10 +45,11 @@ async function routeResponse(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Everything except API routes, Next's own files and the files public/ ships
-  // (its asset folders, and top-level files by extension). A dotted path
-  // anywhere else (/en/d/x.y, /nope.xyz) is a page: it gets the security and
-  // noindex headers. src/middleware-matcher.test.ts compiles this with Next's
-  // own matcher and checks it against every file in public/.
-  matcher: ['/((?!api|_next|_vercel|fonts/|landing/|og/|[^/]+\\.(?:ico|png|svg|txt|xml|html|webmanifest)$).*)'],
+  // Everything except API routes and Next's own files, so every response the
+  // Worker renders, a missing file's 404 included (/nope.png, /og/x.png), gets
+  // the security and noindex headers. The files public/ ships never reach it on
+  // Cloudflare: they are static assets, served before the Worker runs (and
+  // public/_headers gives them the static set). src/middleware-matcher.test.ts
+  // compiles this with Next's own matcher.
+  matcher: ['/((?!api|_next|_vercel).*)'],
 };

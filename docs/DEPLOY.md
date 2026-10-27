@@ -437,12 +437,15 @@ every owner step below is done by hand, once.
   `AUTH_OTP_IP_RATE_LIMITER` (namespace 1007, 10 per 60 s per step and caller
   IP, an IPv6 caller by its /64) and `AUTH_OTP_IDENTIFIER_RATE_LIMITER`
   (namespace 1008, 15 per 60 s per step and address; the key is a sha256 prefix,
-  never the address). Past either: 429 `otp_rate_limited` with `retry-after: 60`.
-  Send and verify are separate buckets. The per-address ceiling stays above the
-  per-IP one, so one source alone cannot lock a named address out of sign-in.
-  The address or phone is made canonical once (lower-case address; phone as `+`
-  and its digits), and that one string is both the bucket key and what Supabase
-  receives.
+  never the address). Past either: 429 `otp_rate_limited` with `retry-after: 60`
+  (`otp_verify_rate_limited` on a code check: "type the code again", since the
+  code held is still good). Send and verify are separate buckets. The
+  per-address ceiling stays above the per-IP one, so one source alone cannot
+  lock a named address out of sign-in. The address or phone is made canonical
+  once (lower-case address; phone as `+` and its digits, dropping only spaces,
+  dashes, dots and brackets), and that one string is both the bucket key and
+  what Supabase receives. A phone with anything else in it (a letter O for a
+  zero, `ext 9`) is refused as `phone_format` and never sent.
   Like every binding it counts per data centre, and a binding **missing** on
   Cloudflare makes sign-in answer 500, by design.
 - **Daily email caps per studio** (`apps/web/src/lib/email/daily-caps.ts`,
@@ -450,8 +453,10 @@ every owner step below is done by hand, once.
   plus delivery reminder emails) per rolling 24 hours, counted from rows the app
   already writes. The cap gates the EMAIL: an invite, a resend or a proposal send
   still happens and its link is shown to copy. Only the delivery reminder, where
-  the email is the action, refuses with "today's email limit". A count that fails
-  lets the email go (logged).
+  the email is the action, refuses with "today's email limit". The cap is a lock:
+  a request that cannot take it within the 5 s lock timeout answers "busy, try
+  again" and writes and sends nothing. Only a count that fails lets the email go
+  (logged).
 - **Session cookies** are HttpOnly, SameSite=Lax, Path=/, Secure in production,
   and live **30 days, rolling** (owner decision D2): every token refresh
   rewrites them, so only 30 days without a visit forces a new sign-in.

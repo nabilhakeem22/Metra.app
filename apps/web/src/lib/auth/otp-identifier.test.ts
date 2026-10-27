@@ -9,15 +9,21 @@ describe('canonicalOtpIdentifier', () => {
     expect(canonicalOtpIdentifier('email', typed)).toBe('mona@firm.example');
   });
 
-  it.each(['+201001234567', '201001234567', '+20 100 123 4567', '+20 1001234567', '+20-100-123-4567', ' +20 (100) 123-4567 ', '+٢٠١٠٠١٢٣٤٥٦٧'])(
+  it.each(['+201001234567', '201001234567', '+20 100 123 4567', '+20 1001234567', '+20-100-123-4567', ' +20 (100) 123-4567 ', '+20.100.123.4567', '+٢٠١٠٠١٢٣٤٥٦٧'])(
     'folds the phone %j to + and its digits',
     (typed) => {
       expect(canonicalOtpIdentifier('phone', typed)).toBe('+201001234567');
     },
   );
 
-  it('keeps a phone with no digit empty, so the pre-check says it is required', () => {
-    expect(canonicalOtpIdentifier('phone', ' + - ')).toBe('');
+  it.each([
+    ['+20 1OO 123 4567', '+20 1OO 123 4567'],
+    [' +20 100 123 4567 ext 9 ', '+20 100 123 4567 ext 9'],
+    ['owner@firm.example', 'owner@firm.example'],
+    ['20+1001234567', '20+1001234567'],
+    [' + - ', '+ -'],
+  ])('never deletes what is not formatting: %j stays %j, for the pre-check to refuse (F2)', (typed, kept) => {
+    expect(canonicalOtpIdentifier('phone', typed)).toBe(kept);
   });
 
   it('is idempotent: the canonical form is its own canonical form', () => {

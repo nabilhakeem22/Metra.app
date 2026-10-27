@@ -23,7 +23,8 @@ import { readReminderRecipient } from './recipient';
  * its primary contact), `reminder_too_soon` (one went out within
  * REMINDER_EMAIL_COOLDOWN_MINUTES), `daily_email_cap_reached` (the studio's
  * daily client email cap, claimed in the same transaction as the audit row it
- * counts, lib/email/daily-caps.ts: no audit row, no send),
+ * counts, lib/email/daily-caps.ts: no audit row, no send), `busy` (that
+ * cap's lock could not be taken: no audit row, no send),
  * `reminder_email_failed` (Resend refused or did not answer within
  * EMAIL_TIMEOUT_MS).
  *

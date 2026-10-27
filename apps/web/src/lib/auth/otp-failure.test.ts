@@ -95,9 +95,9 @@ describe('otpVerifyFailure', () => {
     });
   });
 
-  it('too many attempts is otp_rate_limited', () => {
+  it('too many checks is otp_verify_rate_limited: the code held is still good, so type it again (F6)', () => {
     expect(otpVerifyFailure('verify', supabaseError('over_request_rate_limit', 429)).error).toBe(
-      'otp_rate_limited',
+      'otp_verify_rate_limited',
     );
   });
 });

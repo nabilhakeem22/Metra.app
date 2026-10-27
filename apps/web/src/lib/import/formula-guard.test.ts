@@ -36,7 +36,18 @@ describe('stripFormulaGuard', () => {
   });
 
   it('drops only ONE guard', () => {
-    expect(stripFormulaGuard("''=1")).toBe("''=1");
+    expect(stripFormulaGuard("''=1")).toBe("'=1");
     expect(stripFormulaGuard("'=1")).toBe('=1');
+  });
+
+  it.each(["'-5 with apostrophe", "''=SUM(A1)", "'＋cmd", "'​=1+1", "'abc", "'", "'-5"])(
+    'gives back an apostrophe the studio typed: %j round-trips exactly (F4)',
+    (cell) => {
+      expect(stripFormulaGuard(neutralizeFormula(cell))).toBe(cell);
+    },
+  );
+
+  it('guards a formula behind a typed apostrophe with one more apostrophe (F4)', () => {
+    expect(neutralizeFormula("'-5 with apostrophe")).toBe("''-5 with apostrophe");
   });
 });

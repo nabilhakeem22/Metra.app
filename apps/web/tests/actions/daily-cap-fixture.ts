@@ -1,3 +1,4 @@
+import { createSql } from '@metra/db';
 import { raw } from './fixture';
 
 // TEST-ONLY. The rows the daily email caps count (lib/email/daily-cap-queries.ts),
@@ -37,4 +38,23 @@ export async function auditRowCount(orgId: string, entity: string): Promise<numb
     `select count(*)::int as n from public.audit_log where org_id = '${orgId}' and entity = '${entity}'`,
   );
   return row.n;
+}
+
+/**
+ * Another session holds the (org, cap) lock for `seconds`, as a claimer stuck
+ * ahead in the queue would. `held` resolves once the lock is taken, `released`
+ * once that session committed.
+ */
+export function holdCapLock(orgId: string, cap: 'team_invite' | 'client_email', seconds: number) {
+  const session = createSql(process.env.DATABASE_URL as string, { max: 1 });
+  let markHeld: () => void = () => {};
+  const held = new Promise<void>((resolve) => (markHeld = resolve));
+  const released = session
+    .begin(async (tx) => {
+      await tx.unsafe(`select pg_advisory_xact_lock(hashtext('${orgId}:email-cap:${cap}'))`);
+      markHeld();
+      await tx.unsafe(`select pg_sleep(${seconds})`);
+    })
+    .finally(() => session.end());
+  return { held, released };
 }

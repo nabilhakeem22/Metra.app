@@ -66,7 +66,8 @@ function recordInvitation(ctx: OrgContext, invite: { email: string; role: Member
  * Email box (empty, malformed, already a member, already invited); a role no
  * select offers is `malformed`. Answers the accept link, also when the email
  * could not be sent or the studio's daily invite email cap is reached (the Team
- * page shows it to copy).
+ * page shows it to copy). `busy` when the cap's lock could not be taken: no
+ * invitation, no email.
  */
 export async function inviteMember(input: { email: string; role: MemberRole }): Promise<ActionResult> {
   const ctx = await requireOrg();

@@ -39,6 +39,10 @@ describe('the template formula guard', () => {
     expect(reimported("'abc").ok[0]?.description).toBe("'abc");
   });
 
+  it("gives back an apostrophe the studio typed before a trigger: '-5 with apostrophe (F4)", () => {
+    expect(reimported("'-5 with apostrophe").ok[0]?.description).toBe("'-5 with apostrophe");
+  });
+
   it('reads a guarded number cell as the number', () => {
     const { grid } = decodeCsv("Description,Unit,Qty,Unit price\r\nWalls,sqm,'-2,10\r\n");
     const result = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));

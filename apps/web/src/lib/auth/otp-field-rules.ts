@@ -3,6 +3,7 @@
 // rules, so the sentence under the box is the one the server would answer.
 import type { FieldErrors } from '@/lib/actions/field-errors';
 import { isValidEmail, normalizeEmail } from '@/lib/validation/email';
+import { phoneNumberOf } from './otp-phone';
 
 export const OTP_LENGTH = 6;
 
@@ -26,6 +27,7 @@ export function otpIdentifierErrors(channel: OtpChannel, identifier: string): Fi
   if (channel === 'email' && !isValidEmail(normalizeEmail(typed))) {
     return { email: { code: 'email_format' } };
   }
+  if (channel === 'phone' && phoneNumberOf(typed) === null) return { phone: { code: 'phone_format' } };
   return {};
 }
 

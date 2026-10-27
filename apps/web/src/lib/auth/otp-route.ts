@@ -14,7 +14,8 @@ import { otpThrottleRefusal, type OtpStep } from './otp-throttle';
 //   403 forbidden         missing or foreign Origin, or a body not declared JSON
 //   400 malformed         a body that is not JSON, is over 4 KiB, or is not the request's shape
 //   429 otp_rate_limited  past the per-IP or per-identifier budget (lib/auth/otp-throttle.ts),
-//                         with retry-after; Supabase is never called
+//                         with retry-after; Supabase is never called. A verify answers
+//                         otp_verify_rate_limited instead: the code held is still good
 //   500 generic           a throttle binding is missing on Cloudflare, or the core threw
 //                         (one log line, its reference in the body)
 //   200                   the core's ActionResult, a refusal included

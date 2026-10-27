@@ -4,7 +4,8 @@ import type { SQL } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // S4 (go-live security): the cap verdict, its window, its lock and its failure
-// mode. The counts and the transaction are replaced;
+// modes (the lock fails CLOSED, the count fails open). The counts and the
+// transaction are replaced;
 // tests/actions/daily-email-caps*.dbtest.ts run the real queries and the real
 // lock against a seeded database, under concurrency.
 
@@ -13,6 +14,7 @@ const counts = vi.hoisted(() => ({ countTeamInviteEmailsSince: vi.fn(), countCli
 vi.mock('./daily-cap-queries', () => counts);
 
 const { DAILY_EMAIL_CAPS, DAILY_EMAIL_CAP_WINDOW_MS, claimDailyEmail } = await import('./daily-caps');
+const { ActionError } = await import('@/lib/actions/result');
 
 const ORG = '11111111-1111-4111-8111-111111111111';
 const dialect = new PgDialect();
@@ -46,15 +48,15 @@ describe('claimDailyEmail', () => {
     expect(DAILY_EMAIL_CAP_WINDOW_MS).toBe(86_400_000);
   });
 
-  it('takes the (org, cap) transaction lock in a savepoint BEFORE it counts, on the caller transaction', async () => {
+  it('takes the (org, cap) transaction lock on the caller transaction, then counts in a savepoint', async () => {
     expect(await claimDailyEmail(db(), ORG, 'team_invite')).toBe(true);
-    expect(steps).toEqual(['savepoint', `select pg_advisory_xact_lock(hashtext($1)) ["${ORG}:email-cap:team_invite"]`, 'count']);
+    expect(steps).toEqual([`select pg_advisory_xact_lock(hashtext($1)) ["${ORG}:email-cap:team_invite"]`, 'savepoint', 'count']);
     expect(counts.countTeamInviteEmailsSince.mock.calls[0]?.[0]).toBe(tx);
   });
 
   it('keeps the two caps on separate locks', async () => {
     await claimDailyEmail(db(), ORG, 'client_email');
-    expect(steps[1]).toContain(`${ORG}:email-cap:client_email`);
+    expect(steps[0]).toContain(`${ORG}:email-cap:client_email`);
   });
 
   it('counts from 24 hours ago', async () => {
@@ -80,7 +82,7 @@ describe('claimDailyEmail', () => {
     warn.mockRestore();
   });
 
-  it('fails open on a database error, with one log line and no address', async () => {
+  it('fails open when the COUNT errors, with one log line and no address', async () => {
     counts.countClientEmailsSince.mockRejectedValue(new Error('connect ECONNREFUSED'));
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await claimDailyEmail(db(), ORG, 'client_email')).toBe(true);
@@ -88,5 +90,23 @@ describe('claimDailyEmail', () => {
     expect(error.mock.calls[0]?.[0]).toBe('daily email cap count failed (failing open):');
     expect(JSON.stringify(error.mock.calls)).not.toContain('@');
     error.mockRestore();
+  });
+
+  it.each([
+    ['a lock wait past lock_timeout', Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' })],
+    ['a cancelled statement', Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' })],
+    ['a transaction timeout', Object.assign(new Error('terminating connection due to transaction timeout'), { code: '25P04' })],
+    ['any other error', new Error('connect ECONNREFUSED')],
+  ])('fails CLOSED as busy on %s taking the lock, and never counts', async (_label, lockError) => {
+    tx.execute.mockRejectedValueOnce(lockError);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const claim = claimDailyEmail(db(), ORG, 'team_invite');
+    await expect(claim).rejects.toBeInstanceOf(ActionError);
+    await expect(claim).rejects.toMatchObject({ code: 'busy' });
+    expect(counts.countTeamInviteEmailsSince).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toBe('daily email cap lock busy:');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(ORG);
+    warn.mockRestore();
   });
 });

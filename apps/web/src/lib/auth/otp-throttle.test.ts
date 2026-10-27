@@ -69,6 +69,14 @@ describe('otpThrottleRefusal order and failures', () => {
     warn.mockRestore();
   });
 
+  it('a refused verify answers otp_verify_rate_limited, not "ask for a new code" (F6)', async () => {
+    identifierBinding.limit.mockResolvedValue({ success: false });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const refused = await otpThrottleRefusal(fromIp('203.0.113.9'), 'verify', EMAIL);
+    expect(refused).toEqual({ status: 429, body: { ok: false, error: 'otp_verify_rate_limited' } });
+    warn.mockRestore();
+  });
+
   it('refuses with a logged generic when a binding is missing on Cloudflare', async () => {
     runtime.env = { AUTH_OTP_IDENTIFIER_RATE_LIMITER: identifierBinding };
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});

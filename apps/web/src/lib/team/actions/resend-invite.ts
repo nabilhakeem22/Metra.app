@@ -17,7 +17,8 @@ import { INVITE_TTL_DAYS, buildAcceptUrl, currentLocale, mintShareToken, orgDisp
  * Mint a fresh link for a pending invite and email it again (also the "copy
  * link" path). An invite accepted or revoked meanwhile is `record_not_found`.
  * Past the studio's daily invite email cap the link is still rotated and
- * returned, and no email goes out.
+ * returned, and no email goes out. `busy` when the cap's lock could not be
+ * taken: the link is not rotated, no email.
  */
 export async function resendInvite(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();

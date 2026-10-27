@@ -48,9 +48,10 @@ async function charge(binding: string, key: string): Promise<boolean> {
   return consumeRateLimit(rateLimitBinding(binding, OTP_SURFACE), key, binding);
 }
 
+/** A refused check keeps its own sentence: the code held is still good (fix round 2, F6). */
 function refusedBy(binding: string, step: OtpStep): OtpThrottleRefusal {
   console.warn('otp rate limit refused:', { binding, step });
-  return { status: 429, body: err('otp_rate_limited') };
+  return { status: 429, body: err(step === 'verify' ? 'otp_verify_rate_limited' : 'otp_rate_limited') };
 }
 
 /**

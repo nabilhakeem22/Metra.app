@@ -107,7 +107,8 @@ async function sendInTransaction(
 /**
  * `data` is the raw share token (the action wrapper turns it into the public
  * link). `emailAllowed` says whether the client email is within the studio's
- * daily cap; the send itself never depends on it.
+ * daily cap; the send itself never depends on it, except that a cap lock that
+ * could not be taken answers `busy` and nothing is sent.
  */
 export async function sendProposalCore(
   ctx: OrgContext,

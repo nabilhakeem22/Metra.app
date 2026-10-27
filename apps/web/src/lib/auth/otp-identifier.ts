@@ -3,17 +3,17 @@
 // once (otp-route.ts), so the per-address throttle key (otp-throttle.ts) and
 // the value Supabase receives (otp.ts) are the same string and cannot diverge:
 // a spelling that reaches Supabase as one person is one bucket.
-import { latinDigits } from '@/lib/format/latin-digits';
 import { normalizeEmail } from '@/lib/validation/email';
 import type { OtpChannel } from './otp-field-rules';
+import { phoneNumberOf } from './otp-phone';
 
 /**
- * Email: trimmed and lower-cased. Phone: `+` and its digits only, Arabic-Indic
- * digits folded to Latin, so `+20 100-123 4567` is `+201001234567`; a phone
- * with no digit at all is '' (the identifier pre-check then says required).
+ * Email: trimmed and lower-cased. Phone: `+` and its digits (otp-phone.ts), so
+ * `+20 100-123 4567` is `+201001234567`. A phone that is not a number (a
+ * letter, an address, `ext 9`) is only trimmed: the pre-check then answers
+ * phone_format, and nothing reaches Supabase.
  */
 export function canonicalOtpIdentifier(channel: OtpChannel, identifier: string): string {
   if (channel === 'email') return normalizeEmail(identifier);
-  const digits = latinDigits(identifier).replace(/\D/g, '');
-  return digits === '' ? '' : `+${digits}`;
+  return phoneNumberOf(identifier) ?? identifier.trim();
 }

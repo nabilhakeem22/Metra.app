@@ -5,11 +5,15 @@ import * as pageStaticInfo from 'next/dist/build/analysis/get-page-static-info';
 import { NextRequest } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
 
-// Go-live security fix round, T6. The matcher used to skip EVERY path with a
-// dot, so a dotted page path (/en/d/xxxx.yyyy) rendered with no security or
-// noindex header, and framed. It now skips only Next's own files, the API and
-// the files public/ ships. The matcher is compiled here by Next's own
-// function, exactly as the build compiles it.
+// Go-live security fix rounds, T6 and F3. The matcher used to skip EVERY path
+// with a dot, so a dotted page path (/en/d/xxxx.yyyy) rendered with no security
+// or noindex header, and framed; then it skipped public/'s files by pattern, so
+// a MISSING /nope.png still did. It now skips only Next's own files and the
+// API. The files public/ ships are static assets on Cloudflare, served before
+// the Worker (src/test/wrangler-assets.test.ts); in next dev and next start
+// they come after the middleware, which must pass them through untouched. The
+// matcher is compiled here by Next's own function, exactly as the build
+// compiles it.
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null }, error: null }) } }),
@@ -36,12 +40,27 @@ function publicPaths(): string[] {
     .map((entry) => `/${relative(PUBLIC_DIR, join(entry.parentPath, entry.name)).split(sep).join('/')}`);
 }
 
-describe('the middleware matcher (T6)', () => {
-  it('skips every file public/ ships, and the robots and sitemap files the build emits', () => {
+const pageHeaders = (profile: 'page' | 'token_page') => Object.entries(securityHeadersFor(profile, ['https://ref.supabase.test']));
+
+describe('the middleware matcher (T6, F3)', () => {
+  it('passes every file public/ ships, and the emitted robots and sitemap, through with no locale redirect', async () => {
     const served = [...publicPaths(), '/robots.txt', '/sitemap.xml'];
     expect(served).toContain('/fonts/Cairo-Variable.ttf');
-    expect(served.filter(runsMiddleware)).toEqual([]);
+    for (const path of served) {
+      const response = await middleware(new NextRequest(`https://app.test${path}`));
+      expect([path, response.headers.get('location'), response.headers.get('x-middleware-next')]).toEqual([path, null, '1']);
+    }
   });
+
+  it.each(['/nope.png', '/nope.html', '/fonts/missing.ttf', '/og/missing.png', '/landing/missing.webp', '/manifest.webmanifest'])(
+    'runs on the missing file %s and gives its 404 the page security set and noindex',
+    async (path) => {
+      expect(runsMiddleware(path)).toBe(true);
+      const response = await middleware(new NextRequest(`https://app.test${path}`));
+      for (const [name, value] of pageHeaders('page')) expect(response.headers.get(name), name).toBe(value);
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    },
+  );
 
   it.each(['/_next/static/chunks/main.js', '/_next/image', '/api/v1/projects', '/api/auth/otp/send'])('skips %s', (path) => {
     expect(runsMiddleware(path)).toBe(false);
@@ -64,9 +83,7 @@ describe('the middleware matcher (T6)', () => {
 
   it('gives a dotted token path the token-page security set and noindex', async () => {
     const response = await middleware(new NextRequest('https://app.test/en/d/xxxxxxx.yyyy'));
-    for (const [name, value] of Object.entries(securityHeadersFor('token_page', ['https://ref.supabase.test']))) {
-      expect(response.headers.get(name), name).toBe(value);
-    }
+    for (const [name, value] of pageHeaders('token_page')) expect(response.headers.get(name), name).toBe(value);
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
   });
