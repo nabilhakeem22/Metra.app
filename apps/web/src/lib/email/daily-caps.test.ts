@@ -58,11 +58,16 @@ describe('claimDailyEmail', () => {
   });
 
   it('counts from 24 hours ago', async () => {
-    const before = Date.now();
-    await claimDailyEmail(db(), ORG, 'team_invite');
+    const now = new Date('2026-10-27T12:00:00.000Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    try {
+      await claimDailyEmail(db(), ORG, 'team_invite');
+    } finally {
+      vi.useRealTimers();
+    }
     const since = counts.countTeamInviteEmailsSince.mock.calls[0]?.[1] as Date;
-    expect(before - since.getTime()).toBeGreaterThanOrEqual(DAILY_EMAIL_CAP_WINDOW_MS);
-    expect(before - since.getTime()).toBeLessThan(DAILY_EMAIL_CAP_WINDOW_MS + 1000);
+    expect(now.getTime() - since.getTime()).toBe(DAILY_EMAIL_CAP_WINDOW_MS);
   });
 
   it('allows one before the cap and refuses at it, logging the cap only', async () => {
