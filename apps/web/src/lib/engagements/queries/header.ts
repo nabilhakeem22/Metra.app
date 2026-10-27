@@ -1,5 +1,5 @@
 import 'server-only';
-import { clientContacts, clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
+import { clientContacts, clients, designEngagements, projects, type DesignEngagementState, type MetraDb } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { EntryPhase } from '@/lib/flow/types';
@@ -60,43 +60,40 @@ export interface EngagementHeader {
   updatedAt: string;
 }
 
-export function getEngagementHeader(
-  ctx: OrgContext,
-  engagementId: string,
-): Promise<EngagementHeader | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const [row] = await tx
-      .select({
-        id: designEngagements.id,
-        number: designEngagements.number,
-        titleAr: designEngagements.titleAr,
-        titleEn: designEngagements.titleEn,
-        clientId: designEngagements.clientId,
-        projectId: designEngagements.projectId,
-        clientNameEn: clients.nameEn,
-        clientNameAr: clients.nameAr,
-        projectNameEn: projects.nameEn,
-        projectNameAr: projects.nameAr,
-        state: designEngagements.state,
-        entryPhase: designEngagements.entryPhase,
-        designFee: designEngagements.designFee,
-        offPlan: designEngagements.offPlan,
-        asBuiltDue: designEngagements.asBuiltDue,
-        freeRevisionN: designEngagements.freeRevisionN,
-        revisionCount: designEngagements.revisionCount,
-        freeDesignRevisionN: designEngagements.freeDesignRevisionN,
-        designRevisionCount: designEngagements.designRevisionCount,
-        romLow: designEngagements.romLow,
-        romHigh: designEngagements.romHigh,
-        romIssuedAt: designEngagements.romIssuedAt,
-        conceptLockedAt: designEngagements.conceptLockedAt,
-        renderManifestHash: designEngagements.renderManifestHash,
-        rendersReadyAt: designEngagements.rendersReadyAt,
-        clientExpectedOn: designEngagements.clientExpectedOn,
-        clientExpectedState: designEngagements.clientExpectedState,
-        clientExpectedSetAt: designEngagements.clientExpectedSetAt,
-        // In this one statement, so the flag costs no round trip of its own.
-        clientHasEmail: sql<boolean>`(
+/** The header row in one statement: the engagement, its client and project names, and the email flag. */
+async function readHeaderRow(tx: MetraDb, engagementId: string) {
+  const [row] = await tx
+    .select({
+      id: designEngagements.id,
+      number: designEngagements.number,
+      titleAr: designEngagements.titleAr,
+      titleEn: designEngagements.titleEn,
+      clientId: designEngagements.clientId,
+      projectId: designEngagements.projectId,
+      clientNameEn: clients.nameEn,
+      clientNameAr: clients.nameAr,
+      projectNameEn: projects.nameEn,
+      projectNameAr: projects.nameAr,
+      state: designEngagements.state,
+      entryPhase: designEngagements.entryPhase,
+      designFee: designEngagements.designFee,
+      offPlan: designEngagements.offPlan,
+      asBuiltDue: designEngagements.asBuiltDue,
+      freeRevisionN: designEngagements.freeRevisionN,
+      revisionCount: designEngagements.revisionCount,
+      freeDesignRevisionN: designEngagements.freeDesignRevisionN,
+      designRevisionCount: designEngagements.designRevisionCount,
+      romLow: designEngagements.romLow,
+      romHigh: designEngagements.romHigh,
+      romIssuedAt: designEngagements.romIssuedAt,
+      conceptLockedAt: designEngagements.conceptLockedAt,
+      renderManifestHash: designEngagements.renderManifestHash,
+      rendersReadyAt: designEngagements.rendersReadyAt,
+      clientExpectedOn: designEngagements.clientExpectedOn,
+      clientExpectedState: designEngagements.clientExpectedState,
+      clientExpectedSetAt: designEngagements.clientExpectedSetAt,
+      // In this one statement, so the flag costs no round trip of its own.
+      clientHasEmail: sql<boolean>`(
           lower(coalesce(
             (select nullif(btrim(${clientContacts.email}), '') from ${clientContacts}
               where ${clientContacts.orgId} = ${designEngagements.orgId}
@@ -106,62 +103,44 @@ export function getEngagementHeader(
             nullif(btrim(${clients.email}), '')
           )) ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:].]+$'
         ) is true`,
-        createdAt: designEngagements.createdAt,
-        updatedAt: designEngagements.updatedAt,
-      })
-      .from(designEngagements)
-      .leftJoin(clients, eq(clients.id, designEngagements.clientId))
-      .leftJoin(projects, eq(projects.id, designEngagements.projectId))
-      .where(eq(designEngagements.id, engagementId))
-      .limit(1);
-
-    if (!row) return null;
-    const { clientExpectedOn, clientExpectedState, clientExpectedSetAt, ...header } = row;
-    return {
-      ...header,
-      entryPhase: entryPhaseOf(row.entryPhase),
-      // All three or none (0058's CHECK); read as one record or null.
-      clientExpected:
-        clientExpectedOn && clientExpectedState && clientExpectedSetAt
-          ? { on: clientExpectedOn, state: clientExpectedState, setAt: clientExpectedSetAt.toISOString() }
-          : null,
-      conceptLockedAt: row.conceptLockedAt?.toISOString() ?? null,
-      rendersReadyAt: row.rendersReadyAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    };
-  });
+      createdAt: designEngagements.createdAt,
+      updatedAt: designEngagements.updatedAt,
+    })
+    .from(designEngagements)
+    .leftJoin(clients, eq(clients.id, designEngagements.clientId))
+    .leftJoin(projects, eq(projects.id, designEngagements.projectId))
+    .where(eq(designEngagements.id, engagementId))
+    .limit(1);
+  return row;
 }
 
-/**
- * The client-share status of a delivery, for the cockpit "Share with client"
- * control. Reports ONLY whether a live link exists (token_hash is set) plus its
- * optional expiry — it NEVER returns the token_hash itself. RLS scopes the read to
- * the caller's org (a foreign delivery reads as not-shared). The CALLER gates the
- * read on an engagements capability; this is display state, not the token.
- */
-export interface DeliveryShareStatus {
-  shared: boolean;
-  expiresAt: string | null;
+type HeaderRow = NonNullable<Awaited<ReturnType<typeof readHeaderRow>>>;
+
+/** The header row as the detail surface reads it: one expected-date record, ISO timestamps. */
+function engagementHeaderOf(row: HeaderRow): EngagementHeader {
+  const { clientExpectedOn, clientExpectedState, clientExpectedSetAt, ...header } = row;
+  return {
+    ...header,
+    entryPhase: entryPhaseOf(row.entryPhase),
+    // All three or none (0058's CHECK); read as one record or null.
+    clientExpected:
+      clientExpectedOn && clientExpectedState && clientExpectedSetAt
+        ? { on: clientExpectedOn, state: clientExpectedState, setAt: clientExpectedSetAt.toISOString() }
+        : null,
+    conceptLockedAt: row.conceptLockedAt?.toISOString() ?? null,
+    rendersReadyAt: row.rendersReadyAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-export function getDeliveryShareStatus(
+export function getEngagementHeader(
   ctx: OrgContext,
   engagementId: string,
-): Promise<DeliveryShareStatus> {
+): Promise<EngagementHeader | null> {
   return withOrgContext(ctx, async (tx) => {
-    const [row] = await tx
-      .select({
-        // Derive a boolean at the DB — the hash itself never crosses this boundary.
-        shared: sql<boolean>`${designEngagements.tokenHash} is not null`,
-        expiresAt: designEngagements.shareExpiresAt,
-      })
-      .from(designEngagements)
-      .where(eq(designEngagements.id, engagementId))
-      .limit(1);
-    return {
-      shared: row?.shared ?? false,
-      expiresAt: row?.expiresAt?.toISOString() ?? null,
-    };
+    const row = await readHeaderRow(tx, engagementId);
+    if (!row) return null;
+    return engagementHeaderOf(row);
   });
 }

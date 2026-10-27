@@ -1,91 +1,15 @@
-// PURE price-book import validator + resolvers. No server-only deps, no drizzle
-// values — importable by the client preview AND vitest. Section resolution maps a
-// spreadsheet token to one of the org's `sections` (passed in); unknown tokens
-// are REJECTED per-row (category_invalid) — import never auto-creates a section.
+// PURE price-book import validator. No server-only deps, no drizzle values:
+// importable by the client preview AND vitest. Section and unit tokens resolve
+// through ./import-resolvers (re-exported below so every import path is
+// unchanged); unknown tokens are REJECTED per-row (category_invalid); import
+// never auto-creates a section.
 import type { CostItemUnit } from '@metra/db';
 import { readMoneyString } from '@/lib/money/read';
-import { unitFromToken } from '@/lib/units/unit-aliases';
 import type { FieldRead } from '@/lib/validation/field-rules';
 import { COST_ITEM_CODE_MAX, COST_ITEM_NAME_MAX, readCostItemCode, readCostItemName } from './cost-item-input';
+import { resolveSection, resolveUnit, type ImportSection } from './import-resolvers';
 
-export const UNIT_TOKENS: readonly CostItemUnit[] = [
-  'sqm',
-  'linear_meter',
-  'pcs',
-  'lump_sum',
-  'day',
-  'kg',
-  'ton',
-  'liter',
-  'cbm',
-  'roll',
-];
-
-// Retained EN + AR aliases for the 8 seeded defaults (keyed by section.key), so
-// a spreadsheet using the old category words still resolves after the unify.
-const DEFAULT_SECTION_ALIASES: Record<string, string[]> = {
-  civil: ['civil', 'أعمال مدنية', 'مدني'],
-  gypsum: ['gypsum', 'جبس', 'جبسوم'],
-  electrical: ['electrical', 'كهرباء', 'كهربائي'],
-  plumbing: ['plumbing', 'سباكة'],
-  joinery: ['joinery', 'نجارة'],
-  finishes: ['finishes', 'تشطيبات', 'تشطيب'],
-  furniture: ['furniture', 'أثاث'],
-  preliminaries: ['preliminaries', 'أعمال تمهيدية', 'تمهيدية'],
-};
-
-
-// §4.1 Arabic normalization so plain/hamza'd forms match: fold alef variants,
-// taa-marbuta -> haa, alef-maqsura -> yaa, and drop tashkeel + tatweel.
-function norm(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[ً-ْ]/g, '') // tashkeel (harakat)
-    .replace(/ـ/g, '') // tatweel
-    .replace(/[أإآ]/g, 'ا') // أ إ آ -> ا
-    .replace(/ة/g, 'ه') // ة -> ه
-    .replace(/ى/g, 'ي'); // ى -> ي
-}
-
-/** The minimal shape resolveSection needs — a row from listSections. */
-export interface ImportSection {
-  id: string;
-  key: string | null;
-  nameEn: string | null;
-  nameAr: string | null;
-}
-
-/**
- * Resolve a spreadsheet section token to one of the org's section ids. Matches
- * (case/whitespace/Arabic-normalized) against each section's key, English name
- * and Arabic name, then falls back to the retained aliases for the 8 defaults.
- * Returns null for an unknown token (the row becomes category_invalid).
- */
-export function resolveSection(
-  text: string,
-  sections: ImportSection[],
-): string | null {
-  if (!text) return null;
-  const n = norm(text);
-  for (const s of sections) {
-    if (s.key && norm(s.key) === n) return s.id;
-    if (s.nameEn && norm(s.nameEn) === n) return s.id;
-    if (s.nameAr && norm(s.nameAr) === n) return s.id;
-  }
-  for (const s of sections) {
-    if (s.key && DEFAULT_SECTION_ALIASES[s.key]?.some((a) => norm(a) === n)) {
-      return s.id;
-    }
-  }
-  return null;
-}
-
-/** The shared alias table (lib/units/unit-aliases.ts), so both importers agree. */
-export function resolveUnit(text: string): CostItemUnit | null {
-  return text ? unitFromToken(text) : null;
-}
+export { UNIT_TOKENS, resolveSection, resolveUnit, type ImportSection } from './import-resolvers';
 
 type ImportRowError =
   | 'row_empty'
@@ -169,6 +93,96 @@ export function importedCodes(rows: string[][], mapping: ColumnMapping): string[
 // and Arabic-Indic digits are refused too. A blank cell is a zero.
 const MONEY_CELL = { allowGroupSeparators: true, blank: '0' } as const;
 
+/** One row's cells, trimmed, under the column mapping (an unmapped column reads as ''). */
+interface RowCells {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  categoryRaw: string;
+  unitRaw: string;
+  costRaw: string;
+  priceRaw: string;
+}
+
+function readCells(row: string[], mapping: ColumnMapping): RowCells {
+  return {
+    code: cell(row, mapping.code),
+    nameEn: cell(row, mapping.nameEn),
+    nameAr: cell(row, mapping.nameAr),
+    categoryRaw: cell(row, mapping.category),
+    unitRaw: cell(row, mapping.unit),
+    costRaw: cell(row, mapping.cost),
+    priceRaw: cell(row, mapping.price),
+  };
+}
+
+/** The first refusal on the row's identity (empty, code, name), in check order; null when it reads. */
+function identityError(c: RowCells, existingCodes: Set<string>, seen: Set<string>): ImportRowError | null {
+  const anyFilled =
+    c.code || c.nameEn || c.nameAr || c.categoryRaw || c.unitRaw || c.costRaw || c.priceRaw;
+  if (!anyFilled) return 'row_empty';
+  if (!c.code) return 'code_missing';
+  const codeError = textError(readCostItemCode(c.code), 'code');
+  if (codeError) return codeError;
+  // Case-SENSITIVE: the DB unique(org_id, code) is case-sensitive, so `ABC`
+  // and `abc` are distinct codes and must not be collapsed here.
+  if (seen.has(c.code)) return 'code_duplicate_in_file';
+  if (existingCodes.has(c.code)) return 'code_exists';
+  if (!c.nameEn && !c.nameAr) return 'name_missing';
+  return textError(readCostItemName(c.nameEn), 'name') ?? textError(readCostItemName(c.nameAr), 'name');
+}
+
+interface ResolvedFields {
+  sectionId: string;
+  unit: CostItemUnit;
+  defaultUnitCost: string;
+  defaultUnitPrice: string;
+}
+
+/** The section, unit, cost and price a row resolves to, or the first refusal (in that order). */
+function resolveFields(c: RowCells, sections: ImportSection[]): ResolvedFields | { error: ImportRowError } {
+  const sectionId = resolveSection(c.categoryRaw, sections);
+  if (!sectionId) return { error: 'category_invalid' };
+  const unit = resolveUnit(c.unitRaw);
+  if (!unit) return { error: 'unit_invalid' };
+
+  const defaultUnitCost = readMoneyString(c.costRaw, MONEY_CELL);
+  if (defaultUnitCost === null) return { error: 'cost_invalid' };
+  const defaultUnitPrice = readMoneyString(c.priceRaw, MONEY_CELL);
+  if (defaultUnitPrice === null) return { error: 'price_invalid' };
+  return { sectionId, unit, defaultUnitCost, defaultUnitPrice };
+}
+
+function validateImportRow(
+  row: string[],
+  index: number,
+  mapping: ColumnMapping,
+  existingCodes: Set<string>,
+  sections: ImportSection[],
+  seen: Set<string>,
+): ValidatedRow {
+  const c = readCells(row, mapping);
+  const refuse = (error: ImportRowError): ValidatedRow => ({ index, code: c.code, ok: false, error });
+  const identity = identityError(c, existingCodes, seen);
+  if (identity) return refuse(identity);
+  const fields = resolveFields(c, sections);
+  if ('error' in fields) return refuse(fields.error);
+  return {
+    index,
+    code: c.code,
+    ok: true,
+    data: {
+      code: c.code,
+      nameEn: c.nameEn || null,
+      nameAr: c.nameAr || null,
+      ...fields,
+      taxCode: cell(row, mapping.taxCode) || null,
+      etaItemCode: cell(row, mapping.etaItemCode) || null,
+      etaCodeType: cell(row, mapping.etaCodeType) || null,
+    },
+  };
+}
+
 /**
  * Validates parsed spreadsheet rows against a column mapping, the org's existing
  * codes AND its sections (the section token must resolve to one of them). Pure:
@@ -186,61 +200,9 @@ export function validateImportRows(
   const out: ValidatedRow[] = [];
 
   rows.forEach((row, index) => {
-    const code = cell(row, mapping.code);
-    const nameEn = cell(row, mapping.nameEn);
-    const nameAr = cell(row, mapping.nameAr);
-    const categoryRaw = cell(row, mapping.category);
-    const unitRaw = cell(row, mapping.unit);
-    const costRaw = cell(row, mapping.cost);
-    const priceRaw = cell(row, mapping.price);
-
-    const anyFilled =
-      code || nameEn || nameAr || categoryRaw || unitRaw || costRaw || priceRaw;
-
-    const fail = (error: ImportRowError): void => {
-      out.push({ index, code, ok: false, error });
-    };
-
-    if (!anyFilled) return fail('row_empty');
-    if (!code) return fail('code_missing');
-    const codeError = textError(readCostItemCode(code), 'code');
-    if (codeError) return fail(codeError);
-    // Case-SENSITIVE: the DB unique(org_id, code) is case-sensitive, so `ABC`
-    // and `abc` are distinct codes and must not be collapsed here.
-    if (seen.has(code)) return fail('code_duplicate_in_file');
-    if (existingCodes.has(code)) return fail('code_exists');
-    if (!nameEn && !nameAr) return fail('name_missing');
-    const nameError = textError(readCostItemName(nameEn), 'name') ?? textError(readCostItemName(nameAr), 'name');
-    if (nameError) return fail(nameError);
-
-    const sectionId = resolveSection(categoryRaw, sections);
-    if (!sectionId) return fail('category_invalid');
-    const unit = resolveUnit(unitRaw);
-    if (!unit) return fail('unit_invalid');
-
-    const defaultUnitCost = readMoneyString(costRaw, MONEY_CELL);
-    if (defaultUnitCost === null) return fail('cost_invalid');
-    const defaultUnitPrice = readMoneyString(priceRaw, MONEY_CELL);
-    if (defaultUnitPrice === null) return fail('price_invalid');
-
-    seen.add(code);
-    out.push({
-      index,
-      code,
-      ok: true,
-      data: {
-        code,
-        nameEn: nameEn || null,
-        nameAr: nameAr || null,
-        sectionId,
-        unit,
-        defaultUnitCost,
-        defaultUnitPrice,
-        taxCode: cell(row, mapping.taxCode) || null,
-        etaItemCode: cell(row, mapping.etaItemCode) || null,
-        etaCodeType: cell(row, mapping.etaCodeType) || null,
-      },
-    });
+    const verdict = validateImportRow(row, index, mapping, existingCodes, sections, seen);
+    if (verdict.ok) seen.add(verdict.code);
+    out.push(verdict);
   });
 
   return out;
