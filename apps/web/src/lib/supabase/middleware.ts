@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import type { NextRequest, NextResponse } from 'next/server';
 import { supabaseAnonKey, supabaseUrl } from './config';
+import { hardenedSessionCookieOptions } from './session-cookie';
 
 /**
  * Refreshes the Supabase auth session and writes rotated cookies onto the given
@@ -27,7 +28,7 @@ export async function updateSession(
           request.cookies.set(name, value);
         }
         for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
+          response.cookies.set(name, value, hardenedSessionCookieOptions(options));
         }
       },
     },

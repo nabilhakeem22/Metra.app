@@ -20,6 +20,12 @@ export const cookieStore = {
 /** The session cookies a successful verify makes Supabase write. */
 export const SESSION_COOKIES: CookieToSet[] = [{ name: 'sb-ref-auth-token', value: 'base64-session', options: { path: '/' } }];
 
+/** SESSION_COOKIES as the route writes them: hardened (lib/supabase/session-cookie.ts), off production so not Secure. */
+export const WRITTEN_SESSION_COOKIES: CookieToSet[] = SESSION_COOKIES.map((cookie) => ({
+  ...cookie,
+  options: { path: '/', sameSite: 'lax', httpOnly: true, secure: false, maxAge: 2592000 },
+}));
+
 export const supabaseAuth = {
   signInWithOtp: vi.fn(async (_credentials: unknown): Promise<AuthAnswer> => ({ data: {}, error: null })),
   verifyOtp: vi.fn(async (_credentials: unknown): Promise<AuthAnswer> => ({ data: { user: { id: 'user-1' } }, error: null })),
