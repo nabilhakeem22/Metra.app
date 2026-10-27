@@ -7,6 +7,7 @@ import { failureOf } from '@/lib/actions/failure-of';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { dailyEmailCapReached } from '@/lib/email/daily-caps';
 import { sendDeliveryReminderEmail } from '@/lib/email/delivery-senders';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { deliveryPortalUrl, portalLocale } from '../portal-url';
@@ -23,8 +24,10 @@ import { readReminderRecipient } from './recipient';
  * `engagement_not_found`, `engagement_not_active`, the link codes of
  * readLiveDeliveryLink, `client_email_missing` (no address on the client or
  * its primary contact), `reminder_too_soon` (one went out within
- * REMINDER_EMAIL_COOLDOWN_MINUTES), `reminder_email_failed` (Resend refused or
- * did not answer within EMAIL_TIMEOUT_MS).
+ * REMINDER_EMAIL_COOLDOWN_MINUTES), `daily_email_cap_reached` (the studio's
+ * daily client email cap, lib/email/daily-caps.ts: no audit row, no send),
+ * `reminder_email_failed` (Resend refused or did not answer within
+ * EMAIL_TIMEOUT_MS).
  *
  * The read, the cooldown check and the audit row commit BEFORE the send, so no
  * database transaction waits on the mail provider. That audit row records the
@@ -38,6 +41,7 @@ export async function emailDeliveryReminderCore(
 ): Promise<ActionResult> {
   const locale = portalLocale(input.locale);
   if (!locale) return err('malformed');
+  if (await dailyEmailCapReached(ctx, 'client_email')) return err('daily_email_cap_reached');
 
   const read = await mutateInOrg(ctx, DELIVERY_LINK_GATE, async (tx, audit) => {
     const link = await readLiveDeliveryLink(tx, input.engagementId, { activeOnly: true });

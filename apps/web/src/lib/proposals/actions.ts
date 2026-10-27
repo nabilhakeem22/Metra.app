@@ -11,6 +11,7 @@ import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
+import { dailyEmailCapReached } from '@/lib/email/daily-caps';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import {
   createProposalCore,
@@ -85,6 +86,9 @@ export async function sendProposal(id: string): Promise<
   // never receives.
   const origin = await resolveRequestOrigin();
   if (!origin) return unexpectedFailure('sendProposal: no request origin');
+  // Past the studio's daily client email cap the proposal is still sent and its
+  // link returned to copy; only the email is skipped (lib/email/daily-caps.ts).
+  const emailCapped = await dailyEmailCapReached(ctx, 'client_email');
   const res = await sendProposalCore(ctx, { id });
   if (!res.ok) return res;
   if (!res.data) return unexpectedFailure('sendProposalCore answered ok without a token');
@@ -93,11 +97,9 @@ export async function sendProposal(id: string): Promise<
   const link = `${origin}/${locale}/p/${res.data}`;
   refreshApp();
   // The proposal is ALREADY sent. The email is best-effort and cannot fail this.
-  const email = await notifyClientOfSentProposal(ctx, {
-    proposalId: id,
-    acceptUrl: link,
-    locale,
-  });
+  const email = emailCapped
+    ? { emailSent: false, emailSkippedNoAddress: false }
+    : await notifyClientOfSentProposal(ctx, { proposalId: id, acceptUrl: link, locale });
   return { ok: true, link, ...email };
 }
 

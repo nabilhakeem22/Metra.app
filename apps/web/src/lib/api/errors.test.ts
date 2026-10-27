@@ -33,6 +33,7 @@ const ALL_CODES: ActionCode[] = [
   'otp_verify_failed',
   'otp_rate_limited',
   'rate_limited',
+  'daily_email_cap_reached',
   'otp_sms_unavailable',
   'otp_email_unavailable',
   'immutable',

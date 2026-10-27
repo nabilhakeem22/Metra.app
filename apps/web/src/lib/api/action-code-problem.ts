@@ -39,6 +39,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   otp_verify_failed: 'bad-request',
   otp_rate_limited: 'rate-limited',
   rate_limited: 'rate-limited',
+  daily_email_cap_reached: 'rate-limited',
   otp_sms_unavailable: 'internal',
   otp_email_unavailable: 'internal',
   immutable: 'bad-request',

@@ -40,6 +40,9 @@ export type CommonActionCode =
   // A member asked for an expensive studio read too often in a short time
   // (lib/cf/studio-read-rate-limit.ts): wait a minute and ask again.
   | 'rate_limited'
+  // The studio used today's email allowance (lib/email/daily-caps.ts): the
+  // delivery reminder refuses, since its email IS the action.
+  | 'daily_email_cap_reached'
   | 'otp_sms_unavailable'
   | 'otp_email_unavailable'
   | 'immutable'

@@ -7,6 +7,7 @@ import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
+import { dailyEmailCapReached } from '@/lib/email/daily-caps';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
 import { normalizeEmail } from '@/lib/validation/email';
@@ -22,7 +23,8 @@ const PENDING_INVITE_INDEX = 'invitations_org_email_pending_idx';
  * Invite someone by email. Every refusal the studio can fix is said under the
  * Email box (empty, malformed, already a member, already invited); a role no
  * select offers is `malformed`. Answers the accept link, also when the email
- * could not be sent (the Team page shows it to copy).
+ * could not be sent or the studio's daily invite email cap is reached (the Team
+ * page shows it to copy).
  */
 export async function inviteMember(input: { email: string; role: MemberRole }): Promise<ActionResult> {
   const ctx = await requireOrg();
@@ -46,6 +48,7 @@ export async function inviteMember(input: { email: string; role: MemberRole }): 
   const link = await buildAcceptUrl(locale, raw);
   if (!link) return unexpectedFailure('inviteMember: no request origin');
 
+  const emailCapped = await dailyEmailCapReached(ctx, 'team_invite');
   const result = await mutateInOrg(
     ctx,
     { refusals: [{ constraint: PENDING_INVITE_INDEX, field: 'email', error: { code: 'pending_exists' } }] },
@@ -74,6 +77,6 @@ export async function inviteMember(input: { email: string; role: MemberRole }): 
   );
   if (!result.ok) return result;
 
-  await sendInviteEmail({ to: email, orgName: await orgDisplayName(ctx), acceptUrl: link, role, locale });
+  if (!emailCapped) await sendInviteEmail({ to: email, orgName: await orgDisplayName(ctx), acceptUrl: link, role, locale });
   return { ok: true, link };
 }
