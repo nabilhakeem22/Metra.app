@@ -565,7 +565,10 @@ every owner step below is done by hand, once.
    7. **Smoke test, CAPTCHA ON:** email sign-in end to end in both locales
       (phone too, if SMS is on). The verify step must succeed. Then
       ```bash
-      curl -s -X POST https://metra-web.nabil-hakeem22.workers.dev/api/auth/otp/send         -H "origin: https://metra-web.nabil-hakeem22.workers.dev"         -H "content-type: application/json"         -d '{"channel":"email","identifier":"<your address>"}'
+      curl -s -X POST https://metra-web.nabil-hakeem22.workers.dev/api/auth/otp/send \
+        -H "origin: https://metra-web.nabil-hakeem22.workers.dev" \
+        -H "content-type: application/json" \
+        -d '{"channel":"email","identifier":"<your address>"}'
       ```
       must answer `{"ok":false,"error":"otp_captcha_failed"}`, and no email
       arrives.
