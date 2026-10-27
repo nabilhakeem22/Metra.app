@@ -329,8 +329,9 @@ const SDF_CALLER_ALLOWLIST = [
   // each calling the /c function with the contract's stored hash.
   'apps/web/src/lib/client-home/contract.ts',
   // Client home H5: the one-time code request (app_home_code_issue_by_token)
-  // and the code-checked "I paid" acts (app_home_claim_request_by_token,
-  // app_home_claim_design_payment_by_token): the same delivery token, no
+  // and the code-checked acts, "I paid" (app_home_claim_request_by_token,
+  // app_home_claim_design_payment_by_token) and, from H6.2, signing the
+  // contract (app_home_contract_ack_by_token): the same delivery token, no
   // session; only the code's hash is passed.
   'apps/web/src/lib/client-home/codes.ts',
   'apps/web/src/lib/client-home/code-acts.ts',
