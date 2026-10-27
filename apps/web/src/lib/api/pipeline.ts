@@ -7,7 +7,7 @@ import { canSeeMargin } from '@/lib/permissions/can';
 import { touchApiKey, API_KEY_PREFIX, type ApiPrincipal } from '@/lib/api-keys/resolve';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { admitApiCaller, bearerToken, type AdmissionOptions } from './admit';
-import { problemResponse } from './errors';
+import { API_RESPONSE_HEADERS, problemResponse } from './errors';
 import { InvalidCursorError } from './pagination';
 
 /** Thrown by a handler when a requested resource is absent/foreign. -> 404. */
@@ -127,7 +127,7 @@ export async function handleApiRequest(
     deferUsageStamp(raw);
     return new Response(JSON.stringify(value), {
       status: 200,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...API_RESPONSE_HEADERS },
     });
   } catch (error) {
     return problemForThrown(error);

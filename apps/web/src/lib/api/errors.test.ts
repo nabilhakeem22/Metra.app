@@ -228,6 +228,13 @@ describe('problem+json envelope', () => {
     const json = (await res.json()) as { status: number };
     expect(json.status).toBe(429);
   });
+
+  it('is never cached and never sniffed (go-live security)', () => {
+    for (const res of [problemResponse('internal'), problemFromActionCode('forbidden'), problemResponse('rate-limited', { headers: { 'retry-after': '60' } })]) {
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    }
+  });
 });
 
 describe('ActionCode -> problem mapping', () => {
