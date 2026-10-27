@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { homePayload } from '@/test/client-home-payloads';
+import { CONTRACT_ID, homePayload } from '@/test/client-home-payloads';
+import type { ClientExecutionReason } from '@/lib/flow/locate/execution-client';
 
 // The client home's reads per view (H4.2, AC16; the Workers CPU budget):
 // every token SDF the page makes goes through lib/share/sdf-call, so the calls
 // are counted at the one connection they share. The design snapshot and the
 // home answer canned payloads; only which functions are called, and how often,
-// is asserted.
+// is asserted. The one state that reads a second call is a contract
+// awaiting the client's signature: its document is shown open with the page
+// (H6.2, A2; AC1).
 
 const db = vi.hoisted(() => ({
   calls: [] as string[],
@@ -48,16 +51,21 @@ function designSnapshot(state: string, entryPhase = 'design'): Record<string, un
   };
 }
 
+/** The contract snapshot app_home_contract_by_token answers: /c's JSON of the home's contract. */
+const CONTRACT_SNAPSHOT = { id: CONTRACT_ID, status: 'issued', source: 'boq', section_count: 0, sections: [], payment_schedule: [] };
+
 function answer(design: string | null, home: Record<string, unknown> | null) {
   db.answers = {
     app_delivery_by_token: design === null ? null : designSnapshot(design),
     app_home_by_token: home,
+    app_home_contract_by_token: CONTRACT_SNAPSHOT,
   };
 }
 
 /** A LIGHT delivery (entry_phase 'execution'): born at execution, with no design behind it. */
 function answerLight(home: Record<string, unknown>) {
   db.answers = {
+    app_home_contract_by_token: CONTRACT_SNAPSHOT,
     app_delivery_by_token: designSnapshot('execution', 'execution'),
     app_home_by_token: { ...home, delivery: { ...(home.delivery as object), entry_phase: 'execution' } },
   };
@@ -81,10 +89,27 @@ describe('reads per view', () => {
     expect(db.calls).toEqual(['app_home_by_token']);
   });
 
-  it('the Execution tab while a contract awaits signature is still one call: the document is read on the client tap (H6.2)', async () => {
+  it('the Execution tab while a contract awaits signature: two calls, the home then the document shown open (H6.2, AC1)', async () => {
     answer('execution', homePayload('sign_contract'));
-    await readHomeView('tok', 'execution');
-    expect(db.calls).toEqual(['app_home_by_token']);
+    const view = await readHomeView('tok', 'execution');
+    expect(db.calls).toEqual(['app_home_by_token', 'app_home_contract_by_token']);
+    expect(view).toMatchObject({ tab: 'execution', signingDocument: { id: CONTRACT_ID, sections: [] } });
+  });
+
+  it.each<ClientExecutionReason>(['signing_closed', 'works_in_progress', 'pay_request', 'terminated'])(
+    'the Execution tab at %s: ONE call, no document read with the page (AC1)',
+    async (reason) => {
+      answer('execution', homePayload(reason));
+      const view = await readHomeView('tok', 'execution');
+      expect(db.calls).toEqual(['app_home_by_token']);
+      expect(view).toMatchObject({ tab: 'execution', signingDocument: null });
+    },
+  );
+
+  it('awaiting signature, a document that is now another contract is not shown: no document (sign.unavailable)', async () => {
+    answer('execution', homePayload('sign_contract'));
+    db.answers.app_home_contract_by_token = { ...CONTRACT_SNAPSHOT, id: '00000000-0000-4000-8000-0000000000c2' };
+    expect(await readHomeView('tok', 'execution')).toMatchObject({ tab: 'execution', signingDocument: null });
   });
 
   it('the design tab: exactly ONE call, app_delivery_by_token, in the design phase and as the record at execution', async () => {
@@ -109,6 +134,12 @@ describe('reads per view', () => {
     expect(db.calls).toEqual(['app_delivery_by_token', 'app_home_by_token']);
   });
 
+  it('no tab at execution awaiting signature: three calls, the document last (AC1)', async () => {
+    answer('execution', homePayload('sign_contract'));
+    expect((await readHomeView('tok', null)).tab).toBe('execution');
+    expect(db.calls).toEqual(['app_delivery_by_token', 'app_home_by_token', 'app_home_contract_by_token']);
+  });
+
   it('an unknown link asked for the Execution tab: one call, the same not-found as the design tab', async () => {
     answer(null, null);
     expect(await readHomeView('tok', 'execution')).toEqual({ tab: 'design', read: { status: 'not_found' } });
@@ -116,7 +147,7 @@ describe('reads per view', () => {
   });
 
   it('a light delivery with no tab opens its Execution tab: two calls, as any delivery at execution', async () => {
-    answerLight(homePayload('sign_contract'));
+    answerLight(homePayload('works_in_progress'));
     const view = await readHomeView('tok', null);
     expect(view.tab).toBe('execution');
     expect(db.calls).toEqual(['app_delivery_by_token', 'app_home_by_token']);

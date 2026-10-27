@@ -10,6 +10,7 @@ import type { HomeExecution } from '@/lib/client-home/types';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { ContractDocumentDisclosure } from './contract-document';
 import { DocumentNumber } from './document-number';
@@ -40,12 +41,15 @@ export function ExecutionContract({
   execution,
   firmName,
   showsDesignRecord,
+  signingDocument,
 }: {
   token: string;
   execution: HomeExecution;
   firmName: string;
   /** The delivery began with a design, so its record is a tab of this page. */
   showsDesignRecord: boolean;
+  /** The contract awaiting the client's signature, read with the page (shown open), or null. */
+  signingDocument: ContractDocument | null;
 }) {
   const t = useTranslations('delivery.contract');
   const locale = useLocale();
@@ -85,7 +89,9 @@ export function ExecutionContract({
             {contract.terminatedAt && <Fact label={t('terminatedOn')}>{day(contract.terminatedAt)}</Fact>}
           </dl>
           {/* Keyed by the contract: a page read again naming another one never keeps the old document under it. */}
-          {contract.status !== 'terminated' && <ContractDocumentDisclosure key={contract.id} token={token} contractId={contract.id} />}
+          {contract.status !== 'terminated' && (
+            <ContractDocumentDisclosure key={contract.id} token={token} contractId={contract.id} initial={signingDocument} />
+          )}
           {contract.status === 'issued' && (
             <p className="rounded-item bg-muted/50 p-3 text-caption text-muted-foreground">
               {t(contract.signingOpen ? 'signWithLink' : 'signingClosed', { studio: firmName })}

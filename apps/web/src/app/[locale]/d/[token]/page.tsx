@@ -66,7 +66,7 @@ export default async function PublicDeliveryPage({
   const { document, tab, focus } = await searchParams;
   const view = await renderedView(locale, token, tab);
   if (view.tab === 'execution') {
-    return <ExecutionTabView token={token} home={view.home} focus={requestedFocus(focus)} />;
+    return <ExecutionTabView token={token} home={view.home} signingDocument={view.signingDocument} focus={requestedFocus(focus)} />;
   }
   return (
     <PublicDeliveryView token={token} read={view.read} documentUnavailable={document === 'unavailable'} focus={requestedFocus(focus)} />

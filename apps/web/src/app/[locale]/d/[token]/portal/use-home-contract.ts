@@ -12,11 +12,13 @@ export type HomeContractProblem = { failure: ShownPortalFailure } | { own: 'gone
  * The Execution tab's contract document, read the first time the client opens
  * it and kept after that: hiding and showing it again reads nothing, so the
  * lines a client has loaded stay. One read at a time; a failed one keeps the
- * document closed and says why.
+ * document closed and says why. `initial` is the document the page read with
+ * it (a contract awaiting the client's signature): it starts open, and no
+ * read is made for it.
  */
-export function useHomeContract(token: string, contractId: string) {
-  const [document, setDocument] = useState<ContractDocument | null>(null);
-  const [open, setOpen] = useState(false);
+export function useHomeContract(token: string, contractId: string, initial: ContractDocument | null) {
+  const [document, setDocument] = useState(initial);
+  const [open, setOpen] = useState(initial !== null);
   const [problem, setProblem] = useState<HomeContractProblem | null>(null);
   const [pending, startTransition] = useTransition();
   // Up from the tap until a read fails: two taps in the same tick (before the

@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { homeNamesSource } from '@/lib/client-home/names';
 import type { HomeFocus } from '@/lib/client-home/tab';
 import type { HomeAtExecution } from '@/lib/client-home/types';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { deliveryDisplayNames } from '@/lib/engagements/public/display-names';
 import { HomeTabs } from './home-tabs';
 import { ExecutionChangeOrders } from './portal/execution-change-orders';
@@ -16,7 +17,8 @@ import { StudioBar } from './portal/studio-bar';
 import { useFocusSection } from './portal/use-focus-section';
 
 /**
- * The client home's EXECUTION tab, read from ONE token SDF (./home-read.ts):
+ * The client home's EXECUTION tab, read from ONE token SDF (./home-read.ts),
+ * and the contract's document with it while it awaits the client's signature:
  * the studio bar, the greeting, the tab strip when the delivery began with a
  * design (a light delivery has only this tab), then the hero (where the
  * client stands and the one thing to do) and, in this order, the contract,
@@ -29,10 +31,13 @@ import { useFocusSection } from './portal/use-focus-section';
 export function ExecutionTabView({
   token,
   home,
+  signingDocument,
   focus,
 }: {
   token: string;
   home: HomeAtExecution;
+  /** The contract awaiting the client's signature, read with the page; null in every other state, or when its read failed. */
+  signingDocument: ContractDocument | null;
   focus: HomeFocus | null;
 }) {
   const t = useTranslations('delivery');
@@ -86,7 +91,13 @@ export function ExecutionTabView({
           </div>
           <div className="contents lg:flex lg:flex-col lg:gap-4">
             <div className="order-2">
-              <ExecutionContract token={token} execution={execution} firmName={firmName} showsDesignRecord={startedWithDesign} />
+              <ExecutionContract
+                token={token}
+                execution={execution}
+                firmName={firmName}
+                showsDesignRecord={startedWithDesign}
+                signingDocument={signingDocument}
+              />
             </div>
             {execution.openVariationCount > 0 && (
               <div className="order-3">

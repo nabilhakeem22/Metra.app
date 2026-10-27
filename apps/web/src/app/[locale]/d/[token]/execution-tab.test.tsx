@@ -34,7 +34,7 @@ function homeOf(reason: ClientExecutionReason, entryPhase: 'design' | 'execution
 }
 
 const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null) =>
-  renderWithIntl(<ExecutionTabView token="tok-1" home={home} focus={focus} />, { locale });
+  renderWithIntl(<ExecutionTabView token="tok-1" home={home} signingDocument={null} focus={focus} />, { locale });
 
 /** The headline each reason says, built from the catalogue with the fixture's facts. */
 function expectedHeadline(locale: TestLocale, reason: ClientExecutionReason): string {

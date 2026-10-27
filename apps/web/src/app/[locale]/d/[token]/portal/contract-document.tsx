@@ -6,6 +6,7 @@ import { ContractScheduleCard } from '@/components/client-contract/schedule-card
 import { ContractSectionList } from '@/components/client-contract/section-list';
 import { ContractTotalsCard } from '@/components/client-contract/totals-card';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { cn } from '@/lib/utils';
 import { loadHomeContractSectionLines, loadHomeContractSections } from '../contract-actions';
 import { useHomeContract } from './use-home-contract';
@@ -17,13 +18,24 @@ const DOCUMENT_ID = 'home-contract-document';
  * the page (the tab's render reads nothing for it), opened on the client's
  * tap, then shown as /c shows it, through the SAME components: the sections
  * with their lines (more sections and a section's lines read when asked for),
- * the figures and the payment schedule. Those later reads name the contract
- * the document was opened on, so once the studio has replaced it they answer
- * gone rather than add another contract's pages. فصحى copy, Latin digits.
+ * the figures and the payment schedule. A contract awaiting the client's
+ * signature is the exception: the page read it, and it opens with the page
+ * (`initial`). Later reads name the contract the document was opened on, so
+ * once the studio has replaced it they answer gone rather than add another
+ * contract's pages. فصحى copy, Latin digits.
  */
-export function ContractDocumentDisclosure({ token, contractId }: { token: string; contractId: string }) {
+export function ContractDocumentDisclosure({
+  token,
+  contractId,
+  initial = null,
+}: {
+  token: string;
+  contractId: string;
+  /** The document read with the page, shown open (a contract awaiting the client's signature), or null. */
+  initial?: ContractDocument | null;
+}) {
   const t = useTranslations('delivery.contract.document');
-  const contract = useHomeContract(token, contractId);
+  const contract = useHomeContract(token, contractId, initial);
   const { document, open, problem, pending } = contract;
 
   return (

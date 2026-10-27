@@ -4,6 +4,9 @@ import 'server-only';
 // token SDF:
 //   Execution  app_home_by_token (the money card embedded; never the design snapshot)
 //   Design     app_delivery_by_token (at `execution`, the design record)
+// ONE state reads a second: while the contract awaits the client's signature,
+// the Execution tab shows the document open above the signing, so it reads
+// app_home_contract_by_token with the page (H6.2, A2).
 // With no tab the page opens on the delivery's current phase, and only the
 // design snapshot can say which that is without a second call: so the design
 // phase stays one call, as it was, and a delivery at `execution` reached by a
@@ -12,19 +15,29 @@ import 'server-only';
 // A LIGHT delivery (entry_phase 'execution') has no design phase, so it has no
 // design tab: without a tab it opens the Execution tab, and a link to its
 // design tab is sent there instead.
+import { readSigningDocument } from '@/lib/client-home/contract';
 import { getHomeByToken } from '@/lib/client-home/read';
 import type { HomeTab } from '@/lib/client-home/tab';
-import type { HomeAtExecution, PortalHome } from '@/lib/client-home/types';
+import type { HomeAtExecution, HomeExecution, PortalHome } from '@/lib/client-home/types';
+import type { ContractDocument } from '@/lib/contracts/public-types';
 import { getDeliveryByToken, type DeliveryReadResult } from '@/lib/engagements/public';
 
 type HomeView =
   | { tab: 'design'; read: DeliveryReadResult }
-  | { tab: 'execution'; home: HomeAtExecution }
+  | { tab: 'execution'; home: HomeAtExecution; signingDocument: ContractDocument | null }
   | { tab: 'redirect'; to: HomeTab };
 
+/** The document a page awaiting the client's signature shows open; in every other state none is read. */
+async function signingDocumentOf(token: string, execution: HomeExecution): Promise<ContractDocument | null> {
+  const { contract, location } = execution;
+  return location.reason === 'sign_contract' && contract ? readSigningDocument(token, contract.id) : null;
+}
+
 /** The Execution tab's view of a home, or null when the delivery is not at execution. */
-function atExecution(home: PortalHome): HomeView | null {
-  return home.execution ? { tab: 'execution', home: { ...home, execution: home.execution } } : null;
+async function atExecution(token: string, home: PortalHome): Promise<HomeView | null> {
+  const { execution } = home;
+  if (!execution) return null;
+  return { tab: 'execution', home: { ...home, execution }, signingDocument: await signingDocumentOf(token, execution) };
 }
 
 /** The design tab's view: today's page, or the design record once the delivery is at execution. */
@@ -41,7 +54,7 @@ async function designView(token: string): Promise<HomeView> {
 async function executionView(token: string): Promise<HomeView> {
   const read = await getHomeByToken(token);
   if (read.status !== 'ok') return { tab: 'design', read };
-  return atExecution(read.home) ?? designView(token);
+  return (await atExecution(token, read.home)) ?? designView(token);
 }
 
 export async function readHomeView(token: string, requested: HomeTab | null): Promise<HomeView> {
@@ -53,5 +66,5 @@ export async function readHomeView(token: string, requested: HomeTab | null): Pr
   const inExecution = read.status === 'ok' && read.delivery.stageKey === 'construction';
   if (requested === 'design' || !inExecution) return { tab: 'design', read };
   const home = await getHomeByToken(token);
-  return (home.status === 'ok' ? atExecution(home.home) : null) ?? { tab: 'design', read };
+  return (home.status === 'ok' ? await atExecution(token, home.home) : null) ?? { tab: 'design', read };
 }

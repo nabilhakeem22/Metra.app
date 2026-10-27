@@ -91,7 +91,7 @@ function RefreshedCard() {
   const [contractId, setContractId] = useState(CONTRACT_ID);
   nameContract = setContractId;
   const named = { ...execution, contract: execution.contract && { ...execution.contract, id: contractId } };
-  return <ExecutionContract token="tok" execution={named} firmName="Noon" showsDesignRecord={false} />;
+  return <ExecutionContract token="tok" execution={named} firmName="Noon" showsDesignRecord={false} signingDocument={null} />;
 }
 
 const LATER_LINES = { section_id: 's-2', offset: 0, line_count: 2, lines: [line(4, 'pcs', '42.0000'), line(5, 'roll', '3.5000')] };
@@ -132,6 +132,19 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the contract in the client home (%s)
     await tap(at('delivery.contract.document.show'));
     expect(document.getElementById('home-contract-document')?.hidden).toBe(false);
     expect(home.open).toHaveBeenCalledTimes(1);
+  });
+
+  test('a contract awaiting signature opens with the page, from the document read with it: no open read; its lines still name it (H6.2, AC2)', async () => {
+    renderWithIntl(<ContractDocumentDisclosure token="tok" contractId={CONTRACT_ID} initial={contractDocumentOf(CONTRACT)} />, { locale });
+    expect(document.getElementById('home-contract-document')?.hidden).toBe(false);
+    expect(screen.getByRole('button', { name: at('delivery.contract.document.hide') }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getAllByRole('row').length).toBeGreaterThan(3);
+    home.lines.mockResolvedValueOnce({ ok: true, page: LATER_LINES });
+    await tap(at('portal.contract.lines.show').replace('{count}', '2'));
+    expect(home.lines).toHaveBeenLastCalledWith('tok', CONTRACT_ID, 's-2', 0);
+    await tap(at('delivery.contract.document.hide'));
+    await tap(at('delivery.contract.document.show'));
+    expect(home.open).not.toHaveBeenCalled();
   });
 
   test('two taps in the same tick read once (H6-read F6); a failed read can be asked again', async () => {
