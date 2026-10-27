@@ -16,7 +16,8 @@ import 'server-only';
 //   dialog opens (and again on focus), so it proves only that it was opened.
 import { sql, type SQL } from 'drizzle-orm';
 import { WEEKLY_KEY as FOLLOWUP_ALERT_KEY } from '@/lib/automation/delivery-followup-writes';
-import { REMINDER_EMAIL_COOLDOWN_MINUTES, REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/cooldown';
+import { REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/audit-values';
+import { REMINDER_EMAIL_COOLDOWN_MINUTES } from '@/lib/engagements/reminder/cooldown';
 import { REMINDER_WHATSAPP_OPENED } from '@/lib/engagements/reminder/whatsapp-opened';
 import { ALERT_LOOKBACK_DAYS } from './window-sql';
 

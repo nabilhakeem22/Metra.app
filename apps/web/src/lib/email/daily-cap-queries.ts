@@ -2,7 +2,7 @@ import 'server-only';
 import { auditLog, proposalEvents } from '@metra/db';
 import { and, eq, gt, or, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/cooldown';
+import { REMINDER_EMAIL_REQUESTED } from '@/lib/engagements/reminder/audit-values';
 
 // How many emails a studio has caused since a moment, counted from rows the
 // actions ALREADY write (no counter table, no migration). Read under the org's

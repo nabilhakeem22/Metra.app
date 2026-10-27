@@ -12,11 +12,8 @@ import { sendDeliveryReminderEmail } from '@/lib/email/delivery-senders';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { deliveryPortalUrl, portalLocale } from '../portal-url';
 import { DELIVERY_LINK_GATE, readLiveDeliveryLink } from '../share-reveal';
-import {
-  REMINDER_EMAIL_FAILED,
-  REMINDER_EMAIL_REQUESTED,
-  refuseIfRemindedRecently,
-} from './cooldown';
+import { REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from './audit-values';
+import { refuseIfRemindedRecently } from './cooldown';
 import { readReminderRecipient } from './recipient';
 
 /**
