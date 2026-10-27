@@ -5,6 +5,7 @@
 // Nothing here knows what a CSV is. It takes a SheetGrid, so the same code
 // serves an XLSX decoder unchanged.
 
+import { stripFormulaGuard } from '@/lib/import/formula-guard';
 import { readMoney } from '@/lib/money/read';
 import { unitFromToken } from '@/lib/units/unit-aliases';
 import type { SheetGrid } from './decode';
@@ -213,7 +214,8 @@ export interface MapResult {
 /** The section a line falls under when the sheet has no section column. */
 export const DEFAULT_SECTION = 'General';
 
-const cell = (row: string[], idx: number) => (idx >= 0 ? (row[idx] ?? '') : '');
+/** A data cell, with the template's formula guard dropped (lib/import/formula-guard.ts). */
+const cell = (row: string[], idx: number) => (idx >= 0 ? stripFormulaGuard(row[idx] ?? '') : '');
 
 /**
  * Map every data row. Rows are validated INDEPENDENTLY and a bad row never stops
