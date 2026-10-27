@@ -69,12 +69,28 @@ export async function dispatchEmail(
   }
 }
 
-/** The SDK is loaded lazily: most requests never send an email. */
+let resendSdk: Promise<typeof import('resend')> | undefined;
+
+/**
+ * The SDK, loaded lazily (most requests never send an email) and ONCE: every
+ * send that overlaps the first load waits on the same `import()`.
+ *
+ * The platform caches the module anyway, so production gains nothing; the point
+ * is the tests. Vitest 2 hands a `vi.mock`ed module to only one in-flight
+ * import per importer, and an overlapping second `import('resend')` got the REAL
+ * SDK, which sent a real request to api.resend.com from CI. One import call per
+ * module instance leaves nothing to overlap.
+ */
+function loadResendSdk(): Promise<typeof import('resend')> {
+  resendSdk ??= import('resend');
+  return resendSdk;
+}
+
 async function sendViaResend(
   apiKey: string,
   from: string,
   payload: EmailPayload,
 ): Promise<{ error: unknown }> {
-  const { Resend } = await import('resend');
+  const { Resend } = await loadResendSdk();
   return new Resend(apiKey).emails.send({ from, ...payload });
 }

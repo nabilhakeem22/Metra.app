@@ -14,6 +14,14 @@
   "workers_dev": true,
   // Version preview URLs OFF: they would serve old builds with production secrets.
   "preview_urls": false,
+  // esbuild keep-names OFF (OpenNext's documented fix, howtos/keep_names). When
+  // it is on, every function gets a `__name(fn, "fn")` call, and next-themes
+  // ships its no-flash theme script as the function's own source text: every
+  // page the Worker rendered threw `__name is not defined` in the browser and
+  // painted before the stored theme applied. Function and class names in the
+  // bundle are then the bundler's (`Foo2` after a clash); nothing here reads
+  // one, and errors are told apart by `this.name` strings and instanceof.
+  "keep_names": false,
   // Assets-first is LOAD-BEARING: the landing and login pages are pre-rendered
   // HTML served before the Worker runs. Never set run_worker_first or
   // not_found_handling here (src/test/wrangler-assets.test.ts, docs/DEPLOY.md).
