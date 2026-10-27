@@ -52,9 +52,10 @@ describe('the sign-in throttle on the routes', () => {
     expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledTimes(AUTH_OTP_IP_CEILING);
   });
 
-  it('answers the 6th verify for one address, however typed and from any IP, with 429', async () => {
+  it('answers the verify past the per-address ceiling, however typed and from any IP, with 429', async () => {
     const spellings = ['mona@firm.example', 'MONA@firm.example', ' mona@FIRM.example ', 'Mona@Firm.Example', 'mona@firm.example '];
-    for (const [index, identifier] of spellings.entries()) {
+    for (let index = 0; index < AUTH_OTP_IDENTIFIER_CEILING; index += 1) {
+      const identifier = spellings[index % spellings.length];
       const response = await verify(otpPost('/api/auth/otp/verify', verifyBody(identifier), { 'cf-connecting-ip': `198.51.100.${index}` }));
       expect(response.status).toBe(200);
     }
@@ -85,5 +86,41 @@ describe('the sign-in throttle on the routes', () => {
     expect(consoleCalls.length).toBeGreaterThan(0);
     expect(seen).not.toContain('secret.person');
     expect(seen).not.toContain('1001234567');
+  });
+});
+
+describe('one source cannot lock a named address out (fix round T4, T5)', () => {
+  const VICTIM = 'owner@studio.example';
+  const ATTACKER = { 'cf-connecting-ip': '198.51.100.66' };
+  const OWN_IP = { 'cf-connecting-ip': '203.0.113.200' };
+  const verifyAs = (identifier: string, headers: Record<string, string>) => verify(otpPost('/api/auth/otp/verify', verifyBody(identifier), headers));
+  const sendAs = (identifier: string, headers: Record<string, string>) => send(otpPost('/api/auth/otp/send', sendBody(identifier), headers));
+
+  it('an attacker IP that spends its whole budget on the address leaves its owner able to send and verify', async () => {
+    for (let index = 0; index < AUTH_OTP_IP_CEILING; index += 1) {
+      await verifyAs(VICTIM, ATTACKER);
+      await sendAs(VICTIM, ATTACKER);
+    }
+    expect((await sendAs(VICTIM, ATTACKER)).status).toBe(429);
+    expect((await verifyAs(VICTIM, OWN_IP)).status).toBe(200);
+    expect((await sendAs(VICTIM, OWN_IP)).status).toBe(200);
+  });
+
+  it('verify has its own per-address bucket: a spent send budget leaves verify open', async () => {
+    for (let index = 0; index < AUTH_OTP_IDENTIFIER_CEILING; index += 1) {
+      expect((await sendAs(VICTIM, { 'cf-connecting-ip': `192.0.2.${index}` })).status).toBe(200);
+    }
+    expect((await sendAs(VICTIM, OWN_IP)).status).toBe(429);
+    expect((await verifyAs(VICTIM, OWN_IP)).status).toBe(200);
+  });
+
+  it('keys a phone exactly as Supabase receives it: every spelling of one number is one bucket and one value', async () => {
+    const spellings = ['+201001234567', '201001234567', '+20 100 123 4567', '+20-100-123-4567'];
+    for (const [index, identifier] of spellings.entries()) {
+      await send(otpPost('/api/auth/otp/send', JSON.stringify({ channel: 'phone', identifier }), { 'cf-connecting-ip': `203.0.114.${index}` }));
+    }
+    const identifierBinding = runtime.env.AUTH_OTP_IDENTIFIER_RATE_LIMITER as ReturnType<typeof countingRateLimit>;
+    expect(new Set(identifierBinding.limit.mock.calls.map(([options]) => options.key)).size).toBe(1);
+    expect(doubles.supabaseAuth.signInWithOtp.mock.calls.map(([options]) => options)).toEqual(spellings.map(() => ({ phone: '+201001234567' })));
   });
 });

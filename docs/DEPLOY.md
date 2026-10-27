@@ -436,8 +436,13 @@ every owner step below is done by hand, once.
   (`apps/web/src/lib/auth/otp-throttle.ts`, ceilings in `wrangler.jsonc` only):
   `AUTH_OTP_IP_RATE_LIMITER` (namespace 1007, 10 per 60 s per step and caller
   IP, an IPv6 caller by its /64) and `AUTH_OTP_IDENTIFIER_RATE_LIMITER`
-  (namespace 1008, 5 per 60 s per step and address; the key is a sha256 prefix,
+  (namespace 1008, 15 per 60 s per step and address; the key is a sha256 prefix,
   never the address). Past either: 429 `otp_rate_limited` with `retry-after: 60`.
+  Send and verify are separate buckets. The per-address ceiling stays above the
+  per-IP one, so one source alone cannot lock a named address out of sign-in.
+  The address or phone is made canonical once (lower-case address; phone as `+`
+  and its digits), and that one string is both the bucket key and what Supabase
+  receives.
   Like every binding it counts per data centre, and a binding **missing** on
   Cloudflare makes sign-in answer 500, by design.
 - **Daily email caps per studio** (`apps/web/src/lib/email/daily-caps.ts`,

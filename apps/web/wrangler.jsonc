@@ -87,9 +87,11 @@
   // it unlimited.
   //   AUTH_OTP_IP_RATE_LIMITER          10 req / 60s, keyed per step + caller IP
   //     (cf-connecting-ip, IPv6 by its /64), charged first.
-  //   AUTH_OTP_IDENTIFIER_RATE_LIMITER   5 req / 60s, keyed per step + a sha256
-  //     prefix of the normalized email or phone; only charged once the IP
-  //     bucket allowed the request.
+  //   AUTH_OTP_IDENTIFIER_RATE_LIMITER  15 req / 60s, keyed per step + a sha256
+  //     prefix of the canonical email or phone (the value Supabase receives);
+  //     only charged once the IP bucket allowed the request. It MUST stay above
+  //     the IP ceiling, so one source alone cannot lock a named address out
+  //     (src/test/otp-ceilings.test.ts).
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.
@@ -132,7 +134,7 @@
     {
       "name": "AUTH_OTP_IDENTIFIER_RATE_LIMITER",
       "namespace_id": "1008",
-      "simple": { "limit": 5, "period": 60 }
+      "simple": { "limit": 15, "period": 60 }
     }
   ]
 }
