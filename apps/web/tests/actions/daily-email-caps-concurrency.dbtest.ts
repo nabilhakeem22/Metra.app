@@ -13,12 +13,28 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // brake. Before the fix, 150 invites fired at once sent 150 emails (each read
 // the count before any of the others committed its row). Now each claim takes
 // the (org, cap) transaction lock in the transaction that writes the counted
-// row, so a burst of any size sends exactly the cap. The session, the member
-// lookup (Supabase admin) and Resend are replaced; the actions, the counts and
-// the lock run on the seeded database.
+// row, so a burst of any size is allowed exactly the cap. The session, the
+// member lookup (Supabase admin) and Resend are replaced; the actions, the
+// counts and the lock run on the seeded database.
+//
+// The cap's verdict is asserted on the claims themselves (each real
+// claimDailyEmail answer is recorded). Delivery is asserted as "never more
+// than the cap": under a loaded CI runner an allowed email can still miss its
+// own 5 s send deadline, which is the mailer's outcome, not the cap's.
 
 const BURST = 150;
-const holder = vi.hoisted(() => ({ ctx: null as OrgContext | null, sends: [] as Array<{ to: unknown }> }));
+const holder = vi.hoisted(() => ({ ctx: null as OrgContext | null, sends: [] as Array<{ to: unknown }>, claims: [] as boolean[] }));
+vi.mock('@/lib/email/daily-caps', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/email/daily-caps')>();
+  return {
+    ...real,
+    claimDailyEmail: async (...args: Parameters<typeof real.claimDailyEmail>) => {
+      const allowed = await real.claimDailyEmail(...args);
+      holder.claims.push(allowed);
+      return allowed;
+    },
+  };
+});
 vi.mock('@/lib/auth/require-org', () => ({ requireOrg: async () => holder.ctx }));
 vi.mock('@/lib/team/identities', () => ({ getOrgMemberIdentities: async () => [] }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
@@ -54,6 +70,7 @@ afterAll(async () => {
 });
 beforeEach(() => {
   holder.sends = [];
+  holder.claims = [];
 });
 
 async function ownerOfNewOrg(): Promise<{ orgId: string; ctx: OrgContext }> {
@@ -78,23 +95,30 @@ async function draftProposals(ctx: OrgContext, count: number): Promise<string[]>
 
 const countOf = async (query: string) => (await raw.query<{ n: number }>(query))[0].n;
 
+/** Every action claimed once, exactly `cap` claims were allowed, and the mailer was never asked for more. */
+function expectExactlyTheCap(cap: number) {
+  expect(holder.claims).toHaveLength(BURST);
+  expect(holder.claims.filter(Boolean)).toHaveLength(cap);
+  expect(holder.sends.length).toBeLessThanOrEqual(cap);
+}
+
 describe('the daily email caps under a burst (T2)', () => {
-  it(`${BURST} concurrent invites create ${BURST} invitations and send exactly ${DAILY_EMAIL_CAPS.team_invite} emails`, async () => {
+  it(`${BURST} concurrent invites create ${BURST} invitations and allow exactly ${DAILY_EMAIL_CAPS.team_invite} emails`, async () => {
     const { orgId } = await ownerOfNewOrg();
     const emails = Array.from({ length: BURST }, () => `burst-${randomUUID()}@example.com`);
     const answers = await Promise.all(emails.map((email) => inviteMember({ email, role: 'viewer' })));
     expect(answers.every((answer) => answer.ok)).toBe(true);
-    expect(holder.sends).toHaveLength(DAILY_EMAIL_CAPS.team_invite);
+    expectExactlyTheCap(DAILY_EMAIL_CAPS.team_invite);
     expect(await countOf(`select count(*)::int as n from public.invitations where org_id = '${orgId}' and status = 'pending'`)).toBe(BURST);
   });
 
-  it(`${BURST} concurrent proposal sends send every proposal and exactly ${DAILY_EMAIL_CAPS.client_email} client emails`, async () => {
+  it(`${BURST} concurrent proposal sends send every proposal and allow exactly ${DAILY_EMAIL_CAPS.client_email} client emails`, async () => {
     const { orgId, ctx } = await ownerOfNewOrg();
     const ids = await draftProposals(ctx, BURST);
     const answers = await Promise.all(ids.map((id) => sendProposal(id)));
     expect(answers.every((answer) => answer.ok && answer.link)).toBe(true);
-    expect(answers.filter((answer) => answer.emailSent)).toHaveLength(DAILY_EMAIL_CAPS.client_email);
-    expect(holder.sends).toHaveLength(DAILY_EMAIL_CAPS.client_email);
+    expectExactlyTheCap(DAILY_EMAIL_CAPS.client_email);
+    expect(answers.filter((answer) => answer.emailSent).length).toBeLessThanOrEqual(DAILY_EMAIL_CAPS.client_email);
     expect(await countOf(`select count(*)::int as n from public.proposals where org_id = '${orgId}' and status = 'sent'`)).toBe(BURST);
   });
 });
