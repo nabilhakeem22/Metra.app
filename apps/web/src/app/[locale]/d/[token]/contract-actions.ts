@@ -1,17 +1,23 @@
 'use server';
 
+import { LINK_BRAKE_REFUSAL, type SignContractAnswer } from '@/lib/client-home/code-answers';
+import { signContractWithCodeByToken } from '@/lib/client-home/code-acts';
 import { getHomeContract, getHomeContractSectionLines, getHomeContractSections } from '@/lib/client-home/contract';
 import type { ContractSectionLinesAnswer, ContractSectionsAnswer } from '@/lib/contracts/public';
 import type { ContractDocument } from '@/lib/contracts/public-types';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
-import { portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import { requestProvenance } from '@/lib/share/request-provenance';
 
-// The Execution tab's contract document (H6.2, the read): opening it, and the
-// sections and lines after its opening, each read when the client asks and
-// never with the page (the tab's render stays one call). Every read spends the
-// link's READ budget (lib/share/portal-rate-limit.ts) and, past it, answers
-// `too_many` unread. NOTHING THROWS TO THE CLIENT: each runs through
-// `answered`, so a failure underneath is `generic` with its reference.
+// The Execution tab's contract: its document (H6.2, the read) and signing it
+// with a one-time code (H6.2, the act). The document opens, and its sections
+// and lines after its opening are read, when the client asks; only a page
+// awaiting the client's signature reads the document with it (./home-read.ts).
+// Every read spends the link's READ budget, the signing its ACT budget
+// (lib/share/portal-rate-limit.ts); past either, nothing is read or written
+// and the answer is `too_many`. NOTHING THROWS TO THE CLIENT: each runs
+// through `answered`, so a failure underneath is `uncertain` (the signing may
+// still commit) or `generic` with its reference.
 
 /** The document opened; `gone`, uniformly, when the link no longer shows THIS contract. */
 export type HomeContractAnswer =
@@ -21,6 +27,29 @@ export type HomeContractAnswer =
   | ({ ok: false } & PortalFailure);
 
 const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
+
+/**
+ * Public (no-session): the client signs the home's execution contract
+ * `contractId` with the name they typed and the code emailed to them for it
+ * (./code-actions.ts). The hash of what is signed is the server's own, over
+ * the contract /c shows; the browser never sends one. The database signs,
+ * uses the code up and tells the studio in one transaction. Captures the
+ * client IP and user agent for the signature's provenance.
+ */
+export async function signContractInHome(
+  token: string,
+  input: { contractId: string; name: string; code: string },
+): Promise<SignContractAnswer> {
+  return answered('signContractInHome', failed, async (): Promise<SignContractAnswer> => {
+    if (!(await portalActAllowed(token))) return LINK_BRAKE_REFUSAL;
+    return signContractWithCodeByToken(token, {
+      contractId: input?.contractId,
+      name: input?.name,
+      code: input?.code,
+      ...(await requestProvenance()),
+    });
+  });
+}
 
 /**
  * Public (no-session): the home's contract document, as /c opens it. The
