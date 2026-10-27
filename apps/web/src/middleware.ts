@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
 import { isPortalPicturePath } from './lib/engagements/portal-picture-path';
 import { clientLinkLocaleOf, clientLinkResponse, withNoReferrer } from './lib/middleware/client-link';
+import { responseHeadersFor } from './lib/middleware/response-headers';
 import { hasSupabaseAuthCookie } from './lib/supabase/auth-cookie';
 import { updateSession } from './lib/supabase/middleware';
 
@@ -23,7 +24,17 @@ const TOKEN_ROUTE = /\/(d|p|c|v)\/[^/]+/;
 //    path forwards the locale and syncs the cookie (lib/middleware/client-link.ts).
 // 3. Everything else: i18n (locale detection + redirect), then the Supabase
 //    session refresh, only when there is a session cookie to refresh.
+// Every response then gets the path's headers (responseHeadersFor): noindex
+// everywhere but the landing pages.
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  const response = await routeResponse(request);
+  for (const [name, value] of Object.entries(responseHeadersFor(request.nextUrl.pathname))) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
+async function routeResponse(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   if (isPortalPicturePath(pathname)) return withNoReferrer(NextResponse.next());
   const clientLinkLocale = clientLinkLocaleOf(pathname);

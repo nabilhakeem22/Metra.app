@@ -47,9 +47,10 @@ the flag unset ships nothing and reports nothing.
 ### Static pages are served before the Worker
 
 On the Workers Free plan every Worker request may use 10 ms of CPU, and a
-request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`
-and `/en/login` never reach the Worker: they are static assets, which
-Cloudflare serves before the Worker runs, at no CPU cost.
+request over it fails with Error 1102. So `/`, `/ar-EG`, `/en`, `/ar-EG/login`,
+`/en/login`, `/robots.txt`, `/sitemap.xml` and the icons never reach the
+Worker: they are static assets, which Cloudflare serves before the Worker runs,
+at no CPU cost.
 
 - `/` is `apps/web/public/index.html`, a tiny page that picks the locale in the
   browser (the `NEXT_LOCALE` cookie, then the browser's languages, then
@@ -59,6 +60,12 @@ Cloudflare serves before the Worker runs, at no CPU cost.
   (OpenNext does not). It runs after the OpenNext build in both workflows and
   fails the build if a page stopped being static. A manual build without it
   still works, but the Worker renders those pages again, 1102s and all.
+- `robots.txt` and `sitemap.xml` are pre-rendered route handlers
+  (`app/robots.ts`, `app/sitemap.ts`). Next writes their bodies to
+  `.next/server/app/robots.txt.body` and `.next/server/app/sitemap.xml.body`,
+  and the same script copies them to `.open-next/assets`. This matters more
+  than CPU: a `robots.txt` that answers 1102 or 5xx makes Google pause crawling
+  the whole site.
 
 Three rules keep this working:
 
@@ -76,6 +83,40 @@ Three rules keep this working:
 3. **Keep both pages free of request-time APIs** (`cookies()`, `headers()`, the
    Supabase server client). They export `dynamic = 'error'`, so the build fails
    rather than quietly rendering them per request.
+
+### Search engines: what may be indexed
+
+Only the two landing pages, `/ar-EG` and `/en`, are indexable. The list lives
+in `apps/web/src/lib/seo/indexable-pages.ts`, and the sitemap, the landing's
+hreflang links and the noindex exemption all read it.
+
+- **Noindex everywhere else.** The middleware sets `X-Robots-Tag: noindex,
+  nofollow` on every response it returns except the landing pages
+  (`src/lib/middleware/response-headers.ts`), the 404 and the redirects
+  included. The login pages are static assets the middleware never sees, so
+  `apps/web/public/_headers` sets the same header on them. Every private page
+  also carries the robots meta (`src/test/private-metadata-coverage.test.ts`).
+- **robots.txt has two groups.** Every crawler, AI crawlers included, may read
+  the landing pages and none may read `/api/` or a signed-in section. Googlebot
+  and Bingbot may also fetch the client links (`/c`, `/d`, `/invite`, `/p`,
+  `/v`): they then see the noindex and drop a leaked link from the index. The
+  login pages stay crawlable for the same reason. A new top-level route folder
+  fails `src/app/robots.test.ts` until it is added to
+  `src/lib/seo/private-paths.ts`.
+- **The sitemap date** is `LANDING_LAST_MODIFIED` in `indexable-pages.ts`, never
+  the build time. Bump it in the PR that changes the landing copy.
+- **Every absolute URL comes from `NEXT_PUBLIC_APP_URL`** (canonical, hreflang,
+  `og:image`, sitemap, robots). Moving to a custom domain needs no code change:
+  add it as a Workers Custom Domain on `metra-web`, set the
+  `NEXT_PUBLIC_APP_URL` Actions variable to it, deploy, then update the Supabase
+  Auth Site URL and redirect URLs.
+- **Search Console and Bing verification.** Set the optional Actions variables
+  `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` and/or
+  `NEXT_PUBLIC_BING_SITE_VERIFICATION` to the token alone (the `content` value
+  of the meta tag the console shows you), then deploy. The tag goes into the
+  landing pages and into `/`. A token outside `[A-Za-z0-9_-]`, or shorter than
+  10 or longer than 100 characters, fails the build on purpose. Blank means no
+  tag.
 
 ### Two things that were fixed to get here
 
@@ -106,7 +147,7 @@ History, so the setup is not accidentally reverted.
 Auto-deploy is already on; what follows is the recovery procedure, not a to-do.
 In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 
-#### Variables tab → New repository variable (7)
+#### Variables tab → New repository variable (7, plus 2 optional)
 
 | Name | Value |
 |------|-------|
@@ -116,6 +157,8 @@ In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
 | `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
 | `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
 | `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | optional: the Search Console token alone (see "Search engines" above) |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | optional: the Bing Webmaster `msvalidate.01` token alone |
 | `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
 
 #### Secrets tab → New repository secret (1)

@@ -148,3 +148,37 @@ describe('the session refresh runs only with a session cookie', () => {
     expect(createServerClient).not.toHaveBeenCalled();
   });
 });
+
+describe('the noindex header', () => {
+  it.each([
+    ['/ar-EG/dashboard'],
+    ['/en/d/abc'],
+    ['/en/d/abc/documents/x'],
+    ['/ar-EG/d/tok/logo'],
+    ['/ar-EG/onboarding'],
+    ['/ar-EG/invite/x'],
+    ['/en/login'],
+    ['/dashboard'],
+    ['/ar-EG/nope'],
+    ['/ar-EG/'],
+  ])('%s is noindex, nofollow', async (path) => {
+    expect((await get(path)).headers.get('x-robots-tag')).toBe('noindex, nofollow');
+  });
+
+  it.each([['/ar-EG'], ['/en']])('the landing %s carries no robots header', async (path) => {
+    expect((await get(path)).headers.get('x-robots-tag')).toBeNull();
+  });
+
+  it('a signed-in landing visit still carries no robots header', async () => {
+    expect((await get('/en', 'sb-ref-auth-token=x')).headers.get('x-robots-tag')).toBeNull();
+  });
+
+  it.each([['/en/d/abc'], ['/ar-EG/p/xyz'], ['/en/c/t/sub'], ['/en/v/abc']])(
+    '%s keeps no-referrer beside the robots header',
+    async (path) => {
+      const response = await get(path);
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    },
+  );
+});

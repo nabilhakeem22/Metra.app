@@ -1,0 +1,8 @@
+# Response headers for what Cloudflare serves as a STATIC ASSET, before the
+# Worker runs. The middleware never sees those requests; everything the Worker
+# renders gets its headers from src/lib/middleware/response-headers.ts.
+# The login pages are pre-rendered assets, so their noindex is set here.
+# No rule may match /, /ar-EG, /en, /robots.txt or /sitemap.xml
+# (src/test/static-headers.test.ts).
+/:locale/login
+  X-Robots-Tag: noindex, nofollow

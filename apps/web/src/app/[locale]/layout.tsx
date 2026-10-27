@@ -46,6 +46,14 @@ export async function generateMetadata({
       template: `%s · ${siteName}`,
     },
     description: t('description'),
+    // Static files in public/, so a favicon probe never reaches the Worker.
+    icons: {
+      icon: [
+        { url: '/favicon.ico', sizes: '48x48' },
+        { url: '/icon.svg', type: 'image/svg+xml' },
+      ],
+      apple: '/apple-touch-icon.png',
+    },
   };
 }
 

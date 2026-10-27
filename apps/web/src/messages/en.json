@@ -9,8 +9,10 @@
   },
   "landing": {
     "seo": {
-      "title": "Project & cost control for interior-design studios",
-      "description": "Metra runs interior-design studios through every stage of a fit-out (proposals, approvals, payment gates, and handoff) with every pound traceable from quote to invoice. Bilingual and EGP-native."
+      "title": "Metra · Software for interior design and fit-out studios in Egypt",
+      "description": "Metra is Arabic-first software for interior design and fit-out studios in Egypt: proposals and BOQs, contracts, payment requests, change orders and a private link where the client follows their project.",
+      "ogImageAlt": "Metra: Arabic-first software for interior design and fit-out studios",
+      "ogHeadline": "From quote to handover, in one system."
     },
     "nav": {
       "primaryLabel": "Primary",
@@ -116,6 +118,11 @@
     "footer": {
       "label": "Footer",
       "copyright": "© Metra"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page may have moved or been removed. You can go back to the home page.",
+      "cta": "Back to the home page"
     }
   },
   "meta": {
