@@ -8,11 +8,11 @@ describe('signerNameOf: the name a contract is signed with', () => {
   });
 
   it('is null for nothing to sign with: empty, spaces, controls only, or not text', () => {
-    for (const sent of ['', '   ', '\u0000\t‏', null, undefined, 42, { name: 'Hesham' }]) expect(signerNameOf(sent)).toBeNull();
+    for (const sent of ['', '   ', '\u0000\t\u200f', null, undefined, 42, { name: 'Hesham' }]) expect(signerNameOf(sent)).toBeNull();
   });
 
   it('drops bidi overrides and NUL, so the name cannot reverse or cut what the studio reads', () => {
-    expect(signerNameOf('‮Hesham\u0000Adel')).toBe('Hesham Adel');
+    expect(signerNameOf('\u202eHesham\u0000Adel')).toBe('Hesham Adel');
   });
 
   it('keeps at most 120 characters, ending in an ellipsis', () => {
