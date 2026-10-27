@@ -23,6 +23,11 @@ describe('signerNameOf: the name a contract is signed with', () => {
     }
   });
 
+  it('refuses a name of tatweel only, and keeps a tatweel between letters (H6.2 re-check N3)', () => {
+    for (const stroke of ['ـــ', ' ـ ', 'ـ - ـ']) expect(signerNameOf(stroke)).toBeNull();
+    expect(signerNameOf('هشـــام')).toBe('هشـــام');
+  });
+
   it('refuses a name sent longer than 8 x 120 before cleaning it, and cleans one at that length (security L3)', () => {
     expect(signerNameOf('a'.repeat(SIGNER_NAME_MAX * 8 + 1))).toBeNull();
     expect(signerNameOf('́'.repeat(1_000_000))).toBeNull();
