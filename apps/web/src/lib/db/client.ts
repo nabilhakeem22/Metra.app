@@ -2,6 +2,7 @@ import 'server-only';
 import { createDb, type MetraDb, type PostgresJs } from '@metra/db';
 import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
 import { getRequestConnection } from './request-connection';
+import { throwRedactedDatabaseFailure } from './redacted-failure';
 
 // Runtime connection string. On the Cloudflare Workers runtime, Postgres is
 // reached through the Hyperdrive binding (pooling + edge cache). Off-platform —
@@ -131,14 +132,23 @@ function getDb(): MetraDb {
  *
  * Off-platform this is a straight pass-through to the process-lived singleton, so
  * Node/Vitest/migrate/seed/next-dev behaviour is unchanged.
+ *
+ * On both paths a database failure leaves redacted (redacted-failure.ts): no
+ * query, no params, no driver `detail`, the same SQLSTATE and constraint.
  */
 export async function withRequestDb<T>(
   fn: (db: MetraDb) => Promise<T>,
   opts: { write?: boolean } = {},
 ): Promise<T> {
-  if (!isCloudflareRuntime()) {
-    return fn(getDb());
-  }
+  const work = isCloudflareRuntime() ? withinRequestDeadline(fn, opts) : fn(getDb());
+  return work.catch(throwRedactedDatabaseFailure);
+}
+
+/** The Cloudflare path: the request's shared connection, under CF_DB_DEADLINE_MS. */
+async function withinRequestDeadline<T>(
+  fn: (db: MetraDb) => Promise<T>,
+  opts: { write?: boolean },
+): Promise<T> {
   // Reuse the ONE request-scoped instance; no socket is opened or closed here per
   // call. Teardown is request-scoped (getRequestConnection registers it once), so
   // this branch must NOT call sql.end() — doing so would kill siblings still using
