@@ -6,9 +6,12 @@ import 'server-only';
 // withOrgContext, NO org GUCs: the token IS the auth); the raw token is hashed
 // here and never logged. Each read is made only when the client asks for it:
 // the document when it is opened, more sections and a section's lines when
-// shown (the Workers CPU budget).
+// shown (the Workers CPU budget). Two exceptions, both for signing: the page
+// awaiting the client's signature reads the document with it, and the sign
+// act hashes the whole snapshot, /c's own, so what is signed is what /c signs.
 import { sql } from 'drizzle-orm';
-import { isLineOffset, isSectionOffset } from '@/lib/contracts/public';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { contractPayloadHash, isLineOffset, isSectionOffset } from '@/lib/contracts/public';
 import type {
   ContractDocument,
   PublicContract,
@@ -42,18 +45,53 @@ export function contractDocumentOf(contract: PublicContract): ContractDocument {
 }
 
 /**
- * The home's contract document, opening as /c opens (its first 50 sections,
- * holding its first 50 lines). Null, uniformly, for a blank, unknown, revoked
- * or expired link, a delivery not at execution, and a contract that is not
- * issued or signed.
+ * The home's whole contract snapshot, /c's JSON. Null, uniformly, for a blank,
+ * unknown, revoked or expired link, a delivery not at execution, and a
+ * contract that is not issued or signed.
  */
-export async function getHomeContract(rawToken: string): Promise<ContractDocument | null> {
+async function readHomeContractSnapshot(rawToken: string): Promise<PublicContract | null> {
   const token = normalizeRawToken(rawToken);
   if (!token) return null;
-  const contract = await readSdfJson<PublicContract>(
-    sql`select public.app_home_contract_by_token(${hashShareToken(token)}) as data`,
-  );
+  return readSdfJson<PublicContract>(sql`select public.app_home_contract_by_token(${hashShareToken(token)}) as data`);
+}
+
+/** The snapshot when it IS the contract named (ids compared lower case), else null: never another contract's. */
+async function readNamedContractSnapshot(rawToken: string, contractId: string): Promise<PublicContract | null> {
+  const contract = await readHomeContractSnapshot(rawToken);
+  return contract !== null && contract.id === contractId.toLowerCase() ? contract : null;
+}
+
+/** The home's contract document, opening as /c opens (its first 50 sections, holding its first 50 lines); null as the snapshot. */
+export async function getHomeContract(rawToken: string): Promise<ContractDocument | null> {
+  const contract = await readHomeContractSnapshot(rawToken);
   return contract && contractDocumentOf(contract);
+}
+
+/**
+ * What signing `contractId` covers: contractPayloadHash over the home's whole
+ * snapshot, the very hash /c's acknowledgement computes over the same
+ * contract. Null when the home's contract is not that one (or none): the act
+ * is then not sent. The browser never supplies it.
+ */
+export async function getHomeContractPayloadHash(rawToken: string, contractId: string): Promise<string | null> {
+  const contract = await readNamedContractSnapshot(rawToken, contractId);
+  return contract && contractPayloadHash(contract);
+}
+
+/**
+ * The document the page awaiting the client's signature shows open, read
+ * with the page. A failed read must not take the page down: it is logged
+ * once, redacted, and answers null (the section then says it could not show
+ * the contract). Null too when the home's contract is no longer `contractId`.
+ */
+export async function readSigningDocument(rawToken: string, contractId: string): Promise<ContractDocument | null> {
+  try {
+    const contract = await readNamedContractSnapshot(rawToken, contractId);
+    return contract && contractDocumentOf(contract);
+  } catch (error) {
+    console.error('client home signing document read failed:', loggableFailure(error));
+    return null;
+  }
 }
 
 /** A contract id as the browser hands it back: a uuid string, or nothing to read with. */
