@@ -35,7 +35,7 @@ async function download(): Promise<Response> {
 
 /** The CSV rows as cells (the fixture has no quoted cell). */
 async function rowsOf(response: Response): Promise<string[][]> {
-  return (await response.text()).replace(/^﻿/, '').trim().split('\r\n').map((line) => line.split(','));
+  return (await response.text()).replace(/^\uFEFF/, '').trim().split('\r\n').map((line) => line.split(','));
 }
 
 beforeEach(() => {
