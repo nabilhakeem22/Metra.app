@@ -48,12 +48,13 @@ export interface PaymentClaimSubmission {
  * expired code is said in the panel and the claim stays open; any other answer
  * closes it. The claim is advisory and idempotent (a repeat resolves ok); the
  * amount is locked server-side, so none is sent. A claim that landed re-reads
- * the page from the server.
+ * the page from the server. `openOn` (a code email's link, already checked
+ * claimable) opens that instalment's claim on the code box at once.
  */
-export function usePaymentClaim(token: string): PaymentClaimSubmission {
+export function usePaymentClaim(token: string, openOn: string | null): PaymentClaimSubmission {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [askingKind, setAskingKind] = useState<string | null>(null);
+  const [askingKind, setAskingKind] = useState(openOn);
   const [submittingKind, setSubmittingKind] = useState<string | null>(null);
   const [claimedKinds, setClaimedKinds] = useState<ReadonlySet<string>>(new Set());
   const [notifiedKinds, setNotifiedKinds] = useState<ReadonlySet<string>>(new Set());
@@ -69,7 +70,7 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
     if (askingKind) withdraw(askingKind);
     router.refresh();
   }
-  const code = useClientCode(token, 'claim_design_payment', askingKind, 'unknown', gone);
+  const code = useClientCode(token, 'claim_design_payment', askingKind, 'unknown', gone, openOn);
 
   function confirm() {
     const milestoneKind = askingKind;

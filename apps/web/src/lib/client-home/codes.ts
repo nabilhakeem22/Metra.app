@@ -1,33 +1,39 @@
 import 'server-only';
-// The one-time codes of the client home, the server's half: making a code and
+// The one-time codes of the client home, the server's half: making a code,
 // asking the database for it (app_home_code_issue_by_token, the ONE token
-// function a code request runs). The raw code exists only here, in the email
-// and in what the client types: the database is passed sha256(challengeId:code)
-// and nothing in this file logs or returns the code to the browser.
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+// function a code request runs), and telling it a code's email never left
+// (app_home_code_unsent_by_token). The raw code exists only here, in the email
+// and in what the client types: the database is passed
+// sha256(purpose:target:code), and nothing in this file logs or returns the
+// code to the browser.
+import { createHash, randomInt } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { formatDocNumber, type DocPrefix } from '@/lib/format/doc-number';
-import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
+import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
-import type { CodePurpose } from './code-answers';
+import { isUuid } from '@/lib/uuid';
+import { ISSUE_LIMITS, type CodeLimit, type CodePurpose } from './code-answers';
+import { busyOnLockRefusal } from './lock-refusal';
 
-/** A fresh code and the challenge it answers. `codeHash` is all the database ever sees. */
+/** A fresh code and its hash. `codeHash` is all the database ever sees. */
 export interface NewClientCode {
-  challengeId: string;
   code: string;
   codeHash: string;
 }
 
-/** sha256 of `challengeId:code`, lower-case hex: the code bound to its challenge. */
-export function clientCodeHash(challengeId: string, code: string): string {
-  return createHash('sha256').update(`${challengeId}:${code}`).digest('hex');
+/**
+ * sha256 of `purpose:target:code`, lower-case hex: the code bound to the act
+ * it is for. The act sends the same three, so the database checks the code
+ * by its target and never by an id the browser holds (H5 functional F1).
+ */
+export function clientCodeHash(purpose: CodePurpose, target: string, code: string): string {
+  return createHash('sha256').update(`${purpose}:${target}:${code}`).digest('hex');
 }
 
-/** Six digits from the CSPRNG, zero-padded, and a challenge id of the app's own. */
-export function newClientCode(): NewClientCode {
-  const challengeId = randomUUID();
+/** Six digits from the CSPRNG, zero-padded, hashed for the act they are for. */
+export function newClientCode(purpose: CodePurpose, target: string): NewClientCode {
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  return { challengeId, code, codeHash: clientCodeHash(challengeId, code) };
+  return { code, codeHash: clientCodeHash(purpose, target, code) };
 }
 
 /** The studio and the document an issued code's email names, as the database read them. */
@@ -38,10 +44,10 @@ export interface CodeEmailFacts {
   documentNumber: string;
 }
 
-/** What the issue function answered. */
+/** What the issue function answered. `challengeId` is the code's row, for the server only. */
 export type CodeIssueResult =
-  | ({ status: 'ok'; hint: string; resendAfterSeconds: number; platformDayHalf: boolean } & CodeEmailFacts)
-  | { status: 'too_many'; retryAfterSeconds: number }
+  | ({ status: 'ok'; challengeId: string; hint: string; resendAfterSeconds: number; platformDayHalfCrossed: boolean } & CodeEmailFacts)
+  | { status: 'too_many'; retryAfterSeconds: number; limit: CodeLimit }
   | { status: 'no_channel' | 'not_available' | 'busy' | 'invalid' | 'expired' };
 
 const REFUSALS = new Set(['no_channel', 'not_available', 'busy', 'invalid', 'expired']);
@@ -49,11 +55,13 @@ const DOC_PREFIXES = new Set<DocPrefix>(['C', 'VO', 'PR', 'DE']);
 
 interface IssuePayload {
   status?: unknown;
+  challenge_id?: unknown;
   email?: unknown;
   hint?: unknown;
   resend_after_seconds?: unknown;
   retry_after_seconds?: unknown;
-  platform_day_half?: unknown;
+  limit?: unknown;
+  platform_day_half_crossed?: unknown;
   studio?: { name_ar?: unknown; name_en?: unknown } | null;
   document?: { prefix?: unknown; number?: unknown; year?: unknown } | null;
 }
@@ -69,6 +77,13 @@ function documentNumberOf(document: IssuePayload['document']): string | null {
   return formatDocNumber(prefix as DocPrefix, number as number, year as number);
 }
 
+/** A too_many answer, read strictly: its wait and the limit the database named; null for any other answer. */
+function tooManyOf(answer: IssuePayload): CodeIssueResult | null {
+  const limit = ISSUE_LIMITS.find((known) => known === answer.limit);
+  if (answer.status !== 'too_many' || !Number.isInteger(answer.retry_after_seconds) || !limit) return null;
+  return { status: 'too_many', retryAfterSeconds: answer.retry_after_seconds as number, limit };
+}
+
 /**
  * The issue function's answer, read strictly. An answer this build cannot read
  * is the server's own defect and throws (developer-only): the action answers
@@ -76,27 +91,28 @@ function documentNumberOf(document: IssuePayload['document']): string | null {
  */
 export function issueResultOf(payload: unknown): CodeIssueResult {
   const answer = (payload ?? {}) as IssuePayload;
-  if (answer.status === 'too_many' && Number.isInteger(answer.retry_after_seconds)) {
-    return { status: 'too_many', retryAfterSeconds: answer.retry_after_seconds as number };
-  }
+  const tooMany = tooManyOf(answer);
+  if (tooMany) return tooMany;
   if (typeof answer.status === 'string' && REFUSALS.has(answer.status)) {
     return { status: answer.status as 'no_channel' | 'not_available' | 'busy' | 'invalid' | 'expired' };
   }
   const documentNumber = documentNumberOf(answer.document);
   if (
     answer.status === 'ok' &&
+    isUuid(answer.challenge_id) &&
     typeof answer.email === 'string' &&
     typeof answer.hint === 'string' &&
     Number.isInteger(answer.resend_after_seconds) &&
-    typeof answer.platform_day_half === 'boolean' &&
+    typeof answer.platform_day_half_crossed === 'boolean' &&
     documentNumber !== null
   ) {
     return {
       status: 'ok',
+      challengeId: answer.challenge_id,
       email: answer.email,
       hint: answer.hint,
       resendAfterSeconds: answer.resend_after_seconds as number,
-      platformDayHalf: answer.platform_day_half,
+      platformDayHalfCrossed: answer.platform_day_half_crossed,
       studio: { nameAr: textOrNull(answer.studio?.name_ar), nameEn: textOrNull(answer.studio?.name_en) },
       documentNumber,
     };
@@ -109,22 +125,41 @@ export function issueResultOf(payload: unknown): CodeIssueResult {
  * Ask the database for a code for ONE act on the home behind a RAW delivery
  * token (hashed here, never logged; a blank one is `invalid` with no round
  * trip). The database checks the act can be taken now and every limit, and
- * writes the challenge row, in one statement; nothing is written unless it
- * answers `ok`. A WRITE: a deadline on Cloudflare is "may have applied",
- * never "nothing written".
+ * writes the code's row, in one statement; nothing is written unless it
+ * answers `ok`. A lock wait that gave up, or a deadlock that chose this
+ * request, rolled the statement back: `busy` (H5 reliability R4). A WRITE: a
+ * deadline on Cloudflare is "may have applied", never "nothing written".
  */
 export async function issueClientCodeByToken(
   rawToken: string,
-  input: { code: NewClientCode; purpose: CodePurpose; target: string; ip: string | null; userAgent: string | null },
+  input: { codeHash: string; purpose: CodePurpose; target: string; ip: string | null; userAgent: string | null },
 ): Promise<CodeIssueResult> {
   const token = normalizeRawToken(rawToken);
   if (!token) return { status: 'invalid' };
-  const payload = await readSdfJson<unknown>(
-    sql`select public.app_home_code_issue_by_token(
-      ${hashShareToken(token)}, ${input.code.challengeId}::uuid, ${input.purpose}, ${input.target}, ${input.code.codeHash},
-      ${input.ip}, ${input.userAgent}
-    ) as data`,
+  return busyOnLockRefusal('requestClientCode', { status: 'busy' }, async () =>
+    issueResultOf(
+      await readSdfJson<unknown>(
+        sql`select public.app_home_code_issue_by_token(
+          ${hashShareToken(token)}, ${input.purpose}, ${input.target}, ${input.codeHash}, ${input.ip}, ${input.userAgent}
+        ) as data`,
+        { write: true },
+      ),
+    ),
+  );
+}
+
+/**
+ * Tell the database the code it just made was NOT sent (H5 reliability R1):
+ * it is marked used by its own id, so it authorises nothing and spends no day
+ * limit, only its target's 60 s spacing. `ok`, or why it was not marked:
+ * `gone` (no such live, untried code of this link) or `busy`.
+ */
+export async function markClientCodeUnsentByToken(rawToken: string, challengeId: string): Promise<'ok' | 'gone' | 'busy'> {
+  const token = normalizeRawToken(rawToken);
+  if (!token) return 'gone';
+  const answer = await readSdfCode(
+    sql`select public.app_home_code_unsent_by_token(${hashShareToken(token)}, ${challengeId}::uuid) as code`,
     { write: true },
   );
-  return issueResultOf(payload);
+  return answer === 'ok' || answer === 'busy' ? answer : 'gone';
 }

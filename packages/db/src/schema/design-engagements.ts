@@ -97,6 +97,12 @@ export const designEngagements = pgTable(
     // a BOQ contract no design delivery stands behind, born at `execution` and
     // kept there (CHECK). metra_app cannot update it (roles.sql).
     entryPhase: text('entry_phase').notNull().default('design'),
+    // When an owner or admin last reset the client's one-time codes (0066, DB
+    // step D): every code made before it no longer works, and the delivery's
+    // own code limits count from it. NULL until the first reset. Written only
+    // by app_client_codes_reset (rls/functions/75-client-home.sql); metra_app
+    // cannot update it (roles.sql).
+    clientCodesResetAt: timestamp('client_codes_reset_at', { withTimezone: true }),
   },
   (t) => [
     unique('design_engagements_org_id_id_unique').on(t.orgId, t.id),

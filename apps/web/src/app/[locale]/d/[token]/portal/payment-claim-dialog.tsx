@@ -62,6 +62,7 @@ export function PaymentClaimDialog({
       cancelLabel={tActions('cancel')}
       pending={submission.pending}
       confirmDisabled={!submission.code.ready}
+      confirmShown={!submission.code.noChannel}
       onConfirm={submission.confirm}
       onOpenChange={(open) => !open && submission.dismiss()}
     />

@@ -1,9 +1,15 @@
 'use server';
 
-import { CODE_PURPOSES, type CodePurpose, type CodeRequestAnswer } from '@/lib/client-home/code-answers';
-import { alertPlatformCodesHalfUsed, logCodeNotSent, logCodeRequestRefused } from '@/lib/client-home/code-log';
-import { issueClientCodeByToken, newClientCode, type CodeIssueResult } from '@/lib/client-home/codes';
-import { homeHref } from '@/lib/client-home/tab';
+import { CODE_PURPOSES, LINK_BRAKE_REFUSAL, type CodePurpose, type CodeRequestAnswer } from '@/lib/client-home/code-answers';
+import {
+  alertPlatformCodesHalfUsed,
+  logCodeNotSent,
+  logCodeRequestRefused,
+  logCodeUnsentNotMarked,
+} from '@/lib/client-home/code-log';
+import { issueClientCodeByToken, markClientCodeUnsentByToken, newClientCode, type CodeIssueResult } from '@/lib/client-home/codes';
+import { homePaymentHref } from '@/lib/client-home/tab';
+import { claimableMilestoneOf } from '@/lib/engagements/claimable-milestones';
 import { sendClientCodeEmail } from '@/lib/email/client-code';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { requestLocaleOrDefault } from '@/lib/engagements/portal-url';
@@ -17,8 +23,9 @@ import { isUuid } from '@/lib/uuid';
 // The client home's one-time code: the client asks, the server makes the code,
 // the database checks the act can be taken now and every limit and keeps the
 // code's hash (ONE token function), and the code is emailed to the client's
-// address on file. The browser is told only where it went (the masked hint),
-// never the address, the studio's own words or the code.
+// address on file, with a link that opens the act on its code box. The browser
+// is told only where it went (the masked hint), never the address, the
+// studio's own words, the code or its row.
 //
 // THE PER-LINK BRAKE comes first (lib/share/portal-rate-limit.ts, the act
 // budget). NOTHING THROWS TO THE CLIENT: a failure underneath is `uncertain`
@@ -26,50 +33,64 @@ import { isUuid } from '@/lib/uuid';
 
 const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
 
-/** The per-link brake is per minute: ask again after one. */
-const LINK_BRAKE_SECONDS = 60;
-
 /** The act's target as the database keys it, or null when it cannot name one. */
 function targetOf(purpose: CodePurpose, target: unknown): string | null {
   if (purpose === 'claim_request') return isUuid(target) ? target.toLowerCase() : null;
-  return typeof target === 'string' && target.length > 0 && target.length <= 64 ? target : null;
+  return claimableMilestoneOf(target);
 }
 
-/** The client's page the email links back to: the tab the act is on. */
-function homeUrlOf(origin: string, locale: string, rawToken: string, purpose: CodePurpose): string {
-  const tab = purpose === 'claim_request' ? 'execution' : null;
-  return `${origin}/${locale}${homeHref(tokenPathSegment(rawToken), tab)}`;
+/** The client's page the email links back to: the act itself, open on its code box (H5 functional F1). */
+function actUrlOf(origin: string, locale: string, rawToken: string, purpose: CodePurpose, target: string): string {
+  const instalment = purpose === 'claim_design_payment' ? claimableMilestoneOf(target) : null;
+  return `${origin}/${locale}${homePaymentHref(tokenPathSegment(rawToken), instalment ? { instalment } : { requestId: target })}`;
 }
 
-/** Email the code the database accepted, in the page's language; false (and one log line) when it did not leave. */
+/**
+ * Email the code the database accepted, in the page's language. When it did
+ * not leave: one log line with what the provider said, and the code is marked
+ * unsent, so it spends no day limit (H5 reliability R1); false.
+ */
 async function emailCode(
   issued: Extract<CodeIssueResult, { status: 'ok' }>,
   code: string,
-  purpose: CodePurpose,
+  act: { purpose: CodePurpose; target: string },
   link: { origin: string; rawToken: string },
 ): Promise<boolean> {
   const locale = await requestLocaleOrDefault();
   const sent = await sendClientCodeEmail({
     to: issued.email,
     code,
-    purpose,
+    purpose: act.purpose,
     documentNumber: issued.documentNumber,
     studioName: pickLocale(issued.studio, 'name', locale).value,
-    homeUrl: homeUrlOf(link.origin, locale, link.rawToken, purpose),
+    homeUrl: actUrlOf(link.origin, locale, link.rawToken, act.purpose, act.target),
     locale,
   });
-  if (!sent.sent) logCodeNotSent(purpose, sent.transient === true);
-  return sent.sent;
+  if (sent.sent) return true;
+  logCodeNotSent(act.purpose, { transient: sent.transient === true, refusal: sent.refusal });
+  await markUnsent(link.rawToken, issued.challengeId, act.purpose);
+  return false;
+}
+
+/** Mark a code whose email failed as unsent; a mark that did not land is logged, never thrown (the client is told send_failed either way). */
+async function markUnsent(rawToken: string, challengeId: string, purpose: CodePurpose): Promise<void> {
+  try {
+    const marked = await markClientCodeUnsentByToken(rawToken, challengeId);
+    if (marked !== 'ok') logCodeUnsentNotMarked(purpose, marked);
+  } catch {
+    logCodeUnsentNotMarked(purpose, 'failed');
+  }
 }
 
 /**
  * Public (no-session): email the client a one-time code for ONE act on their
  * home. `purpose` and `target` name the act (a payment request's id, or a
  * design-fee milestone kind); a code is good for that act only, for ten
- * minutes and five tries. A client with no address on file is `no_channel`;
- * an act that cannot be taken now is `not_available`; either way nothing is
- * written or sent. `send_failed` is honest: the code was made but did not
- * leave, and the client is told to contact the studio.
+ * minutes and five tries, and only the newest one works. A client with no
+ * address on file is `no_channel`; an act that cannot be taken now is
+ * `not_available`; either way nothing is written or sent. `send_failed` is
+ * honest: the code was made but did not leave, and the client is told to
+ * contact the studio and when a new one may be asked for.
  */
 export async function requestClientCode(
   token: string,
@@ -79,25 +100,27 @@ export async function requestClientCode(
     const purpose = CODE_PURPOSES.find((known) => known === input?.purpose);
     const target = purpose ? targetOf(purpose, input.target) : null;
     if (!purpose || target === null) return { ok: false, error: 'not_available' };
-    if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many', retryAfterSeconds: LINK_BRAKE_SECONDS };
+    if (!(await portalActAllowed(token))) return LINK_BRAKE_REFUSAL;
     // The email's link needs the public origin; without it nothing is written.
     const origin = await resolveRequestOrigin();
     if (!origin) {
       console.error('client code request: no public origin to link the email to');
-      return { ok: false, error: 'send_failed' };
+      return { ok: false, error: 'send_failed', resendAfterSeconds: null };
     }
-    const code = newClientCode();
-    const issued = await issueClientCodeByToken(token, { code, purpose, target, ...(await requestProvenance()) });
+    const fresh = newClientCode(purpose, target);
+    const issued = await issueClientCodeByToken(token, { codeHash: fresh.codeHash, purpose, target, ...(await requestProvenance()) });
     switch (issued.status) {
       case 'ok':
-        if (issued.platformDayHalf) alertPlatformCodesHalfUsed(purpose);
-        if (!(await emailCode(issued, code.code, purpose, { origin, rawToken: token.trim() }))) return { ok: false, error: 'send_failed' };
-        return { ok: true, challengeId: code.challengeId, hint: issued.hint, resendAfterSeconds: issued.resendAfterSeconds };
+        if (issued.platformDayHalfCrossed) alertPlatformCodesHalfUsed(purpose);
+        if (!(await emailCode(issued, fresh.code, { purpose, target }, { origin, rawToken: token.trim() }))) {
+          return { ok: false, error: 'send_failed', resendAfterSeconds: issued.resendAfterSeconds };
+        }
+        return { ok: true, hint: issued.hint, resendAfterSeconds: issued.resendAfterSeconds };
       case 'too_many':
-        logCodeRequestRefused(purpose, 'too_many', issued.retryAfterSeconds);
-        return { ok: false, error: 'too_many', retryAfterSeconds: issued.retryAfterSeconds };
+        logCodeRequestRefused(purpose, { kind: 'too_many', limit: issued.limit, retryAfterSeconds: issued.retryAfterSeconds });
+        return { ok: false, error: 'too_many', retryAfterSeconds: issued.retryAfterSeconds, limit: issued.limit };
       case 'busy':
-        logCodeRequestRefused(purpose, 'busy');
+        logCodeRequestRefused(purpose, { kind: 'busy' });
         return { ok: false, error: 'busy' };
       case 'invalid':
         return { ok: false, error: 'token_invalid' };

@@ -12,9 +12,10 @@ import { useReturnFocus } from './use-return-focus';
  * payment was made. Cancel (or Escape, or a tap outside) only closes it: it
  * calls nothing. Confirm calls `onConfirm` once and shows `pending` until the
  * caller closes the dialog; `confirmDisabled` holds it until the act can be
- * sent (an act that needs a one-time code, before the code is typed). Both
- * buttons are at least 44 px tall. Closing returns focus to the button that
- * opened it.
+ * sent (an act that needs a one-time code, before the code is typed), and
+ * `confirmShown` false leaves it out when the act cannot be sent from here at
+ * all (no address on file for the code: H5 weak spot 5). Both buttons are at
+ * least 44 px tall. Closing returns focus to the button that opened it.
  */
 export function ConfirmActDialog({
   open,
@@ -24,6 +25,7 @@ export function ConfirmActDialog({
   cancelLabel,
   pending,
   confirmDisabled = false,
+  confirmShown = true,
   onConfirm,
   onOpenChange,
 }: {
@@ -34,6 +36,7 @@ export function ConfirmActDialog({
   cancelLabel: string;
   pending: boolean;
   confirmDisabled?: boolean;
+  confirmShown?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -58,10 +61,12 @@ export function ConfirmActDialog({
             >
               {cancelLabel}
             </Button>
-            <Button variant="default" className="min-h-11" disabled={pending || confirmDisabled} onClick={onConfirm}>
-              {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {confirmLabel}
-            </Button>
+            {confirmShown && (
+              <Button variant="default" className="min-h-11" disabled={pending || confirmDisabled} onClick={onConfirm}>
+                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                {confirmLabel}
+              </Button>
+            )}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

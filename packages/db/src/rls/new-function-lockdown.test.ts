@@ -166,7 +166,7 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract(text)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_destination(uuid, uuid)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_email_hint(text)', grantsApp: false },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_check(uuid, uuid, uuid, text, text, text)', grantsApp: false },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_check(uuid, uuid, text, text, text)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_refusal(text)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_code_consume(uuid, uuid)', grantsApp: false },
   { file: 'functions/75-client-home.sql', signature: 'public.enforce_client_code_guarded()', grantsApp: true },
@@ -177,18 +177,30 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_sections_by_token(text, uuid, integer)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_section_lines_by_token(text, uuid, uuid, integer)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_variations_by_token(text)', grantsApp: true },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_home_code_issue_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_ack_by_token(text, uuid, uuid, text, text, text, text, text)', grantsApp: true },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_home_variation_respond_by_token(text, uuid, text, uuid, text, text, text, text)', grantsApp: true },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_request_by_token(text, uuid, uuid, text, text, text, text, text)', grantsApp: true },
-  { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_design_payment_by_token(text, text, uuid, text, text, text, text, text)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_code_issue_by_token(text, text, text, text, text, text)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_code_unsent_by_token(text, uuid)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_client_codes_reset(uuid)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_contract_ack_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_variation_respond_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
+  { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_home_target_by_token(text, text)', grantsApp: true },
 ];
 
-/** The argument types a CREATE declares, as `pg_proc` would list them: `text, uuid`. */
+/**
+ * The argument types a CREATE declares, as `pg_proc` would list them: `text,
+ * uuid`. An OUT parameter is part of the result, not of the signature, so it
+ * is left out, as pg_get_function_identity_arguments leaves it out.
+ */
 function argumentTypesOf(create: string): string {
   const list = create.slice(create.indexOf('(') + 1, create.indexOf(')'));
-  return list.split(',').map((parameter) => parameter.trim().split(/\s+/).pop()).filter(Boolean).join(', ');
+  return list
+    .split(',')
+    .map((parameter) => parameter.trim())
+    .filter((parameter) => !/^out\s/i.test(parameter))
+    .map((parameter) => parameter.split(/\s+/).pop())
+    .filter(Boolean)
+    .join(', ');
 }
 
 /**

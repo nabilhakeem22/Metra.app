@@ -12,9 +12,8 @@ import { hashShareToken } from '@/lib/share/token';
 import { claimDesignPaymentWithCodeByToken, claimRequestWithCodeByToken, codeAnswerOf } from './code-acts';
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
-const CHALLENGE = '22222222-2222-4222-8222-222222222222';
-const PROOF = { challengeId: CHALLENGE, code: '042917', ip: '9.9.9.9', userAgent: 'probe/1' };
-const hashOf = (challengeId: string, code: string) => createHash('sha256').update(`${challengeId}:${code}`).digest('hex');
+const PROOF = { code: '042917', ip: '9.9.9.9', userAgent: 'probe/1' };
+const hashOf = (purpose: string, target: string, code: string) => createHash('sha256').update(`${purpose}:${target}:${code}`).digest('hex');
 
 /** The bound values of the one statement the act ran. */
 function sentParams(): unknown[] {
@@ -54,32 +53,57 @@ describe('codeAnswerOf: every answer of the act wrappers', () => {
     expect(codeAnswerOf({ code })).toEqual({ ok: false, error: code });
   });
 
+  it('reads the claim ceiling as too_many with its wait (R5)', () => {
+    expect(codeAnswerOf({ code: 'too_many', limit: 'claims_hour', retry_after_seconds: 2400 })).toEqual({
+      ok: false,
+      error: 'too_many',
+      limit: 'claims_hour',
+      retryAfterSeconds: 2400,
+    });
+  });
+
   it('reads invalid, nothing and a code nobody sent as a dead link, never as success', () => {
-    for (const payload of [{ code: 'invalid' }, null, {}, { code: 'expired' }, { code: 'code_wrong' }, { code: 'OK' }]) {
+    for (const payload of [
+      { code: 'invalid' },
+      null,
+      {},
+      { code: 'expired' },
+      { code: 'code_wrong' },
+      { code: 'OK' },
+      { code: 'too_many' },
+      { code: 'too_many', limit: 'studio_day', retry_after_seconds: 60 },
+    ]) {
       expect(codeAnswerOf(payload)).toEqual({ ok: false, error: 'token_invalid' });
     }
   });
 });
 
 describe('claimRequestWithCodeByToken', () => {
-  it('runs ONE write with the token hash and the code hash, never the code (AC14)', async () => {
+  it('runs ONE write with the token hash and the code hash bound to the request, never the code nor a code id (AC14, F1)', async () => {
     expect(await claimRequestWithCodeByToken(' tok ', { ...PROOF, requestId: REQUEST })).toEqual({ ok: true, already: false });
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(1);
     expect(sdf.readSdfJson.mock.calls[0][1]).toEqual({ write: true });
-    expect(sentParams()).toEqual([hashShareToken('tok'), REQUEST, CHALLENGE, hashOf(CHALLENGE, '042917'), null, null, '9.9.9.9', 'probe/1']);
+    expect(sentParams()).toEqual([hashShareToken('tok'), REQUEST, hashOf('claim_request', REQUEST, '042917'), null, null, '9.9.9.9', 'probe/1']);
     expect(JSON.stringify(sentParams())).not.toContain('042917');
   });
 
-  it('folds Arabic-Indic digits and hashes an upper-case challenge id as the app made it', async () => {
-    await claimRequestWithCodeByToken('tok', { ...PROOF, challengeId: CHALLENGE.toUpperCase(), code: '٠٤٢٩١٧', requestId: REQUEST });
-    expect(sentParams()[2]).toBe(CHALLENGE);
-    expect(sentParams()[3]).toBe(hashOf(CHALLENGE, '042917'));
+  it('folds Arabic-Indic digits and keys an upper-case request id lower case, as the code was made', async () => {
+    await claimRequestWithCodeByToken('tok', { ...PROOF, code: '٠٤٢٩١٧', requestId: REQUEST.toUpperCase() });
+    expect(sentParams()[1]).toBe(REQUEST);
+    expect(sentParams()[2]).toBe(hashOf('claim_request', REQUEST, '042917'));
   });
 
-  it('refuses before any round trip: a blank token, a request or challenge that is not a uuid, a code that is not six digits', async () => {
+  it('a lock wait that gave up (55P03) or a deadlock (40P01) is busy, the code unused (R4)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    for (const code of ['55P03', '40P01']) {
+      sdf.readSdfJson.mockRejectedValueOnce(Object.assign(new Error('lock'), { code }));
+      expect(await claimRequestWithCodeByToken('tok', { ...PROOF, requestId: REQUEST })).toEqual({ ok: false, error: 'busy' });
+    }
+  });
+
+  it('refuses before any round trip: a blank token, a request that is not a uuid, a code that is not six digits', async () => {
     expect(await claimRequestWithCodeByToken('  ', { ...PROOF, requestId: REQUEST })).toEqual({ ok: false, error: 'token_invalid' });
     expect(await claimRequestWithCodeByToken('tok', { ...PROOF, requestId: 'r1' })).toEqual({ ok: false, error: 'wrong_target' });
-    expect(await claimRequestWithCodeByToken('tok', { ...PROOF, challengeId: 'c1', requestId: REQUEST })).toEqual({ ok: false, error: 'code_unknown' });
     for (const code of ['12345', '1234567', 'abcdef', 123456, null]) {
       expect(await claimRequestWithCodeByToken('tok', { ...PROOF, code, requestId: REQUEST })).toEqual({ ok: false, error: 'code_wrong' });
     }
@@ -95,7 +119,7 @@ describe('claimDesignPaymentWithCodeByToken', () => {
       error: 'code_wrong',
       attemptsLeft: 0,
     });
-    expect(sentParams()).toEqual([hashShareToken('tok'), 'deposit', CHALLENGE, hashOf(CHALLENGE, '042917'), null, null, '9.9.9.9', 'probe/1']);
+    expect(sentParams()).toEqual([hashShareToken('tok'), 'deposit', hashOf('claim_design_payment', 'deposit', '042917'), null, null, '9.9.9.9', 'probe/1']);
   });
 
   it('a milestone kind that is not text names no code: code_unknown, no round trip', async () => {

@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect } from 'react';
 import { IconButton } from '@/components/ui/icon-button';
+import { ClientCodesReset } from './client-codes-reset';
 import { DELIVERY_SHARE_OPEN_EVENT } from './share-anchor';
 import { ShareLinkPanel } from './share-link-panel';
 import { useDeliveryShare } from './use-delivery-share';
@@ -12,8 +13,9 @@ import { useOpenOnShareLink } from './use-open-on-share-link';
 
 /**
  * The client link: share it, show it again (re-derived, never rotated),
- * replace it, or revoke it. Owner/admin only (the caller renders it only with
- * `canShare`; the server actions enforce it).
+ * replace it, or revoke it; and, once shared, reset the client's one-time
+ * codes on it (./client-codes-reset.tsx). Owner/admin only (the caller renders
+ * it only with `canShare`; the server actions enforce it).
  *
  * A dialog rather than a bar on the page: sharing is a side action, and as a bar
  * it sat between the header and the command card, pushing the one thing the
@@ -58,6 +60,7 @@ export function ClientLinkDialog({
           </div>
           <DialogPrimitive.Description className="sr-only">{t('title')}</DialogPrimitive.Description>
           <ShareLinkPanel share={share} />
+          {share.shared && <ClientCodesReset engagementId={engagementId} />}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

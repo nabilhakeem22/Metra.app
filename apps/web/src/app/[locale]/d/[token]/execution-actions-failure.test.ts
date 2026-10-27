@@ -22,7 +22,7 @@ vi.mock('@/lib/engagements/public/execution', () => ({ getDeliveryExecutionByTok
 const actions = await import('./execution-actions');
 const TOKEN = 'portal-link-token';
 const REQUEST = '11111111-1111-4111-8111-111111111111';
-const CLAIM = { requestId: REQUEST, challengeId: '22222222-2222-4222-8222-222222222222', code: '042917' };
+const CLAIM = { requestId: REQUEST, code: '042917' };
 
 beforeEach(() => {
   reads.claimRequestWithCodeByToken.mockReset();
@@ -61,7 +61,6 @@ describe('the claim', () => {
     expect(await actions.claimRequestInHome(TOKEN, undefined as never)).toEqual({ ok: false, error: 'wrong_target' });
     expect(reads.claimRequestWithCodeByToken).toHaveBeenCalledWith(TOKEN, {
       requestId: undefined,
-      challengeId: undefined,
       code: undefined,
       ip: '9.9.9.9',
       userAgent: 'probe/1',

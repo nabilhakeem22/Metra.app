@@ -2,6 +2,7 @@
 
 import { StepCard, StepHeadline } from '@/components/flow/step-card';
 import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
+import { executionMoveIsClientPayment } from '@/lib/engagements/no-email-notice';
 import { buildPhaseView } from '@/lib/flow/build-view';
 import { locateExecutionForStudio } from '@/lib/flow/locate/execution-studio';
 import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
@@ -12,11 +13,12 @@ import type { EngagementCommandCardProps, ExecutionCockpit } from './command-car
 import { DesignSummaryLine } from './design-summary-line';
 import { ExecutionPhaseRail } from './execution-phase-rail';
 import { useExecutionStepCopy } from './execution-step-copy';
+import { NoEmailNotice } from './no-email-notice';
 
 /** The command card props this card reads. */
 export type ExecutionStepCardProps = Pick<
   EngagementCommandCardProps,
-  'status' | 'pending' | 'paymentClaims' | 'canResolveClaims' | 'runAction' | 'actionError' | 'onOpenTab'
+  'status' | 'pending' | 'paymentClaims' | 'canResolveClaims' | 'clientHasEmail' | 'runAction' | 'actionError' | 'onOpenTab'
 >;
 
 // The cockpit's STEP CARD AT EXECUTION: the same shared card the design phase
@@ -25,7 +27,9 @@ export type ExecutionStepCardProps = Pick<
 // execution steps with whose move each is; its
 // body names the ONE next action (lib/execution/stage.ts) and offers it, with
 // "Record costs" and "Record measurements" beside it. A client payment claim
-// left on the finished design is still dismissed here, as it was before.
+// left on the finished design is still dismissed here, as it was before. While
+// the client owes a payment and has no email on file, one line says they
+// cannot report it online (./no-email-notice.tsx).
 // Composition only: the copy is execution-step-copy.ts, the controls
 // command-card-execution.tsx, the rail execution-phase-rail.tsx.
 export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCardProps; execution: ExecutionCockpit }) {
@@ -55,6 +59,7 @@ export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCard
         <div>
           <StepHeadline eyebrow={copy.eyebrow} headline={copy.headline} hint={copy.hint} />
         </div>
+        {!card.clientHasEmail && executionMoveIsClientPayment(view.next, location.whoseMove) && <NoEmailNotice />}
         {view.next && copy.actionLabel && (
           <ExecutionNextAction view={view} kind={view.next.kind} label={copy.actionLabel} />
         )}

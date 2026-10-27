@@ -50,7 +50,8 @@ export async function generateMetadata({
 // friendly not-found page, and a read that FAILED renders a different,
 // transient notice — a valid link during a database blip must not be called dead.
 // `?tab=` picks the Design or the Execution tab (./home-read.ts reads only that
-// tab's data); `?focus=` opens the Execution tab on one section.
+// tab's data); `?focus=` opens the home on one section, or on one payment's
+// "I've made this payment" with its code box (the link a code email carries).
 export default async function PublicDeliveryPage({
   params,
   searchParams,
@@ -67,5 +68,7 @@ export default async function PublicDeliveryPage({
   if (view.tab === 'execution') {
     return <ExecutionTabView token={token} home={view.home} focus={requestedFocus(focus)} />;
   }
-  return <PublicDeliveryView token={token} read={view.read} documentUnavailable={document === 'unavailable'} />;
+  return (
+    <PublicDeliveryView token={token} read={view.read} documentUnavailable={document === 'unavailable'} focus={requestedFocus(focus)} />
+  );
 }

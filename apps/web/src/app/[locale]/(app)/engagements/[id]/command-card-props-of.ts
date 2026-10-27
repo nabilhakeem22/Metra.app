@@ -47,6 +47,7 @@ export function commandCardPropsOf(
     canResolveClaims: detail.canResolveClaims,
     canShare: detail.canShare,
     canUpload: detail.canUpload,
+    clientHasEmail: header.clientHasEmail,
     canSetOffPlan: detail.capabilities.setRom,
     offPlan: header.offPlan,
     feeSplitPrefill: detail.feeSplitPrefill,

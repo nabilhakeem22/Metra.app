@@ -39,6 +39,7 @@ export function PaymentsCard({
   receipts,
   receiptsTruncated,
   studio,
+  openOn,
 }: {
   token: string;
   schedule: PublicDelivery['paymentSchedule'];
@@ -48,11 +49,14 @@ export function PaymentsCard({
   receiptsTruncated: PublicDelivery['receiptsTruncated'];
   /** The studio, for the claim's code step (its WhatsApp when no code can be sent). */
   studio: StudioContactFacts;
+  /** The instalment whose claim opens on its code box (a code email's link), or null. */
+  openOn: string | null;
 }) {
   const t = useTranslations('delivery.payments');
   const locale = useLocale();
   const milestoneLabel = useMilestoneLabel();
-  const submission = usePaymentClaim(token);
+  // A code email's link opens its instalment's claim at once, while it can still be claimed.
+  const submission = usePaymentClaim(token, openOn && paymentClaimState(claim, openOn, new Set()).kind === 'claimable' ? openOn : null);
   const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'design');
   const overview = derivePaymentsOverview(schedule);
   if (!overview) return null;

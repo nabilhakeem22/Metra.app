@@ -37,28 +37,59 @@ export function typedCode(sent: unknown): string | null {
   return SIX_DIGITS.test(digits) ? digits : null;
 }
 
+/**
+ * The limit a refused code request or act met, so the panel names it (H5
+ * functional F4) and the log says which fired (reliability R6). The
+ * database's own (ISSUE_LIMITS): 60 s between codes for one act, 5 codes and
+ * 15 wrong tries an hour on it, 10 codes a day on this client's page, 25 a
+ * day for the studio, 80 a day for the service. The app's: the link's
+ * 30-a-minute brake. The act's: 10 payment claims on one contract in an hour.
+ */
+export type CodeLimit =
+  | 'target_spacing'
+  | 'target_hour'
+  | 'target_tries'
+  | 'delivery_day'
+  | 'studio_day'
+  | 'platform_day'
+  | 'link_minute'
+  | 'claims_hour';
+
+/** The limits app_home_code_issue_by_token names. */
+export const ISSUE_LIMITS: readonly CodeLimit[] = [
+  'target_spacing',
+  'target_hour',
+  'target_tries',
+  'delivery_day',
+  'studio_day',
+  'platform_day',
+];
+
 /** A refused code request, in the words the code panel has for each. */
-export type CodeRequestRefusal =
-  | 'no_channel'
-  | 'not_available'
-  | 'busy'
-  | 'send_failed'
-  | 'token_invalid'
-  | 'token_expired';
+export type CodeRequestRefusal = 'no_channel' | 'not_available' | 'busy' | 'token_invalid' | 'token_expired';
+
+/** A request or an act refused for a limit: the exact wait, and which limit. */
+export type CodeTooMany = { ok: false; error: 'too_many'; retryAfterSeconds: number; limit: CodeLimit };
+
+/** The link's brake (lib/share/portal-rate-limit.ts) is per minute: ask again after one. */
+export const LINK_BRAKE_REFUSAL: CodeTooMany = { ok: false, error: 'too_many', retryAfterSeconds: 60, limit: 'link_minute' };
 
 /**
  * What asking for a code came to. `ok`: the code is on its way to `hint` (the
  * masked address; the address itself never reaches the browser), and a new
  * one may be asked for after `resendAfterSeconds`. `too_many` carries the
- * exact wait.
+ * exact wait and its limit. `send_failed`: the code did not leave, and a new
+ * one may be asked for after `resendAfterSeconds` (null when nothing was
+ * made). The browser never holds a code's id: the act names its target.
  */
 export type CodeRequestAnswer =
-  | { ok: true; challengeId: string; hint: string; resendAfterSeconds: number }
-  | { ok: false; error: 'too_many'; retryAfterSeconds: number }
+  | { ok: true; hint: string; resendAfterSeconds: number }
+  | CodeTooMany
+  | { ok: false; error: 'send_failed'; resendAfterSeconds: number | null }
   | { ok: false; error: CodeRequestRefusal }
   | ({ ok: false } & PortalFailure);
 
-/** A code-checked act refused, every answer of the database's act wrappers but a wrong code. */
+/** A code-checked act refused, every answer of the database's act wrappers but a wrong code and a limit. */
 export type CodeActRefusal =
   | 'code_unknown'
   | 'code_expired'
@@ -72,17 +103,18 @@ export type CodeActRefusal =
   | 'busy'
   | 'signing_closed'
   | 'link_expired'
-  | 'contract_inactive'
-  | 'too_many';
+  | 'contract_inactive';
 
 /**
  * What a code-checked act came to. `already`: the act IS done (an earlier
  * answer was lost, or another tab did it), so the code was not used.
  * `code_wrong` carries the tries the code has left; without them the code was
- * not six digits and nothing was counted.
+ * not six digits and nothing was counted. `too_many` (the link's brake, or the
+ * contract's claims in the hour) left the code unused, with the wait.
  */
 export type CodeAnswer =
   | { ok: true; already: boolean }
   | { ok: false; error: 'code_wrong'; attemptsLeft?: number }
+  | CodeTooMany
   | { ok: false; error: CodeActRefusal }
   | ({ ok: false } & PortalFailure);

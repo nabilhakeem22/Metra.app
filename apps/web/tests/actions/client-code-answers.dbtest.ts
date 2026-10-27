@@ -54,7 +54,7 @@ async function homeWithSignCode(): Promise<Home & { challengeId: string; code: s
 }
 
 const sign = (home: Home & { challengeId: string; code: string }) =>
-  signWithCode(home.delivery.tokenHash, home.contract.contractId, home.challengeId, home.code);
+  signWithCode(home.delivery.tokenHash, home.contract.contractId, home.code);
 
 /** The studio records the paper signature, as recordContractSignedOfflineCore writes it. */
 async function signOnPaper(contractId: string): Promise<void> {
@@ -90,15 +90,15 @@ describe('F1: signing a contract that is no longer issued', () => {
     expect((await codesOf(home.delivery.id))[0]).toMatchObject({ consumed_at: null, result_ref: null });
   });
 
-  it('signed online with another code: already, and the second code claims nothing', async () => {
+  it('signed online with the newest code: the older code then answers code_used and claims nothing (DB step D, H5 F1)', async () => {
     const home = await homeWithSignCode();
     await ageCodes(home.delivery.id, 61);
     const second = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
-    expect(await sign(home)).toEqual({ code: 'ok' });
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, second.challengeId, second.code)).toEqual({ code: 'already' });
-    const [first, other] = await codesOf(home.delivery.id);
-    expect(first.result_ref).not.toBeNull();
-    expect(other).toMatchObject({ id: second.challengeId, consumed_at: null, result_ref: null });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, second.code)).toEqual({ code: 'ok' });
+    expect(await sign(home)).toEqual({ code: 'code_used' });
+    const [first, newest] = await codesOf(home.delivery.id);
+    expect(first).toMatchObject({ id: home.challengeId, consumed_at: null, result_ref: null, attempts: 0 });
+    expect(newest.result_ref).not.toBeNull();
   });
 });
 
@@ -108,12 +108,11 @@ describe('F2: three kinds of "expired", three codes', () => {
     const request = await seedRequest(orgId, home.contract.contractId, owner.userId, { milestoneId: home.contract.milestoneIds[0] }, '100');
     const order = await seedVariation(orgId, home.contract, 'issued', { tokenHash: `${randomUUID()}-expiry` });
     await tamper(`update public.design_engagements set share_expires_at = now() - interval '1 second' where id = $1`, [home.delivery.id]);
-    const challenge = randomUUID();
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challenge, '123456')).toEqual({ code: 'token_expired' });
-    expect(await decideWithCode(home.delivery.tokenHash, order.id, 'approve', challenge, '123456')).toEqual({ code: 'token_expired' });
-    expect(await claimRequestWithCode(home.delivery.tokenHash, request, challenge, '123456')).toEqual({ code: 'token_expired' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, '123456')).toEqual({ code: 'token_expired' });
+    expect(await decideWithCode(home.delivery.tokenHash, order.id, 'approve', '123456')).toEqual({ code: 'token_expired' });
+    expect(await claimRequestWithCode(home.delivery.tokenHash, request, '123456')).toEqual({ code: 'token_expired' });
     const designing = await seedDelivery(orgId, { state: 'design_proposal', expired: true });
-    expect(await claimDesignWithCode(designing.tokenHash, 'deposit', challenge, '123456')).toEqual({ code: 'token_expired' });
+    expect(await claimDesignWithCode(designing.tokenHash, 'deposit', '123456')).toEqual({ code: 'token_expired' });
   });
 
   it('the contract\'s signing window closed: signing_closed, the code unused', async () => {
@@ -129,7 +128,7 @@ describe('F2: three kinds of "expired", three codes', () => {
     const order = await seedVariation(orgId, home.contract, 'issued', { tokenHash: `${randomUUID()}-lapse` });
     const issued = await requestCode(home.delivery.tokenHash, 'decide_variation', order.id);
     await tamper(`update public.variation_orders set share_expires_at = now() - interval '1 second' where id = $1`, [order.id]);
-    expect(await decideWithCode(home.delivery.tokenHash, order.id, 'approve', issued.challengeId, issued.code)).toEqual({ code: 'link_expired' });
+    expect(await decideWithCode(home.delivery.tokenHash, order.id, 'approve', issued.code)).toEqual({ code: 'link_expired' });
     expect((await codesOf(home.delivery.id))[0].consumed_at).toBeNull();
   });
 });

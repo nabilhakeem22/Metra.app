@@ -22,7 +22,6 @@ vi.mock('../code-actions', () => codeActions);
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const DASH = /[–—]/;
-const CHALLENGE = '22222222-2222-4222-8222-222222222222';
 const HINT = 'c•••@e•••.com';
 
 const request = (id: string, fields: Partial<PortalExecutionRequest> = {}): PortalExecutionRequest => ({
@@ -62,8 +61,10 @@ async function answerDialog(locale: TestLocale, button: 'confirm' | 'cancel') {
 
 const onChanged = vi.fn();
 const STUDIO = { name: 'Diwan Studio', whatsappDigits: '201001234567', deliveryRef: 'DE-2026-0012' };
-const show = (locale: TestLocale, card: PortalExecution = CARD, channel: { hint: string } | null = { hint: HINT }) =>
-  renderWithIntl(<ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={channel} studio={STUDIO} />, { locale });
+const show = (locale: TestLocale, card: PortalExecution = CARD, channel: { hint: string } | null = { hint: HINT }, openOn: string | null = null) =>
+  renderWithIntl(<ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={channel} studio={STUDIO} openOn={openOn} />, {
+    locale,
+  });
 const claimButtons = (locale: TestLocale) => screen.queryAllByRole('button', { name: messageAt(locale, 'delivery.execution.claim') });
 const confirmButton = async (locale: TestLocale) =>
   within(await confirmDialog()).getByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') }) as HTMLButtonElement;
@@ -89,7 +90,7 @@ beforeEach(() => {
   actions.claimRequestInHome.mockReset();
   actions.loadDeliveryExecution.mockReset();
   codeActions.requestClientCode.mockReset();
-  codeActions.requestClientCode.mockResolvedValue({ ok: true, challengeId: CHALLENGE, hint: HINT, resendAfterSeconds: 60 });
+  codeActions.requestClientCode.mockResolvedValue({ ok: true, hint: HINT, resendAfterSeconds: 60 });
   onChanged.mockReset();
 });
 
@@ -141,7 +142,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     expect((await confirmButton(locale)).disabled).toBe(false);
     await answerDialog(locale, 'confirm');
     await act(async () => {});
-    expect(actions.claimRequestInHome).toHaveBeenCalledWith('tok', { requestId: '3', challengeId: CHALLENGE, code: '042917' });
+    expect(actions.claimRequestInHome).toHaveBeenCalledWith('tok', { requestId: '3', code: '042917' });
     expect(claimButtons(locale)).toHaveLength(0);
     expect(screen.getByText(messageAt(locale, 'delivery.execution.claimNotified'))).toBeTruthy();
     expect(actions.loadDeliveryExecution).not.toHaveBeenCalled();
@@ -214,15 +215,95 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     expect(claimButtons(locale)).toHaveLength(1);
   });
 
-  it("with no email on file the claim says so plainly, offers the studio's WhatsApp, and sends nothing", async () => {
+  it("with no email on file the claim says so plainly, offers the studio's WhatsApp, shows no Confirm, and sends nothing", async () => {
     show(locale, CARD, null);
     fireEvent.click(claimButtons(locale)[0]);
     const dialog = await confirmDialog();
     expect(dialog.textContent).toContain(messageAt(locale, 'delivery.code.noChannel').replaceAll('{studio}', 'Diwan Studio'));
     expect(within(dialog).queryByRole('button', { name: messageAt(locale, 'delivery.code.send') })).toBeNull();
     expect(within(dialog).getByRole('link').getAttribute('href')).toMatch(/^https:\/\/wa\.me\/201001234567\?text=/);
-    expect((await confirmButton(locale)).disabled).toBe(true);
+    expect(within(dialog).queryByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.actions.cancel') })).toBeTruthy();
     expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+  });
+
+  it('F1: "I already have a code" opens the box with no request: the typed code claims by the request alone', async () => {
+    actions.claimRequestInHome.mockResolvedValue({ ok: true, already: false });
+    show(locale);
+    fireEvent.click(claimButtons(locale)[0]);
+    const dialog = await confirmDialog();
+    fireEvent.click(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.code.haveCode') }));
+    expect(dialog.textContent).toContain(HINT);
+    fireEvent.change(codeBox(dialog, locale), { target: { value: '424242' } });
+    await answerDialog(locale, 'confirm');
+    await act(async () => {});
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+    expect(actions.claimRequestInHome).toHaveBeenCalledWith('tok', { requestId: '3', code: '424242' });
+  });
+
+  it("F1: the email's link opens that request's claim at once, on the code box; a request no longer claimable opens nothing", async () => {
+    const { unmount } = show(locale, CARD, { hint: HINT }, '3');
+    const dialog = await confirmDialog();
+    expect(dialog.textContent).toContain('PR-2026-0003');
+    expect(codeBox(dialog, locale)).toBeTruthy();
+    expect(codeActions.requestClientCode).not.toHaveBeenCalled();
+    unmount();
+    show(locale, CARD, { hint: HINT }, '2');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("weak spot 2: the link's brake on the claim keeps it open, the code kept, Confirm held until the wait is over", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      actions.claimRequestInHome.mockResolvedValueOnce({ ok: false, error: 'too_many', retryAfterSeconds: 60, limit: 'link_minute' });
+      show(locale);
+      await claimAndConfirm(locale);
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByRole('alert').textContent).toContain(
+        messageAt(locale, 'delivery.code.tooMany.link').slice(0, messageAt(locale, 'delivery.code.tooMany.link').indexOf('{wait}')),
+      );
+      expect(codeBox(dialog, locale).value).toBe('042917');
+      expect((within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(61_000);
+      });
+      expect(within(dialog).queryByRole('alert')).toBeNull();
+      expect((within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.actions.confirm') }) as HTMLButtonElement).disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('F2: after send_failed the 60 s countdown runs and Send waits for it; F3: a limit\'s notice goes when its wait ends', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      codeActions.requestClientCode.mockResolvedValueOnce({ ok: false, error: 'send_failed', resendAfterSeconds: 60 });
+      show(locale);
+      fireEvent.click(claimButtons(locale)[0]);
+      const dialog = screen.getByRole('dialog');
+      const send = () => within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.code.send') }) as HTMLButtonElement;
+      fireEvent.click(send());
+      await act(async () => {});
+      expect(within(dialog).getByRole('alert').textContent).toBe(messageAt(locale, 'delivery.code.error.send_failed').replace('{studio}', 'Diwan Studio'));
+      expect(dialog.querySelector('[data-code-wait]')?.textContent).toContain('1:00');
+      expect(send().disabled).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(61_000);
+      });
+      expect(send().disabled).toBe(false);
+
+      codeActions.requestClientCode.mockResolvedValueOnce({ ok: false, error: 'too_many', retryAfterSeconds: 90, limit: 'studio_day' });
+      fireEvent.click(send());
+      await act(async () => {});
+      expect(within(dialog).getByRole('alert').textContent).toContain('Diwan Studio');
+      await act(async () => {
+        vi.advanceTimersByTime(91_000);
+      });
+      expect(within(dialog).queryByRole('alert')).toBeNull();
+      expect(send().disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('follows a new read the page hands down', () => {
@@ -231,7 +312,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
       return (
         <>
           <button onClick={() => setCard(CLAIMED)}>refresh</button>
-          <ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={{ hint: HINT }} studio={STUDIO} />
+          <ExecutionPayments token="tok" initial={card} onChanged={onChanged} channel={{ hint: HINT }} studio={STUDIO} openOn={null} />
         </>
       );
     }

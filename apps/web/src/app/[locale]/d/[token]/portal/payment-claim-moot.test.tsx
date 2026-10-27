@@ -32,7 +32,7 @@ function Page() {
       <button type="button" hidden onClick={() => setClaim(CLAIMABLE)}>
         claimable again
       </button>
-      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />
+      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} openOn={null} />
     </>
   );
 }

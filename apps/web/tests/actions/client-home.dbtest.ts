@@ -213,9 +213,9 @@ describe('the bodies are client-safe (AC3)', () => {
            'app_client_code_refusal', 'app_client_code_consume', 'enforce_client_code_guarded', 'app_client_home_target_by_token',
            'app_delivery_boqs', 'app_contract_measured_lines', 'app_contract_measured_works', 'app_contract_money_facts',
            'app_payment_request_due', 'app_engagement_milestone_due', 'app_contract_signed', 'app_contract_time_extension_days',
-           'app_contract_terminated_at', 'app_delivery_current_contract'))`,
+           'app_contract_terminated_at', 'app_delivery_current_contract', 'app_client_codes_reset'))`,
     );
-    expect(sources.length).toBe(30);
+    expect(sources.length).toBe(32);
     for (const source of sources) {
       expect({ fn: source.proname, forbidden: /cost|margin|supervision/i.test(source.prosrc) }).toEqual({ fn: source.proname, forbidden: false });
     }

@@ -6,9 +6,11 @@ import type { HomeFocus } from '@/lib/client-home/tab';
 /**
  * The element a focus names, by the id the Execution tab gives it: the
  * contract section, a payment request's row (`request-<id>`), a change order's
- * row (`variation-<id>`). Null when the page does not show it.
+ * row (`variation-<id>`). Null when the page does not show it, and for a
+ * design-fee instalment (the design tab's).
  */
 function targetOf(focus: HomeFocus): HTMLElement | null {
+  if (focus.section === 'instalment') return null;
   return document.getElementById(focus.section === 'contract' ? 'contract' : `${focus.section}-${focus.id}`);
 }
 

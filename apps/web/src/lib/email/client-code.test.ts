@@ -57,7 +57,7 @@ describe('sendClientCodeEmail', () => {
 
   it('a refusal (the sending domain not verified) is not sent', async () => {
     send.mockResolvedValue({ error: { statusCode: 403, name: 'validation_error' } });
-    await expect(sendClientCodeEmail(input)).resolves.toEqual({ sent: false, transient: false });
+    await expect(sendClientCodeEmail(input)).resolves.toEqual({ sent: false, transient: false, refusal: { statusCode: 403, name: 'validation_error' } });
   });
 
   it('no key on the Worker is not sent, and nothing is called', async () => {

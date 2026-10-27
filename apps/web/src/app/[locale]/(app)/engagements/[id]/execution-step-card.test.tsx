@@ -115,6 +115,7 @@ function cardProps(cockpit: ExecutionCockpit, extra: Partial<ExecutionStepCardPr
     pending: false,
     paymentClaims: [],
     canResolveClaims: true,
+    clientHasEmail: true,
     runAction: vi.fn(),
     actionError: null,
     onOpenTab: vi.fn(),
@@ -434,6 +435,19 @@ describe('the card at execution', () => {
     const stripe = renderCard(terminated, { extra: { status } }).container.querySelector('section')!;
     expect(stripe.className).toContain('border-[color:var(--rule)]');
     expect(stripe.innerHTML).not.toContain('bg-[color:var(--success)]');
+  });
+
+  test('H5: while the client owes a payment and has no email on file, one line says they cannot report it online', () => {
+    const notice = (cardView: ExecutionCardView, clientHasEmail: boolean) =>
+      renderCard(cardView, { locale: 'ar-EG', extra: { clientHasEmail } }).container.querySelector('[data-no-email-notice]')?.textContent ?? null;
+    const owed = view('record_payment');
+    expect(locateExecutionForStudio(owed.flow).whoseMove).toBe('client');
+    expect(notice(owed, false)).toBe(messageAt('ar-EG', 'engagements.command.noEmailPayment'));
+    expect(notice(owed, true)).toBeNull();
+    const signing = view('record_signed_offline');
+    expect(locateExecutionForStudio(signing.flow).whoseMove).toBe('client');
+    expect(notice(signing, false)).toBeNull();
+    expect(notice(view('send_contract'), false)).toBeNull();
   });
 
   test('a client payment claim left on the finished design can still be dismissed, by a role that resolves claims', () => {

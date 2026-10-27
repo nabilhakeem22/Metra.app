@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 const CALLS: Array<[string, () => Promise<unknown>]> = [
-  ['claimDesignPaymentInHome', () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', challengeId: DOCUMENT, code: '123456' })],
+  ['claimDesignPaymentInHome', () => portal.claimDesignPaymentInHome(TOKEN, { milestoneKind: 'deposit', code: '123456' })],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT, 'Is the wall moving?')],
 ];
 

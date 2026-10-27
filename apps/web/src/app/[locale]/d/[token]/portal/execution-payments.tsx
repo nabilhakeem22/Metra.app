@@ -33,7 +33,8 @@ function amountsOf(execution: PortalExecution): string[] {
  * rule (./portal-money.ts). Figures are what the client is asked to pay or has
  * paid, never the studio's own price basis. "I've made this payment" needs a
  * one-time code emailed to the client (the panel in its dialog; `channel` is
- * where it goes, or null with no address on file). A claim that landed, or a
+ * where it goes, or null with no address on file; `openOn` a request whose
+ * dialog opens on the code box). A claim that landed, or a
  * request that moved on, tells the page (`onChanged`), whose hero then follows.
  * فصحى copy, Latin digits, money left to right.
  */
@@ -43,17 +44,20 @@ export function ExecutionPayments({
   onChanged,
   channel,
   studio,
+  openOn,
 }: {
   token: string;
   initial: PortalExecution;
   onChanged: () => void;
   channel: KnownCodeChannel;
   studio: StudioContactFacts;
+  /** The request whose claim opens on its code box (a code email's link), or null. */
+  openOn: string | null;
 }) {
   const t = useTranslations('delivery.execution');
   const tActions = useTranslations('delivery.actions');
   const locale = useLocale();
-  const claim = useExecutionClaim(token, initial, onChanged, channel);
+  const claim = useExecutionClaim(token, initial, onChanged, channel, openOn);
   const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'execution');
   const requestLabel = useRequestLabel();
   const { requests } = claim.execution;
@@ -104,6 +108,7 @@ export function ExecutionPayments({
         cancelLabel={tActions('cancel')}
         pending={claim.pending}
         confirmDisabled={!claim.code.ready}
+        confirmShown={!claim.code.noChannel}
         onConfirm={claim.confirm}
         onOpenChange={(open) => !open && claim.dismiss()}
       />

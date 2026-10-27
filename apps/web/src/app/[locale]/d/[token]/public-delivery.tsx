@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import type { HomeFocus } from '@/lib/client-home/tab';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
 import { deliveryDisplayNames, deliveryReference } from '@/lib/engagements/public/display-names';
 import { HomeTabs } from './home-tabs';
@@ -36,12 +37,15 @@ export function PublicDeliveryView({
   token,
   read,
   documentUnavailable = false,
+  focus = null,
 }: {
   token: string;
   read: DeliveryReadResult;
   /** Set when the download route bounced back — the client asked for a document
    *  that is not (or is no longer) available to them. */
   documentUnavailable?: boolean;
+  /** What the link opens on: a fee instalment's claim, on its code box (a code email's link). */
+  focus?: HomeFocus | null;
 }) {
   const t = useTranslations('delivery');
   const locale = useLocale();
@@ -101,6 +105,7 @@ export function PublicDeliveryView({
           receipts={delivery.receipts}
           receiptsTruncated={delivery.receiptsTruncated}
           studio={{ name: firmName, whatsappDigits: delivery.firm.whatsappDigits, deliveryRef: deliveryReference(delivery) }}
+          openOn={focus?.section === 'instalment' ? focus.kind : null}
         />
         <DocumentsCard
           token={token}

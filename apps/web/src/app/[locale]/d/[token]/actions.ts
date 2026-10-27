@@ -1,7 +1,7 @@
 'use server';
 
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
-import type { CodeAnswer } from '@/lib/client-home/code-answers';
+import { LINK_BRAKE_REFUSAL, type CodeAnswer } from '@/lib/client-home/code-answers';
 import { claimDesignPaymentWithCodeByToken } from '@/lib/client-home/code-acts';
 import { paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { commentFieldErrors, type CommentField } from '@/lib/engagements/comment-field-rules';
@@ -67,14 +67,13 @@ export type DesignClaimAnswer = CodeAnswer & { studioNotified: boolean };
  */
 export async function claimDesignPaymentInHome(
   token: string,
-  input: { milestoneKind: string; challengeId: string; code: string },
+  input: { milestoneKind: string; code: string },
 ): Promise<DesignClaimAnswer> {
   return answered('claimDesignPaymentInHome', failed, async (): Promise<DesignClaimAnswer> => {
-    if (!(await portalActAllowed(token))) return TOO_MANY;
+    if (!(await portalActAllowed(token))) return { ...LINK_BRAKE_REFUSAL, studioNotified: false };
     const milestoneKind = input?.milestoneKind;
     const answer = await claimDesignPaymentWithCodeByToken(token, {
       milestoneKind,
-      challengeId: input?.challengeId,
       code: input?.code,
       ...(await requestProvenance()),
     });

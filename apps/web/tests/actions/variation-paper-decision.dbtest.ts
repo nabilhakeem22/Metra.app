@@ -79,7 +79,7 @@ describe('rejection_channel follows recorded_on_paper', () => {
   it('today\'s writers never name the column: the client\'s own online rejection is false and reads as the client\'s', async () => {
     const order = await issuedOrder();
     const code = await requestCode(order.delivery.tokenHash, 'decide_variation', order.orderId);
-    expect(await decideWithCode(order.delivery.tokenHash, order.orderId, 'reject', code.challengeId, code.code)).toEqual({ code: 'ok' });
+    expect(await decideWithCode(order.delivery.tokenHash, order.orderId, 'reject', code.code)).toEqual({ code: 'ok' });
     expect(await rejectionsOf(order.orderId)).toEqual([{ actor_channel: 'client', recorded_on_paper: false }]);
     expect(await rejectionChannelOf(order.tokenHash)).toBe('client');
   });

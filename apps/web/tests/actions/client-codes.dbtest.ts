@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  type CodePurpose,
   ageCodes,
   claimDesignWithCode,
   claimRequestWithCode,
@@ -21,8 +22,9 @@ import { closeFixture, seedOrg, teardown } from './fixture';
 // Client home DB step C, the one-time codes (rls/functions/75-client-home.sql,
 // policies/36-client-home.sql): the table's grants and guard, the issue
 // function's checks and limits, and the four code-checked acts (AC4 to AC14 at
-// the SQL level). Every call passes what the app will: a fresh challenge id
-// and sha256(challengeId:code), never the code itself.
+// the SQL level). Every call passes what the app will: sha256(purpose:target:
+// code), never the code itself, and never a code id (the act checks the
+// target's newest code, DB step D).
 //
 // Each test has a studio of its own, and its codes are cleared after it: the
 // per-studio and platform day caps would otherwise carry one test's codes
@@ -162,7 +164,8 @@ describe('app_home_code_issue_by_token: what it checks before it makes a code (A
       email: 'client.name@example.com',
       hint: 'c•••@e•••.com',
       resend_after_seconds: 60,
-      platform_day_half: false,
+      platform_day_half_crossed: false,
+      challenge_id: issued.challengeId,
       ...named,
     });
     const [stored] = await codesOf(home.delivery.id);
@@ -170,7 +173,7 @@ describe('app_home_code_issue_by_token: what it checks before it makes a code (A
       id: issued.challengeId,
       purpose: 'sign_contract',
       target_key: home.contract.contractId,
-      code_hash: codeHashOf(issued.challengeId, issued.code),
+      code_hash: codeHashOf('sign_contract', home.contract.contractId, issued.code),
       destination_hint: 'c•••@e•••.com',
       attempts: 0,
       consumed_at: null,
@@ -221,7 +224,7 @@ describe('app_home_code_issue_by_token: what it checks before it makes a code (A
       ['sign_contract', 'x'.repeat(65)],
     ];
     for (const [purpose, target] of cases) {
-      const { answer } = await requestCode(signed.delivery.tokenHash, purpose, target);
+      const { answer } = await requestCode(signed.delivery.tokenHash, purpose as CodePurpose, target);
       expect({ purpose, target, answer }).toEqual({ purpose, target, answer: { status: 'not_available' } });
     }
     const issued = await seedHome(orgId, 'issued');
@@ -237,7 +240,7 @@ describe('app_home_code_issue_by_token: what it checks before it makes a code (A
     expect((await requestCode(null, 'sign_contract', home.contract.contractId)).answer).toEqual({ status: 'invalid' });
     await tamper(`update public.design_engagements set share_expires_at = now() - interval '1 minute' where id = $1`, [home.delivery.id]);
     expect((await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId)).answer).toEqual({ status: 'expired' });
-    const malformed = ownerQuery(`select public.app_home_code_issue_by_token($1, gen_random_uuid(), 'sign_contract', $2, 'ABC', null, null)`, [
+    const malformed = ownerQuery(`select public.app_home_code_issue_by_token($1, 'sign_contract', $2, 'ABC', null, null)`, [
       home.delivery.tokenHash,
       home.contract.contractId,
     ]);
@@ -290,16 +293,16 @@ describe('app_home_code_issue_by_token: the limits, in the database (AC8)', () =
 describe('the code check: wrong, locked, expired, unknown, used (AC10, AC11, AC12)', () => {
   it('counts wrong codes down 4 to 0, then refuses even the right one, and signs nothing', async () => {
     const home = await seedHome(orgId);
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    const { code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     const wrong = code === '000000' ? '111111' : '000000';
     const left: Array<number | undefined> = [];
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const answer = await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, wrong);
+      const answer = await signWithCode(home.delivery.tokenHash, home.contract.contractId, wrong);
       expect(answer.code).toBe('code_wrong');
       left.push(answer.attempts_left);
     }
     expect(left).toEqual([4, 3, 2, 1, 0]);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code)).toEqual({ code: 'code_locked' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, code)).toEqual({ code: 'code_locked' });
     expect(await contractStatus(home.contract.contractId)).toBe('issued');
     expect(await contractEvents(home.contract.contractId)).toEqual([]);
   });
@@ -308,28 +311,29 @@ describe('the code check: wrong, locked, expired, unknown, used (AC10, AC11, AC1
     const home = await seedHome(orgId);
     const other = await seedHome(orgId);
     const forSign = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
-    expect(await signWithCode(other.delivery.tokenHash, other.contract.contractId, forSign.challengeId, forSign.code)).toEqual({ code: 'code_unknown' });
+    expect(await signWithCode(other.delivery.tokenHash, other.contract.contractId, forSign.code)).toEqual({ code: 'code_unknown' });
     await tamper(`update public.contracts set status = 'signed' where id = $1`, [home.contract.contractId]);
     const request = await seedRequest(orgId, home.contract.contractId, members.owner, { milestoneId: home.contract.milestoneIds[0] }, '100');
-    expect(await claimRequestWithCode(home.delivery.tokenHash, request, forSign.challengeId, forSign.code)).toEqual({ code: 'code_unknown' });
+    expect(await claimRequestWithCode(home.delivery.tokenHash, request, forSign.code)).toEqual({ code: 'code_unknown' });
     await tamper(`update public.contracts set status = 'issued' where id = $1`, [home.contract.contractId]);
     await ageCodes(home.delivery.id, 601);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, forSign.challengeId, forSign.code)).toEqual({ code: 'code_expired' });
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, randomUUID(), '123456')).toEqual({ code: 'code_unknown' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, forSign.code)).toEqual({ code: 'code_expired' });
+    // Only the newest code of a target is checked: once it has expired, any code typed for it is expired.
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, '123456')).toEqual({ code: 'code_expired' });
     expect(await contractEvents(home.contract.contractId)).toEqual([]);
   });
 
   it('signs once with the right code, consumes it by the event it wrote, and a replay writes nothing', async () => {
     const home = await seedHome(orgId);
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    const { code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     const pdfHash = 'c'.repeat(64);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code, { pdfHash })).toEqual({ code: 'ok' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, code, { pdfHash })).toEqual({ code: 'ok' });
     const events = await contractEvents(home.contract.contractId);
     expect(events).toEqual([{ id: events[0].id, kind: 'acknowledged', pdf_hash: pdfHash, actor_name: 'Client Name' }]);
     const [stored] = await codesOf(home.delivery.id);
     expect(stored.consumed_at).not.toBeNull();
     expect(stored.result_ref).toBe(events[0].id);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code)).toEqual({ code: 'code_used' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, code)).toEqual({ code: 'code_used' });
     expect(await contractEvents(home.contract.contractId)).toHaveLength(1);
     const notified = await ownerQuery<{ n: number }>(
       `select count(*)::int as n from public.notifications where entity_id = $1 and body_key = 'client_contract_signed'`,
@@ -341,26 +345,26 @@ describe('the code check: wrong, locked, expired, unknown, used (AC10, AC11, AC1
   it('refuses a contract that is not the home\'s before the code is checked, so a forged id costs no try', async () => {
     const home = await seedHome(orgId);
     const other = await seedHome(orgId);
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
-    expect(await signWithCode(home.delivery.tokenHash, other.contract.contractId, challengeId, code)).toEqual({ code: 'wrong_target' });
+    const { code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    expect(await signWithCode(home.delivery.tokenHash, other.contract.contractId, code)).toEqual({ code: 'wrong_target' });
     expect((await codesOf(home.delivery.id))[0].attempts).toBe(0);
   });
 
   it('answers the signing window closing after the code was sent as signing_closed, and keeps the code', async () => {
     const home = await seedHome(orgId);
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    const { code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     await tamper(`update public.contracts set share_expires_at = now() - interval '1 second' where id = $1`, [home.contract.contractId]);
-    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, challengeId, code)).toEqual({ code: 'signing_closed' });
+    expect(await signWithCode(home.delivery.tokenHash, home.contract.contractId, code)).toEqual({ code: 'signing_closed' });
     expect((await codesOf(home.delivery.id))[0].consumed_at).toBeNull();
   });
 
   it('sets the verified flag for the inner call only: it reads off again in the same transaction', async () => {
     const home = await seedHome(orgId);
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
+    const { code } = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
     const [row] = await ownerQuery<{ answer: { code: string }; flag: string | null }>(
-      `select public.app_home_contract_ack_by_token($1, $2::uuid, $3::uuid, $4, 'Client', null, null, $5) as answer,
+      `select public.app_home_contract_ack_by_token($1, $2::uuid, $3, 'Client', null, null, $4) as answer,
               current_setting('app.client_code_verified', true) as flag`,
-      [home.delivery.tokenHash, home.contract.contractId, challengeId, codeHashOf(challengeId, code), 'd'.repeat(64)],
+      [home.delivery.tokenHash, home.contract.contractId, codeHashOf('sign_contract', home.contract.contractId, code), 'd'.repeat(64)],
     );
     expect(row).toEqual({ answer: { code: 'ok' }, flag: 'off' });
   });
@@ -371,18 +375,18 @@ describe('the other three acts with a code (AC13, AC21 at the SQL level)', () =>
     const home = await seedHome(orgId, 'signed');
     const request = await seedRequest(orgId, home.contract.contractId, members.owner, { milestoneId: home.contract.milestoneIds[0] }, '62000');
     await seedPayment(orgId, home.contract.contractId, request, members.owner, '2000');
-    const { challengeId, code } = await requestCode(home.delivery.tokenHash, 'claim_request', request);
-    expect(await claimRequestWithCode(home.delivery.tokenHash, request, challengeId, code)).toEqual({ code: 'ok' });
+    const { code } = await requestCode(home.delivery.tokenHash, 'claim_request', request);
+    expect(await claimRequestWithCode(home.delivery.tokenHash, request, code)).toEqual({ code: 'ok' });
     const claims = await claimsOf(home.contract.contractId);
     expect(claims.map((claim) => [claim.request_id, claim.claimed_amount, claim.status])).toEqual([[request, '60000.0000', 'pending']]);
     expect((await claimNotifications(home.contract.contractId)).map((row) => row.recipient_user_id).sort()).toEqual(
       [members.owner, members.admin, members.accountant].sort(),
     );
     expect((await codesOf(home.delivery.id))[0].result_ref).toBe(claims[0].id);
-    expect(await claimRequestWithCode(home.delivery.tokenHash, request, challengeId, code)).toEqual({ code: 'code_used' });
+    expect(await claimRequestWithCode(home.delivery.tokenHash, request, code)).toEqual({ code: 'code_used' });
     const otherHome = await seedHome(orgId, 'signed');
     const foreign = await seedRequest(orgId, otherHome.contract.contractId, members.owner, {}, '10');
-    expect(await claimRequestWithCode(home.delivery.tokenHash, foreign, challengeId, code)).toEqual({ code: 'wrong_target' });
+    expect(await claimRequestWithCode(home.delivery.tokenHash, foreign, code)).toEqual({ code: 'wrong_target' });
   });
 
   it('approve and reject a change order: the order flips, the studio is told, each needs its own code', async () => {
@@ -390,11 +394,11 @@ describe('the other three acts with a code (AC13, AC21 at the SQL level)', () =>
     const approveMe = await seedVariation(orgId, home.contract, 'issued', { tokenHash: randomUUID().replace(/-/g, '') + 'a' });
     const rejectMe = await seedVariation(orgId, home.contract, 'issued', { tokenHash: randomUUID().replace(/-/g, '') + 'b' });
     const approval = await requestCode(home.delivery.tokenHash, 'decide_variation', approveMe.id);
-    expect(await decideWithCode(home.delivery.tokenHash, rejectMe.id, 'reject', approval.challengeId, approval.code)).toEqual({ code: 'code_unknown' });
-    expect(await decideWithCode(home.delivery.tokenHash, approveMe.id, 'maybe', approval.challengeId, approval.code)).toEqual({ code: 'invalid' });
-    expect(await decideWithCode(home.delivery.tokenHash, approveMe.id, 'approve', approval.challengeId, approval.code)).toEqual({ code: 'ok' });
+    expect(await decideWithCode(home.delivery.tokenHash, rejectMe.id, 'reject', approval.code)).toEqual({ code: 'code_unknown' });
+    expect(await decideWithCode(home.delivery.tokenHash, approveMe.id, 'maybe', approval.code)).toEqual({ code: 'invalid' });
+    expect(await decideWithCode(home.delivery.tokenHash, approveMe.id, 'approve', approval.code)).toEqual({ code: 'ok' });
     const rejection = await requestCode(home.delivery.tokenHash, 'decide_variation', rejectMe.id);
-    expect(await decideWithCode(home.delivery.tokenHash, rejectMe.id, 'reject', rejection.challengeId, rejection.code)).toEqual({ code: 'ok' });
+    expect(await decideWithCode(home.delivery.tokenHash, rejectMe.id, 'reject', rejection.code)).toEqual({ code: 'ok' });
     const statuses = await ownerQuery<{ id: string; status: string }>(
       `select id, status::text from public.variation_orders where id = any($1::uuid[]) order by number`,
       [[approveMe.id, rejectMe.id]],
@@ -421,8 +425,8 @@ describe('the other three acts with a code (AC13, AC21 at the SQL level)', () =>
 
   it('"I paid" on a design instalment: one pending claim, the code consumed by it; then nothing more to claim', async () => {
     const delivery = await seedDesignDelivery();
-    const { challengeId, code } = await requestCode(delivery.tokenHash, 'claim_design_payment', 'deposit');
-    expect(await claimDesignWithCode(delivery.tokenHash, 'deposit', challengeId, code)).toEqual({ code: 'ok' });
+    const { code } = await requestCode(delivery.tokenHash, 'claim_design_payment', 'deposit');
+    expect(await claimDesignWithCode(delivery.tokenHash, 'deposit', code)).toEqual({ code: 'ok' });
     const claims = await ownerQuery<{ id: string; claimed_amount: string }>(
       `select id, claimed_amount::text from public.client_payment_claims where engagement_id = $1`,
       [delivery.id],
@@ -438,9 +442,9 @@ describe('the raw code never reaches the database (AC14)', () => {
   it('no stored column and no function argument of the acts carries it: only its hash', async () => {
     const home = await seedHome(orgId);
     const issued = await requestCode(home.delivery.tokenHash, 'sign_contract', home.contract.contractId);
-    await signWithCode(home.delivery.tokenHash, home.contract.contractId, issued.challengeId, issued.code);
+    await signWithCode(home.delivery.tokenHash, home.contract.contractId, issued.code);
     const stored = JSON.stringify(await ownerQuery(`select * from public.client_verification_codes where engagement_id = $1`, [home.delivery.id]));
-    expect(stored).toContain(codeHashOf(issued.challengeId, issued.code));
+    expect(stored).toContain(codeHashOf('sign_contract', home.contract.contractId, issued.code));
     expect(stored).not.toMatch(new RegExp(`"${issued.code}"`));
     const signatures = await ownerQuery<{ args: string }>(
       `select pg_get_function_identity_arguments(p.oid) as args from pg_proc p

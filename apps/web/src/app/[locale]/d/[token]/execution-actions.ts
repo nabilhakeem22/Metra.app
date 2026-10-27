@@ -1,6 +1,6 @@
 'use server';
 
-import type { CodeAnswer } from '@/lib/client-home/code-answers';
+import { LINK_BRAKE_REFUSAL, type CodeAnswer } from '@/lib/client-home/code-answers';
 import { claimRequestWithCodeByToken } from '@/lib/client-home/code-acts';
 import { getDeliveryExecutionByToken } from '@/lib/engagements/public/execution';
 import type { PortalExecution } from '@/lib/engagements/public/execution-types';
@@ -21,7 +21,8 @@ import { requestProvenance } from '@/lib/share/request-provenance';
 //
 // THE PER-LINK BRAKE (lib/share/portal-rate-limit.ts): the claim spends the
 // link's ACT budget, the read its READ budget; past either, nothing is read or
-// written and the answer is `too_many`. NOTHING THROWS TO THE CLIENT: both run
+// written and the answer is `too_many` (the code, unused, still works after
+// the wait). NOTHING THROWS TO THE CLIENT: both run
 // through `answered`, so a failure underneath is `uncertain` (the claim may
 // still commit) or `generic` with its reference.
 
@@ -42,13 +43,12 @@ const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
  */
 export async function claimRequestInHome(
   token: string,
-  input: { requestId: string; challengeId: string; code: string },
+  input: { requestId: string; code: string },
 ): Promise<CodeAnswer> {
   return answered('claimRequestInHome', failed, async (): Promise<CodeAnswer> => {
-    if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many' };
+    if (!(await portalActAllowed(token))) return LINK_BRAKE_REFUSAL;
     return claimRequestWithCodeByToken(token, {
       requestId: input?.requestId,
-      challengeId: input?.challengeId,
       code: input?.code,
       ...(await requestProvenance()),
     });

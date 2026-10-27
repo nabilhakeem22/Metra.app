@@ -91,7 +91,7 @@ describe('functionsIn', () => {
 });
 
 describe('what the real manifest declares', () => {
-  it('finds 81 policies, 36 triggers and 100 functions', () => {
+  it('finds 81 policies, 36 triggers and 102 functions', () => {
     // A guard on the guards: if a parser breaks, these numbers move and the
     // post-apply verification would otherwise silently check nothing.
     //
@@ -105,7 +105,7 @@ describe('what the real manifest declares', () => {
     // where it was.
     expect(declaredPolicies().size).toBe(81);
     expect(declaredTriggers().size).toBe(36);
-    expect(declaredFunctions().size).toBe(100);
+    expect(declaredFunctions().size).toBe(102);
   });
 
   it('names objects this squad can point at, in the file that creates them', () => {

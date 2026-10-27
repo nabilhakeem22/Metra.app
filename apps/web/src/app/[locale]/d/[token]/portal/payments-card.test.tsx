@@ -39,7 +39,7 @@ function renderCard(
   claim: PublicDelivery['paymentClaim'],
   locale: TestLocale = 'en',
 ) {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} openOn={null} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>

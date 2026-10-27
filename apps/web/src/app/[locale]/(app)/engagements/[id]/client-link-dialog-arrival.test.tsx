@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
   revokeDeliveryLink: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
+// The client link dialog's reset of the client's codes (H5) is a server action: never reached here.
+vi.mock('@/lib/client-home/actions', () => ({ resetClientCodes: vi.fn() }));
 
 beforeEach(() => {
   query.value = '';

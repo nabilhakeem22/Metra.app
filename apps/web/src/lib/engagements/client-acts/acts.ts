@@ -7,6 +7,7 @@
 // write just performed, never from request input: a client can choose what to
 // approve, not who in the studio gets emailed or what their feed says.
 import type { MilestoneKind } from '@metra/db';
+import { claimableMilestoneOf } from '@/lib/engagements/claimable-milestones';
 import { can } from '@/lib/permissions/can';
 import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/member-roles';
 
@@ -56,10 +57,6 @@ const ACT_OF_VERB: Readonly<Record<string, ClientActKind>> = {
   acknowledge_handoff: 'handover_acknowledged',
 };
 
-/** The milestones a client can mark as paid, with a code (app_home_claim_design_payment_by_token). */
-const CLAIMABLE_MILESTONES = ['deposit', 'gate_a', 'gate_b', 'balance'] as const satisfies
-  readonly MilestoneKind[];
-
 /** The act one of the six respond verbs records, or null for anything else. */
 export function clientActOfVerb(verb: string): ClientAct | null {
   const kind = Object.hasOwn(ACT_OF_VERB, verb) ? ACT_OF_VERB[verb] : undefined;
@@ -68,7 +65,7 @@ export function clientActOfVerb(verb: string): ClientAct | null {
 
 /** The payment claim act for a milestone, or null when it is not a claimable one. */
 export function paymentClaimedAct(milestoneKind: string): ClientAct | null {
-  const milestone = CLAIMABLE_MILESTONES.find((kind) => kind === milestoneKind);
+  const milestone = claimableMilestoneOf(milestoneKind);
   return milestone ? { kind: 'payment_claimed', milestoneKind: milestone } : null;
 }
 
