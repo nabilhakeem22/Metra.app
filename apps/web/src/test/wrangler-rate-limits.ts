@@ -40,3 +40,5 @@ export const PORTAL_ACT_CEILING = rateLimitCeiling('PORTAL_ACT_RATE_LIMITER');
 export const PORTAL_READ_CEILING = rateLimitCeiling('PORTAL_READ_RATE_LIMITER');
 export const STUDIO_READ_CEILING = rateLimitCeiling('STUDIO_READ_RATE_LIMITER');
 export const STUDIO_SEARCH_CEILING = rateLimitCeiling('STUDIO_SEARCH_RATE_LIMITER');
+export const AUTH_OTP_IP_CEILING = rateLimitCeiling('AUTH_OTP_IP_RATE_LIMITER');
+export const AUTH_OTP_IDENTIFIER_CEILING = rateLimitCeiling('AUTH_OTP_IDENTIFIER_RATE_LIMITER');

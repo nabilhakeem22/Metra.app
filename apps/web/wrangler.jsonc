@@ -80,6 +80,16 @@
   //   STUDIO_SEARCH_RATE_LIMITER 120 req / 60s, keyed the same way: the contract
   //     line picker and the price book picker (one ask per pause in typing),
   //     and the market prices search (/market-book?q=).
+  // The sign-in code throttle (S2, go-live security), see
+  // lib/auth/otp-throttle.ts. Charged by /api/auth/otp/send and /verify BEFORE
+  // any Supabase call, each step (send, verify) its own key. Same rule: ON
+  // Cloudflare a missing binding refuses the sign-in step rather than serving
+  // it unlimited.
+  //   AUTH_OTP_IP_RATE_LIMITER          10 req / 60s, keyed per step + caller IP
+  //     (cf-connecting-ip, IPv6 by its /64), charged first.
+  //   AUTH_OTP_IDENTIFIER_RATE_LIMITER   5 req / 60s, keyed per step + a sha256
+  //     prefix of the normalized email or phone; only charged once the IP
+  //     bucket allowed the request.
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.
@@ -113,6 +123,16 @@
       "name": "STUDIO_SEARCH_RATE_LIMITER",
       "namespace_id": "1006",
       "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "AUTH_OTP_IP_RATE_LIMITER",
+      "namespace_id": "1007",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "AUTH_OTP_IDENTIFIER_RATE_LIMITER",
+      "namespace_id": "1008",
+      "simple": { "limit": 5, "period": 60 }
     }
   ]
 }
