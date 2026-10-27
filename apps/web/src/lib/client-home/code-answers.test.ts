@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeBoxValue, typedCode } from './code-answers';
+import { CODE_PURPOSE_ACT, CODE_PURPOSES, codeBoxValue, typedCode } from './code-answers';
 
 describe('codeBoxValue: what the code box holds', () => {
   it('keeps Latin digits only, Arabic-Indic ones folded, at most six', () => {
@@ -14,5 +14,12 @@ describe('typedCode: the code a client sent', () => {
     expect(typedCode('042917')).toBe('042917');
     expect(typedCode(' ۰۴۲ ۹۱۷ ')).toBe('042917');
     for (const sent of ['04291', '0429170', '04a917', '', null, 42917, { code: '042917' }]) expect(typedCode(sent)).toBeNull();
+  });
+});
+
+describe('CODE_PURPOSES and the act each names', () => {
+  it('lists the three acts of this build, each with the panel words for it', () => {
+    expect(CODE_PURPOSES).toEqual(['claim_request', 'claim_design_payment', 'sign_contract']);
+    expect(CODE_PURPOSES.map((purpose) => CODE_PURPOSE_ACT[purpose])).toEqual(['payment', 'payment', 'signature']);
   });
 });

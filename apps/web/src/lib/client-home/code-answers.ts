@@ -8,13 +8,24 @@ import type { PortalFailure } from '@/lib/share/portal-act-failure';
 
 /**
  * The acts a code is asked for in this build: "I paid" on a payment request
- * of the execution contract, and on a design-fee instalment. Signing and a
- * change-order decision join when their acts are built (plan H6.2, H7.1); the
- * database already knows all four.
+ * of the execution contract and on a design-fee instalment, and signing the
+ * execution contract. A change-order decision joins when its act is built
+ * (plan H7.1); the database already knows all four.
  */
-export type CodePurpose = 'claim_request' | 'claim_design_payment';
+export type CodePurpose = 'claim_request' | 'claim_design_payment' | 'sign_contract';
 
-export const CODE_PURPOSES: readonly CodePurpose[] = ['claim_request', 'claim_design_payment'];
+export const CODE_PURPOSES: readonly CodePurpose[] = ['claim_request', 'claim_design_payment', 'sign_contract'];
+
+/**
+ * What the client is doing with a code, as the code panel words it: saying a
+ * payment was made, or signing. Total over the purposes, so a new act names
+ * its words here before the panel can speak of it.
+ */
+export const CODE_PURPOSE_ACT: Readonly<Record<CodePurpose, 'payment' | 'signature'>> = {
+  claim_request: 'payment',
+  claim_design_payment: 'payment',
+  sign_contract: 'signature',
+};
 
 /** A code is six digits. */
 export const CODE_LENGTH = 6;
@@ -118,3 +129,6 @@ export type CodeAnswer =
   | CodeTooMany
   | { ok: false; error: CodeActRefusal }
   | ({ ok: false } & PortalFailure);
+
+/** What signing the contract came to: a code-checked act's answers, or no name to sign with (nothing sent). */
+export type SignContractAnswer = CodeAnswer | { ok: false; error: 'name_required' };
