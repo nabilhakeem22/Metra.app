@@ -69,7 +69,7 @@ function DesignStepCard(props: EngagementCommandCardProps) {
 
       {!closed && !props.clientHasEmail && designMoveIsClientPayment(view) && (
         <div className="mb-4">
-          <NoEmailNotice />
+          <NoEmailNotice act="payment" />
         </div>
       )}
 

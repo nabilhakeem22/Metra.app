@@ -138,13 +138,16 @@ describe('AC7: the issue gate', () => {
     expect(await issueContractCore(owner, { id: contractId })).toEqual({ ok: false, error: 'contract_schedule_invalid' });
     await saveContractScheduleCore(owner, { contractId, milestones: [row('114000', 'amount')] });
     const issued = await issueContractCore(owner, { id: contractId });
-    expect(issued).toMatchObject({ ok: true, data: expect.stringMatching(/.{20,}/) });
+    expect(issued).toEqual({ ok: true, data: { rawToken: expect.stringMatching(/.{20,}/), execution: true } });
     expect(await issueTrail(contractId)).toEqual({ status: 'issued', token: true, events: 1 });
   });
 
   it('issues a proposal contract with no schedule, as before', async () => {
     const proposalContractId = await seedProposalContract(orgId);
-    expect(await issueContractCore(owner, { id: proposalContractId })).toMatchObject({ ok: true });
+    expect(await issueContractCore(owner, { id: proposalContractId })).toEqual({
+      ok: true,
+      data: { rawToken: expect.stringMatching(/.{20,}/), execution: false },
+    });
   });
 });
 

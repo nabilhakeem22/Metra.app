@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 // AC10, OD2 strict (H6.2): the client home signs the contract only through
 // the code-checked wrapper. The contract acknowledgement it wraps is CALLED
 // from one place in the app, /c's own (lib/contracts/public.ts), and that
-// function is used by /c's actions only, until plan H6.3 moves /c onto the
-// code too and DB step C2 makes the SQL refuse a call without the code's flag
-// (both checks retire with C2). Comments may name the SQL function; a call is
+// function is used by /c's actions only, which send a proposal contract
+// alone: a BOQ contract answers `moved` there (H6.3). DB step C2 makes the
+// SQL refuse a call without the code's flag (both checks retire with C2). Comments may name the SQL function; a call is
 // its name followed by "(", with any white space between (security L2: the
 // SDF runner accepts that spacing too).
 

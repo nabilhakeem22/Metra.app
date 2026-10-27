@@ -438,16 +438,24 @@ describe('the card at execution', () => {
     expect(stripe.innerHTML).not.toContain('bg-[color:var(--success)]');
   });
 
-  test('H5: while the client owes a payment and has no email on file, one line says they cannot report it online', () => {
-    const notice = (cardView: ExecutionCardView, clientHasEmail: boolean) =>
-      renderCard(cardView, { locale: 'ar-EG', extra: { clientHasEmail } }).container.querySelector('[data-no-email-notice]')?.textContent ?? null;
+  test.each<TestLocale>(['ar-EG', 'en'])('H5, H6.3 A5: with no email on file, one line says the client cannot pay or sign online (%s)', (locale) => {
+    const notice = (cardView: ExecutionCardView, clientHasEmail: boolean) => {
+      const { container, unmount } = renderCard(cardView, { locale, extra: { clientHasEmail } });
+      const text = container.querySelector('[data-no-email-notice]')?.textContent ?? null;
+      unmount();
+      return text;
+    };
     const owed = view('record_payment');
     expect(locateExecutionForStudio(owed.flow).whoseMove).toBe('client');
-    expect(notice(owed, false)).toBe(messageAt('ar-EG', 'engagements.command.noEmailPayment'));
+    expect(notice(owed, false)).toBe(messageAt(locale, 'engagements.command.noEmailPayment'));
     expect(notice(owed, true)).toBeNull();
     const signing = view('record_signed_offline');
     expect(locateExecutionForStudio(signing.flow).whoseMove).toBe('client');
-    expect(notice(signing, false)).toBeNull();
+    expect(notice(signing, false)).toBe(messageAt(locale, 'engagements.command.noEmailSignature'));
+    expect(notice(signing, true)).toBeNull();
+    const windowClosed = viewOf(flowTakenBack('signing_closed'));
+    expect(locateExecutionForStudio(windowClosed.flow).whoseMove).toBe('studio');
+    expect(notice(windowClosed, false)).toBeNull();
     expect(notice(view('send_contract'), false)).toBeNull();
   });
 

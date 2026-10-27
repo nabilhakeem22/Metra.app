@@ -281,8 +281,7 @@ describe('public acknowledgement token (AC7, AC11)', () => {
     const base = await setup();
     const { id: proposalId } = await acceptedProposal(base.ctx, base.clientId, base.projectId);
     const contractId = ((await generateContractCore(base.ctx, { proposalId })) as { data?: string }).data!;
-    const link = (await issueContractCore(base.ctx, { id: contractId })) as { data?: string };
-    const token = link.data!;
+    const token = (await issueContractCore(base.ctx, { id: contractId })).data!.rawToken;
     const payload = await getContractByToken(token);
     expect(payload).not.toBeNull();
     expect(JSON.stringify(payload)).not.toMatch(/unit_cost|line_cost|line_margin|total_cost|total_margin/i);
@@ -293,7 +292,7 @@ describe('public acknowledgement token (AC7, AC11)', () => {
     const base = await setup();
     const { id: proposalId } = await acceptedProposal(base.ctx, base.clientId, base.projectId);
     const contractId = ((await generateContractCore(base.ctx, { proposalId })) as { data?: string }).data!;
-    const token = ((await issueContractCore(base.ctx, { id: contractId })) as { data?: string }).data!;
+    const token = (await issueContractCore(base.ctx, { id: contractId })).data!.rawToken;
 
     const ack = await acknowledgeContractByToken(token, { actorName: 'Nabil', ip: '1.2.3.4', userAgent: 'jest', pdfHash: 'abc123' });
     expect(ack).toEqual({ ok: true });

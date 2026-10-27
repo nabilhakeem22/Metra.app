@@ -2,6 +2,7 @@
 // (server-safe: types only).
 import type { CostItemUnit } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
+import type { ClientHomeAnswer } from '@/lib/client-home/types';
 
 export interface DraftVoLine {
   /** The row's own key: its refusals stay on it when another row is removed. */
@@ -27,5 +28,5 @@ export interface VariationChargeRates {
   supervisionPct: string;
 }
 
-/** Runs a server action, refreshing on success and saying why it failed. */
-export type ContractAction = (fn: () => Promise<ActionResult>) => void;
+/** Runs a server action, refreshing on success, showing the link it hands over (./shared-link.ts) and saying why it failed. */
+export type ContractAction = (fn: () => Promise<ActionResult & { clientHome?: ClientHomeAnswer }>) => void;

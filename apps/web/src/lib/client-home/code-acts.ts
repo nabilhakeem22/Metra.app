@@ -7,11 +7,11 @@ import 'server-only';
 // the code up in the same statement. There is no other way to them from the
 // app (OD2 strict): the claim functions those wrap are never called directly
 // (no-unverified-claim.test.ts), and the contract acknowledgement the signing
-// wraps is called directly by /c's own page only, until plan H6.3 moves /c
-// onto the code too (no-unverified-sign.test.ts). The raw code is hashed here
-// with the act it is for and never sent, logged or returned; the database
-// checks it against the newest code of that act (H5 functional F1), so the
-// browser holds no code id.
+// wraps is called directly by /c's own action only, for a proposal contract:
+// a BOQ contract answers `moved` there (H6.3, no-unverified-sign.test.ts).
+// The raw code is hashed here with the act it is for and never sent, logged
+// or returned; the database checks it against the newest code of that act
+// (H5 functional F1), so the browser holds no code id.
 import { sql, type SQL } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';

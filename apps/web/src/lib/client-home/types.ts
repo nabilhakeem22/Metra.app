@@ -4,6 +4,7 @@
 // reader turns it into WHERE the client stands (`location`) and drops it, so no
 // fact of the studio's (a balance, a rate, an internal change order) is ever
 // part of this shape (H3 ruling D2).
+import type { ActionResult } from '@/lib/actions/result';
 import type { PortalExecution, PortalContractStatus } from '@/lib/engagements/public/execution-types';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import type { ClientExecutionLocation } from '@/lib/flow/locate/execution-client';
@@ -72,6 +73,9 @@ export type ClientHomeLinkReason = 'delivery_links_not_configured' | 'delivery_l
 
 /** The home's link as the studio is handed it, or why there is none. */
 export type ClientHomeLink = { link: string; linkReason?: never } | { link: null; linkReason: ClientHomeLinkReason };
+
+/** What the studio is answered when it asks for a contract's client home: the link, why there is none, or the refusal. */
+export type ClientHomeAnswer = (ActionResult & { ok: false }) | ({ ok: true } & ClientHomeLink);
 
 /** A home whose Execution tab can be shown: the delivery is at `execution`. */
 export type HomeAtExecution = PortalHome & { execution: HomeExecution };

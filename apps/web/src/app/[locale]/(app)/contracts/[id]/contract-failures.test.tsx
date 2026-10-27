@@ -85,8 +85,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
     expectSaid(locale, 'contract_not_draft');
   });
 
-  test('issuing from the detail page answered contract_not_draft', async () => {
-    contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
+  const renderDetail = () =>
     renderWithIntl(
       <ContractDetailClient
         {...contractPagePayload(DETAIL, { seeContract: true, seeRegister: true })}
@@ -107,6 +106,22 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       />,
       { locale },
     );
+
+  test('H6.4: issuing an execution contract shows its client home, and a later act with no link keeps it', async () => {
+    const home = 'https://studio.example/en/d/home-raw?tab=execution';
+    contracts.issueContract.mockResolvedValue({ ok: true, clientHome: { ok: true, link: home } });
+    renderDetail();
+    await press(at('contracts.issue'));
+    expect(screen.getByText(at('contracts.clientPage.issued.title'))).toBeTruthy();
+    expect(screen.getByText(home)).toBeTruthy();
+    contracts.issueContract.mockResolvedValue({ ok: true });
+    await press(at('contracts.issue'));
+    expect(screen.getByText(home)).toBeTruthy();
+  });
+
+  test('issuing from the detail page answered contract_not_draft', async () => {
+    contracts.issueContract.mockResolvedValue({ ok: false, error: 'contract_not_draft' });
+    renderDetail();
     await press(at('contracts.issue'));
     expectSaid(locale, 'contract_not_draft');
   });

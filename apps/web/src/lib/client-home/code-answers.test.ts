@@ -15,6 +15,11 @@ describe('typedCode: the code a client sent', () => {
     expect(typedCode(' ۰۴۲ ۹۱۷ ')).toBe('042917');
     for (const sent of ['04291', '0429170', '04a917', '', null, 42917, { code: '042917' }]) expect(typedCode(sent)).toBeNull();
   });
+
+  it('refuses a body longer than 48 characters before folding it (H6.2 fix observation)', () => {
+    expect(typedCode(`${' '.repeat(42)}042917`)).toBe('042917');
+    expect(typedCode(`${' '.repeat(43)}042917`)).toBeNull();
+  });
 });
 
 describe('CODE_PURPOSES and the act each names', () => {

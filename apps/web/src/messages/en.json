@@ -1793,7 +1793,8 @@
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
       "notSignature": "This is an electronic acknowledgement, not a binding signature.",
-      "heading": "Contract"
+      "heading": "Contract",
+      "signInHome": "This contract is now signed from your page with {studio}. Ask {studio} for the link to your page to review and sign it there."
     },
     "lines": {
       "show": "Show lines ({count})",
@@ -2107,6 +2108,11 @@
       "reason": {
         "delivery_links_not_configured": "Client page links are not set up on the server yet. Contact support.",
         "delivery_link_unrecoverable": "The current client page link cannot be shown again. Replace it from the delivery page."
+      },
+      "issued": {
+        "title": "Send the client their page link",
+        "body": "The client reviews the contract on their page and signs it with a code sent to their email.",
+        "retry": "The contract is issued, but the client page link did not come up just now. Try again with \"Get the client page link\" below."
       }
     }
   },
@@ -2381,7 +2387,8 @@
           "headline": "This delivery was abandoned"
         }
       },
-      "noEmailPayment": "The client has no email on file, so they cannot report a payment online. Add their email on the client's page."
+      "noEmailPayment": "The client has no email on file, so they cannot report a payment online. Add their email to the client's details.",
+      "noEmailSignature": "The client has no email on file, so they cannot sign the contract online. Add their email to the client's details, or record the paper signature."
     },
     "spine": {
       "proposal": "Proposal",

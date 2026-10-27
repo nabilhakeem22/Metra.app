@@ -335,6 +335,10 @@ const SDF_CALLER_ALLOWLIST = [
   // session; only the code's hash is passed.
   'apps/web/src/lib/client-home/codes.ts',
   'apps/web/src/lib/client-home/code-acts.ts',
+  // H6.3: where an old /c link sends its holder (app_client_home_target_by_token):
+  // the same contract token, no session; returns ids and the home's hash and
+  // nonce, never a money column.
+  'apps/web/src/lib/client-home/redirect.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

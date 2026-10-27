@@ -32,6 +32,9 @@ export const CODE_LENGTH = 6;
 
 const SIX_DIGITS = /^\d{6}$/;
 
+/** Longer than this (UTF-16 units) is no typed code: refused before any folding, so a huge body costs no CPU (as a signer's name is). */
+const LONGEST_CODE_SENT = CODE_LENGTH * 8;
+
 /**
  * What the code box holds after a keystroke or a paste: Latin digits only
  * (Arabic-Indic ones folded, as the proposal builder's number boxes do), at
@@ -43,7 +46,7 @@ export function codeBoxValue(typed: string): string {
 
 /** The code a client sent, or null when it is not six digits (a direct call can send anything). */
 export function typedCode(sent: unknown): string | null {
-  if (typeof sent !== 'string') return null;
+  if (typeof sent !== 'string' || sent.length > LONGEST_CODE_SENT) return null;
   const digits = latinDigits(sent).replace(/\s/g, '');
   return SIX_DIGITS.test(digits) ? digits : null;
 }

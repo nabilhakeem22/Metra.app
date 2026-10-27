@@ -257,14 +257,11 @@ describe('signing with the code (AC12 to AC17)', () => {
   }, 20_000);
 });
 
-describe('/c is as it was (AC19)', () => {
-  it('acknowledges a BOQ contract with no code (the interim gap until H6.3), hashing its own snapshot', async () => {
+describe('/c after H6.3 (AC19, H6.3 AC9)', () => {
+  it('refuses a BOQ contract with moved: it is signed in the home with a code, never on /c', async () => {
     const contract = await seedExecutionContract(orgId, { project: await seedClientProject(orgId) });
-    const expectedHash = contractPayloadHash(await snapshotOfC(contract.contractId));
-    expect(await acknowledgeContract(contract.rawToken as string, 'Link Client')).toEqual({ ok: true });
-    const state = await contractState(contract.contractId);
-    expect(state).toMatchObject({ status: 'signed', events: [{ actor_name: 'Link Client', pdf_hash: expectedHash }] });
-    expect(await acknowledgeContract(contract.rawToken as string, 'Link Client')).toEqual({ ok: false, error: 'already_responded' });
+    expect(await acknowledgeContract(contract.rawToken as string, 'Link Client')).toEqual({ ok: false, error: 'moved' });
+    expect(await contractState(contract.contractId)).toMatchObject({ status: 'issued', events: [], notified: 0 });
   });
 
   it('acknowledges a proposal contract as before', async () => {

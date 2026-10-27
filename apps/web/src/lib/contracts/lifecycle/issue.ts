@@ -95,18 +95,27 @@ async function recordIssuedEvent(
   });
 }
 
+/** What an issue hands its action wrapper. */
+export interface IssuedContract {
+  /** The contract's /c token, RAW: goes into a link once, never stored or logged. */
+  rawToken: string;
+  /** Generated from a BOQ: signed in the client home (H6.4), so its /c link is not handed out. */
+  execution: boolean;
+}
+
 /**
  * Issue a draft contract: draft->issued, mint the client acknowledgement token,
  * write the event. Owner/admin only (contracts_issue). The transition IS the
  * admission gate — a concurrent 2nd issue finds status<>'draft' -> 0 rows ->
  * contract_not_draft, no 2nd token, no 2nd event. An execution contract also
  * needs a valid schedule; a refusal writes no token and no event. Returns the
- * RAW token; the action wrapper turns it into the public acknowledgement link.
+ * RAW token and whether it is an execution contract (read under the lock); the
+ * action wrapper turns that into the link the studio hands the client.
  */
 export async function issueContractCore(
   ctx: OrgContext,
   input: { id: string },
-): Promise<ActionResult & { data?: string }> {
+): Promise<ActionResult & { data?: IssuedContract }> {
   // Directly invokable: a null or a non-object payload is malformed, never a throw.
   if (!isRecord(input)) return err('malformed');
   const contractId = typeof input.id === 'string' ? input.id.trim() : '';
@@ -127,7 +136,7 @@ export async function issueContractCore(
         before: { status: 'draft' },
         after: { status: 'issued' },
       });
-      return raw;
+      return { rawToken: raw, execution: contract.sourceBoqId !== null };
     },
   );
 }

@@ -16,6 +16,7 @@ import { CostsTab } from './costs-tab';
 import { ExecutionTabPanel, isOnDemandTab, type ExecutionMay } from './execution-tab-panel';
 import { ScheduleTab } from './schedule-tab';
 import { ShareLinkCard } from './share-link-card';
+import { sharedLinkOf, type SharedLink } from './shared-link';
 import type { ContractPageHeader } from './page-payload';
 import type { ContractTab } from './tabs';
 import { useKeptSectionLines } from './use-kept-section-lines';
@@ -75,7 +76,7 @@ export function ContractDetailClient({
   const keptSections = useKeptSections(openingSections);
   const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
-  const [link, setLink] = useState<string | null>(null);
+  const [shared, setShared] = useState<SharedLink | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const m = (v: string) => formatMoney(v, locale);
@@ -86,7 +87,7 @@ export function ContractDetailClient({
       try {
         const res = await fn();
         if (res.ok) {
-          if (res.link) setLink(res.link);
+          setShared((current) => sharedLinkOf(res) ?? current);
           router.refresh();
         } else {
           setError(describeFailure(res, te));
@@ -99,12 +100,8 @@ export function ContractDetailClient({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <p className="text-body text-destructive" role="alert">
-          {error}
-        </p>
-      )}
-      {link && <ShareLinkCard link={link} />}
+      {error && <p className="text-body text-destructive" role="alert">{error}</p>}
+      {shared && <ShareLinkCard shared={shared} />}
 
       <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />
 

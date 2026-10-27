@@ -1,5 +1,6 @@
 'use server';
 
+import { signsInClientHome } from '@/lib/contracts/home-signing';
 import {
   acknowledgeContractByToken,
   contractPayloadHash,
@@ -15,7 +16,7 @@ import { portalReadAllowed } from '@/lib/share/portal-rate-limit';
 import { requestProvenance } from '@/lib/share/request-provenance';
 
 /** The client's acknowledgement: its outcome, or an act that never landed. */
-export type ContractAnswer = { ok: boolean; error?: AckError } | ({ ok: false } & PortalFailure);
+export type ContractAnswer = { ok: boolean; error?: AckError | 'moved' } | ({ ok: false } & PortalFailure);
 
 /**
  * Public (no-session) electronic acknowledgement. Captures the client IP (the
@@ -23,15 +24,18 @@ export type ContractAnswer = { ok: boolean; error?: AckError } | ({ ok: false } 
  * agent, and a content hash of the exact document being acknowledged (the "PDF
  * hash" per A5; binding e-signature stays deferred). Nothing throws to the
  * client: a failure underneath answers `uncertain` or `generic` with a
- * reference (answered), never "this link is not valid".
+ * reference (answered), never "this link is not valid". A BOQ contract is
+ * signed in the client home with a code (H6.3): it answers `moved`, and
+ * nothing is sent to the database's acknowledgement.
  */
 export async function acknowledgeContract(token: string, actorName?: string): Promise<ContractAnswer> {
   return answered('acknowledgeContract', (failure) => ({ ok: false as const, ...failure }), async () => {
+    // The exact document the client is acknowledging: what it is hashed over, and where it is signed.
+    const contract = await getContractByToken(token);
+    if (contract !== null && signsInClientHome(contract)) return { ok: false, error: 'moved' as const };
     const { ip, userAgent } = await requestProvenance();
     // Directly invokable: a non-string name is no name, never a throw.
     const name = (typeof actorName === 'string' ? actorName.trim().slice(0, 120) : '') || null;
-    // Hash the exact document the client is acknowledging.
-    const contract = await getContractByToken(token);
     const pdfHash = contract ? contractPayloadHash(contract) : null;
     return acknowledgeContractByToken(token, { actorName: name, ip, userAgent, pdfHash });
   });
