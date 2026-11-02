@@ -153,6 +153,7 @@ const ALL_CODES: ActionCode[] = [
   'design_only_closed',
   'boq_not_on_home',
   'boq_delivery_abandoned',
+  'boq_version_in_progress',
   'boq_needs_delivery',
   'contract_from_boq_only',
   'contract_schedule_missing',

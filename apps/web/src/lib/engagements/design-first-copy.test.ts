@@ -15,6 +15,13 @@ describe('design_open and the ending hint (F4, F5)', () => {
   });
 });
 
+describe('boq_version_in_progress (R-F1)', () => {
+  it('says to issue the draft, then create the contract from it', () => {
+    expect(en.errors.boq_version_in_progress).toBe('A new version of this BOQ is still a draft. Open the BOQ tab and issue it, then create the contract from it.');
+    expect(ar.errors.boq_version_in_progress).toBe('فيه نسخة جديدة من المقايسة دي لسه مسودة. افتح تبويب المقايسة واصدرها، وبعدين اعمل العقد منها.');
+  });
+});
+
 describe('the fix round (F1, F2, F6)', () => {
   it.each([['en', en], ['ar-EG', ar]] as const)('%s: boq_not_on_home names the button on this page; the trigger label is gone', (_locale, bundle) => {
     expect(bundle.errors.boq_not_on_home).toContain(bundle.projects.profile.boq.newVersion);

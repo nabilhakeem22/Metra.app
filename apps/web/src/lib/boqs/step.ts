@@ -15,6 +15,8 @@ export interface BoqStepSummary {
   /** `BQ-YYYY-NNNN`, formatted on the SERVER (never in the browser). */
   documentNumber: string;
   total: string;
+  /** A draft stands on the project, this BOQ itself if it is one: a contract on an issued BOQ is refused meanwhile. */
+  projectHasDraft: boolean;
 }
 
 /** Everything the delivery's BOQ step renders from, assembled on the server. */

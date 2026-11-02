@@ -3,9 +3,10 @@
 // supervision fee on top of the BOQ total, which is carried to the piastre and
 // never recomputed (plan A4).
 //
-// Five named phases inside the one `mutateInOrg`: load the BOQ (locked, so a
-// re-issue cannot supersede it under this transaction), check the pair's design,
-// persist the header, lock it, copy the content (./create-from-boq-copy.ts).
+// Named phases inside the one `mutateInOrg`: load the BOQ (locked, so a re-issue
+// cannot supersede it under this transaction), check the pair's design, refuse
+// (./create-from-boq-refusals.ts), persist the header, lock it, copy the content
+// (./create-from-boq-copy.ts).
 import { boqs, contracts, type MetraDb } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
@@ -20,6 +21,7 @@ import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
 import { readContractCharges, type ContractChargeRates, type ContractChargesInput } from '../charges-input';
 import { copyBoqContentToContract } from './create-from-boq-copy';
+import { refuseSecondContract, refuseWhileVersionInProgress } from './create-from-boq-refusals';
 
 export interface GenerateExecutionContractInput extends ContractChargesInput {
   boqId?: unknown;
@@ -64,16 +66,6 @@ async function requireBoqOnHome(tx: MetraDb, boq: IssuedBoq): Promise<void> {
   if (refusal) fail(refusal.code, 'params' in refusal ? refusal.params : undefined);
 }
 
-/** The fast path of "one contract per BOQ"; the unique index is the real guard. */
-async function refuseSecondContract(tx: MetraDb, boqId: string): Promise<void> {
-  const [existing] = await tx
-    .select({ id: contracts.id })
-    .from(contracts)
-    .where(eq(contracts.sourceBoqId, boqId))
-    .limit(1);
-  if (existing) fail('contract_exists');
-}
-
 /** Insert the draft header and return its id. Retention and advance stay 0 (plan A5). */
 async function persistExecutionHeader(
   tx: MetraDb,
@@ -108,7 +100,8 @@ async function persistExecutionHeader(
  * Generate a DRAFT execution contract from an ISSUED BOQ. One contract per BOQ
  * (`contract_exists`); a draft or superseded BOQ is `boq_not_issued`; `design_open`,
  * `design_only_closed` and `boq_not_on_home` while design has not finished or the
- * contract would miss the client's link; another org's BOQ is `boq_not_found`.
+ * contract would miss the client's link; `boq_version_in_progress` while a draft
+ * stands on the project; another org's BOQ is `boq_not_found`.
  */
 export async function generateExecutionContractCore(
   ctx: OrgContext,
@@ -132,6 +125,7 @@ export async function generateExecutionContractCore(
       const boq = await loadIssuedBoq(tx, boqId);
       await requireBoqOnHome(tx, boq);
       await refuseSecondContract(tx, boqId);
+      await refuseWhileVersionInProgress(tx, boq.projectId);
       const contract = await persistExecutionHeader(tx, ctx, boq, rates.values);
       await copyBoqContentToContract(tx, { orgId: ctx.orgId, boqId, contractId: contract.id });
       await audit({

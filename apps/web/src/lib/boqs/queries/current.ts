@@ -9,6 +9,8 @@ export interface CurrentBoqRow {
   number: number;
   total: string;
   createdAt: Date;
+  /** A draft stands on the project, this row itself if it is one. In the one statement: the cockpit reads no more. */
+  projectHasDraft: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export async function selectCurrentProjectBoq(
       number: boqs.number,
       total: boqs.total,
       createdAt: boqs.createdAt,
+      projectHasDraft: sql<boolean>`exists (select 1 from public.boqs d where d.project_id = ${projectId} and d.status = 'draft')`,
     })
     .from(boqs)
     .where(and(eq(boqs.projectId, projectId), ne(boqs.status, 'superseded')))

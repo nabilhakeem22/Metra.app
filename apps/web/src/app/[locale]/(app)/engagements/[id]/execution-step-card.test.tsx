@@ -100,7 +100,7 @@ function viewOf(flow: ExecutionFlowFacts, may = EVERYTHING): ExecutionCardView {
       nextInstalment: { labelAr: 'دفعة مقدمة', labelEn: 'Advance' },
       signed: contract?.status === 'signed' ? { on: '2026-10-15', via: 'online', signerName: 'Hesham Adel' } : null,
     },
-    { projectId: 'p-1', may },
+    { projectId: 'p-1', versionInProgress: false, may },
   );
 }
 

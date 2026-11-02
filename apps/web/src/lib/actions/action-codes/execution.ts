@@ -20,6 +20,8 @@ export type ExecutionActionCode =
   | 'boq_not_on_home'
   // Every delivery of the pair was abandoned: a new delivery fixes it.
   | 'boq_delivery_abandoned'
+  // A draft version stands on the project: a contract on the BOQ it replaces would block its issue.
+  | 'boq_version_in_progress'
   // A BOQ goes out through a delivery, and the project has no single one to use.
   | 'boq_needs_delivery'
   // The pair has a delivery: its contract comes from that BOQ, not from a proposal.

@@ -42,6 +42,7 @@ export async function getProjectBoqSummary(
         new Date(boq.createdAt).getUTCFullYear(),
       ),
       total: boq.total,
+      projectHasDraft: boq.projectHasDraft,
     };
   });
 }

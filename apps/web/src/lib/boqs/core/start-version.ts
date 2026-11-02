@@ -17,8 +17,9 @@ import { copyBoqContent } from './start-version-copy';
 
 /**
  * The issued BOQ, FOR UPDATE: a generate still open on it (FOR SHARE) finishes
- * first, so the contract read that follows sees its contract; and a second call
- * waits here, so its read of the project's draft sees this one's.
+ * first, so the contract read that follows sees its contract; a generate that
+ * comes after waits for this one, then reads its draft and refuses; and a second
+ * call waits here, so its read of the project's draft sees this one's.
  */
 async function lockIssuedBoq(tx: MetraDb, boqId: string) {
   const [boq] = await tx
@@ -59,7 +60,7 @@ async function refuseOversizedCopy(tx: MetraDb, boqId: string): Promise<void> {
 }
 
 /** The project's draft, the oldest if old rows hold more than one (the current-BOQ rule among drafts). */
-async function findDraftOf(tx: MetraDb, projectId: string): Promise<string | null> {
+export async function findDraftOf(tx: MetraDb, projectId: string): Promise<string | null> {
   const [draft] = await tx
     .select({ id: boqs.id })
     .from(boqs)

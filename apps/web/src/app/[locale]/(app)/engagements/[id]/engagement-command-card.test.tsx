@@ -321,6 +321,7 @@ describe('a closed delivery', () => {
       },
       projectId: 'p-1',
       boqId: null,
+      versionInProgress: false,
       contract: null,
       nextInstalment: null,
       may: {

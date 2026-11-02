@@ -679,6 +679,7 @@
     "design_only_closed": "Delivery {delivery} closed as design only. If the client wants to build, open it and tap \"Continue to execution\". The contract will appear on the client's same link.",
     "boq_not_on_home": "This BOQ does not belong to the client's current delivery, so its contract would not appear on their link. Tap \"New version\" on this page and issue it, then create the contract.",
     "boq_delivery_abandoned": "The delivery behind this BOQ was abandoned. Start a new delivery from the project page, and the BOQ goes out from it.",
+    "boq_version_in_progress": "A new version of this BOQ is still a draft. Open the BOQ tab and issue it, then create the contract from it.",
     "boq_needs_delivery": "A BOQ goes out through a delivery, and this project has no single delivery to attach it to. Use the delivery panel on the project page, then issue it.",
     "contract_from_boq_only": "This client has delivery {delivery} on this project, so the execution contract comes from the delivery's BOQ, not from a proposal.",
     "contract_schedule_missing": "The contract has no payment schedule yet. Add the schedule on the Schedule tab, then send the contract.",
