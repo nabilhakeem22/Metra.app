@@ -26,8 +26,10 @@ function useAnsweredCopy(answered: AnsweredReview | null): { headline: string; b
  * stage's label and note from the catalog (`delivery.stage.<key>`). Once the
  * client has ANSWERED the stage's review (./lib/engagements/portal-answered.ts) it
  * says what they did and that the studio is preparing the next step, never the
- * stage's "ready for your approval". Elsewhere it repeats the option the client
- * chose, in the letter saved with that choice. Never a raw state name.
+ * stage's "ready for your approval"; with a fee awaited it says only what they
+ * did, because the next step is not being prepared yet. Elsewhere it repeats the
+ * option the client chose, in the letter saved with that choice. Never a raw
+ * state name.
  *
  * Round C: in progress, it says when the studio expects the next step (when the
  * studio set a date that still holds); delivered, it says on which day.
@@ -50,7 +52,7 @@ export function CalmHero({
   expectedOn: string | null;
   /** When the design was delivered (the newest delivered stage move), or null. */
   deliveredAt: string | null;
-  /** The next step waits on the client's instalment: "nothing to do" would be untrue. */
+  /** The next step waits on the client's instalment: neither "nothing to do" nor "preparing the next step" is true. */
   feeAwaited: boolean;
 }) {
   const t = useTranslations('delivery.hero');
@@ -61,9 +63,12 @@ export function CalmHero({
   const delivered = kind === 'delivered';
   const date = (instant: string) => bidiIsolate(formatDate(instant, locale));
   const deliveredHeadline = delivered && deliveredAt ? t('deliveredOn', { date: date(deliveredAt) }) : null;
-  // In-progress reassures ("nothing to do") unless a fee is awaited; the rest keep the stage note.
   const headline = answeredCopy?.headline ?? deliveredHeadline ?? tStage(`${stageKey}.label`);
-  const body = answeredCopy?.body ?? (kind === 'inProgress' && !feeAwaited ? t('reassurance') : tStage(`${stageKey}.note`));
+  // In-progress reassures ("nothing to do") unless a fee is awaited; the rest keep the stage note.
+  const stageBody = kind === 'inProgress' && !feeAwaited ? t('reassurance') : tStage(`${stageKey}.note`);
+  // Answered with a fee awaited, the fee line under this card says what comes next: no body.
+  const answeredBody = feeAwaited ? null : answeredCopy?.body;
+  const body = answeredCopy ? answeredBody : stageBody;
   // The answered headline of a choice already names the option: say it once.
   const repeatsChoice = chosenLetter && kind !== 'closed' && answered?.kind !== 'conceptChosen';
 
@@ -85,7 +90,7 @@ export function CalmHero({
         </span>
       )}
       <h2 className="text-heading font-semibold">{headline}</h2>
-      <p className="text-body text-muted-foreground">{body}</p>
+      {body && <p className="text-body text-muted-foreground">{body}</p>}
       {kind === 'inProgress' && expectedOn && (
         <p className="flex items-center gap-1.5 text-body font-medium">
           <CalendarClock className="size-4 shrink-0 text-primary" aria-hidden />

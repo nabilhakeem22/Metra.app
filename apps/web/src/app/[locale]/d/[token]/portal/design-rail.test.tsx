@@ -23,6 +23,8 @@ function renderAt(state: DesignState, locale: TestLocale) {
     hero: deriveHero(VERBS[state] ?? [], state),
     paymentSchedule: [],
     paymentClaim: null,
+    designDecision: null,
+    conceptDecision: null,
   });
   return renderWithIntl(<DesignRail view={buildPhaseView(DESIGN_PHASE, location, 'client')} />, { locale });
 }

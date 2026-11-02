@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StepCard } from '@/components/flow/step-card';
 import { clientMoveTone } from '@/lib/client-home/hero';
 import { commandCardChromeForTone } from '@/lib/engagements/command-card-chrome';
+import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { buildPhaseView } from '@/lib/flow/build-view';
 import { awaitedDesignFee, locateDesignForClient, type ClientDesignFacts } from '@/lib/flow/locate/design-client';
 import { DESIGN_PHASE } from '@/lib/flow/phases/design';
@@ -13,8 +14,8 @@ import { DesignRail } from './design-rail';
 import { HeroCard, type HeroLastAnswer, type HeroReview } from './hero-card';
 import { WhatsNext } from './whats-next';
 
-/** What the card reads off the delivery: where it stands, and what its hero reads. */
-type CommandCardFacts = ClientDesignFacts & HeroReview;
+/** What the card reads off the delivery: where it stands, what its hero reads, and whether the page can say how to pay. */
+type CommandCardFacts = ClientDesignFacts & HeroReview & Pick<PublicDelivery, 'paymentDetails'>;
 
 /**
  * The client's command card: the shared step card, read top to bottom every time:
@@ -39,7 +40,9 @@ export function PortalCommandCard({ token, delivery }: { token: string; delivery
 
   const location = locateDesignForClient(delivery);
   const view = buildPhaseView(DESIGN_PHASE, location, 'client');
-  const fee = delivery.hero.kind === 'action' ? null : awaitedDesignFee(delivery);
+  // Read under an open hero too: its approval's confirmation stands from the tap on, before the refresh brings the fee line.
+  const awaitedFee = awaitedDesignFee(delivery);
+  const fee = delivery.hero.kind === 'action' ? null : awaitedFee;
 
   return (
     <StepCard chrome={commandCardChromeForTone(clientMoveTone(location))} rail={<DesignRail view={view} />}>
@@ -51,9 +54,9 @@ export function PortalCommandCard({ token, delivery }: { token: string; delivery
           review={delivery}
           lastAnswer={lastAnswer}
           onAnswered={answered}
-          feeAwaited={fee !== null}
+          feeAwaited={awaitedFee !== null}
         />
-        {fee && <DesignFeeWait kind={fee} />}
+        {fee && <DesignFeeWait kind={fee} canSayHowToPay={delivery.paymentDetails !== null} />}
         <WhatsNext view={view} />
       </div>
     </StepCard>

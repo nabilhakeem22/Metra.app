@@ -121,6 +121,36 @@ describe('the design rail on the real read', () => {
     expect(awaitedDesignFee(answered)).toBe('gate_a');
   });
 
+  it('a change request on file: the fee waits on nobody and the move is the studio\'s, at both reviews, with the gate due (F1)', async () => {
+    const concept = await seedDesignDelivery('h8-concept-changes');
+    await forceState(concept.engagementId, 'concept_review');
+    expect(await respondAsSeen(concept.token, { action: 'request_concept_changes', note: 'More light' })).toMatchObject({ ok: true });
+    const conceptAnswered = await read(concept);
+    expect(conceptAnswered.conceptDecision).toBe('changes_requested');
+    expect(conceptAnswered.paymentSchedule.find((row) => row.milestone_kind === 'gate_a')?.status).toBe('due');
+    expect(awaitedDesignFee(conceptAnswered)).toBeNull();
+    expect(locateDesignForClient(conceptAnswered)).toEqual({ step: 'concept', whoseMove: 'studio', status: 'active' });
+
+    const design = await seedDesignDelivery('h8-design-changes');
+    await forceState(design.engagementId, 'final_approval');
+    expect(await respondAsSeen(design.token, { action: 'request_design_changes', note: 'More light' })).toMatchObject({ ok: true });
+    const designAnswered = await read(design);
+    expect(designAnswered.designDecision?.kind).toBe('changes_requested');
+    expect(designAnswered.paymentSchedule.find((row) => row.milestone_kind === 'gate_b')?.status).toBe('due');
+    expect(awaitedDesignFee(designAnswered)).toBeNull();
+    expect(locateDesignForClient(designAnswered).whoseMove).toBe('studio');
+  });
+
+  it('an approved final design with Gate B due still holds the client\'s move on the fee (F1)', async () => {
+    const d = await seedDesignDelivery('h8-design-approved');
+    await forceState(d.engagementId, 'final_approval');
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toMatchObject({ ok: true });
+    const answered = await read(d);
+    expect(answered.designDecision?.kind).toBe('approved');
+    expect(awaitedDesignFee(answered)).toBe('gate_b');
+    expect(locateDesignForClient(answered).whoseMove).toBe('client');
+  });
+
   it('a finished, a closed and a continued delivery: no step in hand and no fee, the balance still due included', async () => {
     const d = await seedDesignDelivery('h8-ends');
     await forceState(d.engagementId, 'closed_design_only');

@@ -65,13 +65,13 @@ export function HeroCard({
   review: HeroReview;
   lastAnswer: HeroLastAnswer | null;
   onAnswered: (answer: HeroLastAnswer) => void;
-  /** The next step waits on the client's instalment (the calm card then does not say "nothing to do"). */
+  /** The next step waits on the client's instalment: the calm card and an approval's confirmation do not say it is coming. */
   feeAwaited: boolean;
 }) {
   const { clientActions, conceptOptions, conceptChoice, conceptDecision } = review;
   const asked = hero.kind === 'action' ? hero.group : undefined;
   if (lastAnswer && (!asked || asked === lastAnswer.group)) {
-    return <HeroConfirmed group={lastAnswer.group} {...lastAnswer.confirmed} />;
+    return <HeroConfirmed group={lastAnswer.group} {...lastAnswer.confirmed} feeAwaited={feeAwaited} />;
   }
   if (!asked) {
     return (

@@ -3024,6 +3024,9 @@
       "deliveredTag": "تم التسليم",
       "reassurance": "لا حاجة لأي إجراء الآن. تابع هذه الصفحة لمعرفة آخر المستجدات من مصممك.",
       "feeWait": "تبدأ الخطوة التالية بعد سداد {instalment}.",
+      "feeWaitAskDesigner": "اسأل مصممك عن طريقة الدفع.",
+      "approvedFeeWaits": "تم تسجيل موافقتك.",
+      "approvedFeeWaitsNotified": "تم تسجيل موافقتك وإبلاغ مصممك.",
       "answered": {
         "responded": "تم تسجيل ردّك",
         "conceptApproved": "اعتمدتَ التصميم المبدئي",
@@ -3333,6 +3336,7 @@
         "reviewContract": "راجع العقد ووقّعه",
         "reviewChangeOrder": "راجع أمر التغيير",
         "howToPay": "طريقة الدفع",
+        "seePayment": "عرض هذه الدفعة",
         "whatsapp": "راسل {studio} عبر واتساب"
       },
       "lapsedChangeOrders": "{count, plural, zero {لا يوجد أمر تغيير انتهت مهلة الرد عليه.} one {انتهت مهلة الرد على أمر تغيير، وسيتواصل معك {studio} بشأنه.} two {انتهت مهلة الرد على أمرَي تغيير، وسيتواصل معك {studio} بشأنهما.} few {انتهت مهلة الرد على {countText} أوامر تغيير، وسيتواصل معك {studio} بشأنها.} many {انتهت مهلة الرد على {countText} أمر تغيير، وسيتواصل معك {studio} بشأنها.} other {انتهت مهلة الرد على {countText} أمر تغيير، وسيتواصل معك {studio} بشأنها.}}"

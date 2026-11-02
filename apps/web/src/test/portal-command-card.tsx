@@ -26,6 +26,8 @@ export interface CommandCardProps {
   rendersIssuedAt?: PublicDelivery['rendersIssuedAt'];
   paymentSchedule?: PublicDelivery['paymentSchedule'];
   paymentClaim?: PublicDelivery['paymentClaim'];
+  paymentDetails?: PublicDelivery['paymentDetails'];
+  designDecision?: PublicDelivery['designDecision'];
 }
 
 const REFRESH_LABEL = 'land the server refresh';
@@ -61,6 +63,8 @@ export function renderCommandCard(
             stageKey,
             paymentSchedule: props.paymentSchedule ?? [],
             paymentClaim: props.paymentClaim ?? null,
+            paymentDetails: props.paymentDetails ?? null,
+            designDecision: props.designDecision ?? null,
             clientActions: props.clientActions,
             conceptOptions: props.conceptOptions ?? [],
             conceptChoice: props.conceptChoice ?? null,

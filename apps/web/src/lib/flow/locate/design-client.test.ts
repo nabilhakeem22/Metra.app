@@ -35,6 +35,8 @@ function deliveryAt(state: DesignState, heroKind: HeroKind, kind: MilestoneKind 
         ? [{ milestoneKind: kind, amountRemaining: '1000.0000', hasPendingClaim: fee === 'claimed', claimedAt: null }]
         : [],
     },
+    designDecision: null,
+    conceptDecision: null,
   };
 }
 
@@ -143,5 +145,42 @@ describe('awaitedDesignFee', () => {
     const facts = deliveryAt('design_proposal', 'inProgress', 'deposit', 'due');
     const [row] = facts.paymentSchedule;
     expect(awaitedDesignFee({ ...facts, paymentSchedule: [{ ...row, amount_cleared: '400.0000', status: 'partial' }] })).toBe('deposit');
+  });
+
+  describe('with a change request on file at the review stage (functional F1)', () => {
+    const AT = '2026-10-01T09:00:00.000Z';
+
+    it("awaits no fee at the concept review, and the move is the studio's", () => {
+      const facts = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(facts)).toBeNull();
+      expect(locateDesignForClient(facts).whoseMove).toBe('studio');
+    });
+
+    it("awaits no fee at the final approval, and the move is the studio's", () => {
+      const facts = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), designDecision: { kind: 'changes_requested' as const, at: AT } };
+      expect(awaitedDesignFee(facts)).toBeNull();
+      expect(locateDesignForClient(facts).whoseMove).toBe('studio');
+    });
+
+    it.each(['chosen', 'approved'] as const)('still awaits the fee on a concept answer of %s', (conceptDecision) => {
+      const facts = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), conceptDecision };
+      expect(awaitedDesignFee(facts)).toBe('gate_a');
+      expect(locateDesignForClient(facts).whoseMove).toBe('client');
+    });
+
+    it('still awaits the fee on an approved final design', () => {
+      const facts = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), designDecision: { kind: 'approved' as const, at: AT } };
+      expect(awaitedDesignFee(facts)).toBe('gate_b');
+      expect(locateDesignForClient(facts).whoseMove).toBe('client');
+    });
+
+    it('reads each answer only at its own stage: an answer from another stage lifts no gate', () => {
+      const concept = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(concept)).toBe('gate_b');
+      const design = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), designDecision: { kind: 'changes_requested' as const, at: AT } };
+      expect(awaitedDesignFee(design)).toBe('gate_a');
+      const proposal = { ...deliveryAt('design_proposal', 'inProgress', 'deposit', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(proposal)).toBe('deposit');
+    });
   });
 });

@@ -16,6 +16,8 @@ function viewAt(state: DesignState) {
     hero: { kind: 'inProgress', showRomAck: false },
     paymentSchedule: [],
     paymentClaim: null,
+    designDecision: null,
+    conceptDecision: null,
   });
   return buildPhaseView(DESIGN_PHASE, location, 'client');
 }

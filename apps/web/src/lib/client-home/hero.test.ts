@@ -94,6 +94,8 @@ describe('clientMoveTone on the design tab', () => {
         hero: { kind, showRomAck: false },
         paymentSchedule: [],
         paymentClaim: null,
+        designDecision: null,
+        conceptDecision: null,
       }),
     );
 

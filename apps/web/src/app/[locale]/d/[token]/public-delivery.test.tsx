@@ -114,6 +114,7 @@ describe('the fee wait, on the page', () => {
       milestone: { index: 0, allComplete: false, closed: false },
       hero: { kind: 'inProgress', showRomAck: false },
       clientActions: [],
+      paymentDetails: { instapay: 'studio@instapay', bankName: null, bankAccountHolder: null, bankAccountNumber: null, bankIban: null },
     });
     expect(container.querySelector('[data-fee-wait]')).not.toBeNull();
     expect(screen.getByRole('link', { name: messageAt('en', 'delivery.home.act.howToPay') }).getAttribute('href')).toBe('#payments');

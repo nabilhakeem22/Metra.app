@@ -36,7 +36,9 @@ const BUDGET_LINE_KEY = {
  * the letter the client tapped. After the one-tap approve+budget it says how
  * the budget half ended, about the budget alone: confirmed, not recorded
  * because the range changed (confirm the current one once it is on the page),
- * or not saved.
+ * or not saved. An approval whose next step waits on the client's instalment
+ * (`feeAwaited`) says only that it is recorded, never that the next step is
+ * coming: the fee line under this card says what it waits on.
  */
 export function HeroConfirmed({
   group,
@@ -44,6 +46,7 @@ export function HeroConfirmed({
   studioNotified,
   chosenLetter,
   budget,
+  feeAwaited,
 }: {
   group: HeroGroup;
   outcome: HeroOutcome;
@@ -51,11 +54,17 @@ export function HeroConfirmed({
   chosenLetter?: string;
   /** The one-tap approve+budget: how its budget half ended. */
   budget?: BudgetPart;
+  feeAwaited: boolean;
 }) {
+  const tHero = useTranslations('delivery.hero');
   const tGroup = useTranslations(`delivery.hero.${group}`);
   const tDesign = useTranslations('delivery.hero.design');
   const tPicker = useTranslations('delivery.conceptPicker');
   const keys = CONFIRM_KEYS[outcome];
+  const body =
+    outcome === 'approved' && feeAwaited
+      ? tHero(studioNotified ? 'approvedFeeWaitsNotified' : 'approvedFeeWaits')
+      : tGroup(studioNotified ? keys.notified : keys.body);
   return (
     <section className="rounded-panel border border-[color:var(--success)]/30 bg-[color:var(--success-tint)] p-5 text-center shadow-sm">
       <CheckCircle2 className="mx-auto mb-3 size-11 text-[color:var(--success)]" aria-hidden />
@@ -65,9 +74,7 @@ export function HeroConfirmed({
           {tPicker('chosen', { letter: bidiIsolate(chosenLetter) })}
         </p>
       )}
-      <p className="mx-auto mt-2 max-w-xs text-body text-muted-foreground">
-        {tGroup(studioNotified ? keys.notified : keys.body)}
-      </p>
+      <p className="mx-auto mt-2 max-w-xs text-body text-muted-foreground">{body}</p>
       {budget && (
         <p className="mx-auto mt-2 max-w-xs text-body font-medium text-foreground">{tDesign(BUDGET_LINE_KEY[budget])}</p>
       )}
