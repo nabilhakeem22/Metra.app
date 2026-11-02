@@ -69,6 +69,47 @@ describe('clientCodeEmailTemplate', () => {
     }
   });
 
+  describe('a studio name holding URL-like text (H7 S4)', () => {
+    const LURE = 'Pay at https://evil.example/now';
+
+    it('en: says your studio, in both sentences, and holds nothing of the name', () => {
+      const email = render('en', 'claim_request', LURE);
+      expect(email.text).toContain('on your project page with your studio, to confirm');
+      expect(email.text).toContain('ignore this message and tell your studio.');
+      for (const part of [email.subject, email.html, email.text]) expect(part).not.toContain('evil.example');
+    });
+
+    it('ar-EG: says it in the client register, in both sentences, with no Latin punctuation of its own', () => {
+      const email = render('ar-EG', 'claim_request', LURE);
+      expect(email.text).toContain('من صفحة مشروعك مع الاستوديو الخاص بك لتأكيد إبلاغك');
+      expect(email.text).toContain('وأبلغ الاستوديو الخاص بك.');
+      for (const part of [email.subject, email.html, email.text]) expect(part).not.toContain('evil.example');
+      expect(email.text).not.toContain('your studio');
+      expect(email.text.split(HOME).join('')).not.toMatch(/[,;?!]/);
+    });
+
+    it('a link past the cap of the line is still seen', () => {
+      const email = render('en', 'claim_request', `${'s'.repeat(200)} evil.com`);
+      expect(email.text).toContain('with your studio,');
+      expect(email.text).not.toContain('sss');
+    });
+
+    it.each(['ar-EG', 'en'])('%s: the one link stays the client\'s own page', (locale) => {
+      const email = render(locale, 'decide_variation', LURE);
+      expect(hrefsOf(email.html)).toEqual([HOME.replace('&', '&amp;')]);
+      expect(email.text.match(/https?:\/\/\S+/g)).toEqual([HOME]);
+    });
+
+    it.each([
+      ['ar-EG', 'استوديو نون'],
+      ['ar-EG', 'م.أحمد للتصميم'],
+      ['en', 'A.B. Design'],
+      ['en', 'Eng.Ahmed Studio'],
+    ])('%s: an ordinary name stays: %s', (locale, name) => {
+      expect(render(locale, 'claim_request', name).text).toContain(name);
+    });
+  });
+
   it('the studio name is one capped line, escaped', () => {
     const email = render('en', 'claim_request', `<img src=x>\r\nBcc: x${'s'.repeat(300)}`);
     expect(email.html).not.toContain('<img src=x>');

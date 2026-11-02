@@ -9,9 +9,12 @@
 // client's own project page, the page the code is typed into. Every name and
 // number here came from the database (app_home_code_issue_by_token), never
 // from the browser: a link holder must not be able to put words of their own
-// into an email that reaches the client.
+// into an email that reaches the client. Nor a link of a studio's: the studio
+// names itself, and this email goes out under the platform's From, so a name
+// holding URL-like text is not printed (lib/format/url-like.ts).
 import { EMAIL_BRAND } from '@/lib/email/brand';
 import { NAME_MAX_CHARS, oneLine } from '@/lib/format/one-line';
+import { holdsUrlLikeText } from '@/lib/format/url-like';
 import type { CodePurpose } from '@/lib/client-home/code-answers';
 import { escapeHtml } from '@/lib/html/escape';
 import type { EmailContent } from './automation';
@@ -31,6 +34,12 @@ export interface ClientCodeEmailInput {
 /** Ten minutes, as the database's CHECK holds it (client_verification_codes_life). */
 const VALID_MINUTES = 10;
 
+/** The studio as this email says it: one capped line, or "your studio" for a name holding URL-like text. */
+function studioWords(studioName: string, ar: boolean): string {
+  if (holdsUrlLikeText(studioName)) return ar ? 'الاستوديو الخاص بك' : 'your studio';
+  return oneLine(studioName, NAME_MAX_CHARS);
+}
+
 /** What the code is for, in the client's words. */
 function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): string {
   switch (purpose) {
@@ -49,8 +58,7 @@ function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): s
 
 export function clientCodeEmailTemplate(input: ClientCodeEmailInput): EmailContent {
   const ar = input.locale.startsWith('ar');
-  // Studio-typed and unbounded: one capped line before it reaches the body.
-  const studio = oneLine(input.studioName, NAME_MAX_CHARS);
+  const studio = studioWords(input.studioName, ar);
   const purpose = purposeOf(input.purpose, input.documentNumber, ar);
 
   const subject = ar ? `رمز التحقق: ${input.code}` : `Your verification code: ${input.code}`;
