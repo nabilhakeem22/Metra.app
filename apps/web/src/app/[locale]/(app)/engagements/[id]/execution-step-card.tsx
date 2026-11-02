@@ -29,17 +29,17 @@ export type ExecutionStepCardProps = Pick<
 // body names the ONE next action (lib/execution/stage.ts) and offers it, with
 // "Record costs" and "Record measurements" beside it. A client payment claim
 // left on the finished design is still dismissed here, as it was before. While
-// the client owes a payment, or the contract to sign, and has no email on
-// file, one line says they cannot do it online (./no-email-notice.tsx). Once
-// the contract is signed, one line says when and how, and the name an online
-// signer typed.
+// the client owes a payment, the contract to sign or the answer to a change
+// order, and has no email on file, one line says they cannot do it online
+// (./no-email-notice.tsx). Once the contract is signed, one line says when and
+// how, and the name an online signer typed.
 // Composition only: the copy is execution-step-copy.ts, the controls
 // command-card-execution.tsx, the rail execution-phase-rail.tsx.
 export function ExecutionStepCard({ card, execution }: { card: ExecutionStepCardProps; execution: ExecutionCockpit }) {
   const { view, designSummary } = execution;
   const location = locateExecutionForStudio(view.flow);
   const copy = useExecutionStepCopy({ view, location });
-  const noEmailAct = card.clientHasEmail ? null : executionNoEmailAct(view.next, location.whoseMove);
+  const noEmailAct = card.clientHasEmail ? null : executionNoEmailAct(view.next, location.whoseMove, view.flow.issuedChangeOrderCount);
 
   return (
     <StepCard

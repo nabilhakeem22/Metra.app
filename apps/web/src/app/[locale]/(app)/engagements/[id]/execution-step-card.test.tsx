@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import { executionDeliveryStatus } from '@/lib/engagements/delivery-status';
+import { executionNoEmailAct } from '@/lib/engagements/no-email-notice';
 import type { DesignSummary } from '@/lib/engagements/design-summary';
 import { executionCardView, type ExecutionCardView } from '@/lib/execution/card-view';
 import { NEXT_ACTION_TARGET, STAGES_RECORDING_COSTS } from '@/lib/execution/next-action-target';
@@ -10,7 +11,7 @@ import { executionPosition, type ExecutionFlowFacts } from '@/lib/flow/locate/ex
 import { locateExecutionForStudio, STUDIO_TAKE_BACKS, type StudioTakeBack } from '@/lib/flow/locate/execution-studio';
 import { EXECUTION_PHASE } from '@/lib/flow/phases/execution';
 import type { Actor } from '@/lib/flow/types';
-import { executionModels, flowFactsOf } from '@/test/execution-flow-model';
+import { executionModels, flowFactsOf, model } from '@/test/execution-flow-model';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import type { ExecutionCockpit } from './command-card-props';
 import { ExecutionStepCard, type ExecutionStepCardProps } from './execution-step-card';
@@ -468,6 +469,36 @@ describe('the card at execution', () => {
     expect(locateExecutionForStudio(deciding.flow).whoseMove).toBe('client');
     expect(notice(deciding, false)).toBe(messageAt(locale, 'engagements.command.noEmailDecision'));
     expect(notice(deciding, true)).toBeNull();
+  });
+
+  test.each<TestLocale>(['ar-EG', 'en'])('H7 F3: a change order waiting on the client with a live link says so whatever the next action (%s)', (locale) => {
+    const notice = (facts: ExecutionFlowFacts, clientHasEmail = false) => {
+      const { container, unmount } = renderCard(viewOf(facts), { locale, extra: { clientHasEmail } });
+      const text = container.querySelector('[data-no-email-notice]')?.textContent ?? null;
+      unmount();
+      return text;
+    };
+    const decision = messageAt(locale, 'engagements.command.noEmailDecision');
+    const milestoneDue = { nextMilestone: true, balanceLeft: true };
+    const withLiveOrder = flowFactsOf(model({ ...milestoneDue, issuedChangeOrders: 1 }));
+    expect(executionPosition(withLiveOrder).result.next?.kind).toBe('send_milestone_request');
+    expect(locateExecutionForStudio(withLiveOrder).whoseMove).toBe('studio');
+    expect(notice(withLiveOrder)).toBe(decision);
+    expect(notice(withLiveOrder, true)).toBeNull();
+    expect(notice(flowFactsOf(model({ ...milestoneDue, expiredChangeOrders: 1 })))).toBeNull();
+    expect(notice(flowFactsOf(model({ ...milestoneDue, internalChangeOrders: 1 })))).toBeNull();
+    expect(notice(flowFactsOf(model({ issuedChangeOrders: 1, expiredChangeOrders: 1 })))).toBe(decision);
+    expect(notice(flowFactsOf(model({ issuedChangeOrders: 1, requests: [{ kind: 'milestone', state: 'due' }] })))).toBe(messageAt(locale, 'engagements.command.noEmailPayment'));
+  });
+
+  test('H7 F3: over every real fact set, the decision is said exactly while a live order waits, and no payment or signature is said first', () => {
+    for (const { flow, result, whoseMove } of FLOWS) {
+      const act = executionNoEmailAct(result.next, whoseMove, flow.issuedChangeOrderCount);
+      const clientPaysOrSigns = whoseMove === 'client' && (result.next?.kind === 'record_payment' || result.next?.kind === 'record_signed_offline');
+      const liveOrderWaits = flow.issuedChangeOrderCount > 0 && result.next !== null && whoseMove !== null;
+      expect(act === 'decision').toBe(!clientPaysOrSigns && liveOrderWaits);
+      if (result.stage === 'terminated' || result.stage === 'settled') expect(act).toBeNull();
+    }
   });
 
   test.each<TestLocale>(['en', 'ar-EG'])('H6.2 F4: a signed contract says when, how, and the name the client signed with online (%s)', (locale) => {
