@@ -38,22 +38,25 @@ export async function readOpenChangeOrders(rawToken: string): Promise<HomeChange
   return optionalPageRead('client home change orders read failed:', readOpenOrders(rawToken).then((orders) => orders && orders.map(homeChangeOrderOf)));
 }
 
+/** Where an open order stands in its home: on the page, waiting for its contract's signature, or neither. */
+export type OrderStandingInHome = 'shown' | 'waits_for_signature' | 'not_shown';
+
 /**
- * Whether the page of the home behind `rawToken` shows `variation`, known to be
- * open, for a decision now. The page goes by the home's count, which holds a
- * SIGNED contract's orders only (the SQL's money facts), so an order on a
- * contract still awaiting signature is not on the page; and the home stands on
- * one contract, so an order of an older one is not either. Up to the list's cap
- * the count says it all; past it, only the list can say (one more read). A home
- * read that failed is false, logged by its reader; a failed list read throws:
- * the caller decides.
+ * Where `variation`, known to be open, stands in the home behind `rawToken` now.
+ * The page goes by the home's count, which holds a SIGNED contract's orders only
+ * (the SQL's money facts), so an order on a contract still awaiting signature
+ * waits for it; and the home stands on one contract, so an order of an older one
+ * is not on the page at all. Up to the list's cap the count says it all; past it,
+ * only the list can say (one more read). A home read that failed is `not_shown`,
+ * logged by its reader; a failed list read throws: the caller decides.
  */
-export async function homeShowsOpenChangeOrder(rawToken: string, variation: Pick<PublicVariation, 'id' | 'contract_number'>): Promise<boolean> {
+export async function orderStandingInHome(rawToken: string, variation: Pick<PublicVariation, 'id' | 'contract_number'>): Promise<OrderStandingInHome> {
   const read = await getHomeByToken(rawToken);
   const execution = read.status === 'ok' ? read.home.execution : null;
-  if (!execution || execution.openVariationCount === 0 || execution.contract?.number !== variation.contract_number) return false;
-  if (execution.openVariationCount <= OPEN_ORDERS_LISTED) return true;
-  return (await readOpenOrders(rawToken))?.some((order) => order.id === variation.id) ?? false;
+  if (!execution?.contract || execution.contract.number !== variation.contract_number) return 'not_shown';
+  if (execution.openVariationCount === 0) return execution.contract.status === 'issued' ? 'waits_for_signature' : 'not_shown';
+  if (execution.openVariationCount <= OPEN_ORDERS_LISTED) return 'shown';
+  return (await readOpenOrders(rawToken))?.some((order) => order.id === variation.id) ? 'shown' : 'not_shown';
 }
 
 /**

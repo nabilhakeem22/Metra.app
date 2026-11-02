@@ -19,9 +19,12 @@ import { VariationDecisionCard } from './variation-decision-card';
 export function PublicVariationView({
   token,
   variation,
+  waitsForSignature = false,
 }: {
   token: string;
   variation: PublicVariation | null;
+  /** The home says this order's contract is still unsigned (the order's own document cannot). */
+  waitsForSignature?: boolean;
 }) {
   const t = useTranslations('variations.client');
   const locale = useLocale();
@@ -51,6 +54,12 @@ export function PublicVariationView({
   // The order as the page now stands (F2): open, approved (by the client's
   // click too), or closed any other way, which says no days at all.
   const standing = decided ? (decidedKey === 'approved' ? 'approved' : null) : variation.status;
+  // A lapsed order can no longer be decided anywhere online, so it is not sent to the home.
+  const elsewhereNotice = !isOpenForDecision(variation, Date.now())
+    ? t('expired')
+    : waitsForSignature
+      ? t('decideAfterSignature')
+      : t('decideInHome', { studio });
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -95,10 +104,9 @@ export function PublicVariationView({
           </CardContent>
         </Card>
       ) : decidesInClientHome(variation) ? (
-        // A lapsed order can no longer be decided anywhere online, so it is not sent to the home.
         <Card data-decide-in-home>
           <CardContent className="py-6 text-center font-medium">
-            {isOpenForDecision(variation, Date.now()) ? t('decideInHome', { studio }) : t('expired')}
+            {elsewhereNotice}
           </CardContent>
         </Card>
       ) : (

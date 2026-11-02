@@ -16,7 +16,8 @@ import { mintDeliveryLinkToken } from '@/lib/share/delivery-link-token';
 import { hashShareToken } from '@/lib/share/token';
 import { homePayload } from '@/test/client-home-payloads';
 import type { PublicVariation } from '@/lib/variations/public-types';
-import { REDIRECT_LOOKUP_WAIT_MS, variationHomeRedirect } from './redirect';
+import { REDIRECT_LOOKUP_WAIT_MS } from './redirect';
+import { variationLinkLanding } from './redirect-variation';
 
 const ENGAGEMENT = '11111111-1111-4111-8111-111111111111';
 const ORDER = '22222222-2222-4222-8222-222222222222';
@@ -33,6 +34,8 @@ const variationOf = (over: Partial<PublicVariation> = {}) =>
     share_expires_at: new Date(Date.now() + 60_000).toISOString(),
     ...over,
   }) as PublicVariation;
+
+const homePathOf = async (...asked: Parameters<typeof variationLinkLanding>) => (await variationLinkLanding(...asked)).homePath;
 
 function liveHome() {
   const home = mintDeliveryLinkToken(ENGAGEMENT);
@@ -54,13 +57,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('variationHomeRedirect', () => {
+describe('variationLinkLanding, its home path', () => {
   it('the home path in the asked locale, on the order, from the hash of the trimmed token; the target asked by kind', async () => {
     const { home, target } = liveHome();
     sdf.readSdfJson
       .mockResolvedValueOnce({ ...target, focus_id: ORDER.toUpperCase() })
       .mockResolvedValueOnce(homePayload('decide_change_order'));
-    expect(await variationHomeRedirect(` ${V_RAW} `, variationOf(), 'ar-EG')).toBe(`/ar-EG/d/${home.raw}?tab=execution&focus=variation:${ORDER}`);
+    expect(await homePathOf(` ${V_RAW} `, variationOf(), 'ar-EG')).toBe(`/ar-EG/d/${home.raw}?tab=execution&focus=variation:${ORDER}`);
     const [asked] = sdf.readSdfJson.mock.calls[0] as [{ queryChunks: unknown[] }];
     expect(asked.queryChunks).toContain('variation');
     expect(asked.queryChunks).toContain(hashShareToken(V_RAW));
@@ -77,28 +80,28 @@ describe('variationHomeRedirect', () => {
     ['an order of a terminated contract', variationOf({ contractActive: false })],
     ['a window that has closed', variationOf({ share_expires_at: new Date(Date.now() - 1_000).toISOString() })],
   ])('%s is null with no round trip', async (_case, variation) => {
-    expect(await variationHomeRedirect(V_RAW, variation, 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variation, 'en')).toBeNull();
     expect(sdf.readSdfJson).not.toHaveBeenCalled();
   });
 
   it('a blank token is null with no round trip', async () => {
-    expect(await variationHomeRedirect('  ', variationOf(), 'en')).toBeNull();
+    expect(await homePathOf('  ', variationOf(), 'en')).toBeNull();
     expect(sdf.readSdfJson).not.toHaveBeenCalled();
   });
 
   it('no target is null after one read; a home that does not show the order is null after two', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(null);
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(1);
     sdf.readSdfJson.mockReset().mockResolvedValueOnce(liveHome().target).mockResolvedValueOnce(homePayload('decide_change_order'));
-    expect(await variationHomeRedirect(V_RAW, variationOf({ contract_number: 5 }), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf({ contract_number: 5 }), 'en')).toBeNull();
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(2);
     expect(logged).toBe('');
   });
 
   it('a target with no usable focus is the shape error: one constant line, null', async () => {
     sdf.readSdfJson.mockResolvedValue({ ...liveHome().target, focus_id: 'nope' });
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     expect(logged).toBe(JSON.stringify(['documentHomeRedirect: unexpected target shape']));
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(1);
   });
@@ -106,12 +109,40 @@ describe('variationHomeRedirect', () => {
   it('a home link that cannot be re-derived is null, and the home is not asked: no nonce, no secret', async () => {
     const { home, target } = liveHome();
     sdf.readSdfJson.mockResolvedValue({ ...target, token_nonce: null });
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     delete process.env.SHARE_LINK_SECRET;
     sdf.readSdfJson.mockResolvedValue(target);
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(2);
     expect(logged).not.toContain(home.raw);
+  });
+});
+
+describe('an order waiting for its contract to be signed (the lead ruling after the H7 build)', () => {
+  it('the home stands on its contract, unsigned: no path, it waits; two reads and no more', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(liveHome().target).mockResolvedValueOnce(homePayload('sign_contract'));
+    expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({ homePath: null, waitsForSignature: true });
+    expect(sdf.readSdfJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('with the signing window closed it still waits for the signature', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(liveHome().target).mockResolvedValueOnce(homePayload('signing_closed'));
+    expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({ homePath: null, waitsForSignature: true });
+  });
+
+  it('a signed contract, no home, another contract and a failed read do not wait', async () => {
+    const { home, target } = liveHome();
+    sdf.readSdfJson.mockResolvedValueOnce(target).mockResolvedValueOnce(homePayload('decide_change_order'));
+    expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({
+      homePath: `/en/d/${home.raw}?tab=execution&focus=variation:${ORDER}`,
+      waitsForSignature: false,
+    });
+    sdf.readSdfJson.mockReset().mockResolvedValueOnce(null);
+    expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({ homePath: null, waitsForSignature: false });
+    sdf.readSdfJson.mockReset().mockResolvedValueOnce(liveHome().target).mockResolvedValueOnce(homePayload('sign_contract'));
+    expect(await variationLinkLanding(V_RAW, variationOf({ contract_number: 5 }), 'en')).toEqual({ homePath: null, waitsForSignature: false });
+    sdf.readSdfJson.mockReset().mockResolvedValueOnce(liveHome().target).mockRejectedValueOnce(new Error('down'));
+    expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({ homePath: null, waitsForSignature: false });
   });
 });
 
@@ -124,7 +155,7 @@ describe('a lookup that fails or stalls is the link own document', () => {
 
   it('a failed read: null, one redacted line naming the kind and the step', async () => {
     sdf.readSdfJson.mockRejectedValueOnce(failedQuery());
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     expect(logged).toContain('documentHomeRedirect: lookup failed');
     expect(logged).toContain('"kind":"variation"');
     expect(logged).toContain('"step":"target"');
@@ -134,7 +165,7 @@ describe('a lookup that fails or stalls is the link own document', () => {
     logged = '';
     // The home read logs its own failure, redacted, and answers not shown.
     sdf.readSdfJson.mockResolvedValueOnce(liveHome().target).mockRejectedValueOnce(failedQuery());
-    expect(await variationHomeRedirect(V_RAW, variationOf(), 'en')).toBeNull();
+    expect(await homePathOf(V_RAW, variationOf(), 'en')).toBeNull();
     expect(logged).toContain('client home read failed');
     expect(logged).not.toContain(hashShareToken(V_RAW));
   });
@@ -142,7 +173,7 @@ describe('a lookup that fails or stalls is the link own document', () => {
   it('a stalled read: null at the budget of 3.5 s, with DbDeadlineError in the line', async () => {
     vi.useFakeTimers();
     sdf.readSdfJson.mockReturnValue(new Promise(() => {}));
-    const answer = variationHomeRedirect(V_RAW, variationOf(), 'en');
+    const answer = homePathOf(V_RAW, variationOf(), 'en');
     await vi.advanceTimersByTimeAsync(REDIRECT_LOOKUP_WAIT_MS - 1);
     expect(logged).toBe('');
     await vi.advanceTimersByTimeAsync(1);

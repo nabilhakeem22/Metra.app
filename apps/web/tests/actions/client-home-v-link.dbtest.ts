@@ -21,7 +21,8 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
 });
 
 import type { Locale } from '@/i18n/routing';
-import { contractHomeRedirect, variationHomeRedirect } from '@/lib/client-home/redirect';
+import { contractHomeRedirect } from '@/lib/client-home/redirect';
+import { variationLinkLanding } from '@/lib/client-home/redirect-variation';
 import { getContractByToken } from '@/lib/contracts/public';
 import { terminateContractCore } from '@/lib/contracts/lifecycle/terminate';
 import type { OrgContext } from '@/lib/db/context';
@@ -64,7 +65,8 @@ afterAll(async () => {
 const pathOf = (locale: string, homeRaw: string, orderId: string) => `/${locale}/d/${homeRaw}?tab=execution&focus=variation:${orderId}`;
 
 /** The /v page's gate, as it reads: the link's order, then where it leads. */
-const redirectOf = async (raw: string, locale: Locale = 'en') => variationHomeRedirect(raw, await getVariationByToken(raw), locale);
+const landingOf = async (raw: string, locale: Locale = 'en') => variationLinkLanding(raw, await getVariationByToken(raw), locale);
+const redirectOf = async (raw: string, locale: Locale = 'en') => (await landingOf(raw, locale)).homePath;
 
 async function orderOf(contract: Home['contract'], status: 'issued' | 'approved' | 'rejected' = 'issued') {
   const link = mintShareToken();
@@ -170,11 +172,11 @@ describe('every other link shows its own document (AC16, with the H6.3 lessons)'
     expect(await redirectOf(order.raw)).toBeNull();
   });
 
-  it('an order on a contract awaiting its signature stays on /v: the home page lists none until it is signed', async () => {
+  it('an order on a contract awaiting its signature stays on /v and says it waits for the signature: the home page lists none until it is signed', async () => {
     const { home, order, homeRaw } = await liveHome(await seedHome(owner.orgId, 'issued'));
-    expect(await redirectOf(order.raw)).toBeNull();
+    expect(await landingOf(order.raw)).toEqual({ homePath: null, waitsForSignature: true });
     await ownerQuery(`update public.contracts set status = 'signed' where id = $1`, [home.contract.contractId]);
-    expect(await redirectOf(order.raw)).toBe(pathOf('en', homeRaw, order.id));
+    expect(await landingOf(order.raw)).toEqual({ homePath: pathOf('en', homeRaw, order.id), waitsForSignature: false });
   });
 
   it('an order of an older contract stays on /v: the home stands on the newer one', async () => {

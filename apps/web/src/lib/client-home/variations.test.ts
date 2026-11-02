@@ -14,7 +14,7 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => ({
 import { hashShareToken } from '@/lib/share/token';
 import { homePayload } from '@/test/client-home-payloads';
 import { OPTIONAL_READ_WAIT_MS } from './optional-read';
-import { getOpenChangeOrderLines, homeShowsOpenChangeOrder, readOpenChangeOrders } from './variations';
+import { getOpenChangeOrderLines, orderStandingInHome, readOpenChangeOrders } from './variations';
 
 const ORDER = '22222222-2222-4222-8222-222222222222';
 const OTHER = '11111111-1111-4111-8111-111111111111';
@@ -147,7 +147,7 @@ describe('getOpenChangeOrderLines', () => {
   });
 });
 
-describe('homeShowsOpenChangeOrder', () => {
+describe('orderStandingInHome', () => {
   const ON_THE_HOME_CONTRACT = { id: ORDER, contract_number: 4 };
   /** The home's payload counting `open` change orders the client can decide. */
   const homeCounting = (open: number) => {
@@ -156,35 +156,40 @@ describe('homeShowsOpenChangeOrder', () => {
     return home;
   };
 
-  it('counted, on the contract the home stands on: true on the home read alone', async () => {
+  it('counted, on the contract the home stands on: shown, on the home read alone', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(homeCounting(10));
-    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(true);
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('shown');
     expect(sdf.readSdfJson).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(sdf.readSdfJson.mock.calls[0][0])).toContain('app_home_by_token');
   });
 
-  it('an order of another contract of the delivery: false', async () => {
+  it('an order of another contract of the delivery: not shown', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(homeCounting(1));
-    expect(await homeShowsOpenChangeOrder('tok', { id: ORDER, contract_number: 5 })).toBe(false);
+    expect(await orderStandingInHome('tok', { id: ORDER, contract_number: 5 })).toBe('not_shown');
   });
 
-  it('a contract awaiting its signature: the home counts none, so its page lists none', async () => {
+  it('a contract awaiting its signature: the home counts none, so its page lists none, and the order waits', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(homePayload('sign_contract'));
-    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('waits_for_signature');
+  });
+
+  it('a signed contract the home counts none on (lapsed a moment ago): not shown, and not waiting', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(0));
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('not_shown');
   });
 
   it('past the cap of the list, only the list can say', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockResolvedValueOnce({ open: [documentOf()], expired: [], decided: [] });
-    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(true);
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('shown');
     sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockResolvedValueOnce({ open: [documentOf({ id: OTHER })], expired: [], decided: [] });
-    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('not_shown');
   });
 
-  it('a failed home read is false, logged by its reader; a failed list read throws for the caller to decide', async () => {
+  it('a failed home read is not shown, logged by its reader; a failed list read throws for the caller to decide', async () => {
     sdf.readSdfJson.mockRejectedValueOnce(new Error('down'));
-    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
+    expect(await orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).toBe('not_shown');
     expect(logged).toContain('client home read failed');
     sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockRejectedValueOnce(new Error('down'));
-    await expect(homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).rejects.toThrow('down');
+    await expect(orderStandingInHome('tok', ON_THE_HOME_CONTRACT)).rejects.toThrow('down');
   });
 });

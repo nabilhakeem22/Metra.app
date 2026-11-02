@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/routing';
-import { variationHomeRedirect } from '@/lib/client-home/redirect';
+import { variationLinkLanding } from '@/lib/client-home/redirect-variation';
 import { getVariationByToken } from '@/lib/variations/public';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 import { PublicVariationView } from './public-variation';
@@ -30,7 +30,7 @@ export default async function PublicVariationPage({
   const { locale, token } = await params;
   if (!isLocale(locale)) notFound();
   const variation = await getVariationByToken(token);
-  const home = await variationHomeRedirect(token, variation, locale);
-  if (home) redirect(home);
-  return <PublicVariationView token={token} variation={variation} />;
+  const { homePath, waitsForSignature } = await variationLinkLanding(token, variation, locale);
+  if (homePath) redirect(homePath);
+  return <PublicVariationView token={token} variation={variation} waitsForSignature={waitsForSignature} />;
 }

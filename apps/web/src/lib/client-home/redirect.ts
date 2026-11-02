@@ -6,7 +6,7 @@ import 'server-only';
 // token SDF, `app_client_home_target_by_token(kind, hash)`, ONE HMAC re-derive of
 // the home's live link and ONE check that the home shows this document, all
 // through lib/share/sdf-call (no session: the token IS the auth). The raw tokens,
-// the hashes and the ids are never logged.
+// the hashes and the ids are never logged. /v's own question: ./redirect-variation.ts.
 import { sql } from 'drizzle-orm';
 import type { Locale } from '@/i18n/routing';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
@@ -20,11 +20,8 @@ import { rederiveDeliveryLinkToken } from '@/lib/share/delivery-link-token';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
-import { decidesInClientHome, isOpenForDecision } from '@/lib/variations/home-deciding';
-import type { PublicVariation } from '@/lib/variations/public-types';
 import { getHomeContractSections } from './contract';
 import { homeHref } from './tab';
-import { homeShowsOpenChangeOrder } from './variations';
 
 /**
  * How long a document link's request waits for the home before it shows the
@@ -88,7 +85,7 @@ async function homePathShowing(token: string, document: HomeDocument, progress: 
  * REDIRECT_LOOKUP_WAIT_MS is logged once, redacted, and is null: the link's own
  * document, never an error page because of the lookup.
  */
-async function documentHomeRedirect(rawToken: string, document: HomeDocument | null, locale: Locale): Promise<string | null> {
+export async function documentHomeRedirect(rawToken: string, document: HomeDocument | null, locale: Locale): Promise<string | null> {
   const token = normalizeRawToken(rawToken);
   if (!token || !document) return null;
   const progress: LookupProgress = { step: 'target' };
@@ -120,27 +117,6 @@ export function contractHomeRedirect(rawToken: string, contract: PublicContract 
           kind: 'contract',
           focusOf: () => 'contract',
           shownBy: async (homeRaw) => (await getHomeContractSections(homeRaw, contract.id, contract.section_count)) !== null,
-        }
-      : null,
-    locale,
-  );
-}
-
-/**
- * Where an old /v link leads. Only a BOQ contract's change order still awaiting
- * the client's decision, in its window, asks at all (as for /c, security S1), so
- * every other link reads nothing more than on main. The home lists the newest 10
- * orders of its current contract, so an order it does not list stays on /v.
- */
-export function variationHomeRedirect(rawToken: string, variation: PublicVariation | null, locale: Locale): Promise<string | null> {
-  const asks = variation !== null && decidesInClientHome(variation) && isOpenForDecision(variation, Date.now());
-  return documentHomeRedirect(
-    rawToken,
-    asks
-      ? {
-          kind: 'variation',
-          focusOf: ({ focus_id: id }) => (isUuid(id) ? `variation:${id.toLowerCase()}` : null),
-          shownBy: (homeRaw) => homeShowsOpenChangeOrder(homeRaw, variation),
         }
       : null,
     locale,
