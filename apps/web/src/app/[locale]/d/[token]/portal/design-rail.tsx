@@ -9,10 +9,11 @@ import type { PhaseView } from '@/lib/flow/types';
 /**
  * The client's design phase on the shared rail: the six steps in the client's
  * names, never a gate (the view has none for the client). On a phone it is the
- * compact rail: the steps' marks and the current step's name, said once. فصحى copy.
+ * compact rail: the steps' marks and the current step's name, said once. Wider, the
+ * page is still one narrow column, so the names wrap rather than scroll. فصحى copy.
  */
 export function DesignRail({ view }: { view: PhaseView }) {
   const t = useTranslations('delivery.journey');
   const labels = Object.fromEntries(JOURNEY_MILESTONES.map((step) => [step, t(step)]));
-  return <PhaseRail view={view} labels={labels} icons={JOURNEY_STEP_ICON} compactBelowSm />;
+  return <PhaseRail view={view} labels={labels} icons={JOURNEY_STEP_ICON} compactBelowSm wrapNames />;
 }

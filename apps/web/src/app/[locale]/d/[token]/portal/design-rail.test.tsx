@@ -70,4 +70,16 @@ describe('the client design rail', () => {
     expect(labels).toHaveLength(6);
     for (const label of labels) expect(label.className).toContain('[@media(max-width:639.98px)]:sr-only');
   });
+
+  it('wraps each name under its mark rather than scrolling: never one line, never clamped, and no step floor below sm', () => {
+    const { container } = renderAt('survey', 'en');
+    for (const label of container.querySelectorAll('[data-rail-label]')) {
+      expect(label.className).not.toContain('whitespace-nowrap');
+      expect(label.className).not.toContain('line-clamp');
+    }
+    for (const step of container.querySelectorAll('[data-rail-step]')) {
+      expect(step.className).not.toContain('min-w-max');
+      expect(step.className).not.toContain('min-w-[52px]');
+    }
+  });
 });

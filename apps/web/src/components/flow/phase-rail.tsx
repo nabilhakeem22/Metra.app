@@ -20,6 +20,11 @@ import { GateMarker, StepSegment, type StepNote } from './phase-rail-segments';
 // in a phone's card, and a name clipped to "Contr" is one nobody can read. So
 // below sm each step keeps its bar and its mark, its name is left to screen
 // readers, and the CURRENT step's name is said once, in full, under the rail.
+//
+// WRAPPED NAMES (`wrapNames`, the client's design tab): that page is one phone-width
+// column at every viewport, so six names on one line would scroll inside the card
+// on a tablet too. Each step's mark sits above its name, the name wraps at its own
+// words, and a step is never narrower than its longest word.
 
 export type { StepNote } from './phase-rail-segments';
 
@@ -33,6 +38,8 @@ export interface PhaseRailProps {
   notes?: Readonly<Record<string, StepNote>>;
   /** Below the sm breakpoint, the compact rail: marks only, and the current step named once under it. */
   compactBelowSm?: boolean;
+  /** The rail sits in a phone-width column at every viewport: names wrap under their marks and nothing scrolls. */
+  wrapNames?: boolean;
 }
 
 function required<T>(entries: Readonly<Record<string, T>>, key: string, what: string): T {
@@ -42,7 +49,7 @@ function required<T>(entries: Readonly<Record<string, T>>, key: string, what: st
   return entry;
 }
 
-export function PhaseRail({ view, labels, icons, notes, compactBelowSm = false }: PhaseRailProps) {
+export function PhaseRail({ view, labels, icons, notes, compactBelowSm = false, wrapNames = false }: PhaseRailProps) {
   const rail = (
     <ol className="flex items-stretch gap-1.5 overflow-x-auto pb-0.5">
       {view.steps.map((step) => (
@@ -61,6 +68,7 @@ export function PhaseRail({ view, labels, icons, notes, compactBelowSm = false }
             Icon={required(icons, step.key, 'icon')}
             note={notes?.[step.key]}
             compact={compactBelowSm}
+            wrapNames={wrapNames}
           />
         </Fragment>
       ))}

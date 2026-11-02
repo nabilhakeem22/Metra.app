@@ -69,6 +69,7 @@ export function StepSegment({
   Icon,
   note,
   compact,
+  wrapNames,
 }: {
   step: StepView;
   status: SegmentStatus;
@@ -76,18 +77,19 @@ export function StepSegment({
   Icon: LucideIcon;
   note: StepNote | undefined;
   compact: boolean;
+  wrapNames: boolean;
 }) {
   return (
     <li
       data-rail-step
-      className="flex min-w-[52px] flex-[1_1_auto] flex-col gap-1.5 md:min-w-max"
+      className={`flex flex-[1_1_auto] flex-col gap-1.5 ${wrapNames ? '[@media(max-width:639.98px)]:min-w-0' : 'min-w-[52px] md:min-w-max'}`}
       aria-current={status === 'current' ? 'step' : undefined}
     >
       <span className={`h-1 rounded-full ${BAR_CLASS[status]}`} aria-hidden />
       {/* ICONS WHERE THEY MEAN SOMETHING. A step behind the job and the one it
           is on carry their glyph; a step not reached carries a dot, so the eye
           lands on where the icons stop without reading a word. */}
-      <span className={`flex min-w-0 items-start gap-1.5 ${LABEL_CLASS[status]}`}>
+      <span className={`flex min-w-0 items-start ${wrapNames ? 'flex-col gap-1' : 'gap-1.5'} ${LABEL_CLASS[status]}`}>
         {status === 'done' || status === 'current' ? (
           <Icon className="size-[13px] shrink-0" aria-hidden />
         ) : (
@@ -96,10 +98,10 @@ export function StepSegment({
         {/* One line from md up: each step takes the width its own name needs
             (flex basis auto). On a phone it may wrap to two lines rather than
             truncate: a clipped name is one nobody can read. The type size never
-            shrinks to make it fit. */}
+            shrinks to make it fit. `wrapNames`: never one line, and no clamp. */}
         <span
           data-rail-label
-          className={`line-clamp-2 min-w-0 text-caption leading-tight md:line-clamp-none md:whitespace-nowrap ${compact ? COMPACT_HIDDEN : ''}`}
+          className={`min-w-0 text-caption leading-tight ${wrapNames ? '' : 'line-clamp-2 md:line-clamp-none md:whitespace-nowrap'} ${compact ? COMPACT_HIDDEN : ''}`}
           title={label}
         >
           {label}
