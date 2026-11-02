@@ -90,8 +90,6 @@ export async function createEngagementCore(
       const titleEn = typedAnyTitle ? typedTitleEn : clean(project.nameEn);
       if (!titleAr && !titleEn) failFields({ title: { code: 'engagement_title_required' } });
 
-      await assertProjectHasDeliverySlot(tx, projectId);
-
       const number = await allocateNumber(
         tx,
         ctx.orgId,
@@ -100,10 +98,11 @@ export async function createEngagementCore(
         'number',
       );
 
-      // The INSERT can still race the read-guard above: two concurrent creates on
-      // an empty project both pass the read, both allocate a number, then contend
-      // on the one-active-per-project unique index (0032); `refusals` answers the
-      // loser.
+      // After the number's per-org lock: that is what serialises a create against
+      // a light insert (lib/client-home/ensure.ts), so each reads the other's row.
+      // A refusal spends nothing: a number is max+1.
+      await assertProjectHasDeliverySlot(tx, { projectId, clientId });
+
       const [row] = await tx
         .insert(designEngagements)
         .values({

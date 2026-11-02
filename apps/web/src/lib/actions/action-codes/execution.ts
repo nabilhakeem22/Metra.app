@@ -12,7 +12,16 @@ export type ExecutionActionCode =
   | 'contract_terminated'
   // The BOQ cannot be re-issued while a live contract stands on it.
   | 'boq_has_contract'
-  | 'delivery_not_in_execution'
+  // Execution starts only once design has finished on the pair's one delivery
+  // (lib/engagements/design-first.ts); these two carry {delivery, deliveryId}.
+  | 'design_open'
+  | 'design_only_closed'
+  // The BOQ is not on the delivery whose link would show its contract.
+  | 'boq_not_on_home'
+  // A BOQ goes out through a delivery, and the project has no single one to use.
+  | 'boq_needs_delivery'
+  // The pair has a delivery: its contract comes from that BOQ, not from a proposal.
+  | 'contract_from_boq_only'
   // Issuing a BOQ contract needs a schedule that adds up.
   | 'contract_schedule_missing'
   | 'contract_schedule_invalid'

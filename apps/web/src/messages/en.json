@@ -638,7 +638,7 @@
     "ending_requires_explicit_choice": "Choose the ending yourself: design-only handover or client will build.",
     "firm_type_unavailable": "That firm type is not available yet. Choose Interior fit-out to continue.",
     "project_delivery_exists": "This project already has an active delivery. Open it to continue.",
-    "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another.",
+    "project_client_has_delivery": "This client already has delivery {delivery} on this project, and one link for it. Continue from it: extra work is a change order, new work is a new project.",
     "phone_required": "A phone number is required. Write one so the studio can reach them.",
     "start_date_required": "A start date is required. Pick the day the project starts.",
     "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
@@ -675,7 +675,11 @@
     "contract_terminated": "This contract was terminated, so it has no client page to open. Refresh the page to see its current state.",
     "boq_not_issued": "This BOQ is not issued, or a newer version replaced it. Issue the BOQ first, then generate the contract.",
     "boq_has_contract": "A contract stands on the issued BOQ, so it cannot be replaced. Record later changes as change orders.",
-    "delivery_not_in_execution": "The delivery has not reached execution yet. Choose execution as its ending first, then generate the contract.",
+    "design_open": "Design is still open on delivery {delivery}. Finish it with the client and choose execution there, then come back here.",
+    "design_only_closed": "Delivery {delivery} closed as design only. If the client wants to build, open it and tap \"Continue to execution\". The contract will appear on the client's same link.",
+    "boq_not_on_home": "This BOQ does not belong to the client's current delivery, so its contract would not appear on their link. Issue a new version of the BOQ, then create the contract.",
+    "boq_needs_delivery": "A BOQ goes out through a delivery, and this project has no single delivery to attach it to. Use the delivery panel on the project page, then issue it.",
+    "contract_from_boq_only": "This client has delivery {delivery} on this project, so the execution contract comes from the delivery's BOQ, not from a proposal.",
     "contract_schedule_missing": "The contract has no payment schedule yet. Add the schedule on the Schedule tab, then send the contract.",
     "contract_schedule_invalid": "The payment schedule does not add up, or mixes percentages with amounts. Use one kind for every row and make the rows add up exactly.",
     "schedule_too_long": "A payment schedule can have at most 12 rows. Merge some of them, then save.",
@@ -1663,6 +1667,9 @@
     "stageDesc": "Alert owners and admins about overdue and upcoming project stages."
   },
   "contracts": {
+    "designFirst": {
+      "openDelivery": "Open delivery {delivery}"
+    },
     "title": "Contracts",
     "subtitle": "Generated from accepted proposals. Issue for the client's electronic acknowledgement.",
     "pagerLabel": "Contract pages",
@@ -2249,8 +2256,6 @@
       "heading": "Design delivery",
       "lightHeading": "Client page of the execution contract",
       "open": "Open delivery",
-      "extend": "Start extension",
-      "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
       "none": "No delivery started for this project yet."
     },
     "state": {
@@ -2290,6 +2295,7 @@
       "chooseDesignOnly": "Close as design-only",
       "chooseExecution": "Proceed to execution",
       "recipientAcknowledges": "Confirm handoff received",
+      "continueToExecution": "Continued to execution after design",
       "abandon": "Abandon delivery"
     },
     "phase": {
@@ -2371,6 +2377,12 @@
       "crumbLabel": "Where this delivery sits",
       "startedOn": "Started {date}",
       "feeChip": "Design fee {amount}",
+      "continueExecution": {
+        "cta": "Continue to execution",
+        "note": "If the client decides to build, continue from here. They stay on the same link.",
+        "confirmTitle": "Is the client building?",
+        "confirmBody": "The delivery moves to execution on the client's same link, and you create the contract from the BOQ next. This can't be undone."
+      },
       "ending": {
         "headline": "Choose how this delivery ends",
         "hint": "Record the client's decision. Both endings are final.",
@@ -2380,7 +2392,7 @@
         "chooseDesignOnly": {
           "cta": "Design-only handover",
           "confirmTitle": "Hand over the design only?",
-          "confirmBody": "The shop drawings are released to the client and the delivery moves to handover. This can't be undone."
+          "confirmBody": "The shop drawings are released to the client and the delivery moves to handover. If the client decides to build after confirming receipt, you can continue to execution from this delivery."
         },
         "chooseExecution": {
           "cta": "Client will build",

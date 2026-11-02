@@ -1,25 +1,24 @@
 // The client home behind an execution contract: the delivery whose link /d
 // shows the contract's Execution tab, and that link. `ensureClientHomeCore` is
-// what the contract page's "Client page" control runs (and, from a later step,
-// the contract's issue): it finds the home, creating a LIGHT delivery when the
-// contract's BOQ has none behind it, and hands back the home's live link.
+// what the contract page's "Client page" control and the contract's issue run:
+// it finds the pair's one delivery, creating a LIGHT one only when the pair has
+// none, and hands back its live link.
 //
-// THE HOME IS FOUND BY ITS CLIENT TOO (H3 security S2 and the index ruling): a
-// delivery owns only its own client's BOQs (app_delivery_boqs), so a light
-// delivery is the one of (project, client), the unique index
-// design_engagements_one_light_per_project_client, and the BOQ's client is the
-// one the light delivery is born for.
+// THE HOME IS FOUND BY ITS CLIENT TOO (H3 security S2): a delivery owns only its
+// own client's BOQs (app_delivery_boqs), so the pair is the BOQ's project and
+// client, and the BOQ's client is the one a light delivery is born for. A pair
+// has one delivery, so one link (lib/engagements/design-first.ts): a light
+// delivery is never born beside a design one.
 import { boqs, contracts, designEngagements, projects, type MetraDb } from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import { ActionError, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { readLiveDeliveryLink } from '@/lib/engagements/share-reveal';
-import { mintFirstDeliveryLink, renewLapsedDeliveryLink } from '@/lib/engagements/share';
+import { requireDesignFinished, type ProjectClient } from '@/lib/engagements/pair-home';
 import { isUuid } from '@/lib/uuid';
+import { homeLiveLink } from './home-live-link';
 import { requireHomeShows } from './home-shows';
-import type { ClientHomeLink, ClientHomeLinkReason } from './types';
+import type { ClientHomeLink } from './types';
 
 /** The home, whether its client can get a code, and its live link (the RAW token, never logged) or why the studio cannot be shown one. */
 type ClientHome = { engagementId: string; clientHasEmail: boolean } & ClientHomeLink;
@@ -31,9 +30,6 @@ type ClientHome = { engagementId: string; clientHasEmail: boolean } & ClientHome
  * always theirs to see.
  */
 export const CLIENT_HOME_GATE = { capability: 'contracts_issue', action: 'approve', flow: 'interior' } as const;
-
-/** How the home's link came to be handed back, for the audit row. */
-type LinkIssued = 'shown' | 'minted' | 'renewed';
 
 /** The contract statuses a client home shows, and so the ones it is made for. */
 const HOME_CONTRACT_STATUSES: ReadonlySet<string> = new Set(['issued', 'signed']);
@@ -59,32 +55,18 @@ async function loadContractBoq(tx: MetraDb, contractId: string) {
   );
 }
 
-/** The light delivery of (project, client), or null. */
-async function findLightHome(tx: MetraDb, projectId: string, clientId: string): Promise<string | null> {
-  const [row] = await tx
-    .select({ id: designEngagements.id })
-    .from(designEngagements)
-    .where(
-      and(
-        eq(designEngagements.projectId, projectId),
-        eq(designEngagements.clientId, clientId),
-        eq(designEngagements.entryPhase, 'execution'),
-      ),
-    )
-    .limit(1);
-  return row?.id ?? null;
-}
-
 /**
- * Insert the light delivery: born at `execution` with entry_phase
- * 'execution', titled with the project's names. A concurrent call that won the
- * (org, project, client) slot first leaves this insert with no row (ON
- * CONFLICT DO NOTHING on that unique index, after allocateNumber's per-org
- * lock has serialised both), and its row is the home.
+ * The light delivery of a pair with none: born at `execution` with entry_phase
+ * 'execution', titled with the project's names. allocateNumber's per-org lock
+ * serialises this against a create and against another light insert, and the
+ * gate read after it sees whichever won: its home is the answer, its open design
+ * the refusal.
  */
-async function insertLightHome(tx: MetraDb, ctx: OrgContext, projectId: string, clientId: string): Promise<{ id: string; created: boolean }> {
-  const project = await requireInOrg(tx, projects, projectId, { nameAr: projects.nameAr, nameEn: projects.nameEn }, 'record_not_found');
+async function insertLightHome(tx: MetraDb, ctx: OrgContext, pair: ProjectClient): Promise<{ id: string; created: boolean }> {
+  const project = await requireInOrg(tx, projects, pair.projectId, { nameAr: projects.nameAr, nameEn: projects.nameEn }, 'record_not_found');
   const number = await allocateNumber(tx, ctx.orgId, 'design_engagement', 'design_engagements', 'number');
+  const gate = await requireDesignFinished(tx, pair);
+  if (gate.kind === 'home') return { id: gate.delivery.id, created: false };
   const [row] = await tx
     .insert(designEngagements)
     .values({
@@ -92,53 +74,23 @@ async function insertLightHome(tx: MetraDb, ctx: OrgContext, projectId: string, 
       number,
       titleAr: project.nameAr,
       titleEn: project.nameEn,
-      clientId,
-      projectId,
+      clientId: pair.clientId,
+      projectId: pair.projectId,
       state: 'execution',
       entryPhase: 'execution',
     })
-    .onConflictDoNothing({
-      target: [designEngagements.orgId, designEngagements.projectId, designEngagements.clientId],
-      where: sql`entry_phase = 'execution'`,
-    })
     .returning({ id: designEngagements.id });
-  if (row) return { id: row.id, created: true };
-  const winner = await findLightHome(tx, projectId, clientId);
-  if (winner === null) fail('client_home_unavailable');
-  return { id: winner, created: false };
-}
-
-/** The link-reveal refusals that leave the home without a link to hand back. */
-const UNSHOWN_LINK: ReadonlySet<string> = new Set(['delivery_links_not_configured', 'delivery_link_unrecoverable']);
-
-/**
- * The home's live link, re-derived. A home with no live link gets one: its
- * first, or a fresh one in place of a link that has lapsed (the client's old
- * link is dead anyway). A link written meanwhile by someone else is
- * `engagement_state_conflict` (try again: it is then the live one).
- */
-async function homeLink(tx: MetraDb, engagementId: string): Promise<ClientHomeLink & { issued: LinkIssued | null }> {
-  try {
-    return { link: (await readLiveDeliveryLink(tx, engagementId)).raw, issued: 'shown' };
-  } catch (error) {
-    if (!(error instanceof ActionError)) throw error;
-    if (UNSHOWN_LINK.has(error.code)) return { link: null, linkReason: error.code as ClientHomeLinkReason, issued: null };
-    if (error.code !== 'delivery_link_not_shared') throw error;
-  }
-  const minted = await mintFirstDeliveryLink(tx, engagementId);
-  if (minted !== null) return { link: minted, issued: 'minted' };
-  const renewed = await renewLapsedDeliveryLink(tx, engagementId);
-  if (renewed === null) fail('engagement_state_conflict');
-  return { link: renewed, issued: 'renewed' };
+  return { id: row.id, created: true };
 }
 
 /**
- * The client home of one BOQ contract, issued or signed. The home is the
- * delivery the BOQ was generated for, else the light delivery of the BOQ's
- * project and client, else a new light delivery. Its link is the live one,
- * minted or renewed when it has none (homeLink); when it cannot be shown,
- * `link` is null and `linkReason` says why. CLIENT_HOME_GATE. Audited on the
- * delivery as an `issue`, as the share cores are.
+ * The client home of one BOQ contract, issued or signed. Refused while design
+ * runs or stands closed on the pair (`design_open`, `design_only_closed`). The
+ * home is the delivery the BOQ was generated for, else the pair's home, else a
+ * new light delivery. Its link is the live one, minted or renewed when it has
+ * none (homeLiveLink); when it cannot be shown, `link` is null and `linkReason`
+ * says why. CLIENT_HOME_GATE. Audited on the delivery as an `issue`, as the
+ * share cores are.
  */
 export async function ensureClientHomeCore(
   ctx: OrgContext,
@@ -149,10 +101,12 @@ export async function ensureClientHomeCore(
     // The id as the database answers it (lower case), so the home's contract compares equal.
     const contractId = input.contractId.toLowerCase();
     const boq = await loadContractBoq(tx, contractId);
-    const existing = boq.engagementId ?? (await findLightHome(tx, boq.projectId, boq.clientId));
-    const home = existing ? { id: existing, created: false } : await insertLightHome(tx, ctx, boq.projectId, boq.clientId);
+    const pair = { projectId: boq.projectId, clientId: boq.clientId };
+    const gate = await requireDesignFinished(tx, pair);
+    const existing = boq.engagementId ?? (gate.kind === 'home' ? gate.delivery.id : null);
+    const home = existing ? { id: existing, created: false } : await insertLightHome(tx, ctx, pair);
     const { clientHasEmail } = await requireHomeShows(tx, home.id, contractId);
-    const { issued, ...link } = await homeLink(tx, home.id);
+    const { issued, ...link } = await homeLiveLink(tx, home.id);
     await audit({
       entity: 'design_engagement',
       entityId: home.id,

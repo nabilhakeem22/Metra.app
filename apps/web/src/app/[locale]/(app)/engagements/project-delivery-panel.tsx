@@ -15,26 +15,20 @@ import { StateBadge } from './state-badge';
 
 /**
  * The through-project entry point to a Delivery (Slice C2 + C2-hardening). Rendered
- * on the project overview from the serialized `delivery` summary + `deliveryCount`
- * (the project's COUNTED deliveries: abandoned and light ones are not), and what
- * it offers is lib/engagements/project-delivery-offer.ts:
- *   (a) an ACTIVE delivery -> "Open delivery" (its DE number + stage badge), no CTA
- *       (a project holds at most one in-flight delivery);
- *   (b) no counted delivery yet (none at all, or only a terminal light or
- *       abandoned one) -> "Start delivery" (opens the locked create form);
- *   (c) a TERMINAL delivery and one counted -> "Open delivery" (the terminal
- *       one) + a "Start extension" CTA (the SAME locked create form — original +
- *       one extension);
- *   (d) the cap used -> "Open delivery", no CTA, and the at-limit note.
+ * on the project overview from the serialized `delivery` summary, and what it
+ * offers is lib/engagements/project-delivery-offer.ts:
+ *   (a) a delivery of this client that is not abandoned -> "Open delivery" (its DE
+ *       number + stage badge), no CTA: a client on a project has one delivery;
+ *   (b) none, an abandoned one, or a finished one of another client -> "Start
+ *       delivery" (opens the locked create form).
  * A light delivery is headed as the client page of the execution contract,
  * never as a design delivery.
  * `clientId`/`projectId` fix the locked form; the create path is the SAME
  * `createEngagement` action, so the interior entitlement + capability gates still
- * fire server-side and the cap is re-checked atomically there.
+ * fire server-side and the one-delivery rule is re-checked there.
  */
 export function ProjectDeliveryPanel({
   delivery,
-  deliveryCount,
   clientId,
   projectId,
   projectName,
@@ -42,7 +36,6 @@ export function ProjectDeliveryPanel({
   highlighted = false,
 }: {
   delivery: ProjectDeliverySummary | null;
-  deliveryCount: number;
   clientId: string;
   projectId: string;
   /** The project's names: an untitled delivery takes them (the form prefills them). */
@@ -66,8 +59,7 @@ export function ProjectDeliveryPanel({
       ).value
     : '';
 
-  const offer = projectDeliveryOffer(delivery, deliveryCount);
-  // The locked create form powers both "Start delivery" and "Start extension" — one C2 create path.
+  const offer = projectDeliveryOffer(delivery, clientId);
   const canCreate = canStartDelivery && offer.create !== null;
 
   return (
@@ -97,9 +89,6 @@ export function ProjectDeliveryPanel({
             ) : (
               <p className="mt-1 text-body text-muted-foreground">{t('none')}</p>
             )}
-            {offer.atLimit && (
-              <p className="mt-1 text-caption text-muted-foreground">{t('atLimit')}</p>
-            )}
           </div>
         </div>
 
@@ -115,7 +104,7 @@ export function ProjectDeliveryPanel({
           {canCreate && (
             <Button variant={delivery ? 'secondary' : 'default'} onClick={() => setCreating(true)}>
               <Plus className="size-4" aria-hidden />
-              {offer.create === 'extend' ? t('extend') : tStart('startDelivery')}
+              {tStart('startDelivery')}
             </Button>
           )}
         </div>
