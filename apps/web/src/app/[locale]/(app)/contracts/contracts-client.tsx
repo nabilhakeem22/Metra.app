@@ -3,12 +3,14 @@
 import { FileSignature, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition, type ReactNode } from 'react';
+import { DesignFirstLink } from '@/components/contracts/design-first-link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { generateContract } from '@/lib/contracts/actions';
+import { designFirstTargetOf, type DesignFirstTarget } from '@/lib/engagements/design-first';
 import type { ContractListRow } from '@/lib/contracts/queries';
 import { ContractsGeneratePicker, type Generatable } from './contracts-generate-picker';
 import { ContractsTable } from './contracts-table';
@@ -32,9 +34,11 @@ export function ContractsClient({
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refusedFor, setRefusedFor] = useState<DesignFirstTarget | null>(null);
 
   function generate(proposalId: string) {
     setError(null);
+    setRefusedFor(null);
     startTransition(async () => {
       try {
         const res = await generateContract(proposalId);
@@ -43,6 +47,7 @@ export function ContractsClient({
           router.push(`/contracts/${res.data}`);
         } else {
           setError(describeFailure(res, te));
+          setRefusedFor(designFirstTargetOf(res));
         }
       } catch (rejection) {
         setError(describeRejection(rejection, te));
@@ -64,9 +69,12 @@ export function ContractsClient({
       </div>
 
       {error && (
-        <p className="text-body text-destructive" role="alert">
-          {error}
-        </p>
+        <div>
+          <p className="text-body text-destructive" role="alert">
+            {error}
+          </p>
+          <DesignFirstLink target={refusedFor} />
+        </div>
       )}
 
       {picking && (

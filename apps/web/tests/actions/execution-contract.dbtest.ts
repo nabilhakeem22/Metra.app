@@ -128,7 +128,8 @@ describe('AC3: which BOQ may be contracted', () => {
     const early = await seedBoq(orgId, { deliveryState: 'boq' });
     expect(await generateExecutionContractCore(owner, { boqId: early.boqId, ...CHARGES })).toEqual({
       ok: false,
-      error: 'delivery_not_in_execution',
+      error: 'design_open',
+      params: { delivery: expect.stringMatching(/^DE-\d{4}-\d{4}$/), deliveryId: early.engagementId },
     });
     const standalone = await seedBoq(orgId, { deliveryState: null });
     expect(await generateExecutionContractCore(owner, { boqId: standalone.boqId, ...CHARGES })).toMatchObject({ ok: true });

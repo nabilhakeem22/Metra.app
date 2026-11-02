@@ -3,12 +3,12 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
-import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractPageDetail, ContractSectionsPage } from '@/lib/contracts/queries';
 import type { ContractScheduleView } from '@/lib/contracts/schedule/queries';
 import type { VariationListRow } from '@/lib/variations/queries';
+import { ContractActionError, contractFailureOf, contractRejectionOf, type ContractActionFailure } from './contract-action-error';
 import { ContractOverview } from './contract-overview';
 import { ContractTabStrip } from './contract-tab-strip';
 import type { ContractAction, VariationChargeRates } from './contract-vo-types';
@@ -77,12 +77,12 @@ export function ContractDetailClient({
   const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
   const [shared, setShared] = useState<SharedLink | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ContractActionFailure | null>(null);
 
   const m = (v: string) => formatMoney(v, locale);
 
   const act: ContractAction = (fn) => {
-    setError(null);
+    setFailure(null);
     startTransition(async () => {
       try {
         const res = await fn();
@@ -90,17 +90,17 @@ export function ContractDetailClient({
           setShared((current) => sharedLinkOf(res) ?? current);
           router.refresh();
         } else {
-          setError(describeFailure(res, te));
+          setFailure(contractFailureOf(res, te));
         }
       } catch (rejection) {
-        setError(describeRejection(rejection, te));
+        setFailure(contractRejectionOf(rejection, te));
       }
     });
   };
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-body text-destructive" role="alert">{error}</p>}
+      <ContractActionError failure={failure} />
       {shared && <ShareLinkCard shared={shared} />}
 
       <ContractTabStrip tabs={tabs} current={tab} onSelect={setTab} />

@@ -1,7 +1,8 @@
 // Design-Engagement Machine — the edges that LEAVE the handoff_execution phase
-// (`execution_decision`, `design_only_handoff`; see phases.ts). A trigger is filed
-// by the phase of its SOURCE state. These are the two endings and the
-// acknowledgement that closes the design-only one. PURE, CLIENT-SAFE DATA.
+// (`execution_decision`, `design_only_handoff`, `closed_design_only`; see phases.ts).
+// A trigger is filed by the phase of its SOURCE state. These are the two endings,
+// the acknowledgement that closes the design-only one, and the way a closed
+// design-only delivery goes on to execution. PURE, CLIENT-SAFE DATA.
 import { ENDING_DECIDERS } from '../trigger-roles';
 import type { TransitionDef } from '../types';
 
@@ -32,6 +33,18 @@ export const HANDOFF_EXECUTION_EDGES = {
   },
   chooseExecution: {
     from: 'execution_decision',
+    to: 'execution',
+    guards: ['balanceCleared'],
+    sideEffect: null,
+    capability: 'engagements_design',
+    decidedBy: ENDING_DECIDERS,
+  },
+  // Design first, one link (owner ruling, Nov 2 2026): the client who took the
+  // design only and later decides to build continues on the SAME row, so the same
+  // link. The one edge that leaves a terminal state; the studio decides, as with
+  // the endings, and the client's consent is signing the contract.
+  continueToExecution: {
+    from: 'closed_design_only',
     to: 'execution',
     guards: ['balanceCleared'],
     sideEffect: null,

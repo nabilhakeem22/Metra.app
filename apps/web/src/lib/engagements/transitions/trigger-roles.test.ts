@@ -5,9 +5,11 @@ import { TRANSITIONS, type Trigger } from './index';
 import { ENDING_DECIDERS, roleMayFire } from './trigger-roles';
 
 const ENDINGS: Trigger[] = ['chooseDesignOnly', 'chooseExecution'];
+/** The endings, and the way on from a closed design-only one (owner ruling, Nov 2 2026). */
+const DECIDED: Trigger[] = [...ENDINGS, 'continueToExecution'];
 
 describe('who may choose how a delivery ends (owner decision, Oct 6)', () => {
-  it.each(ENDINGS)('%s: owner, admin and project_manager may; every other role may not', (trigger) => {
+  it.each(DECIDED)('%s: owner, admin and project_manager may; every other role may not', (trigger) => {
     const allowed = MEMBER_ROLES.filter((role) => canRunTrigger(role, trigger));
     expect([...allowed].sort()).toEqual(['admin', 'owner', 'project_manager']);
     for (const role of ['site_engineer', 'accountant', 'client', 'viewer'] as const) {
@@ -20,7 +22,7 @@ describe('who may choose how a delivery ends (owner decision, Oct 6)', () => {
     const restricted = (Object.keys(TRANSITIONS) as Trigger[]).filter(
       (trigger) => TRANSITIONS[trigger].decidedBy !== undefined,
     );
-    expect(restricted.sort()).toEqual([...ENDINGS].sort());
+    expect(restricted.sort()).toEqual([...DECIDED].sort());
     for (const trigger of restricted) expect(TRANSITIONS[trigger].decidedBy).toBe(ENDING_DECIDERS);
   });
 });

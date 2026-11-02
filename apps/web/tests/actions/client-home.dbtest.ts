@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadEngagementDetail } from '@/app/[locale]/(app)/engagements/[id]/engagement-detail-data';
 import { contractPayloadHash } from '@/lib/contracts/public';
 import type { PublicContract } from '@/lib/contracts/public-types';
-import { countProjectDeliveries, getEngagementByProject } from '@/lib/engagements/queries/by-project';
+import { getEngagementByProject } from '@/lib/engagements/queries/by-project';
 import { executionCardFactsOf, type StagedContract } from '@/lib/execution/flow-facts';
 import { executionFlowSourceOf } from '@/lib/execution/flow-source';
 import { getContractPageExecution, getExecutionFacts } from '@/lib/execution/queries/facts';
@@ -393,7 +393,5 @@ describe('the light delivery: found by its project everywhere a delivery finds i
     expect(detail?.header.state).toBe('execution');
     expect(detail?.execution?.contract).toMatchObject({ id: light.contract.contractId, status: 'issued' });
     expect(await getEngagementByProject(owner, light.delivery.projectId)).toMatchObject({ id: light.delivery.id, state: 'execution' });
-    // Ruling D14: a light delivery is not counted toward the project delivery cap.
-    expect(await countProjectDeliveries(owner, light.delivery.projectId)).toBe(0);
   });
 });

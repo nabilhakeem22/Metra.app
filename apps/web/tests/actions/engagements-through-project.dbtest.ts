@@ -152,14 +152,14 @@ describe('one-delivery-per-project guard (Slice C2)', () => {
     expect(await deliveryCount(projectId)).toBe(1);
   });
 
-  it('a project whose only delivery is terminal can start a fresh one', async () => {
+  it('a project whose only delivery was abandoned can start a fresh one', async () => {
     const { ctx, clientId, projectId } = await setup();
     const first = await createEngagementCore(ctx, {
       titleEn: 'Old',
       clientId,
       projectId,
     });
-    await setTerminal(idOf(first as { data?: string }), 'execution');
+    await setTerminal(idOf(first as { data?: string }), 'abandoned');
 
     const fresh = await createEngagementCore(ctx, {
       titleEn: 'New',

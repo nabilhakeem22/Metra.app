@@ -25,6 +25,7 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 const actions = vi.hoisted(() => ({
   chooseDesignOnly: vi.fn(),
   chooseExecution: vi.fn(),
+  continueToExecution: vi.fn(),
   recordPayment: vi.fn(),
   logPaymentAndAdvance: vi.fn(),
   confirmPaymentClaim: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('./trigger-actions', () => ({
   DIRECT_TRIGGER_ACTIONS: {
     chooseDesignOnly: actions.chooseDesignOnly,
     chooseExecution: actions.chooseExecution,
+    continueToExecution: actions.continueToExecution,
     abandon: actions.abandon,
   },
 }));
@@ -338,6 +340,10 @@ describe('a closed delivery', () => {
     expect(link('execution.card.next.open_boq')?.getAttribute('href')).toContain('/projects/p-1?tab=boq');
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: ar('engagements.command.nudge') })).toBeNull();
+    // AC16: the execution card replaces the closed one, and the endings never render here.
+    expect(button('engagements.command.ending.chooseDesignOnly.cta')).toBeNull();
+    expect(button('engagements.command.ending.chooseExecution.cta')).toBeNull();
+    expect(button('engagements.command.continueExecution.cta')).toBeNull();
   });
 
   test('closed_design_only and abandoned say how they ended, with no links', () => {
@@ -361,6 +367,44 @@ describe('a closed delivery', () => {
     actorName: 'Client',
     createdAt: '2026-06-01T00:00:00.000Z',
   };
+
+  describe('continuing a closed design-only delivery (AC16)', () => {
+    const continueCta = () => button('engagements.command.continueExecution.cta');
+
+    test('the note and the button, for a role that may fire it', () => {
+      renderWithIntl(<EngagementCommandCard {...closedProps('closed_design_only', { secondaryTriggers: ['continueToExecution'] })} />);
+      expect(screen.getByText(ar('engagements.command.continueExecution.note'))).toBeTruthy();
+      expect(continueCta()).toBeTruthy();
+    });
+
+    test('nothing for any other role, and nothing on an abandoned delivery', () => {
+      const { unmount } = renderWithIntl(<EngagementCommandCard {...closedProps('closed_design_only')} />);
+      expect(continueCta()).toBeNull();
+      expect(screen.queryByText(ar('engagements.command.continueExecution.note'))).toBeNull();
+      unmount();
+      renderWithIntl(<EngagementCommandCard {...closedProps('abandoned')} />);
+      expect(continueCta()).toBeNull();
+    });
+
+    test('Cancel fires nothing; confirming fires it once', async () => {
+      actions.continueToExecution.mockResolvedValue({ ok: true });
+      renderWithIntl(<EngagementCommandCard {...closedProps('closed_design_only', { secondaryTriggers: ['continueToExecution'] })} />);
+      fireEvent.click(continueCta()!);
+      const dialog = await screen.findByRole('alertdialog');
+      expect(dialog.textContent).toContain(ar('engagements.command.continueExecution.confirmTitle'));
+      expect(dialog.textContent).toContain(ar('engagements.command.continueExecution.confirmBody'));
+      fireEvent.click(within(dialog).getByRole('button', { name: ar('engagements.command.ending.cancel') }));
+      await waitForDialogToClose();
+      expect(actions.continueToExecution).not.toHaveBeenCalled();
+
+      fireEvent.click(continueCta()!);
+      const again = await screen.findByRole('alertdialog');
+      fireEvent.click(within(again).getByRole('button', { name: ar('engagements.command.continueExecution.cta') }));
+      await act(async () => {});
+      expect(actions.continueToExecution).toHaveBeenCalledTimes(1);
+      expect(actions.continueToExecution.mock.calls[0][0]).toBe(closedProps('closed_design_only').engagementId);
+    });
+  });
 
   test('a pending claim on a closed delivery can be dismissed, only after a confirm', async () => {
     actions.dismissPaymentClaim.mockResolvedValue({ ok: true });

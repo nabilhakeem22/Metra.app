@@ -14,7 +14,7 @@ import { THREED_APPROVAL_EDGES } from './edges/threed-approvals';
 import type { TransitionDef, Trigger } from './types';
 
 /**
- * The registry. All 19 triggers are wired: the happy path runs created -> … ->
+ * The registry. All 20 triggers are wired: the happy path runs created -> … ->
  * execution / closed_design_only, `abandon` is the guard-less off-ramp,
  * `rejectDesign` bounces the design back to negotiation, and
  * `designChangeRaised` sends the 3D back for a revision.

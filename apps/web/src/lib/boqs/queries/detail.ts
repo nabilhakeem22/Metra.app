@@ -4,7 +4,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 import { formatDocNumber } from '@/lib/format/doc-number';
-import type { BoqDetail, BoqLineRow } from './types';
+import type { BoqDetail, BoqLineRow, ProjectBoq } from './types';
 
 const pick = (ar: string | null, en: string | null) => ar ?? en ?? '';
 
@@ -49,7 +49,7 @@ export async function readBoqDetail(
   tx: MetraDb,
   boqId: string,
   opts: { showCost: boolean },
-): Promise<BoqDetail | null> {
+): Promise<ProjectBoq | null> {
   const [boq] = await tx.select().from(boqs).where(eq(boqs.id, boqId)).limit(1);
   if (!boq) return null;
 
@@ -69,6 +69,8 @@ export async function readBoqDetail(
 
   return {
     id: boq.id,
+    clientId: boq.clientId,
+    engagementId: boq.engagementId,
     number: boq.number,
     documentNumber: formatDocNumber('BQ', boq.number, new Date(boq.createdAt).getUTCFullYear()),
     version: boq.version,

@@ -8,7 +8,7 @@ import type { ClientReleaseKey } from '../client-release';
 import type { GuardKey } from '../guards';
 import type { DesignState } from '../states';
 
-/** The 19 lifecycle triggers. Order is documentation, not a contract. */
+/** The 20 lifecycle triggers. Order is documentation, not a contract. */
 export type Trigger =
   | 'submitDesignFee'
   | 'confirmAndPayDeposit'
@@ -26,6 +26,7 @@ export type Trigger =
   | 'chooseDesignOnly'
   | 'recipientAcknowledges'
   | 'chooseExecution'
+  | 'continueToExecution'
   | 'rejectDesign'
   | 'designChangeRaised'
   | 'abandon';

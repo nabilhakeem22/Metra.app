@@ -4,7 +4,7 @@ import { ensureClientHomeCore } from '@/lib/client-home/ensure';
 import { getHomeByToken } from '@/lib/client-home/read';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
-import { countProjectDeliveries, getDeliveriesByProjects, getEngagementByProject } from '@/lib/engagements/queries/by-project';
+import { getDeliveriesByProjects, getEngagementByProject } from '@/lib/engagements/queries/by-project';
 import { getEngagementHeader } from '@/lib/engagements/queries/header';
 import { getExecutionFacts } from '@/lib/execution/queries/facts';
 import { hashShareToken } from '@/lib/share/token';
@@ -16,9 +16,9 @@ import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 // Client home H4.3 (AC26 to AC28 through the app): ensureClientHomeCore finds
 // the home of a BOQ contract, creating ONE light delivery per (project, client)
 // when no delivery stands behind the BOQ, and hands back its live link; the
-// link opens the Execution tab on the contract. Light deliveries do not count
-// toward the project's delivery cap (ruling D14). And the home reader against
-// the real token SDF (H4.1).
+// link opens the Execution tab on the contract. A light delivery is the pair's
+// one delivery, so nothing starts beside it. And the home reader against the real
+// token SDF (H4.1).
 
 const SECRET = 'h4-share-link-secret-0123456789abcdef0123456789';
 const orgIds: string[] = [];
@@ -226,26 +226,19 @@ describe('ensureClientHomeCore: the link (AC27)', () => {
 });
 
 describe('the light delivery in the studio (AC28, ruling D14)', () => {
-  it('stands on the contract it was made for, and is not counted toward the project delivery cap', async () => {
+  it('stands on the contract it was made for, and is the pair\'s one delivery', async () => {
     const contract = await seedExecutionContract(orgId, { state: 'issued' });
     const home = await ensured(owner, contract.contractId);
     expect((await getExecutionFacts(owner, home.engagementId)).contract).toMatchObject({ id: contract.contractId, status: 'issued' });
     // The cockpit header says so too, so it folds no design into a summary line (H4 follow-up F2).
     expect(await getEngagementHeader(owner, home.engagementId)).toMatchObject({ state: 'execution', entryPhase: 'execution' });
-    expect(await countProjectDeliveries(owner, contract.projectId)).toBe(0);
     // The project panel knows it for the client page it is, never a design delivery (H4 follow-up F3).
     expect(await getEngagementByProject(owner, contract.projectId)).toMatchObject({ id: home.engagementId, entryPhase: 'execution' });
     expect((await getDeliveriesByProjects(owner, [contract.projectId]))[contract.projectId]).toMatchObject({ entryPhase: 'execution' });
-    for (let index = 0; index < 2; index += 1) {
-      const created = await createEngagementCore(owner, { clientId: contract.clientId, projectId: contract.projectId, titleEn: `Design ${String(index)}` });
-      expect(created.ok).toBe(true);
-      await tamper(`update public.design_engagements set state = 'closed_design_only' where id = $1`, [(created as { data?: string }).data]);
-    }
-    expect(await countProjectDeliveries(owner, contract.projectId)).toBe(2);
-    expect(await createEngagementCore(owner, { clientId: contract.clientId, projectId: contract.projectId, titleEn: 'Third' })).toMatchObject({
+    expect(await createEngagementCore(owner, { clientId: contract.clientId, projectId: contract.projectId, titleEn: 'Design' })).toMatchObject({
       ok: false,
       error: 'check_fields',
-      fields: { projectId: { code: 'project_delivery_limit_reached' } },
+      fields: { projectId: { code: 'project_client_has_delivery' } },
     });
   });
 });

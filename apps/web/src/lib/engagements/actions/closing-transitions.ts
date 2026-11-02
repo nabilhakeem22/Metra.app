@@ -74,6 +74,24 @@ export async function chooseExecution(
 }
 
 /**
+ * Server-action wrapper for the `continueToExecution` transition:
+ * closed_design_only -> execution, on the same row and so the same client link.
+ * The `balanceCleared` guard requires the balance installment fully paid. No
+ * side-effect, no payload. Revalidates the shell on success — never throws.
+ */
+export async function continueToExecution(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'continueToExecution',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
  * Server-action wrapper for the `recipientAcknowledges` transition (tail
  * wiring): design_only_handoff -> closed_design_only (terminal). The
  * `handoffAcknowledged` guard requires one `handoff_acknowledgement` event (the

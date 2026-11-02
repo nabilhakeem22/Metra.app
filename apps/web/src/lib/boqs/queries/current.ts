@@ -4,7 +4,7 @@ import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 import { readBoqDetail } from './detail';
-import type { BoqDetail } from './types';
+import type { ProjectBoq } from './types';
 
 /** The header columns the "current BOQ" readers need, and nothing heavier. */
 export interface CurrentBoqRow {
@@ -46,7 +46,7 @@ export async function getProjectBoq(
   ctx: OrgContext,
   projectId: string,
   opts: { showCost: boolean },
-): Promise<BoqDetail | null> {
+): Promise<ProjectBoq | null> {
   return withOrgContext(ctx, async (tx) => {
     const current = await selectCurrentProjectBoq(tx, projectId);
     return current ? readBoqDetail(tx, current.id, opts) : null;
