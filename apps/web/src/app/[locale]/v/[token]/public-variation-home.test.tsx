@@ -41,12 +41,21 @@ beforeEach(() => respondToVariation.mockReset());
 
 /** The ruled copy, word for word: a change to it is a change the lead rules on. */
 const SIGNATURE_FIRST: Record<TestLocale, string> = {
-  en: 'The contract must be signed first. After that, you can decide on this change order.',
+  en: 'The contract must be signed first. After that, you can decide on this variation order.',
   'ar-EG': 'يجب توقيع العقد أولًا، وبعد توقيعه يمكنك اتخاذ قرارك بشأن أمر التغيير.',
 };
 
 /** The words of decideInHome that send the client to ask the studio: the signature state must not hold them. */
 const ASK_YOUR_STUDIO: Record<TestLocale, string> = { en: 'Ask ', 'ar-EG': 'اطلب من' };
+
+describe('the English notices name the document as the page heading does (H7 F5)', () => {
+  it.each(['decideInHome', 'decideAfterSignature'])('%s says variation order, never change order', (key) => {
+    const heading = messageAt('en', 'variations.client.heading').toLowerCase();
+    expect(heading).toBe('variation order');
+    expect(messageAt('en', `variations.client.${key}`)).toContain(heading);
+    expect(messageAt('en', `variations.client.${key}`)).not.toContain('change order');
+  });
+});
 
 describe.each<TestLocale>(['ar-EG', 'en'])('legacy /v of a BOQ order (%s)', (locale) => {
   const at = (key: string) => messageAt(locale, `variations.client.${key}`);

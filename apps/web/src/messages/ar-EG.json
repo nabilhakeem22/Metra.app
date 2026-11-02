@@ -3354,7 +3354,7 @@
         "signed": "موقَّع",
         "terminated": "منتهٍ"
       },
-      "value": "قيمة العقد",
+      "value": "قيمة العقد الأصلية",
       "signedOn": "التوقيع",
       "signedVia": {
         "online": "{date}، إلكترونيًا",

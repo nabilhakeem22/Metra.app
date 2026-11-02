@@ -2198,8 +2198,8 @@
       "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
       "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it.",
       "heading": "Variation order",
-      "decideInHome": "Decisions on this change order are now made from your page with {studio}. Ask {studio} for the link to your page to review it and record your decision there.",
-      "decideAfterSignature": "The contract must be signed first. After that, you can decide on this change order."
+      "decideInHome": "Decisions on this variation order are now made from your page with {studio}. Ask {studio} for the link to your page to review it and record your decision there.",
+      "decideAfterSignature": "The contract must be signed first. After that, you can decide on this variation order."
     },
     "timeExtension": {
       "label": "Days added to the finish date",
@@ -3354,7 +3354,7 @@
         "signed": "Signed",
         "terminated": "Ended"
       },
-      "value": "Contract value",
+      "value": "Original contract value",
       "signedOn": "Signed",
       "signedVia": {
         "online": "{date}, online",

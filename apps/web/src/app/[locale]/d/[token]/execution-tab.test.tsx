@@ -188,6 +188,27 @@ describe('the sections (H4 notes: change orders the client can no longer answer)
   });
 });
 
+describe('the contract card names its figure for what it is (H7 F1)', () => {
+  // The figure stays the frozen original once change orders are approved, so the
+  // label must be true in every state. The revised value comes in C2.
+  const LABEL: Record<TestLocale, string> = { en: 'Original contract value', 'ar-EG': 'قيمة العقد الأصلية' };
+
+  it.each<[TestLocale, ClientExecutionReason]>([
+    ['en', 'sign_contract'],
+    ['en', 'decide_change_order'],
+    ['en', 'works_in_progress'],
+    ['en', 'terminated'],
+    ['ar-EG', 'sign_contract'],
+    ['ar-EG', 'decide_change_order'],
+    ['ar-EG', 'works_in_progress'],
+    ['ar-EG', 'terminated'],
+  ])('%s, %s: the original value, under the words that say so', (locale, reason) => {
+    const { container } = show(locale, homeOf(reason));
+    const label = [...container.querySelectorAll('#contract dt')].find((term) => term.textContent === LABEL[locale]);
+    expect(label?.nextElementSibling?.textContent).toContain('114,000');
+  });
+});
+
 describe.each<TestLocale>(['ar-EG', 'en'])('the contract card once the signing window has closed (%s, H4 follow-up F1)', (locale) => {
   it('says signing closed in the studio-move tone, as the hero does, and offers nothing to sign, only to read it (H6.2)', () => {
     show(locale, homeOf('signing_closed'));
