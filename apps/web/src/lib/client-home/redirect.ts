@@ -21,6 +21,7 @@ import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import { getHomeContractSections } from './contract';
+import { LINK_DOCUMENT_WAIT_MS } from './optional-read';
 import { homeHref } from './tab';
 
 /**
@@ -28,7 +29,7 @@ import { homeHref } from './tab';
  * link's own document (reliability M1): a stalled lookup must not hold the page
  * for the database's whole deadline, or take it down.
  */
-export const REDIRECT_LOOKUP_WAIT_MS = 3_500;
+export const REDIRECT_LOOKUP_WAIT_MS = LINK_DOCUMENT_WAIT_MS;
 
 /** The home that owns the document, as the SQL answers it. */
 interface HomeTarget {

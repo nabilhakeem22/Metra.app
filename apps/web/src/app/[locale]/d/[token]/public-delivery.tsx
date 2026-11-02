@@ -1,7 +1,8 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { HomeFocus } from '@/lib/client-home/tab';
+import { homeHref, type HomeFocus } from '@/lib/client-home/tab';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
 import { deliveryDisplayNames, deliveryReference } from '@/lib/engagements/public/display-names';
 import { HomeTabs } from './home-tabs';
@@ -52,7 +53,7 @@ export function PublicDeliveryView({
 
   if (read.status !== 'ok') {
     const notice = read.status === 'read_failed' ? 'readFailed' : 'notFound';
-    return <DeliveryNotice notice={notice} token={token} locale={locale} />;
+    return <DeliveryNotice notice={notice} switchHref={homeHref(tokenPathSegment(token), null)} locale={locale} />;
   }
 
   const { delivery } = read;

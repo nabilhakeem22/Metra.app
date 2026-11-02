@@ -35,6 +35,9 @@ const CLIENT_CONTRACT = ['portal.contract.lines', 'portal.contract.schedule', 'p
 /** What the client change-order components (components/client-change-order) read, on /v and in the client home. */
 const CLIENT_CHANGE_ORDER = ['portal.changeOrder'];
 
+/** What a document link's page (/c, /v) reads when its document could not be read: the client home's notice, with its mark ('app') beside it in each list. */
+const READ_FAILED_NOTICE = ['delivery.language', 'delivery.readFailed'];
+
 export const CLIENT_NAMESPACES = {
   /** app/[locale]/layout.tsx: the landing page and anything not scoped below. */
   root: ['app'],
@@ -54,13 +57,13 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/invite: accepting a team invitation. */
   invite: ['accept', 'app', ...INVITE_ERRORS],
   /** app/[locale]/c: the client's contract link. */
-  contractLink: ['contracts.ack', ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
+  contractLink: ['app', 'contracts.ack', ...READ_FAILED_NOTICE, ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/d: the client's delivery page. */
   deliveryLink: ['app', 'delivery', ...CLIENT_CHANGE_ORDER, ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/p: the client's proposal link. */
   proposalLink: ['portal.errors', 'portal.units', 'proposals.p'],
   /** app/[locale]/v: the client's variation link. */
-  variationLink: [...CLIENT_CHANGE_ORDER, 'portal.errors', 'variations.client'],
+  variationLink: ['app', ...READ_FAILED_NOTICE, ...CLIENT_CHANGE_ORDER, 'portal.errors', 'variations.client'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type MessageScope = keyof typeof CLIENT_NAMESPACES;

@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/routing';
+import { linkDocumentRead } from '@/lib/client-home/optional-read';
 import { variationLinkLanding } from '@/lib/client-home/redirect-variation';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getVariationByToken } from '@/lib/variations/public';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
+import { DeliveryNotice } from '../../d/[token]/portal/delivery-notice';
 import { PublicVariationView } from './public-variation';
 
 // Tokenized share link — single-use, private to the recipient. Never index it.
@@ -22,6 +25,9 @@ export const metadata: Metadata = PRIVATE_METADATA;
 // refresh tag). A gate in a layout does not help either: Next renders a
 // segment's layout and page in parallel, so the page's whole change order would
 // ride in the 307's body.
+// The order's own read is bounded and caught: one that failed or stalled says
+// nothing about the link, so it renders the client home's "refresh" notice,
+// never Next's raw error screen; a null answer stays the invalid-link page.
 export default async function PublicVariationPage({
   params,
 }: {
@@ -29,8 +35,9 @@ export default async function PublicVariationPage({
 }) {
   const { locale, token } = await params;
   if (!isLocale(locale)) notFound();
-  const variation = await getVariationByToken(token);
-  const { homePath, waitsForSignature } = await variationLinkLanding(token, variation, locale);
+  const read = await linkDocumentRead('public variation read failed:', getVariationByToken(token));
+  if (!read) return <DeliveryNotice notice="readFailed" switchHref={`/v/${tokenPathSegment(token)}`} locale={locale} />;
+  const { homePath, waitsForSignature } = await variationLinkLanding(token, read.document, locale);
   if (homePath) redirect(homePath);
-  return <PublicVariationView token={token} variation={variation} waitsForSignature={waitsForSignature} />;
+  return <PublicVariationView token={token} variation={read.document} waitsForSignature={waitsForSignature} />;
 }

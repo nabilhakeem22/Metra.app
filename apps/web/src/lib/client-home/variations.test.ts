@@ -11,6 +11,7 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => ({
   readSdfJson: sdf.readSdfJson,
 }));
 
+import type { PublicContractLine } from '@/lib/contracts/public-types';
 import { hashShareToken } from '@/lib/share/token';
 import { homePayload } from '@/test/client-home-payloads';
 import { OPTIONAL_READ_WAIT_MS } from './optional-read';
@@ -129,9 +130,9 @@ describe('getOpenChangeOrderLines', () => {
 
   it('the order lines by their order, as contract lines: no item code, not provisional; the id compared lower case', async () => {
     answerWith(documentOf());
-    const lines = await getOpenChangeOrderLines('tok', ORDER.toUpperCase());
-    expect(lines?.map((line) => line.id)).toEqual(['l-2', 'l-1']);
-    expect(lines?.[0]).toMatchObject({ item_code: null, provisional: false, line_total: '10000.0000' });
+    const lines = (await getOpenChangeOrderLines('tok', ORDER.toUpperCase())) as PublicContractLine[];
+    expect(lines.map((line) => line.id)).toEqual(['l-2', 'l-1']);
+    expect(lines[0]).toMatchObject({ item_code: null, provisional: false, line_total: '10000.0000' });
   });
 
   it('an order the list does not hold, or a link that shows none: null', async () => {

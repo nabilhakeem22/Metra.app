@@ -1,6 +1,7 @@
 'use client';
 
-import type { HomeTab } from '@/lib/client-home/tab';
+import { homeHref, type HomeTab } from '@/lib/client-home/tab';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { LanguageSwitch } from './language-switch';
 import { StudioContact } from './studio-contact';
@@ -46,7 +47,7 @@ export function StudioBar({
           deliveryRef={deliveryRef}
           phase={tab === 'execution' ? 'execution' : 'design'}
         />
-        <LanguageSwitch token={token} locale={locale} tab={tab} />
+        <LanguageSwitch href={homeHref(tokenPathSegment(token), tab)} locale={locale} />
       </div>
     </header>
   );
