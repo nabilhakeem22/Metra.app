@@ -7,7 +7,7 @@ import {
   setBoqDiscountCore,
   updateBoqLineCore,
 } from '@/lib/boqs/edit';
-import { getProjectBoq } from '@/lib/boqs/queries';
+import { getBoqTabDocument } from '@/lib/boqs/queries';
 import { createClientCore } from '@/lib/clients/core';
 import { createCostItemCore } from '@/lib/price-book/core';
 import { listClients } from '@/lib/clients/queries';
@@ -84,7 +84,7 @@ async function setup(): Promise<{
 }
 
 const read = (ctx: OrgContext, projectId: string) =>
-  getProjectBoq(ctx, projectId, { showCost: true });
+  getBoqTabDocument(ctx, projectId, { showCost: true, canBuild: false }).then((document) => document.boq);
 
 describe('editing a draft BOQ', () => {
   it('re-rolls the section subtotal and the document total on every write', async () => {
@@ -378,7 +378,7 @@ describe('M12: a zero cost on the sheet takes the catalogue rate', () => {
       ],
     });
 
-    const boq = await getProjectBoq(ctx, project.id, { showCost: true });
+    const { boq } = await getBoqTabDocument(ctx, project.id, { showCost: true, canBuild: false });
     const lines = boq!.sections[0].lines;
     // Zero on the sheet -> the catalogue rate, so the line is not margin-blind.
     expect(lines[0].unitCost).toBe('900.0000');

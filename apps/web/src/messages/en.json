@@ -675,9 +675,10 @@
     "contract_terminated": "This contract was terminated, so it has no client page to open. Refresh the page to see its current state.",
     "boq_not_issued": "This BOQ is not issued, or a newer version replaced it. Issue the BOQ first, then generate the contract.",
     "boq_has_contract": "A contract stands on the issued BOQ, so it cannot be replaced. Record later changes as change orders.",
-    "design_open": "Design is still open on delivery {delivery}. Finish it with the client and choose execution there, then come back here.",
+    "design_open": "Design is still open on delivery {delivery}. Finish it with the client from the delivery page, then come back here.",
     "design_only_closed": "Delivery {delivery} closed as design only. If the client wants to build, open it and tap \"Continue to execution\". The contract will appear on the client's same link.",
-    "boq_not_on_home": "This BOQ does not belong to the client's current delivery, so its contract would not appear on their link. Issue a new version of the BOQ, then create the contract.",
+    "boq_not_on_home": "This BOQ does not belong to the client's current delivery, so its contract would not appear on their link. Tap \"New version\" on this page and issue it, then create the contract.",
+    "boq_delivery_abandoned": "The delivery behind this BOQ was abandoned. Start a new delivery from the project page, and the BOQ goes out from it.",
     "boq_needs_delivery": "A BOQ goes out through a delivery, and this project has no single delivery to attach it to. Use the delivery panel on the project page, then issue it.",
     "contract_from_boq_only": "This client has delivery {delivery} on this project, so the execution contract comes from the delivery's BOQ, not from a proposal.",
     "contract_schedule_missing": "The contract has no payment schedule yet. Add the schedule on the Schedule tab, then send the contract.",
@@ -1367,6 +1368,7 @@
         "issuedStepWaits": "BOQ issued and published to the client. An owner, admin or accountant completes the BOQ step.",
         "issueNoEngagement": "This project has no single active engagement to deliver through",
         "issueBlockedByContract": "The issued BOQ has a contract. Changes now go through change orders.",
+        "newVersion": "New version",
         "statusIssued": "Issued",
         "statusDraft": "Draft",
         "find": "Find a line",
@@ -2295,7 +2297,6 @@
       "chooseDesignOnly": "Close as design-only",
       "chooseExecution": "Proceed to execution",
       "recipientAcknowledges": "Confirm handoff received",
-      "continueToExecution": "Continued to execution after design",
       "abandon": "Abandon delivery"
     },
     "phase": {
@@ -2385,7 +2386,7 @@
       },
       "ending": {
         "headline": "Choose how this delivery ends",
-        "hint": "Record the client's decision. Both endings are final.",
+        "hint": "Record the client's decision. Execution can't be undone. Design only can still continue to execution after the client confirms receipt.",
         "cancel": "Not yet",
         "decidedBy": "An owner, admin or project manager chooses how this delivery ends.",
         "designOnlyCloses": "Upload the handover files first: when the client confirms receipt, this delivery closes.",

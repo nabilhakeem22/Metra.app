@@ -65,23 +65,25 @@ export function designFirstRefusal(gate: ExecutionGate): DesignFirstRefusal | nu
   return { code: gate.kind, params: designFirstTargetFor(gate.delivery) };
 }
 
-/** A contract from this BOQ would appear on the pair's one link. */
-function boqIsOnHome(gate: ExecutionGate, boq: { engagementId: string | null }): boolean {
-  if (gate.kind === 'no_delivery') return boq.engagementId === null;
-  if (gate.kind !== 'home') return false;
-  return boq.engagementId === gate.delivery.id || (boq.engagementId === null && gate.delivery.entryPhase === 'execution');
+/** A contract from this BOQ would appear on the home's link. */
+function boqIsOnHome(home: PairDelivery, boq: { engagementId: string | null }): boolean {
+  return boq.engagementId === home.id || (boq.engagementId === null && home.entryPhase === 'execution');
 }
 
 /**
  * May a contract be generated from this BOQ? Only when the gate is `home` and
  * the BOQ is that row's, or when the BOQ has no delivery and the pair has none
- * or a light one (old rows only). Null when it may.
+ * or a light one (old rows only). Null when it may. At `home` the way on is a new
+ * version on this page (`boq_not_on_home`); with every delivery abandoned there is
+ * no home to version onto, so it is a new delivery (`boq_delivery_abandoned`).
  */
 export function contractFromBoqRefusal(
   gate: ExecutionGate,
   boq: { engagementId: string | null },
-): DesignFirstRefusal | { code: 'boq_not_on_home' } | null {
-  return designFirstRefusal(gate) ?? (boqIsOnHome(gate, boq) ? null : { code: 'boq_not_on_home' });
+): DesignFirstRefusal | { code: 'boq_not_on_home' | 'boq_delivery_abandoned' } | null {
+  if (gate.kind === 'no_delivery') return boq.engagementId === null ? null : { code: 'boq_delivery_abandoned' };
+  if (gate.kind !== 'home') return designFirstRefusal(gate);
+  return boqIsOnHome(gate.delivery, boq) ? null : { code: 'boq_not_on_home' };
 }
 
 const TARGET_CODES: ReadonlySet<string> = new Set(['design_open', 'design_only_closed', 'contract_from_boq_only']);

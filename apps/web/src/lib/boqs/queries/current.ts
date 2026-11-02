@@ -1,10 +1,6 @@
 import 'server-only';
 import { boqs, type MetraDb } from '@metra/db';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
-import type { OrgContext } from '@/lib/db/context';
-import { withOrgContext } from '@/lib/db/context';
-import { readBoqDetail } from './detail';
-import type { ProjectBoq } from './types';
 
 /** The header columns the "current BOQ" readers need, and nothing heavier. */
 export interface CurrentBoqRow {
@@ -39,16 +35,4 @@ export async function selectCurrentProjectBoq(
     .orderBy(desc(sql`(${boqs.status} = 'issued')`), asc(boqs.createdAt))
     .limit(1);
   return row ?? null;
-}
-
-/** The project's current BOQ in full, or null. */
-export async function getProjectBoq(
-  ctx: OrgContext,
-  projectId: string,
-  opts: { showCost: boolean },
-): Promise<ProjectBoq | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const current = await selectCurrentProjectBoq(tx, projectId);
-    return current ? readBoqDetail(tx, current.id, opts) : null;
-  });
 }

@@ -10,6 +10,7 @@ import type { BoqDetail } from '@/lib/boqs/queries';
 import type { DesignFirstRefusal } from '@/lib/engagements/design-first';
 import { BoqCostedCopy } from './boq-costed-copy';
 import { BoqIssue } from './boq-issue';
+import { BoqNewVersion } from './boq-new-version';
 import { BoqSheet } from './boq-sheet';
 
 /** What an issued BOQ offers for execution: its contract, or to create one. */
@@ -18,7 +19,9 @@ export interface BoqExecution {
   /** May generate an execution contract (`contracts_generate` create). */
   canGenerate: boolean;
   /** Why no Create button: the sentence and the link replace it. Null when none. */
-  refusal: DesignFirstRefusal | { code: 'boq_not_on_home' } | null;
+  refusal: DesignFirstRefusal | { code: 'boq_not_on_home' | 'boq_delivery_abandoned' } | null;
+  /** May start a new version: a role that builds BOQs, no live contract, at the pair's home. */
+  canStartVersion: boolean;
 }
 
 /** Why an issued BOQ cannot become a contract yet, and where to go next. */
@@ -77,12 +80,14 @@ export function BoqTabSheet({
   const te = useTranslations('errors');
   return (
     <BoqSheet
+      key={boq.id}
       boq={boq}
       canEdit={canEdit}
       actions={(shown) => (
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
           {boq.status === 'issued' && <BoqExecutionAction execution={execution} boqId={boq.id} />}
+          {boq.status === 'issued' && execution.canStartVersion && <BoqNewVersion boqId={boq.id} />}
           {canEdit && issueBlockedByContract && (
             <p className="text-body text-[color:var(--text-muted)]">{t('issueBlockedByContract')}</p>
           )}

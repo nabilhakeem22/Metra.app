@@ -7,6 +7,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import {
   commitImportCore,
   createBoqCore,
+  startBoqVersionCore,
   type CreateBoqInput,
 } from './core';
 import {
@@ -30,6 +31,14 @@ export async function createBoq(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await createBoqCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+/** A new version of an issued BOQ: the tab then shows its draft in place of the issued one. */
+export async function startBoqVersion(issuedBoqId: string): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await startBoqVersionCore(ctx, issuedBoqId);
   if (res.ok) refreshApp();
   return res;
 }

@@ -66,11 +66,11 @@ describe('generate (AC1 to AC3)', () => {
     expect(await generate(boq.boqId)).toEqual({ ok: false, error: 'design_only_closed', params: await targetOf(closed) });
   });
 
-  it("an abandoned delivery's BOQ: boq_not_on_home, with no other delivery or beside a current one at execution", async () => {
+  it("an abandoned delivery's BOQ: boq_delivery_abandoned with no other delivery, boq_not_on_home beside a current one at execution", async () => {
     const pair = await seedClientProject(orgId);
     const abandoned = await seedDelivery(orgId, pair, 'abandoned');
     const boq = await seedBoq(orgId, { project: pair, engagementId: abandoned });
-    expect(await generate(boq.boqId)).toEqual({ ok: false, error: 'boq_not_on_home' });
+    expect(await generate(boq.boqId)).toEqual({ ok: false, error: 'boq_delivery_abandoned' });
     await seedDelivery(orgId, pair, 'execution');
     expect(await generate(boq.boqId)).toEqual({ ok: false, error: 'boq_not_on_home' });
     expect(await contractCount(pair.projectId)).toBe(0);

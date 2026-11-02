@@ -83,7 +83,7 @@ describe('contractFromBoqRefusal (rule 3)', () => {
 
   it('refuses a BOQ on another row', () => {
     expect(contractFromBoqRefusal(home, { engagementId: 'old' })).toEqual({ code: 'boq_not_on_home' });
-    expect(contractFromBoqRefusal(none, { engagementId: 'abandoned' })).toEqual({ code: 'boq_not_on_home' });
+    expect(contractFromBoqRefusal(none, { engagementId: 'abandoned' })).toEqual({ code: 'boq_delivery_abandoned' });
   });
 
   it('answers the design gate first, naming the open row, even for the BOQ on an executing one', () => {

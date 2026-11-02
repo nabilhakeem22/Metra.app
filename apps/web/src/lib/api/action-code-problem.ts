@@ -185,6 +185,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   design_open: 'conflict',
   design_only_closed: 'conflict',
   boq_not_on_home: 'conflict',
+  boq_delivery_abandoned: 'conflict',
   boq_needs_delivery: 'conflict',
   contract_from_boq_only: 'conflict',
   contract_schedule_missing: 'bad-request',

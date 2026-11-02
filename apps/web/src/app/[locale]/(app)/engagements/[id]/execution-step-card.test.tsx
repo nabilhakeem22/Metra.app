@@ -84,7 +84,7 @@ function flowTakenBack(why: StudioTakeBack): ExecutionFlowFacts {
 }
 
 function flowAt(stage: ExecutionStage): ExecutionFlowFacts {
-  const found = FLOWS.find(({ result }) => result.stage === stage && result.next === null);
+  const found = FLOWS.find(({ result }) => result.stage === stage);
   if (!found) throw new Error(`no model ends at ${stage}`);
   return found.flow;
 }
@@ -254,18 +254,24 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution step card (%s)', (loca
     }
   });
 
-  test('the BOQ link needs no contract permission; settled and terminated say the stage and offer nothing', () => {
+  test('the BOQ link needs no contract permission; settled says the stage and offers nothing', () => {
     const { body, unmount } = renderCard({ ...view('open_boq', NOTHING), contract: null }, { locale });
     expect(body.getByRole('link', { name: at('execution.card.next.open_boq') })).toBeTruthy();
     unmount();
-    for (const stage of ['settled', 'terminated'] as const) {
-      const { body: done, unmount: close } = renderCard(view(null, EVERYTHING, stage), { locale });
-      expect(done.getByRole('heading', { level: 2 }).textContent).toBe(at(`execution.card.stage.${stage}`));
-      expect(done.getByText(`${at('execution.card.title')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
-      expect(done.queryAllByRole('button')).toHaveLength(0);
-      expect(done.queryAllByRole('link')).toHaveLength(0);
-      close();
-    }
+    const { body: done, unmount: close } = renderCard(view(null, EVERYTHING, 'settled'), { locale });
+    expect(done.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.stage.settled'));
+    expect(done.getByText(`${at('execution.card.title')} · \u2068C-2026-0007\u2069`)).toBeTruthy();
+    expect(done.queryAllByRole('button')).toHaveLength(0);
+    expect(done.queryAllByRole('link')).toHaveLength(0);
+    close();
+  });
+
+  test('terminated: the stage as the hint, and the BOQ tab as the way to a new contract', () => {
+    const { body } = renderCard(view(null, NOTHING, 'terminated'), { locale });
+    expect(body.getByRole('heading', { level: 2 }).textContent).toBe(at('execution.card.next.open_boq'));
+    expect(body.getByText(at('execution.card.stage.terminated'))).toBeTruthy();
+    expect(body.getByRole('link', { name: at('execution.card.next.open_boq') }).getAttribute('href')).toContain('?tab=boq');
+    expect(body.queryAllByRole('button')).toHaveLength(0);
   });
 
   test('"Record costs" opens the costs page for a role that records them, from works in progress on (F1)', () => {
@@ -345,7 +351,8 @@ describe('the waits the studio can take back', () => {
   test('the locator names why for every studio-held wait whose holder depends on the facts, and each has its words in both languages', () => {
     const holders = new Map<ExecutionNextActionKind, Set<Actor | null>>();
     for (const { result, whoseMove } of FLOWS) {
-      if (!result.next) continue;
+      // Terminated points at the BOQ tab with the phase closed: nobody holds a step.
+      if (!result.next || result.stage === 'terminated') continue;
       holders.set(result.next.kind, (holders.get(result.next.kind) ?? new Set<Actor | null>()).add(whoseMove));
     }
     const shifting = new Set([...holders].filter(([, actors]) => actors.size > 1).map(([kind]) => kind));

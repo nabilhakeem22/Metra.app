@@ -30,6 +30,7 @@ describe('who reads the gate (AC21)', () => {
   it('the cores, and the BOQ tab; never the client home or the cockpit', () => {
     expect(filesContaining("from '@/lib/engagements/pair-home'")).toEqual([
       'app/[locale]/(app)/projects/[id]/boq-tab-data.ts',
+      'lib/boqs/core/start-version.ts',
       'lib/client-home/ensure.ts',
       'lib/contracts/core/create-from-boq.ts',
       'lib/contracts/core/create.ts',

@@ -106,7 +106,7 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
     { stage: 'final_account', next: { kind: 'review_final_account' } },
   ],
   ['final account paid, nothing owed', withContract({ finalAccountOutstanding: '0' }), { stage: 'settled', next: null }],
-  ['terminated', withContract({ status: 'terminated', ...FINAL_ISSUED }), { stage: 'terminated', next: null }],
+  ['terminated', withContract({ status: 'terminated', ...FINAL_ISSUED }), { stage: 'terminated', next: { kind: 'open_boq' } }],
 ];
 
 /** Every combination of the facts that decide a signed contract's stage. */
@@ -197,7 +197,7 @@ describe('executionStage', () => {
 
   it('a terminated contract is terminated whatever else is true', () => {
     for (const facts of signedGrid()) {
-      expect(stageOf({ ...facts, status: 'terminated' })).toEqual({ stage: 'terminated', next: null });
+      expect(stageOf({ ...facts, status: 'terminated' })).toEqual({ stage: 'terminated', next: { kind: 'open_boq' } });
     }
   });
 

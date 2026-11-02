@@ -63,7 +63,7 @@ const NEXT_ACTION_HOLDER: Readonly<Record<ExecutionNextActionKind, (facts: Execu
 
 export function locateExecutionForStudio(facts: ExecutionFlowFacts): StudioExecutionLocation {
   const { result, step, status } = executionPosition(facts);
-  if (!result.next) return { step, whoseMove: null, status, takenBack: null };
+  if (!result.next || status === 'closed') return { step, whoseMove: null, status, takenBack: null };
   const holder = NEXT_ACTION_HOLDER[result.next.kind](facts);
   return { step, whoseMove: holder.actor, status, takenBack: holder.takenBack };
 }

@@ -16,8 +16,10 @@ export type ExecutionActionCode =
   // (lib/engagements/design-first.ts); these two carry {delivery, deliveryId}.
   | 'design_open'
   | 'design_only_closed'
-  // The BOQ is not on the delivery whose link would show its contract.
+  // The BOQ is not on the delivery whose link would show its contract: a new version fixes it.
   | 'boq_not_on_home'
+  // Every delivery of the pair was abandoned: a new delivery fixes it.
+  | 'boq_delivery_abandoned'
   // A BOQ goes out through a delivery, and the project has no single one to use.
   | 'boq_needs_delivery'
   // The pair has a delivery: its contract comes from that BOQ, not from a proposal.

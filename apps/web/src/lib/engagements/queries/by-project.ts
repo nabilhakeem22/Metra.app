@@ -1,5 +1,5 @@
 import 'server-only';
-import { designEngagements, type DesignEngagementState } from '@metra/db';
+import { designEngagements, projects, type DesignEngagementState } from '@metra/db';
 import { asc, desc, eq, inArray } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { EntryPhase } from '@/lib/flow/types';
@@ -34,28 +34,39 @@ const SUMMARY_COLUMNS = {
   titleAr: designEngagements.titleAr,
   titleEn: designEngagements.titleEn,
   createdAt: designEngagements.createdAt,
+  /** Whose project it is now: read with the row, so preferring them costs no statement. */
+  projectClientId: projects.clientId,
 };
 
 /** A summary row as selected. */
-type SummaryRow = Omit<ProjectDeliverySummary, 'entryPhase' | 'createdAt'> & { entryPhase: string; createdAt: Date };
+type SummaryRow = Omit<ProjectDeliverySummary, 'entryPhase' | 'createdAt'> & {
+  entryPhase: string;
+  createdAt: Date;
+  projectClientId: string | null;
+};
 
-function summaryOf({ entryPhase, createdAt, ...row }: SummaryRow): ProjectDeliverySummary {
+function summaryOf({ entryPhase, createdAt, projectClientId: _projectClient, ...row }: SummaryRow): ProjectDeliverySummary {
   return { ...row, entryPhase: entryPhaseOf(entryPhase), createdAt: createdAt.toISOString() };
 }
 
-/** How strongly a state claims the surface: active, then any non-abandoned, then abandoned. */
-function surfaceRank(state: DesignEngagementState): number {
-  if (!isTerminal(state)) return 2;
-  return state === 'abandoned' ? 0 : 1;
+/**
+ * How strongly a row claims the surface: active, then the project client's
+ * finished row, then another client's, then abandoned.
+ */
+function surfaceRank(row: Pick<SummaryRow, 'state' | 'clientId' | 'projectClientId'>): number {
+  if (!isTerminal(row.state)) return 3;
+  if (row.state === 'abandoned') return 0;
+  return row.clientId === row.projectClientId ? 2 : 1;
 }
 
 /**
  * Does a row replace the one surfaced so far? Rows come newest-first by per-org
- * number, so a project surfaces its newest row of the highest rank: active, else
- * newest non-abandoned, else newest. An abandoned row never hides a running one.
+ * number, so a project surfaces its newest row of the highest rank. An abandoned
+ * row never hides a running one, and the project's client always finds their own
+ * row, whatever a former client's newer one holds.
  */
-function outranks(state: DesignEngagementState, current: { state: DesignEngagementState } | null | undefined): boolean {
-  return !current || surfaceRank(state) > surfaceRank(current.state);
+function outranks(row: SummaryRow, current: SummaryRow | null | undefined): boolean {
+  return !current || surfaceRank(row) > surfaceRank(current);
 }
 
 /**
@@ -72,11 +83,12 @@ export function getEngagementByProject(
     const rows = await tx
       .select(SUMMARY_COLUMNS)
       .from(designEngagements)
+      .leftJoin(projects, eq(projects.id, designEngagements.projectId))
       .where(eq(designEngagements.projectId, projectId))
       .orderBy(desc(designEngagements.number));
     let current: SummaryRow | null = null;
     for (const row of rows) {
-      if (outranks(row.state, current)) current = row;
+      if (outranks(row, current)) current = row;
     }
     return current && summaryOf(current);
   });
@@ -97,19 +109,20 @@ export function getDeliveriesByProjects(
   projectIds: string[],
 ): Promise<Record<string, ProjectDeliverySummary | null>> {
   return withOrgContext(ctx, async (tx) => {
-    const result: Record<string, ProjectDeliverySummary | null> = {};
-    for (const projectId of projectIds) result[projectId] = null;
-    if (projectIds.length === 0) return result;
+    const shown: Record<string, SummaryRow | null> = {};
+    for (const projectId of projectIds) shown[projectId] = null;
+    if (projectIds.length === 0) return {};
 
     const rows = await tx
       .select({ ...SUMMARY_COLUMNS, projectId: designEngagements.projectId })
       .from(designEngagements)
+      .leftJoin(projects, eq(projects.id, designEngagements.projectId))
       .where(inArray(designEngagements.projectId, projectIds))
       .orderBy(asc(designEngagements.projectId), desc(designEngagements.number));
 
     for (const { projectId, ...row } of rows) {
-      if (outranks(row.state, result[projectId])) result[projectId] = summaryOf(row);
+      if (outranks(row, shown[projectId])) shown[projectId] = row;
     }
-    return result;
+    return Object.fromEntries(Object.entries(shown).map(([projectId, row]) => [projectId, row && summaryOf(row)]));
   });
 }

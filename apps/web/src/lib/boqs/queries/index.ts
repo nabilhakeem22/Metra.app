@@ -3,6 +3,6 @@
 // `@/lib/boqs/queries` import site keeps resolving unchanged.
 export type { BoqDetail, BoqLineRow, BoqSectionRow, ProjectBoq } from './types';
 export { getBoqDetail } from './detail';
-export { getProjectBoq } from './current';
+export { getBoqTabDocument, type BoqTabDocument, type IssuedBoqVersion } from './tab-document';
 export { getProjectBoqSummary } from './summary';
 export { isBoqSharedOnEngagement } from './shared';
