@@ -1,6 +1,6 @@
 // Client-portal journey map. PURE and SERVER-SAFE: no `@metra/db` runtime value,
 // no 'use client'. Collapses the 16 internal machine states into the SIX
-// milestones a homeowner recognises, so the portal can light the client's
+// milestones a homeowner recognises, so the client's design rail can draw their
 // position without ever surfacing a raw machine state name. The milestone
 // labels live in the catalogs under `delivery.journey.<key>`.
 import type { DesignState } from './states';

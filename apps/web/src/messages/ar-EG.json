@@ -3011,7 +3011,6 @@
       }
     },
     "journey": {
-      "eyebrow": "رحلتك",
       "proposal": "العرض",
       "survey": "المعاينة",
       "concept": "التصميم المبدئي",
@@ -3024,6 +3023,7 @@
       "inProgressTag": "جارٍ العمل",
       "deliveredTag": "تم التسليم",
       "reassurance": "لا حاجة لأي إجراء الآن. تابع هذه الصفحة لمعرفة آخر المستجدات من مصممك.",
+      "feeWait": "تبدأ الخطوة التالية بعد سداد {instalment}.",
       "answered": {
         "responded": "تم تسجيل ردّك",
         "conceptApproved": "اعتمدتَ التصميم المبدئي",

@@ -39,6 +39,7 @@ export function CalmHero({
   chosenLetter,
   expectedOn,
   deliveredAt,
+  feeAwaited,
 }: {
   kind: HeroView['kind'];
   stageKey: PortalStageKey;
@@ -49,6 +50,8 @@ export function CalmHero({
   expectedOn: string | null;
   /** When the design was delivered (the newest delivered stage move), or null. */
   deliveredAt: string | null;
+  /** The next step waits on the client's instalment: "nothing to do" would be untrue. */
+  feeAwaited: boolean;
 }) {
   const t = useTranslations('delivery.hero');
   const tStage = useTranslations('delivery.stage');
@@ -58,9 +61,9 @@ export function CalmHero({
   const delivered = kind === 'delivered';
   const date = (instant: string) => bidiIsolate(formatDate(instant, locale));
   const deliveredHeadline = delivered && deliveredAt ? t('deliveredOn', { date: date(deliveredAt) }) : null;
-  // In-progress reassures ("nothing to do"); delivered/closed keep the stage note.
+  // In-progress reassures ("nothing to do") unless a fee is awaited; the rest keep the stage note.
   const headline = answeredCopy?.headline ?? deliveredHeadline ?? tStage(`${stageKey}.label`);
-  const body = answeredCopy?.body ?? (kind === 'inProgress' ? t('reassurance') : tStage(`${stageKey}.note`));
+  const body = answeredCopy?.body ?? (kind === 'inProgress' && !feeAwaited ? t('reassurance') : tStage(`${stageKey}.note`));
   // The answered headline of a choice already names the option: say it once.
   const repeatsChoice = chosenLetter && kind !== 'closed' && answered?.kind !== 'conceptChosen';
 

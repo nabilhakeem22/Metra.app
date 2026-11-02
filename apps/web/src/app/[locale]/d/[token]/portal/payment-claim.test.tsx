@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicDelivery, PublicDeliveryMilestone } from '@/lib/engagements/public/types';
 import { answerDialog, confirmDialog } from '@/test/portal-command-card';
@@ -153,14 +154,61 @@ describe('the payment claim', () => {
     expect(container.textContent).toContain(AWAITING('ar-EG'));
   });
 
-  it('a failed claim shows a localized error, keeps the button and does not refresh', async () => {
-    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'wrong_state', studioNotified: false });
+  it.each(['wrong_state', 'wrong_target', 'link_expired'])('a %s answer says so on that row, keeps the button and refreshes once', async (error) => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error, studioNotified: false });
+    renderCard({ claimableMilestones: [claimable('gate_b', '28000.0000'), claimable('balance', '36000.0000')] });
+    await claimAndConfirm();
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(messageAt('en', 'delivery.payments.error.wrong_state'));
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getAllByRole('listitem')[2].contains(alert)).toBe(false);
+    expect(claimButtons('en')).toHaveLength(2);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rejected claim says the answer was lost and refreshes once', async () => {
+    actions.claimDesignPaymentInHome.mockRejectedValue(new Error('lost'));
     renderCard(GATE_B);
     await claimAndConfirm();
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      messageAt('en', 'delivery.payments.error.wrong_state'),
-    );
-    expect(claimButtons('en')).toHaveLength(1);
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('an uncertain answer (a lock wait that may still commit) reads as a lost answer and refreshes once', async () => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'uncertain', studioNotified: false });
+    renderCard(GATE_B);
+    await claimAndConfirm();
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('after the refresh, a lost claim that did land shows as waiting with no failure line', async () => {
+    actions.claimDesignPaymentInHome.mockRejectedValue(new Error('lost'));
+    function Refreshed() {
+      const [claim, setClaim] = useState<PublicDelivery['paymentClaim']>(GATE_B);
+      return (
+        <>
+          <button type="button" hidden onClick={() => setClaim({ claimableMilestones: [claimable('gate_b', '28000.0000', true)] })}>
+            land the refresh
+          </button>
+          <PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} receipts={[]} receiptsTruncated={false} studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }} openOn={null} />
+        </>
+      );
+    }
+    const { container } = renderWithIntl(<Refreshed />, { locale: 'en' });
+    await claimAndConfirm();
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByText('land the refresh'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.textContent).toContain(AWAITING('en'));
+    expect(claimButtons('en')).toHaveLength(0);
+  });
+
+  it('a busy answer keeps the claim open and refreshes nothing', async () => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'busy', studioNotified: false });
+    renderCard(GATE_B);
+    await claimAndConfirm();
+    await confirmDialog();
     expect(router.refresh).not.toHaveBeenCalled();
   });
 

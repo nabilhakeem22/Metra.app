@@ -2,39 +2,33 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { MilestoneProgress } from '@/lib/engagements/journey-map';
-import type { HeroView } from '@/lib/engagements/portal-hero';
-import type { PortalStageKey } from '@/lib/engagements/portal-stage';
+import { StepCard } from '@/components/flow/step-card';
+import { clientMoveTone } from '@/lib/client-home/hero';
+import { commandCardChromeForTone } from '@/lib/engagements/command-card-chrome';
+import { buildPhaseView } from '@/lib/flow/build-view';
+import { awaitedDesignFee, locateDesignForClient, type ClientDesignFacts } from '@/lib/flow/locate/design-client';
+import { DESIGN_PHASE } from '@/lib/flow/phases/design';
+import { DesignFeeWait } from './design-fee-wait';
+import { DesignRail } from './design-rail';
 import { HeroCard, type HeroLastAnswer, type HeroReview } from './hero-card';
-import { JourneyTracker } from './journey-tracker';
 import { WhatsNext } from './whats-next';
 
+/** What the card reads off the delivery: where it stands, and what its hero reads. */
+export type CommandCardFacts = ClientDesignFacts & HeroReview;
+
 /**
- * The client's command card — the studio cockpit's anatomy, on the client side,
- * read top to bottom, every time:
- *   1. where we are      — the six-milestone ribbon
- *   2. the one thing now — the hero's single CTA (or its calm in-progress state)
- *   3. what happens next — one quiet line, directly under the action
+ * The client's command card: the shared step card, read top to bottom every time:
+ *   1. where we are      (the design rail, wearing whose move it is)
+ *   2. the one thing now (the hero's single act, or its calm state, and the
+ *                         instalment the next step waits on, if any)
+ *   3. what happens next (one quiet line, directly under the action)
  *
- * It OWNS the client's last confirmed answer. Every confirmed act re-reads the
- * page from the server (`router.refresh()`), so the journey, the hero and the
- * cards below show where things stand now; the answer is held here, above the
- * hero that gave it, so the confirmation survives that refresh.
+ * One location per render, so the rail, the card's colour and the next line can
+ * never disagree. It OWNS the client's last confirmed answer: every confirmed act
+ * re-reads the page from the server (`router.refresh()`), and the answer is held
+ * here, above the hero that gave it, so the confirmation survives that refresh.
  */
-export function PortalCommandCard({
-  token,
-  hero,
-  milestone,
-  stageKey,
-  review,
-}: {
-  token: string;
-  hero: HeroView;
-  milestone: MilestoneProgress;
-  stageKey: PortalStageKey;
-  /** What the hero reads off the delivery (./hero-card.tsx). */
-  review: HeroReview;
-}) {
+export function PortalCommandCard({ token, delivery }: { token: string; delivery: CommandCardFacts }) {
   const router = useRouter();
   const [lastAnswer, setLastAnswer] = useState<HeroLastAnswer | null>(null);
 
@@ -43,18 +37,25 @@ export function PortalCommandCard({
     router.refresh();
   }
 
+  const location = locateDesignForClient(delivery);
+  const view = buildPhaseView(DESIGN_PHASE, location, 'client');
+  const fee = delivery.hero.kind === 'action' ? null : awaitedDesignFee(delivery);
+
   return (
-    <section className="space-y-4 rounded-panel border bg-background p-4 shadow-sm">
-      <JourneyTracker milestone={milestone} bare />
-      <HeroCard
-        token={token}
-        hero={hero}
-        stageKey={stageKey}
-        review={review}
-        lastAnswer={lastAnswer}
-        onAnswered={answered}
-      />
-      <WhatsNext milestone={milestone} bare />
-    </section>
+    <StepCard chrome={commandCardChromeForTone(clientMoveTone(location))} rail={<DesignRail view={view} />}>
+      <div className="space-y-4" data-design-step={location.step ?? 'none'} data-whose-move={location.whoseMove ?? 'none'}>
+        <HeroCard
+          token={token}
+          hero={delivery.hero}
+          stageKey={delivery.stageKey}
+          review={delivery}
+          lastAnswer={lastAnswer}
+          onAnswered={answered}
+          feeAwaited={fee !== null}
+        />
+        {fee && <DesignFeeWait kind={fee} />}
+        <WhatsNext view={view} />
+      </div>
+    </StepCard>
   );
 }

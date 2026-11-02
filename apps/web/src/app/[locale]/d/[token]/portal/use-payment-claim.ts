@@ -48,7 +48,9 @@ export interface PaymentClaimSubmission {
  * expired code is said in the panel and the claim stays open; any other answer
  * closes it. The claim is advisory and idempotent (a repeat resolves ok); the
  * amount is locked server-side, so none is sent. A claim that landed re-reads
- * the page from the server. `openOn` (a code email's link, already checked
+ * the page from the server, and so does a refusal that says the instalment moved
+ * on and an answer that was lost: the row draws a failure only while it can still
+ * be claimed, so a claim that did land shows as waiting, never as failed. `openOn` (a code email's link, already checked
  * claimable) opens that instalment's claim on the code box at once.
  */
 export function usePaymentClaim(token: string, openOn: string | null): PaymentClaimSubmission {
@@ -90,11 +92,14 @@ export function usePaymentClaim(token: string, openOn: string | null): PaymentCl
         }
         if (code.heard(result)) return;
         setAskingKind(null);
-        setFailure({ kind: milestoneKind, shown: codeActFailureOf(result) });
+        const shown = codeActFailureOf(result);
+        setFailure({ kind: milestoneKind, shown });
+        if (shown.error === 'wrong_state' || shown.error === 'uncertain') router.refresh();
       } catch {
         // The claim may have been saved: refresh and check (UNCONFIRMED_WRITE).
         setAskingKind(null);
         setFailure({ kind: milestoneKind, shown: UNCONFIRMED_WRITE });
+        router.refresh();
       } finally {
         setSubmittingKind(null);
       }

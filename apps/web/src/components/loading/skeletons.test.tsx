@@ -45,14 +45,15 @@ describe('route skeletons', () => {
     expect(container.querySelector('.lg\\:grid-cols-4')).toBeNull();
   });
 
-  test('the client page waits in its own shape: bar, greeting, 6-dot journey, hero, one card', () => {
+  test('the client page waits in its own shape: bar, greeting, a 6-step rail band, hero, one card', () => {
     const { container } = renderWithIntl(<ClientPageLoading />, { locale: 'en' });
     const part = (name: string) => container.querySelector(`[data-skeleton="${name}"]`);
     // The bar: a 40 px mark, the name, and the 44 px language pill.
     expect(part('bar')!.querySelector('.size-10')).not.toBeNull();
     expect(part('bar')!.querySelector('.h-11.rounded-pill')).not.toBeNull();
     expect(part('greeting')).not.toBeNull();
-    expect(part('journey')!.children).toHaveLength(6);
+    expect(part('rail')!.children).toHaveLength(6);
+    expect(part('journey')).toBeNull();
     // The hero: tag, headline, two lines and one 44 px button.
     expect(part('hero')!.children).toHaveLength(5);
     expect(part('hero')!.querySelectorAll('.h-11.rounded-pill')).toHaveLength(1);

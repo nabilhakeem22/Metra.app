@@ -107,6 +107,21 @@ describe('the page', () => {
   });
 });
 
+describe('the fee wait, on the page', () => {
+  it('points at a payments section the page really has, and the page holds one card with a rail', () => {
+    const { container } = renderPage('en', {
+      stageKey: 'proposalReady',
+      milestone: { index: 0, allComplete: false, closed: false },
+      hero: { kind: 'inProgress', showRomAck: false },
+      clientActions: [],
+    });
+    expect(container.querySelector('[data-fee-wait]')).not.toBeNull();
+    expect(screen.getByRole('link', { name: messageAt('en', 'delivery.home.act.howToPay') }).getAttribute('href')).toBe('#payments');
+    expect(container.querySelector('section#payments')).not.toBeNull();
+    expect(container.querySelectorAll('section.glass')).toHaveLength(1);
+  });
+});
+
 describe('the design record, once the delivery is at execution', () => {
   const AT_EXECUTION: Partial<PublicDelivery> = {
     stageKey: 'construction',
@@ -127,6 +142,21 @@ describe('the design record, once the delivery is at execution', () => {
     expect(screen.queryByText(messageAt(locale, 'delivery.hero.deliveredTag'))).toBeNull();
     expect(screen.queryByText(messageAt(locale, 'delivery.stage.construction.label'))).toBeNull();
     expect(switchLink(locale).getAttribute('href')).toMatch(/\?tab=design$/);
+  });
+
+  it.each<TestLocale>(['en', 'ar-EG'])('the record is the shared step card: success stripe, six done steps, none current, no fee line (%s)', (locale) => {
+    const { container } = renderPage(locale, {
+      ...AT_EXECUTION,
+      paymentSchedule: [{ milestone_kind: 'balance', basis: 'amount', amount_due: '36000.0000', amount_cleared: '0.0000', status: 'due' }],
+    });
+    const region = screen.getByRole('region', { name: messageAt(locale, 'delivery.home.record.title') });
+    const card = region.querySelector('section.glass') as HTMLElement;
+    expect((card.querySelector('span[aria-hidden]') as HTMLElement).className).toContain('bg-[color:var(--success)]');
+    expect(card.querySelectorAll('[data-rail-step]')).toHaveLength(6);
+    expect(card.querySelectorAll('[data-rail-step] .bg-\\[color\\:var\\(--spine-done\\)\\]')).toHaveLength(6);
+    expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0);
+    expect(container.querySelector('[data-rail-current-name]')).toBeNull();
+    expect(container.querySelector('[data-fee-wait]')).toBeNull();
   });
 
   it('the design phase itself keeps its command card and shows no tab strip', () => {

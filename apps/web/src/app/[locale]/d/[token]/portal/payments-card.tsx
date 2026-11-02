@@ -80,7 +80,7 @@ export function PaymentsCard({
   const awaitsPayment = awaitsPaymentNow(schedule, claim, submission.claimedKinds);
 
   return (
-    <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
+    <section id="payments" className="scroll-mt-20 space-y-3 rounded-panel border bg-background p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-body font-semibold">{t('title')}</h2>
         <span className="text-caption text-muted-foreground">{t('designFee', { amount: money(overview.total) })}</span>

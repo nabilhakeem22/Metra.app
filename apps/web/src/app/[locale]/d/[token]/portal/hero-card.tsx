@@ -57,6 +57,7 @@ export function HeroCard({
   review,
   lastAnswer,
   onAnswered,
+  feeAwaited,
 }: {
   token: string;
   hero: HeroView;
@@ -64,6 +65,8 @@ export function HeroCard({
   review: HeroReview;
   lastAnswer: HeroLastAnswer | null;
   onAnswered: (answer: HeroLastAnswer) => void;
+  /** The next step waits on the client's instalment (the calm card then does not say "nothing to do"). */
+  feeAwaited: boolean;
 }) {
   const { clientActions, conceptOptions, conceptChoice, conceptDecision } = review;
   const asked = hero.kind === 'action' ? hero.group : undefined;
@@ -79,6 +82,7 @@ export function HeroCard({
         chosenLetter={conceptChoice?.letter ?? null}
         expectedOn={review.expectedOn}
         deliveredAt={deliveredAt(review.timeline)}
+        feeAwaited={feeAwaited}
       />
     );
   }

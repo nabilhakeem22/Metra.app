@@ -288,6 +288,15 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the execution step card (%s)', (loca
     expect(body.queryByRole('link', { name: costs })).toBeNull();
   });
 
+  test('below sm the rail is compact: names left to screen readers, the current one said once; the notes stay', () => {
+    const { container } = renderCard(view('record_signed_offline'), { locale });
+    for (const label of container.querySelectorAll('[data-rail-step] [data-rail-label]')) {
+      expect(label.className).toContain('[@media(max-width:639.98px)]:sr-only');
+    }
+    expect(container.querySelector('[data-rail-current-name]')?.textContent).toBe(at('engagements.flow.execution.signature'));
+    expect(container.querySelectorAll('[data-rail-who]')).toHaveLength(EXECUTION_PHASE.steps.length);
+  });
+
   test('the rail draws the five execution steps, the current one with whose move it is (AC22)', () => {
     const { container } = renderCard(view('record_signed_offline'), { locale });
     const steps = [...container.querySelectorAll('[data-rail-step]')];

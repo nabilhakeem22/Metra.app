@@ -19,17 +19,17 @@ import { TimelineCard } from './portal/timeline-card';
 /**
  * The client home's DESIGN tab: the session-less, mobile-first, studio-branded
  * client page, a guided single column under a sticky studio bar (logo, name,
- * WhatsApp, call, language): greeting → the command card (journey, the ONE
- * thing that needs the client now, what's next) → the budget card whenever the
+ * WhatsApp, call, language): greeting → the command card (the design rail,
+ * the ONE thing that needs the client now, what's next) → the budget card whenever the
  * studio has issued a range → the payments card (a payment due is something
  * the client acts on, so it sits above the documents; how to pay and what was
  * received live there too) → the released documents → what happened, dated →
  * footer. Once the delivery is at `execution` it is the DESIGN RECORD: the tab
  * strip above it, and the record banner (every step done) where the command
  * card was; the execution contract lives in the Execution tab
- * (./execution-tab.tsx), never here. Every derivation (journey position, stage,
- * hero, timeline words) is computed server-side and carries NO raw machine
- * state; every figure is a client-DUE or client-PAID amount (no cost/margin
+ * (./execution-tab.tsx), never here. Every derivation (stage, hero, timeline words)
+ * is computed server-side and carries NO raw machine state, and the rail's
+ * position is read from those same facts; every figure is a client-DUE or client-PAID amount (no cost/margin
  * ever reaches this surface). Bilingual, RTL-safe, Western numerals, logical
  * CSS only. A read that produced no delivery renders a notice instead
  * (./portal/delivery-notice.tsx).
@@ -78,16 +78,10 @@ export function PublicDeliveryView({
         {record ? (
           <>
             <HomeTabs token={token} current="design" />
-            <DesignRecordBanner milestone={delivery.milestone} />
+            <DesignRecordBanner delivery={delivery} />
           </>
         ) : (
-          <PortalCommandCard
-            token={token}
-            hero={delivery.hero}
-            milestone={delivery.milestone}
-            stageKey={delivery.stageKey}
-            review={delivery}
-          />
+          <PortalCommandCard token={token} delivery={delivery} />
         )}
         {rom && (
           <BudgetCard

@@ -11,7 +11,7 @@ import { TRANSITIONS, type Trigger } from '@/lib/engagements/transitions';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { buildPhaseView } from '../build-view';
 import { DESIGN_PHASE } from '../phases/design';
-import { locateDesignForClient, type ClientDesignFacts } from './design-client';
+import { awaitedDesignFee, locateDesignForClient, type ClientDesignFacts } from './design-client';
 import { locateDesignForStudio } from './design-studio';
 
 const HERO_KINDS: HeroKind[] = ['action', 'inProgress', 'delivered', 'closed'];
@@ -106,5 +106,42 @@ describe('locateDesignForClient', () => {
   it('refuses a milestone index past the journey (F8)', () => {
     const facts = { ...deliveryAt('survey', 'inProgress'), milestone: { index: 6, allComplete: false, closed: false } };
     expect(() => locateDesignForClient(facts)).toThrow(/not a journey milestone/);
+  });
+});
+
+describe('awaitedDesignFee', () => {
+  it('is the instalment exactly where the F5 rule gives the client the move, on a calm hero', () => {
+    for (const [, states, , kind] of MONEY_GATES) {
+      for (const state of states.filter((gateState) => !isTerminal(gateState))) {
+        const label = `${state}/${kind}`;
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'due')), label).toBe(kind);
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'claimed')), label).toBeNull();
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'paid')), label).toBeNull();
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'absent')), label).toBeNull();
+      }
+    }
+  });
+
+  it('agrees with the locator in every state, with every fee', () => {
+    for (const state of DESIGN_STATES.filter((designState) => !isTerminal(designState))) {
+      for (const fee of FEE_STATES) {
+        for (const kind of ['deposit', 'gate_a', 'gate_b', 'balance'] as const) {
+          const facts = deliveryAt(state, 'inProgress', kind, fee);
+          expect(locateDesignForClient(facts).whoseMove === 'client', `${state}/${kind}/${fee}`).toBe(awaitedDesignFee(facts) !== null);
+        }
+      }
+    }
+  });
+
+  it('asks for no fee on a finished or closed design, the balance a continued delivery still owes included', () => {
+    for (const state of ['closed_design_only', 'execution', 'abandoned'] as const) {
+      expect(awaitedDesignFee(deliveryAt(state, 'delivered', 'balance', 'due')), state).toBeNull();
+    }
+  });
+
+  it('names a partly paid instalment too: what is left is still owed', () => {
+    const facts = deliveryAt('design_proposal', 'inProgress', 'deposit', 'due');
+    const [row] = facts.paymentSchedule;
+    expect(awaitedDesignFee({ ...facts, paymentSchedule: [{ ...row, amount_cleared: '400.0000', status: 'partial' }] })).toBe('deposit');
   });
 });

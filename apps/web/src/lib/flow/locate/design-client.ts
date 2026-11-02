@@ -32,17 +32,20 @@ const STAGE_GATE_FEE: ReadonlyMap<PortalStageKey, MilestoneKind> = new Map(
 );
 
 /**
- * The client owes the instalment their stage's gate waits on: it is in the
- * schedule (a schedule without it is a free gate), not fully paid, and carries
- * no claim the studio has yet to confirm (then the studio holds the move).
+ * The design fee instalment the job waits on at the client's stage: its gate's,
+ * in the schedule (a schedule without it is a free gate), not paid, and with no
+ * claim the studio has yet to confirm (then the studio holds the move). Null
+ * otherwise, and always once the design is complete or closed: a finished design
+ * waits on nobody, even where the machine gates continuing it to execution.
  */
-function owesGateFee(delivery: ClientDesignFacts): boolean {
+export function awaitedDesignFee(delivery: ClientDesignFacts): MilestoneKind | null {
+  if (delivery.milestone.closed || delivery.milestone.allComplete) return null;
   const fee = STAGE_GATE_FEE.get(delivery.stageKey);
-  if (!fee) return false;
+  if (!fee) return null;
   const instalment = delivery.paymentSchedule.find((row) => row.milestone_kind === fee);
-  if (!instalment || instalment.status === 'paid') return false;
+  if (!instalment || instalment.status === 'paid') return null;
   const claimed = delivery.paymentClaim?.claimableMilestones.some((row) => row.milestoneKind === fee && row.hasPendingClaim);
-  return !claimed;
+  return claimed ? null : fee;
 }
 
 export function locateDesignForClient(delivery: ClientDesignFacts): StepLocation<JourneyMilestoneKey> {
@@ -53,7 +56,7 @@ export function locateDesignForClient(delivery: ClientDesignFacts): StepLocation
   if (step === undefined) throw new Error('milestone index is not a journey milestone');
   return {
     step,
-    whoseMove: delivery.hero.kind === 'action' || owesGateFee(delivery) ? 'client' : 'studio',
+    whoseMove: delivery.hero.kind === 'action' || awaitedDesignFee(delivery) !== null ? 'client' : 'studio',
     status: 'active',
   };
 }

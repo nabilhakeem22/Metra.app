@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PortalExecutionRequest } from '@/lib/engagements/public/execution-types';
 import { CLIENT_EXECUTION_REASONS } from '@/lib/flow/locate/execution-client';
+import { locateDesignForClient } from '@/lib/flow/locate/design-client';
+import { stateMilestone } from '@/lib/engagements/journey-map';
+import { PORTAL_STAGE_KEY } from '@/lib/engagements/portal-stage';
+import type { DesignState } from '@/lib/engagements/states';
 import { homePayload } from '@/test/client-home-payloads';
 import { clientMoveKey, clientMoveTone, heroAct, heroRequest } from './hero';
 import type { HomeExecution } from './types';
@@ -78,5 +82,26 @@ describe('the client side of whose move it is', () => {
       const act = heroAct(reason);
       if (act?.kind === 'section') expect({ reason, move: executionOf(reason).location.whoseMove }).toEqual({ reason, move: 'client' });
     }
+  });
+});
+
+describe('clientMoveTone on the design tab', () => {
+  const designTone = (state: DesignState, kind: 'action' | 'inProgress' | 'delivered' | 'closed') =>
+    clientMoveTone(
+      locateDesignForClient({
+        milestone: stateMilestone(state),
+        stageKey: PORTAL_STAGE_KEY[state],
+        hero: { kind, showRomAck: false },
+        paymentSchedule: [],
+        paymentClaim: null,
+      }),
+    );
+
+  it('wears the client\'s move, the studio\'s, the finished design and the closed one', () => {
+    expect(designTone('concept_review', 'action')).toBe('yourMove');
+    expect(designTone('survey', 'inProgress')).toBe('waiting');
+    expect(designTone('closed_design_only', 'delivered')).toBe('done');
+    expect(designTone('execution', 'delivered')).toBe('done');
+    expect(designTone('abandoned', 'closed')).toBe('neutral');
   });
 });

@@ -3011,7 +3011,6 @@
       }
     },
     "journey": {
-      "eyebrow": "Your journey",
       "proposal": "Proposal",
       "survey": "Survey",
       "concept": "Concept",
@@ -3024,6 +3023,7 @@
       "inProgressTag": "In progress",
       "deliveredTag": "Delivered",
       "reassurance": "Nothing to do right now. Check this page for updates from your designer.",
+      "feeWait": "The next step starts after this payment: {instalment}.",
       "answered": {
         "responded": "Your response is recorded",
         "conceptApproved": "You approved the concept",

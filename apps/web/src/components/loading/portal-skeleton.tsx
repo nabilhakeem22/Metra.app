@@ -2,14 +2,14 @@ import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SkeletonRoot } from './skeleton-root';
 
-/** The six milestones of the client's journey (lib/engagements/journey-map.ts). */
-const JOURNEY_DOTS = 6;
+/** The client's six design steps on the rail (lib/flow/phases/design.ts). */
+const DESIGN_STEPS = 6;
 
 /**
  * The client's delivery page while it loads, in the page's OWN shape so nothing
  * jumps when it arrives: the studio bar (a 40 px mark, the name, the 44 px
- * language pill), the greeting, then the command card with its six-dot journey
- * and the hero (tag, headline, two lines, a 44 px button), then one card. Not the
+ * language pill), the greeting, then the step card with its rail band and,
+ * below it, the hero (tag, headline, two lines, a 44 px button), then one card. Not the
  * studio's brand loader: the client is opening a page, not starting an
  * application.
  */
@@ -28,18 +28,20 @@ export function PortalSkeleton() {
         </div>
         <div className="mx-auto flex max-w-md flex-col gap-4 p-4">
           <Skeleton data-skeleton="greeting" className="h-6 w-2/3" />
-          <div className="space-y-4 rounded-panel border bg-background p-4">
-            <div data-skeleton="journey" className="flex justify-between px-2">
-              {Array.from({ length: JOURNEY_DOTS }, (_, index) => (
-                <Skeleton key={index} className="size-6 rounded-full" />
+          <div className="glass overflow-hidden p-0">
+            <div data-skeleton="rail" className="flex gap-1.5 border-b px-5 pb-4 pt-5" style={{ background: 'var(--track)' }}>
+              {Array.from({ length: DESIGN_STEPS }, (_, index) => (
+                <Skeleton key={index} className="h-1 flex-1 rounded-full" />
               ))}
             </div>
-            <div data-skeleton="hero" className="space-y-3 rounded-panel border p-5">
-              <Skeleton className="h-5 w-24 rounded-pill" />
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
-              <Skeleton className="h-11 w-full rounded-pill" />
+            <div className="p-5">
+              <div data-skeleton="hero" className="space-y-3 rounded-panel border p-5">
+                <Skeleton className="h-5 w-24 rounded-pill" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-11 w-full rounded-pill" />
+              </div>
             </div>
           </div>
           <Skeleton data-skeleton="card" className="h-24 w-full rounded-panel" />

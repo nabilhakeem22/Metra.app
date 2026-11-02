@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { PortalCommandCard } from '@/app/[locale]/d/[token]/portal/command-card';
 import { stateMilestone } from '@/lib/engagements/journey-map';
 import type { HeroView } from '@/lib/engagements/portal-hero';
-import type { PortalStageKey } from '@/lib/engagements/portal-stage';
+import { PORTAL_STAGE_KEY, type PortalStageKey } from '@/lib/engagements/portal-stage';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
+import type { DesignState } from '@/lib/engagements/states';
 import { messageAt, renderWithIntl, type TestLocale } from './render-with-intl';
 
 // TEST-ONLY. The client page's command card with what the server would hand it,
@@ -23,9 +24,19 @@ export interface CommandCardProps {
   documents?: PublicDelivery['documents'];
   rom?: PublicDelivery['rom'];
   rendersIssuedAt?: PublicDelivery['rendersIssuedAt'];
+  paymentSchedule?: PublicDelivery['paymentSchedule'];
+  paymentClaim?: PublicDelivery['paymentClaim'];
 }
 
 const REFRESH_LABEL = 'land the server refresh';
+
+/** The machine state a client stage word stands for: the journey position follows it. */
+function stateOf(stageKey: PortalStageKey): DesignState {
+  const states = Object.keys(PORTAL_STAGE_KEY) as DesignState[];
+  const state = states.find((candidate) => PORTAL_STAGE_KEY[candidate] === stageKey);
+  if (!state) throw new Error(`no state for stage ${stageKey}`);
+  return state;
+}
 
 export function renderCommandCard(
   initial: CommandCardProps,
@@ -34,6 +45,7 @@ export function renderCommandCard(
   function Harness() {
     const [props, setProps] = useState(initial);
     const afterRefresh = options.afterRefresh;
+    const stageKey = props.stageKey ?? 'conceptReview';
     return (
       <>
         {afterRefresh && (
@@ -43,10 +55,12 @@ export function renderCommandCard(
         )}
         <PortalCommandCard
           token={options.token ?? 'tok'}
-          hero={props.hero}
-          milestone={stateMilestone('concept_review')}
-          stageKey={props.stageKey ?? 'conceptReview'}
-          review={{
+          delivery={{
+            hero: props.hero,
+            milestone: stateMilestone(stateOf(stageKey)),
+            stageKey,
+            paymentSchedule: props.paymentSchedule ?? [],
+            paymentClaim: props.paymentClaim ?? null,
             clientActions: props.clientActions,
             conceptOptions: props.conceptOptions ?? [],
             conceptChoice: props.conceptChoice ?? null,
