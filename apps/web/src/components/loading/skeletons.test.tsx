@@ -51,8 +51,12 @@ describe('route skeletons', () => {
     // The bar: a 40 px mark, the name, and the 44 px language pill.
     expect(part('bar')!.querySelector('.size-10')).not.toBeNull();
     expect(part('bar')!.querySelector('.h-11.rounded-pill')).not.toBeNull();
-    expect(part('greeting')).not.toBeNull();
+    // The greeting's two lines: the client's name and the project's title.
+    expect(part('greeting')!.children).toHaveLength(2);
     expect(part('rail')!.children).toHaveLength(6);
+    // A step is its bar and its mark, and a phone's rail names the current step once.
+    for (const step of part('rail')!.children) expect(step.children).toHaveLength(2);
+    expect(part('rail-current-name')!.className).toContain('sm:hidden');
     expect(part('journey')).toBeNull();
     // The hero: tag, headline, two lines and one 44 px button.
     expect(part('hero')!.children).toHaveLength(5);
