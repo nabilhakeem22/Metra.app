@@ -93,7 +93,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the answers to a decision (%s)', (lo
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('a rejected promise on an offline phone: the same sentence, and the page stays (F6)', async () => {
+  it('a rejected promise on an offline phone: the same sentence, the page stays, and it is read again when the network returns (F6, N1)', async () => {
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     mount();
     actions.decideVariationInHome.mockRejectedValueOnce(new Error('lost'));
@@ -103,6 +103,20 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the answers to a decision (%s)', (lo
     expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'portal.errors.uncertain'));
     expect(onChanged).not.toHaveBeenCalled();
     offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('approved as the phone drops: the notice stands, and the page is read again once when the network returns (N1)', async () => {
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    mount();
+    await decideWith({ ok: true, already: false }, 'approve');
+    expect(screen.getByRole('status').textContent).toBe(words('decide.approved', 3));
+    expect(onChanged).not.toHaveBeenCalled();
+    offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    window.dispatchEvent(new Event('online'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('a rejected promise: uncertain, the page read again, the spinner gone (AC10)', async () => {

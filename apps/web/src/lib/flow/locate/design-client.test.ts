@@ -11,7 +11,7 @@ import { TRANSITIONS, type Trigger } from '@/lib/engagements/transitions';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { buildPhaseView } from '../build-view';
 import { DESIGN_PHASE } from '../phases/design';
-import { awaitedDesignFee, locateDesignForClient, type ClientDesignFacts } from './design-client';
+import { awaitedDesignFee, changesRequestedAtReview, locateDesignForClient, type ClientDesignFacts } from './design-client';
 import { locateDesignForStudio } from './design-studio';
 
 const HERO_KINDS: HeroKind[] = ['action', 'inProgress', 'delivered', 'closed'];
@@ -172,6 +172,18 @@ describe('awaitedDesignFee', () => {
       const facts = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), designDecision: { kind: 'approved' as const, at: AT } };
       expect(awaitedDesignFee(facts)).toBe('gate_b');
       expect(locateDesignForClient(facts).whoseMove).toBe('client');
+    });
+
+    it('is one rule: a change request at its own review stage, not an approval or a choice, not another stage (N3)', () => {
+      const at = (state: DesignState, overrides: Partial<ClientDesignFacts>) => changesRequestedAtReview({ ...deliveryAt(state, 'inProgress'), ...overrides });
+      expect(at('concept_review', { conceptDecision: 'changes_requested' })).toBe(true);
+      expect(at('final_approval', { designDecision: { kind: 'changes_requested', at: AT } })).toBe(true);
+      expect(at('concept_review', { conceptDecision: 'chosen' })).toBe(false);
+      expect(at('concept_review', { conceptDecision: 'approved' })).toBe(false);
+      expect(at('final_approval', { designDecision: { kind: 'approved', at: AT } })).toBe(false);
+      expect(at('final_approval', { conceptDecision: 'changes_requested' })).toBe(false);
+      expect(at('concept_review', { designDecision: { kind: 'changes_requested', at: AT } })).toBe(false);
+      expect(at('design_3d', { conceptDecision: 'changes_requested', designDecision: { kind: 'changes_requested', at: AT } })).toBe(false);
     });
 
     it('reads each answer only at its own stage: an answer from another stage lifts no gate', () => {

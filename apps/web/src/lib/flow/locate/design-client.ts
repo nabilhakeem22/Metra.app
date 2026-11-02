@@ -35,7 +35,7 @@ const STAGE_GATE_FEE: ReadonlyMap<PortalStageKey, MilestoneKind> = new Map(
 );
 
 /** The client's answer on file at this review stage asks for changes (`designDecision` is the current round's). */
-function changesRequestedHere({ stageKey, designDecision, conceptDecision }: ClientDesignFacts): boolean {
+export function changesRequestedAtReview({ stageKey, designDecision, conceptDecision }: ClientDesignFacts): boolean {
   if (stageKey === 'finalApproval') return designDecision?.kind === 'changes_requested';
   return stageKey === 'conceptReview' && conceptDecision === 'changes_requested';
 }
@@ -50,7 +50,7 @@ function changesRequestedHere({ stageKey, designDecision, conceptDecision }: Cli
  * studio with no payment, so saying the next step waits on one would be untrue.
  */
 export function awaitedDesignFee(delivery: ClientDesignFacts): MilestoneKind | null {
-  if (delivery.milestone.closed || delivery.milestone.allComplete || changesRequestedHere(delivery)) return null;
+  if (delivery.milestone.closed || delivery.milestone.allComplete || changesRequestedAtReview(delivery)) return null;
   const fee = STAGE_GATE_FEE.get(delivery.stageKey);
   if (!fee) return null;
   const instalment = delivery.paymentSchedule.find((row) => row.milestone_kind === fee);

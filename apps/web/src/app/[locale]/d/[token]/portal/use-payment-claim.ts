@@ -10,7 +10,7 @@ import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { claimDesignPaymentInHome } from '../actions';
 import { claimsNotYetRead } from './claims-not-yet-read';
 import { codeActFailureOf } from './code-act-failure';
-import { refreshUnlessOffline } from './refresh-unless-offline';
+import { refreshNowOrWhenOnline } from './refresh-now-or-when-online';
 import { useClientCode, type ClientCode } from './use-client-code';
 
 export interface PaymentClaimSubmission {
@@ -56,9 +56,9 @@ export interface PaymentClaimSubmission {
  * amount is locked server-side, so none is sent. A claim that landed re-reads
  * the page from the server, and so does a refusal that says the instalment or the
  * delivery moved on or closed (the set the hero acts read,
- * lib/engagements/review-outcome.ts) and an answer that was lost, unless the phone
- * is offline (./refresh-unless-offline.ts): the row draws a failure only while it
- * can still be claimed, so a claim that did land shows as waiting, never as failed.
+ * lib/engagements/review-outcome.ts) and an answer that was lost; an offline phone
+ * waits for its network (./refresh-now-or-when-online.ts): the row draws a failure only
+ * while it can still be claimed, so a claim that did land shows as waiting, never as failed.
  * Once a read shows a claim pending, the server is the truth for that instalment:
  * the local flip and any failure line on it go, so a later dismissal by the studio
  * shows the row claimable again, in step with the card above it. `openOn` (a code
@@ -109,7 +109,7 @@ export function usePaymentClaim(token: string, claim: PublicDelivery['paymentCla
             return notified;
           });
           setAskingKind(null);
-          router.refresh();
+          refreshNowOrWhenOnline(router.refresh);
           return;
         }
         if (code.heard(result)) return;
@@ -117,12 +117,12 @@ export function usePaymentClaim(token: string, claim: PublicDelivery['paymentCla
         const shown = codeActFailureOf(result);
         setFailure({ kind: milestoneKind, shown });
         if (refusalSaysMovedOn(shown.error)) router.refresh();
-        else if (shown.error === 'uncertain') refreshUnlessOffline(router.refresh);
+        else if (shown.error === 'uncertain') refreshNowOrWhenOnline(router.refresh);
       } catch {
         // The claim may have been saved: refresh and check (UNCONFIRMED_WRITE).
         setAskingKind(null);
         setFailure({ kind: milestoneKind, shown: UNCONFIRMED_WRITE });
-        refreshUnlessOffline(router.refresh);
+        refreshNowOrWhenOnline(router.refresh);
       } finally {
         setSubmittingKind(null);
       }

@@ -7,7 +7,7 @@ import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-err
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { claimRequestInHome, loadDeliveryExecution } from '../execution-actions';
 import { codeActFailureOf } from './code-act-failure';
-import { refreshUnlessOffline } from './refresh-unless-offline';
+import { refreshNowOrWhenOnline } from './refresh-now-or-when-online';
 import { useClientCode, type ClientCode, type KnownCodeChannel } from './use-client-code';
 
 /**
@@ -126,7 +126,7 @@ export function useExecutionClaim(
     const row = read.requests.find((request) => request.id === requestId);
     if (row?.claimedAt) {
       setNotifiedIds((previous) => new Set(previous).add(requestId));
-      refreshUnlessOffline(onChanged);
+      refreshNowOrWhenOnline(onChanged);
       return;
     }
     setFailure({ requestId, shown: { error: 'not_received' } });

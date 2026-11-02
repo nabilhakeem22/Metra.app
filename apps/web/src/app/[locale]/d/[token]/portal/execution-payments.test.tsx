@@ -205,7 +205,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     expect(screen.getByRole('status').textContent).toContain(messageAt(locale, 'delivery.execution.claimNotified'));
   });
 
-  it('an offline phone: the read fails too, the row says refresh and check, and the page is not refreshed (F6)', async () => {
+  it('an offline phone: the read fails too, the row says refresh and check, and nothing waits on the network (F6)', async () => {
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     actions.claimRequestInHome.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     actions.loadDeliveryExecution.mockRejectedValueOnce(new TypeError('Failed to fetch'));
@@ -216,7 +216,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     offline.mockRestore();
   });
 
-  it('the network going between the read and the refresh: the row shows the claim, and the page is not refreshed (F6)', async () => {
+  it('the network going between the read and the refresh: the row shows the claim, and the page is read again when it returns (F6, N1)', async () => {
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     actions.claimRequestInHome.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     actions.loadDeliveryExecution.mockResolvedValue({ ok: true, execution: CLAIMED });
@@ -225,6 +225,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the payments of the Execution tab (%
     expect(claimButtons(locale)).toHaveLength(0);
     expect(onChanged).not.toHaveBeenCalled();
     offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('a lost answer whose claim did not land: the row says so and keeps its button (B4 F1)', async () => {

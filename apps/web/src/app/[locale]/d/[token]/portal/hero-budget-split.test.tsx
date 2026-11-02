@@ -109,12 +109,14 @@ describe('the budget half of approve+budget (S10)', () => {
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it.each(LOCALES)("%s: the design half's lost answer on an offline phone keeps the page and the line (F6)", async (locale) => {
+  it.each(LOCALES)("%s: the design half's lost answer on an offline phone keeps the page and the line, and refreshes when the network returns (F6, N1)", async (locale) => {
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     await approveWithBudget(locale, { kind: 'error', error: 'uncertain', budget: 'acknowledged' });
     expect(screen.getByRole('alert').textContent).toContain(messageAt(locale, 'portal.errors.uncertain'));
     expect(router.refresh).not.toHaveBeenCalled();
     offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it.each(LOCALES)('%s: both changed says only that the step changed', async (locale) => {

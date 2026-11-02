@@ -6,7 +6,7 @@ import { signerNameOf } from '@/lib/client-home/signer-name';
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { decideVariationInHome } from '../variation-actions';
 import { decideFailureOf, decideFailureRefreshes, type ShownDecideFailure } from './change-order-decide-failure';
-import { refreshUnlessOffline } from './refresh-unless-offline';
+import { refreshNowOrWhenOnline } from './refresh-now-or-when-online';
 import { useActNameBox, type ActNameBox } from './use-act-name-box';
 import { useClientCode, type ClientCode, type KnownCodeChannel } from './use-client-code';
 
@@ -57,7 +57,7 @@ export function useChangeOrderDecision(
   function settle(notice: DecideNotice) {
     setDecision(null);
     onNotice(notice);
-    if (notice.kind !== 'refused' || decideFailureRefreshes(notice.failure)) refreshUnlessOffline(onChanged);
+    if (notice.kind !== 'refused' || decideFailureRefreshes(notice.failure)) refreshNowOrWhenOnline(onChanged);
   }
   const code = useClientCode(token, 'decide_variation', decision ? variationId : null, channel, () => settle({ kind: 'refused', failure: { error: 'wrong_state' } }), typingFor);
 

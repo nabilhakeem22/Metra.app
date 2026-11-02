@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { messageAt, type TestLocale } from '@/test/render-with-intl';
 import { answerDialog, landRefresh, renderCommandCard, type CommandCardProps } from '@/test/portal-command-card';
@@ -35,6 +35,7 @@ function feeFacts(kind: string, fee: 'due' | 'claimed' | 'paid'): Pick<CommandCa
 const card = (container: HTMLElement) => container.querySelector('section.glass') as HTMLElement;
 const stripe = (container: HTMLElement) => card(container).querySelector('span[aria-hidden]') as HTMLElement;
 const whoseMove = (container: HTMLElement) => container.querySelector('[data-whose-move]')!.getAttribute('data-whose-move');
+const upNext = (container: HTMLElement) => container.querySelector('[data-whose-move] > p svg.lucide-arrow-right');
 const current = (container: HTMLElement) => [...container.querySelectorAll('[aria-current="step"]')].map((step) => step.textContent);
 
 beforeEach(() => {
@@ -136,6 +137,7 @@ describe('a change request on file waits on the studio, not on the fee (F1)', ()
     expect(screen.getByText(messageAt(locale, 'delivery.hero.answered.body'))).toBeTruthy();
     expect(stripe(container).className).toContain('bg-[color:var(--rule)]');
     expect(whoseMove(container)).toBe('studio');
+    expect(upNext(container), 'N3: no next step while the change request is on file').toBeNull();
   });
 
   it.each(LOCALES)('at the final approval, with Gate B due (%s)', (locale) => {
@@ -148,6 +150,19 @@ describe('a change request on file waits on the studio, not on the fee (F1)', ()
     expect(screen.getByText(messageAt(locale, 'delivery.hero.answered.body'))).toBeTruthy();
     expect(stripe(container).className).toContain('bg-[color:var(--rule)]');
     expect(whoseMove(container)).toBe('studio');
+    expect(upNext(container), 'N3: no next step while the change request is on file').toBeNull();
+  });
+
+  it.each(LOCALES)('an approved or chosen answer keeps its next step (N3, %s)', (locale) => {
+    const OPTION_A = { id: '11111111-1111-4111-8111-111111111111', letter: 'A' as const };
+    const design = renderCommandCard({ hero: CALM, clientActions: [], stageKey: 'finalApproval', designDecision: { kind: 'approved', at: AT }, ...feeFacts('gate_b', 'due') }, { locale });
+    expect(upNext(design.container)).not.toBeNull();
+    design.unmount();
+    const approved = renderCommandCard({ hero: CALM, clientActions: [], stageKey: 'conceptReview', conceptDecision: 'approved', ...feeFacts('gate_a', 'due') }, { locale });
+    expect(upNext(approved.container)).not.toBeNull();
+    approved.unmount();
+    const chosen = renderCommandCard({ hero: CALM, clientActions: [], stageKey: 'conceptReview', conceptDecision: 'chosen', conceptChoice: OPTION_A, ...feeFacts('gate_a', 'due') }, { locale });
+    expect(upNext(chosen.container)).not.toBeNull();
   });
 });
 
@@ -258,6 +273,25 @@ describe('an approval whose next step waits on the fee (F5)', () => {
     expect(screen.getByText(messageAt('en', 'delivery.hero.design.changesBodyNotified'))).toBe(said);
     expect(container.querySelector('[data-fee-wait]')).toBeNull();
     expect(stripe(container).className).toContain('bg-[color:var(--rule)]');
+  });
+});
+
+describe('a confirmed answer on an offline phone (N2)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(LOCALES)('keeps the confirmation, and refreshes once when the network returns (%s)', async (locale) => {
+    actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'approved', studioNotified: true });
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderCommandCard({ hero: { kind: 'action', group: 'design', showRomAck: false }, clientActions: ['approve_design', 'request_design_changes'], stageKey: 'finalApproval' }, { locale });
+    fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'delivery.hero.design.approve') }));
+    await answerDialog(locale, 'confirm');
+    await act(async () => {});
+    const said = screen.getByText(messageAt(locale, 'delivery.hero.design.approvedTitle'));
+    expect(router.refresh).not.toHaveBeenCalled();
+    offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(messageAt(locale, 'delivery.hero.design.approvedTitle'))).toBe(said);
   });
 });
 

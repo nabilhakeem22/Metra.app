@@ -203,7 +203,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('signing the contract in the home (%s
     expect((signButton() as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('an answer that never came on an offline phone: the same sentence, and the page stays (F6)', async () => {
+  it('an answer that never came on an offline phone: the same sentence, the page stays, and it is read again when the network returns (F6, N1)', async () => {
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     renderWithIntl(card(executionAt('sign_contract')), { locale });
     actions.signContractInHome.mockRejectedValueOnce(new Error('network'));
@@ -213,6 +213,20 @@ describe.each<TestLocale>(['en', 'ar-EG'])('signing the contract in the home (%s
     expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'portal.errors.uncertain'));
     expect(onChanged).not.toHaveBeenCalled();
     offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('signed as the phone drops: the notice stands, and the page is read again once when the network returns (N1)', async () => {
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderWithIntl(card(executionAt('sign_contract')), { locale });
+    await signWith({ ok: true, already: false });
+    expect(screen.getByRole('status').textContent).toBe(at('signed').replace('{studio}', 'Noon Studio'));
+    expect(onChanged).not.toHaveBeenCalled();
+    offline.mockRestore();
+    window.dispatchEvent(new Event('online'));
+    window.dispatchEvent(new Event('online'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('a dead link or a failure with a reference is said as every link page says it, with no refresh', async () => {

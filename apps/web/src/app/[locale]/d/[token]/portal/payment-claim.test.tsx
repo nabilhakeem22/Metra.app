@@ -64,6 +64,12 @@ function RereadCard({ reads }: { reads: Array<PublicDelivery['paymentClaim']> })
 
 const landNextRead = () => fireEvent.click(screen.getByText('land the next read'));
 
+/** The phone reports its network again, and says so to the window. */
+function comeBackOnline() {
+  vi.restoreAllMocks();
+  window.dispatchEvent(new Event('online'));
+}
+
 function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en', openOn: string | null = null) {
   return renderWithIntl(
     <PaymentsCard
@@ -248,6 +254,33 @@ describe('the payment claim', () => {
       expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
       expect(claimButtons('en')).toHaveLength(1);
       expect(router.refresh).not.toHaveBeenCalled();
+      comeBackOnline();
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('a claim that landed as the phone dropped waits on its row, and refreshes once when the network returns (N2)', async () => {
+      actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: true });
+      const { container } = renderCard(GATE_B);
+      await claimAndConfirm();
+      expect(container.textContent).toContain(AWAITING('en'));
+      expect(router.refresh).not.toHaveBeenCalled();
+      comeBackOnline();
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('the refresh on the way back keeps a code typed meanwhile, in the open dialog', async () => {
+      actions.claimDesignPaymentInHome.mockRejectedValue(new TypeError('Failed to fetch'));
+      renderWithIntl(<RereadCard reads={[GATE_B, { claimableMilestones: [claimable('gate_b', '28000.0000')] }]} />, { locale: 'en' });
+      await claimAndConfirm();
+      await screen.findByRole('alert');
+      fireEvent.click(claimButtons('en')[0]);
+      const dialog = await confirmDialog();
+      fireEvent.change(within(dialog).getByLabelText(messageAt('en', 'delivery.code.label')), { target: { value: '555123' } });
+      comeBackOnline();
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      landNextRead();
+      const open = await confirmDialog();
+      expect((within(open).getByLabelText(messageAt('en', 'delivery.code.label')) as HTMLInputElement).value).toBe('555123');
     });
 
     it('an uncertain answer keeps it too', async () => {
@@ -256,6 +289,8 @@ describe('the payment claim', () => {
       await claimAndConfirm();
       expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
       expect(router.refresh).not.toHaveBeenCalled();
+      comeBackOnline();
+      expect(router.refresh).toHaveBeenCalledTimes(1);
     });
   });
 
