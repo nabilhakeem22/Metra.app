@@ -46,3 +46,13 @@ export async function requireDesignFinished(
   if (gate.kind === 'design_open' || gate.kind === 'design_only_closed') fail(gate.kind, designFirstTargetFor(gate.delivery));
   return gate;
 }
+
+/**
+ * For a contract from a proposal: a pair with a delivery gets its contract from
+ * that delivery's BOQ, on the one link, never beside it. With no delivery, a
+ * proposal contract stands as it always has.
+ */
+export async function requirePairWithoutDelivery(tx: MetraDb, pair: ProjectClient): Promise<void> {
+  const gate = await requireDesignFinished(tx, pair);
+  if (gate.kind === 'home') fail('contract_from_boq_only', designFirstTargetFor(gate.delivery));
+}

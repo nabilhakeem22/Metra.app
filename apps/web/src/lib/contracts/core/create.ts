@@ -14,8 +14,7 @@ import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { designFirstTargetFor } from '@/lib/engagements/design-first';
-import { requireDesignFinished } from '@/lib/engagements/pair-home';
+import { requirePairWithoutDelivery } from '@/lib/engagements/pair-home';
 import { isUuid } from '@/lib/uuid';
 import { copyProposalContentToContract } from './create-copy';
 import {
@@ -55,16 +54,6 @@ async function loadAcceptedProposal(
     .limit(1);
   if (existing[0]) fail('contract_exists');
   return proposal;
-}
-
-/**
- * A pair with a delivery gets its contract from that delivery's BOQ, on the one
- * link: never from a proposal, beside it. With no delivery, a proposal contract
- * stands as it always has.
- */
-async function requireNoDelivery(tx: MetraDb, proposal: ProposalRow): Promise<void> {
-  const gate = await requireDesignFinished(tx, proposal);
-  if (gate.kind === 'home') fail('contract_from_boq_only', designFirstTargetFor(gate.delivery));
 }
 
 /** A configured (non-null) percentage, or undefined so the caller can fall back. */
@@ -155,7 +144,7 @@ export async function generateContractCore(
     },
     async (tx, audit) => {
       const proposal = await loadAcceptedProposal(tx, proposalId);
-      await requireNoDelivery(tx, proposal);
+      await requirePairWithoutDelivery(tx, proposal);
       const percentages = await loadInheritedPercentages(tx, proposal);
       const number = await allocateContractNumber(tx, ctx.orgId);
       const contractId = await persistContractHeader(
