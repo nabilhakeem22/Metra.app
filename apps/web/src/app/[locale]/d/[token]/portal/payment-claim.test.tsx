@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicDelivery, PublicDeliveryMilestone } from '@/lib/engagements/public/types';
 import { answerDialog, confirmDialog } from '@/test/portal-command-card';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
@@ -40,6 +40,30 @@ function claimable(milestoneKind: string, amountRemaining: string, hasPendingCla
   return { milestoneKind, amountRemaining, hasPendingClaim, claimedAt: null };
 }
 
+/** The page's card under a read the test hands down, as a refresh would. */
+function RereadCard({ reads }: { reads: Array<PublicDelivery['paymentClaim']> }) {
+  const [read, setRead] = useState(0);
+  return (
+    <>
+      <button type="button" hidden onClick={() => setRead((current) => current + 1)}>
+        land the next read
+      </button>
+      <PaymentsCard
+        token="tok"
+        schedule={MIDWAY}
+        claim={reads[read]}
+        details={null}
+        receipts={[]}
+        receiptsTruncated={false}
+        studio={{ name: 'Diwan Studio', whatsappDigits: null, deliveryRef: 'DE-2026-0012' }}
+        openOn={null}
+      />
+    </>
+  );
+}
+
+const landNextRead = () => fireEvent.click(screen.getByText('land the next read'));
+
 function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en', openOn: string | null = null) {
   return renderWithIntl(
     <PaymentsCard
@@ -71,12 +95,22 @@ async function claimAndConfirm(locale: TestLocale = 'en') {
   await act(async () => {});
 }
 
+/** The row's claim again, with the code still in its box from the first time. */
+async function claimAgain() {
+  fireEvent.click(claimButtons('en')[0]);
+  await confirmDialog();
+  await answerDialog('en', 'confirm');
+  await act(async () => {});
+}
+
 beforeEach(() => {
   actions.claimDesignPaymentInHome.mockReset();
   codeActions.requestClientCode.mockReset();
   codeActions.requestClientCode.mockResolvedValue({ ok: true, hint: 'c•••@e•••.com', resendAfterSeconds: 60 });
   router.refresh.mockReset();
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('the payment claim', () => {
   it.each(['en', 'ar-EG'] as const)('asks first, naming the milestone and the amount (%s)', async (locale) => {
@@ -202,6 +236,95 @@ describe('the payment claim', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(container.textContent).toContain(AWAITING('en'));
     expect(claimButtons('en')).toHaveLength(0);
+  });
+
+  describe('with the phone offline (F6)', () => {
+    beforeEach(() => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false));
+
+    it('a rejected claim keeps the page and the uncertain line, with no refresh', async () => {
+      actions.claimDesignPaymentInHome.mockRejectedValue(new TypeError('Failed to fetch'));
+      renderCard(GATE_B);
+      await claimAndConfirm();
+      expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
+      expect(claimButtons('en')).toHaveLength(1);
+      expect(router.refresh).not.toHaveBeenCalled();
+    });
+
+    it('an uncertain answer keeps it too', async () => {
+      actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'uncertain', studioNotified: false });
+      renderCard(GATE_B);
+      await claimAndConfirm();
+      expect((await screen.findByRole('alert')).textContent).toBe(messageAt('en', 'portal.errors.uncertain'));
+      expect(router.refresh).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each(['en', 'ar-EG'] as const)('a delivery that closed mid-dialog says so and refreshes once (F8, %s)', async (locale) => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error: 'not_active', studioNotified: false });
+    renderCard(GATE_B, locale);
+    await claimAndConfirm(locale);
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt(locale, 'portal.errors.not_active'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['token_invalid', 'token_expired', 'generic'])('a %s answer is no moved-on refusal: said on the row, with no refresh (F8)', async (error) => {
+    actions.claimDesignPaymentInHome.mockResolvedValue({ ok: false, error, reference: 'REF1', studioNotified: false });
+    renderCard(GATE_B);
+    await claimAndConfirm();
+    await screen.findByRole('alert');
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  describe('once a read shows the claim pending, the server is the truth for it (F9)', () => {
+    const CLAIMED = { claimableMilestones: [{ ...claimable('gate_b', '28000.0000', true), claimedAt: '2026-10-01T06:00:00.000Z' }] };
+
+    it('a later dismissal shows the row claimable again, with no waiting and no notified line', async () => {
+      actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: true });
+      const { container } = renderWithIntl(<RereadCard reads={[GATE_B, CLAIMED, GATE_B]} />, { locale: 'en' });
+      await claimAndConfirm();
+      expect(claimButtons('en')).toHaveLength(0);
+      landNextRead();
+      expect(claimButtons('en')).toHaveLength(0);
+      expect(container.textContent).toContain(messageAt('en', 'delivery.payments.claimNotified'));
+      landNextRead();
+      expect(claimButtons('en')).toHaveLength(1);
+      expect(container.textContent).not.toContain(AWAITING('en'));
+      expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
+    });
+
+    it('a read from before the claim landed does not undo the flip: no read has shown it yet', async () => {
+      actions.claimDesignPaymentInHome.mockResolvedValue({ ok: true, already: false, studioNotified: false });
+      const { container } = renderWithIntl(<RereadCard reads={[GATE_B, { claimableMilestones: [claimable('gate_b', '28000.0000')] }]} />, { locale: 'en' });
+      await claimAndConfirm();
+      landNextRead();
+      expect(claimButtons('en')).toHaveLength(0);
+      expect(container.textContent).toContain(AWAITING('en'));
+    });
+
+    it('the claim made again after a dismissal says only what that one did', async () => {
+      actions.claimDesignPaymentInHome.mockResolvedValueOnce({ ok: true, already: false, studioNotified: true });
+      actions.claimDesignPaymentInHome.mockResolvedValueOnce({ ok: true, already: false, studioNotified: false });
+      const { container } = renderWithIntl(<RereadCard reads={[GATE_B, CLAIMED, GATE_B]} />, { locale: 'en' });
+      await claimAndConfirm();
+      landNextRead();
+      landNextRead();
+      await claimAgain();
+      expect(actions.claimDesignPaymentInHome).toHaveBeenCalledTimes(2);
+      expect(container.textContent).toContain(AWAITING('en'));
+      expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
+    });
+
+    it('an old "could not confirm" line does not come back after a dismissal (F10)', async () => {
+      actions.claimDesignPaymentInHome.mockRejectedValue(new Error('lost'));
+      renderWithIntl(<RereadCard reads={[GATE_B, CLAIMED, GATE_B]} />, { locale: 'en' });
+      await claimAndConfirm();
+      await screen.findByRole('alert');
+      landNextRead();
+      expect(screen.queryByRole('alert')).toBeNull();
+      landNextRead();
+      expect(claimButtons('en')).toHaveLength(1);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 
   it('a busy answer keeps the claim open and refreshes nothing', async () => {

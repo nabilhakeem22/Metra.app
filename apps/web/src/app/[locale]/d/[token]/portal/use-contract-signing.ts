@@ -5,6 +5,7 @@ import { signerNameOf } from '@/lib/client-home/signer-name';
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { signContractInHome } from '../contract-actions';
 import { signFailureOf, signFailureRefreshes, type ShownSignFailure } from './contract-sign-failure';
+import { refreshUnlessOffline } from './refresh-unless-offline';
 import { useActNameBox, type ActNameBox } from './use-act-name-box';
 import { useClientCode, type ClientCode, type KnownCodeChannel } from './use-client-code';
 
@@ -58,7 +59,7 @@ export function useContractSigning(
   function settle(notice: SignNotice) {
     setAsking(false);
     onNotice(notice);
-    if (notice.kind !== 'refused' || signFailureRefreshes(notice.failure)) onChanged();
+    if (notice.kind !== 'refused' || signFailureRefreshes(notice.failure)) refreshUnlessOffline(onChanged);
   }
   const code = useClientCode(token, 'sign_contract', asking ? contractId : null, channel, () => settle({ kind: 'refused', failure: { error: 'wrong_state' } }), typingFor);
 

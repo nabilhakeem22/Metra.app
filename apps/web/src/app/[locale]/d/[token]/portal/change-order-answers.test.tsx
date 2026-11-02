@@ -93,6 +93,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the answers to a decision (%s)', (lo
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
+  it('a rejected promise on an offline phone: the same sentence, and the page stays (F6)', async () => {
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    mount();
+    actions.decideVariationInHome.mockRejectedValueOnce(new Error('lost'));
+    await openWithCode();
+    fireEvent.click(await confirmButton());
+    await act(async () => {});
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'portal.errors.uncertain'));
+    expect(onChanged).not.toHaveBeenCalled();
+    offline.mockRestore();
+  });
+
   it('a rejected promise: uncertain, the page read again, the spinner gone (AC10)', async () => {
     mount();
     actions.decideVariationInHome.mockRejectedValueOnce(new Error('lost'));

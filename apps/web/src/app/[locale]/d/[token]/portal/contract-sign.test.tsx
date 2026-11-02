@@ -203,6 +203,18 @@ describe.each<TestLocale>(['en', 'ar-EG'])('signing the contract in the home (%s
     expect((signButton() as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('an answer that never came on an offline phone: the same sentence, and the page stays (F6)', async () => {
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderWithIntl(card(executionAt('sign_contract')), { locale });
+    actions.signContractInHome.mockRejectedValueOnce(new Error('network'));
+    await openWithCode();
+    fireEvent.click(await confirmButton());
+    await act(async () => {});
+    expect(screen.getByRole('alert').textContent).toBe(messageAt(locale, 'portal.errors.uncertain'));
+    expect(onChanged).not.toHaveBeenCalled();
+    offline.mockRestore();
+  });
+
   it('a dead link or a failure with a reference is said as every link page says it, with no refresh', async () => {
     renderWithIntl(card(executionAt('sign_contract')), { locale });
     await signWith({ ok: false, error: 'token_expired' });

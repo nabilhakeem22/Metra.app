@@ -17,6 +17,7 @@ import { GROUP_BUTTONS, type HeroButton } from './hero-buttons';
 import { HeroConfirmBody } from './hero-confirm-body';
 import { HeroErrorText } from './hero-error';
 import { sendHeroVerb } from './hero-verbs';
+import { refreshUnlessOffline } from './refresh-unless-offline';
 import { useChangesNote } from './use-changes-note';
 import { HeroWorkStrip } from './hero-work-strip';
 
@@ -73,7 +74,8 @@ export function ActionHero({
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
         const { refresh, ...refusal } = answer;
         setFailure(refusal);
-        if (refresh) router.refresh();
+        // Refreshes on a refusal, and on the budget half's lost answer (the only lost answer that does).
+        if (refresh) refreshUnlessOffline(router.refresh);
       } catch {
         // The answer never came back: it may have been saved (UNCONFIRMED_WRITE).
         setFailure(UNCONFIRMED_WRITE);

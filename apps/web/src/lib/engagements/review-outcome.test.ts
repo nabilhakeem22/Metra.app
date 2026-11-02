@@ -4,6 +4,7 @@ import {
   designOutcomeOfSaved,
   handoverOutcomeOfSaved,
   isDesignVerb,
+  refusalSaysMovedOn,
 } from './review-outcome';
 
 // Carry-over 5 (AC 55, 56): a design or handover tap confirms only what is SAVED.
@@ -16,6 +17,16 @@ describe('answersFromSaved', () => {
     expect(answersFromSaved({ ok: true })).toBe(false);
     expect(answersFromSaved({ ok: false, error: 'token_expired' })).toBe(false);
     expect(answersFromSaved({ ok: false })).toBe(false);
+  });
+});
+
+describe('refusalSaysMovedOn', () => {
+  it('is a review that closed or a delivery that ended, the same refusals as answersFromSaved, and no other', () => {
+    expect(refusalSaysMovedOn('wrong_state')).toBe(true);
+    expect(refusalSaysMovedOn('not_active')).toBe(true);
+    for (const error of ['token_invalid', 'token_expired', 'too_many', 'uncertain', 'generic', '']) {
+      expect(refusalSaysMovedOn(error), error).toBe(false);
+    }
   });
 });
 

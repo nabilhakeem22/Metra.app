@@ -56,7 +56,7 @@ export function PaymentsCard({
   const locale = useLocale();
   const milestoneLabel = useMilestoneLabel();
   // A code email's link opens its instalment's claim at once, while it can still be claimed.
-  const submission = usePaymentClaim(token, openOn && paymentClaimState(claim, openOn, new Set()).kind === 'claimable' ? openOn : null);
+  const submission = usePaymentClaim(token, claim, openOn && paymentClaimState(claim, openOn, new Set()).kind === 'claimable' ? openOn : null);
   const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'design');
   const overview = derivePaymentsOverview(schedule);
   if (!overview) return null;
