@@ -74,6 +74,11 @@ describe('loadChangeOrderLines', () => {
     expect(reads.getOpenChangeOrderLines).toHaveBeenCalledWith(TOKEN, ORDER);
   });
 
+  it('a read that failed or was slow: load_failed, never the uncertain of an act (R5)', async () => {
+    reads.getOpenChangeOrderLines.mockResolvedValue('read_failed');
+    expect(await loadChangeOrderLines(TOKEN, ORDER)).toEqual({ ok: false, error: 'load_failed' });
+  });
+
   it('past the read brake: too_many, and nothing is read', async () => {
     brake.portalReadAllowed.mockResolvedValueOnce(false);
     expect(await loadChangeOrderLines(TOKEN, ORDER)).toEqual({ ok: false, error: 'too_many' });

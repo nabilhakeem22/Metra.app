@@ -40,6 +40,7 @@ export function useChangeOrderLines(token: string, variationId: string) {
           setLines(answer.lines);
           setOpen(true);
         } else if (answer.error === 'gone') failed({ own: 'gone' });
+        else if (answer.error === 'load_failed') failed({ own: 'loadFailed' });
         else failed({ failure: answer });
       } catch {
         failed({ own: 'loadFailed' });

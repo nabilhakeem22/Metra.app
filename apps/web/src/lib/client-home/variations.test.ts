@@ -145,6 +145,31 @@ describe('getOpenChangeOrderLines', () => {
     expect(await getOpenChangeOrderLines('tok', id)).toBeNull();
     expect(sdf.readSdfJson).not.toHaveBeenCalled();
   });
+
+  it('a failed read: read_failed, not the null of an order gone, with ONE redacted line and no throw (R5)', async () => {
+    sdf.readSdfJson.mockRejectedValue(Object.assign(new Error(`Failed query: select params: ${hashShareToken('tok')}`), { query: 'select', params: [hashShareToken('tok')] }));
+    expect(await getOpenChangeOrderLines('tok', ORDER)).toBe('read_failed');
+    expect(logged).toContain('client home change order lines read failed');
+    expect(logged.match(/lines read failed/g)).toHaveLength(1);
+    expect(logged).not.toContain(hashShareToken('tok'));
+  });
+
+  it('a document this build cannot read: read_failed, one line (R5)', async () => {
+    sdf.readSdfJson.mockResolvedValue({ open: [null] });
+    expect(await getOpenChangeOrderLines('tok', ORDER)).toBe('read_failed');
+    expect(logged).toContain('client home change order lines read failed');
+  });
+
+  it('a stalled read: read_failed at the wait the list read has, one line (R5)', async () => {
+    vi.useFakeTimers();
+    sdf.readSdfJson.mockReturnValue(new Promise(() => {}));
+    const answer = getOpenChangeOrderLines('tok', ORDER);
+    await vi.advanceTimersByTimeAsync(OPTIONAL_READ_WAIT_MS - 1);
+    expect(logged).toBe('');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await answer).toBe('read_failed');
+    expect(logged).toContain('client home change order lines read failed');
+  });
 });
 
 describe('orderStandingInHome', () => {

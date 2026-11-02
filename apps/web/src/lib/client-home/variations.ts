@@ -59,14 +59,25 @@ export async function orderStandingInHome(rawToken: string, variation: Pick<Publ
   return (await readOpenOrders(rawToken))?.some((order) => order.id === variation.id) ? 'shown' : 'not_shown';
 }
 
+/** The lines of the order `id` of a list, in their order, or null when the list does not hold it. */
+function linesOfOrder(orders: PublicVariation[] | null, id: string): PublicContractLine[] | null {
+  const order = orders?.find((open) => open.id === id);
+  return order ? [...order.lines].sort((first, second) => first.sort_order - second.sort_order).map(changeOrderLineOf) : null;
+}
+
 /**
- * The lines of one order the home shows for a decision, in their order, when
- * the client asks for them. Null, uniformly, for an order decided or lapsed
- * since, another home's, or an id that is not one (no round trip).
+ * The lines of one order the home shows for a decision, when the client asks for
+ * them. Null, uniformly, for an order decided or lapsed since, another home's, or
+ * an id that is not one (no round trip). A read that failed or was slow
+ * (./optional-read.ts, as the list's) is `read_failed`, never null: the order may
+ * well still wait, and nothing here is an act that could have gone through.
  */
-export async function getOpenChangeOrderLines(rawToken: string, variationId: unknown): Promise<PublicContractLine[] | null> {
+export async function getOpenChangeOrderLines(rawToken: string, variationId: unknown): Promise<PublicContractLine[] | null | 'read_failed'> {
   if (!isUuid(variationId)) return null;
   const id = variationId.toLowerCase();
-  const order = (await readOpenOrders(rawToken))?.find((open) => open.id === id);
-  return order ? [...order.lines].sort((first, second) => first.sort_order - second.sort_order).map(changeOrderLineOf) : null;
+  const read = await optionalPageRead(
+    'client home change order lines read failed:',
+    readOpenOrders(rawToken).then((orders) => ({ lines: linesOfOrder(orders, id) })),
+  );
+  return read ? read.lines : 'read_failed';
 }

@@ -14,12 +14,14 @@ import { requestProvenance } from '@/lib/share/request-provenance';
 // budget (lib/share/portal-rate-limit.ts); past either, nothing is read or
 // written and the answer is `too_many`. NOTHING THROWS TO THE CLIENT: each runs
 // through `answered`, so a failure underneath is `uncertain` (the decision may
-// still commit) or `generic` with its reference.
+// still commit) or `generic` with its reference. The lines' own read is bounded
+// and caught where it runs, and answers `load_failed`: no act is in doubt.
 
-/** The order's lines; `gone`, uniformly, when the home no longer shows it for a decision. */
+/** The order's lines; `gone`, uniformly, when the home no longer shows it for a decision; `load_failed` when the read failed or was slow. */
 export type ChangeOrderLinesAnswer =
   | { ok: true; lines: PublicContractLine[] }
   | { ok: false; error: 'gone' }
+  | { ok: false; error: 'load_failed' }
   | { ok: false; error: 'too_many' }
   | ({ ok: false } & PortalFailure);
 
@@ -53,6 +55,7 @@ export async function loadChangeOrderLines(token: string, variationId: string): 
   return answered('loadChangeOrderLines', failed, async (): Promise<ChangeOrderLinesAnswer> => {
     if (!(await portalReadAllowed(token))) return { ok: false, error: 'too_many' };
     const lines = await getOpenChangeOrderLines(token, variationId);
+    if (lines === 'read_failed') return { ok: false, error: 'load_failed' };
     return lines ? { ok: true, lines } : { ok: false, error: 'gone' };
   });
 }

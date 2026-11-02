@@ -46,6 +46,7 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the items of a change order (%s)', (
 
   it.each<[string, unknown, string]>([
     ['gone', { ok: false, error: 'gone' }, 'gone'],
+    ['a read that failed or was slow on the server (R5)', { ok: false, error: 'load_failed' }, 'loadFailed'],
     ['a rejected read', null, 'loadFailed'],
   ])('%s: says why, and the button is free again', async (_case, answer, key) => {
     if (answer) actions.loadChangeOrderLines.mockResolvedValueOnce(answer);
