@@ -1,10 +1,6 @@
 import 'server-only';
 import { boqs, type MetraDb } from '@metra/db';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
-import type { OrgContext } from '@/lib/db/context';
-import { withOrgContext } from '@/lib/db/context';
-import { readBoqDetail } from './detail';
-import type { BoqDetail } from './types';
 
 /** The header columns the "current BOQ" readers need, and nothing heavier. */
 export interface CurrentBoqRow {
@@ -13,6 +9,8 @@ export interface CurrentBoqRow {
   number: number;
   total: string;
   createdAt: Date;
+  /** A draft stands on the project, this row itself if it is one. In the one statement: the cockpit reads no more. */
+  projectHasDraft: boolean;
 }
 
 /**
@@ -33,22 +31,11 @@ export async function selectCurrentProjectBoq(
       number: boqs.number,
       total: boqs.total,
       createdAt: boqs.createdAt,
+      projectHasDraft: sql<boolean>`exists (select 1 from public.boqs d where d.project_id = ${projectId} and d.status = 'draft')`,
     })
     .from(boqs)
     .where(and(eq(boqs.projectId, projectId), ne(boqs.status, 'superseded')))
     .orderBy(desc(sql`(${boqs.status} = 'issued')`), asc(boqs.createdAt))
     .limit(1);
   return row ?? null;
-}
-
-/** The project's current BOQ in full, or null. */
-export async function getProjectBoq(
-  ctx: OrgContext,
-  projectId: string,
-  opts: { showCost: boolean },
-): Promise<BoqDetail | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const current = await selectCurrentProjectBoq(tx, projectId);
-    return current ? readBoqDetail(tx, current.id, opts) : null;
-  });
 }

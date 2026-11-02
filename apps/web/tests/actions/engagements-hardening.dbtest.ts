@@ -109,8 +109,8 @@ describe('one-active-delivery backstop (Slice C2-hardening)', () => {
   });
 });
 
-describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', () => {
-  it('a terminal delivery below the cap can start the project extension', async () => {
+describe('one delivery per client per project (OD-1, abandoned excluded)', () => {
+  it('a finished delivery refuses a second one, writing nothing and spending no number', async () => {
     const { ctx, clientId, projectId } = await setup();
     const first = await createEngagementCore(ctx, {
       titleEn: 'Original',
@@ -119,48 +119,21 @@ describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', (
     });
     await setTerminal(idOf(first as { data?: string }), 'closed_design_only');
 
-    // Non-abandoned count = 1 (< 2) → the one extension is allowed.
-    const extension = await createEngagementCore(ctx, {
-      titleEn: 'Extension',
-      clientId,
-      projectId,
-    });
-    expect(extension.ok).toBe(true);
-    expect(await totalDeliveries(projectId)).toBe(2);
-  });
-
-  it('a project with two non-abandoned deliveries rejects a third, writing nothing', async () => {
-    const { ctx, clientId, projectId } = await setup();
-    const first = await createEngagementCore(ctx, {
-      titleEn: 'Original',
-      clientId,
-      projectId,
-    });
-    await setTerminal(idOf(first as { data?: string }), 'closed_design_only');
     const second = await createEngagementCore(ctx, {
       titleEn: 'Extension',
       clientId,
       projectId,
     });
-    await setTerminal(idOf(second as { data?: string }), 'execution');
-    expect(await totalDeliveries(projectId)).toBe(2);
-
-    // Non-abandoned count = 2 → the cap check fails before allocating a number.
-    const third = await createEngagementCore(ctx, {
-      titleEn: 'Third',
-      clientId,
-      projectId,
-    });
-    expect(third).toEqual({
+    expect(second).toMatchObject({
       ok: false,
       error: 'check_fields',
-      fields: { projectId: { code: 'project_delivery_limit_reached' } },
+      fields: { projectId: { code: 'project_client_has_delivery' } },
     });
-    // Nothing written on the project…
-    expect(await totalDeliveries(projectId)).toBe(2);
+    // Nothing written on the project...
+    expect(await totalDeliveries(projectId)).toBe(1);
 
-    // …and no number was consumed: the next delivery on a fresh project takes the
-    // sequential number after the two that exist (3), with no phantom gap.
+    // ...and no number was consumed: the next delivery on a fresh project takes the
+    // sequential number after the one that exists (2), with no phantom gap.
     const otherProjectId = await addProject(ctx, clientId, '2');
     const fresh = await createEngagementCore(ctx, {
       titleEn: 'Fresh',
@@ -173,10 +146,10 @@ describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', (
         fresh as { data?: string },
       )}'`,
     );
-    expect(Number(row.number)).toBe(3);
+    expect(Number(row.number)).toBe(2);
   });
 
-  it('abandoned deliveries do not count: 1 real + 1 abandoned still allows a new one', async () => {
+  it('abandoned deliveries do not count: a new one starts after them, and it then holds the slot', async () => {
     const { ctx, clientId, projectId } = await setup();
     const first = await createEngagementCore(ctx, {
       titleEn: 'Abandoned attempt',
@@ -189,53 +162,16 @@ describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', (
       clientId,
       projectId,
     });
-    await setTerminal(idOf(second as { data?: string }), 'closed_design_only');
-
-    // Rows on project = 2, but non-abandoned count = 1 → a new create SUCCEEDS.
-    expect(await totalDeliveries(projectId)).toBe(2);
-    const third = await createEngagementCore(ctx, {
-      titleEn: 'Extension despite abandoned',
-      clientId,
-      projectId,
-    });
-    expect(third.ok).toBe(true);
-    expect(await totalDeliveries(projectId)).toBe(3);
-  });
-
-  it('two non-abandoned plus an abandoned: the third non-abandoned is still rejected', async () => {
-    const { ctx, clientId, projectId } = await setup();
-    // Abandon a throwaway FIRST (while the non-abandoned count is still 0) —
-    // the cap would block creating it once two real deliveries already exist.
-    const abandoned = await createEngagementCore(ctx, {
-      titleEn: 'Abandoned extra',
-      clientId,
-      projectId,
-    });
-    await setTerminal(idOf(abandoned as { data?: string }), 'abandoned');
-    const first = await createEngagementCore(ctx, {
-      titleEn: 'Original',
-      clientId,
-      projectId,
-    });
-    await setTerminal(idOf(first as { data?: string }), 'closed_design_only');
-    const second = await createEngagementCore(ctx, {
-      titleEn: 'Extension',
-      clientId,
-      projectId,
-    });
+    expect(second.ok).toBe(true);
     await setTerminal(idOf(second as { data?: string }), 'execution');
 
-    // Non-abandoned count = 2 (the abandoned row is ignored) → reject.
-    const fourth = await createEngagementCore(ctx, {
-      titleEn: 'Fourth',
+    expect(await totalDeliveries(projectId)).toBe(2);
+    const third = await createEngagementCore(ctx, {
+      titleEn: 'A second link',
       clientId,
       projectId,
     });
-    expect(fourth).toEqual({
-      ok: false,
-      error: 'check_fields',
-      fields: { projectId: { code: 'project_delivery_limit_reached' } },
-    });
-    expect(await totalDeliveries(projectId)).toBe(3);
+    expect(third).toMatchObject({ fields: { projectId: { code: 'project_client_has_delivery' } } });
+    expect(await totalDeliveries(projectId)).toBe(2);
   });
 });

@@ -6,7 +6,7 @@ import { JOURNEY_MILESTONES, stateMilestone } from '@/lib/engagements/journey-ma
 import { deriveHero, type HeroKind } from '@/lib/engagements/portal-hero';
 import { PORTAL_STAGE_KEY } from '@/lib/engagements/portal-stage';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
-import { DESIGN_STATES, type DesignState } from '@/lib/engagements/states';
+import { DESIGN_STATES, isTerminal, type DesignState } from '@/lib/engagements/states';
 import { TRANSITIONS, type Trigger } from '@/lib/engagements/transitions';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { buildPhaseView } from '../build-view';
@@ -74,14 +74,14 @@ describe('locateDesignForClient', () => {
     expect(locateDesignForClient(deliveryAt('design_3d', deriveHero([], 'design_3d').kind)).whoseMove).toBe('studio');
   });
 
-  it('knows the four fee gates the machine waits at', () => {
+  it('knows the fee gates the machine holds, closed_design_only the one a delivery does not wait at', () => {
     const gates = MONEY_GATES.flatMap(([, states, , kind]) => states.map((state) => `${state}:${kind}`));
-    expect(gates.sort()).toEqual(['concept_review:gate_a', 'design_proposal:deposit', 'execution_decision:balance', 'execution_decision:balance', 'final_approval:gate_b']);
+    expect(gates.sort()).toEqual(['closed_design_only:balance', 'concept_review:gate_a', 'design_proposal:deposit', 'execution_decision:balance', 'execution_decision:balance', 'final_approval:gate_b']);
   });
 
   it('gives the client the move while the studio waits on their fee at a gate, and the studio once they have claimed it (F5)', () => {
     for (const [trigger, states, guard, kind] of MONEY_GATES) {
-      for (const state of states) {
+      for (const state of states.filter((gateState) => !isTerminal(gateState))) {
         const preview = { primaryTrigger: trigger, endingChoices: [], items: [{ guard, ok: false, code: null, amountDue: '1000.0000' }], awaitingClientReview: false };
         const label = `${state}/${kind}`;
         const waiting = resolveDeliveryStatus({ state, whoseMove: resolveWhoseMove({ state, preview, pendingClaimCount: 0 }), daysSinceChange: 1 });

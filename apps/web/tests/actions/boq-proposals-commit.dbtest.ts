@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { commitProposalBoqCore } from '@/lib/boq-proposals/core/commit';
 import { loadSendSnapshot } from '@/lib/boq-proposals/snapshot';
 import { createBoqCore } from '@/lib/boqs/core';
-import { getBoqDetail, getProjectBoq, getProjectBoqSummary } from '@/lib/boqs/queries';
+import { getBoqDetail, getBoqTabDocument, getProjectBoqSummary } from '@/lib/boqs/queries';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
@@ -215,7 +215,7 @@ describe('a second send is the next version (AC11)', () => {
     const artifacts = await boqArtifacts(engagementId);
     expect(artifacts.map((a) => a.client_visible)).toEqual([false, true]);
 
-    expect((await getProjectBoq(org.ctx, org.projectId, { showCost: false }))?.id).toBe(v2.id);
+    expect((await getBoqTabDocument(org.ctx, org.projectId, { showCost: false, canBuild: false })).boq?.id).toBe(v2.id);
     expect((await getBoqDetail(org.ctx, v1.id, { showCost: false }))?.id).toBe(v1.id);
     expect(await proposalStatus(proposalId)).toBe('draft');
   });

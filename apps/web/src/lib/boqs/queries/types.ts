@@ -51,3 +51,9 @@ export interface BoqDetail {
   totalCost?: string;
   totalMargin?: string;
 }
+
+/** A project's BOQ as its tab reads it: also who it is for, and through which delivery. */
+export interface ProjectBoq extends BoqDetail {
+  clientId: string;
+  engagementId: string | null;
+}

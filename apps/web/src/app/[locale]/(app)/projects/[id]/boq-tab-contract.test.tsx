@@ -61,8 +61,9 @@ function renderTab(locale: TestLocale, issueBlockedByContract: boolean) {
       canBuild
       canSeeCost={false}
       clientCanOpenOnIssue={false}
+      issueNeedsDelivery={false}
       issueBlockedByContract={issueBlockedByContract}
-      execution={{ contractId: null, canGenerate: false }}
+      execution={{ contractId: null, canGenerate: false, refusal: null, canStartVersion: false }}
     />,
     { locale },
   );

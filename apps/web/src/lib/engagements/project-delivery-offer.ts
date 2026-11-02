@@ -1,14 +1,7 @@
 // What a project's delivery panel offers. PURE and CLIENT-SAFE (the panel is a
-// client component; the create guard in ./delivery-slot.ts shares the cap).
+// client component; the create guard in ./delivery-slot.ts is the same rule).
 import type { EntryPhase } from '@/lib/flow/types';
 import { isTerminal, type DesignState } from './states';
-
-/**
- * Lifetime cap: a Project may hold at most TWO counted deliveries over its life
- * (the original + one extension). Abandoned and light deliveries are not
- * counted (./delivery-slot.ts, deliveriesCountedTowardCap).
- */
-export const PROJECT_DELIVERY_CAP = 2;
 
 export interface ProjectDeliveryOffer {
   /**
@@ -17,28 +10,21 @@ export interface ProjectDeliveryOffer {
    * is no design delivery at all.
    */
   heading: 'heading' | 'lightHeading';
-  /**
-   * The create button: the project's first counted delivery (`start`), its
-   * ONE extension once a counted one exists (`extend`), or none while a
-   * delivery is in flight or the cap is used.
-   */
-  create: 'start' | 'extend' | null;
-  /** The cap is used: no delivery can start on this project any more. */
-  atLimit: boolean;
+  /** The create button, or none when the project's client has a delivery to continue from. */
+  create: 'start' | null;
 }
 
 /**
- * The panel's offer from the delivery it shows (the active one, else the
- * newest) and the project's COUNTED deliveries. A light delivery is not
- * counted, so the first design delivery after it is a start, never an
- * extension.
+ * The panel's offer from the delivery it shows (active, else newest non-abandoned,
+ * else newest) and the project's client. A client on a project has one delivery,
+ * so `start` only with none, with an abandoned one, or beside a finished delivery
+ * of ANOTHER client (the project's client changed).
  */
 export function projectDeliveryOffer(
-  delivery: { state: DesignState; entryPhase: EntryPhase } | null,
-  countedDeliveries: number,
+  delivery: { state: DesignState; entryPhase: EntryPhase; clientId: string } | null,
+  projectClientId: string,
 ): ProjectDeliveryOffer {
   const heading = delivery?.entryPhase === 'execution' ? 'lightHeading' : 'heading';
-  if (delivery && !isTerminal(delivery.state)) return { heading, create: null, atLimit: false };
-  if (countedDeliveries >= PROJECT_DELIVERY_CAP) return { heading, create: null, atLimit: true };
-  return { heading, create: countedDeliveries === 0 ? 'start' : 'extend', atLimit: false };
+  if (!delivery || delivery.state === 'abandoned') return { heading, create: 'start' };
+  return { heading, create: isTerminal(delivery.state) && delivery.clientId !== projectClientId ? 'start' : null };
 }

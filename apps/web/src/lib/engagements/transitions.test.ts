@@ -7,7 +7,7 @@ import {
   type Trigger,
 } from './transitions';
 
-// The 19 triggers, spelled out independently of the registry so a dropped or
+// The 20 triggers, spelled out independently of the registry so a dropped or
 // renamed key fails here (the Record<Trigger,…> type also enforces this at
 // compile time; this is the runtime witness).
 const ALL_TRIGGERS: Trigger[] = [
@@ -27,16 +27,17 @@ const ALL_TRIGGERS: Trigger[] = [
   'chooseDesignOnly',
   'recipientAcknowledges',
   'chooseExecution',
+  'continueToExecution',
   'rejectDesign',
   'designChangeRaised',
   'abandon',
 ];
 
 describe('transition registry', () => {
-  it('declares all 19 triggers, exhaustively', () => {
+  it('declares all 20 triggers, exhaustively', () => {
     const keys = Object.keys(TRANSITIONS).sort();
     expect(keys).toEqual([...ALL_TRIGGERS].sort());
-    expect(keys).toHaveLength(19);
+    expect(keys).toHaveLength(20);
   });
 
   it('every def references only known states, guards, and a capability', () => {
@@ -126,7 +127,7 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('all 19 triggers are wired; nothing routes through the fail-closed sentinel', () => {
+  it('all 20 triggers are wired; nothing routes through the fail-closed sentinel', () => {
     // Every declared trigger has an edge: `TRANSITIONS` is annotated
     // `Record<Trigger, TransitionDef>`, so a trigger filed in no edge file does
     // not compile. Each one carries a concrete guard, never the sentinel.
@@ -289,6 +290,15 @@ describe('transition registry', () => {
     expect(TRANSITIONS.chooseExecution.to).toBe('execution');
     expect(TRANSITIONS.chooseExecution.capability).toBe('engagements_design');
     expect(TRANSITIONS.chooseExecution.sideEffect).toBeNull();
+
+    // continueToExecution: a closed design-only delivery goes on to execution on
+    // the same row; the only edge that leaves a terminal state.
+    expect(TRANSITIONS.continueToExecution.guards).toEqual(['balanceCleared']);
+    expect(TRANSITIONS.continueToExecution.from).toBe('closed_design_only');
+    expect(TRANSITIONS.continueToExecution.to).toBe('execution');
+    expect(TRANSITIONS.continueToExecution.capability).toBe('engagements_design');
+    expect(TRANSITIONS.continueToExecution.sideEffect).toBeNull();
+    expect(TRANSITIONS.continueToExecution.decidedBy).toEqual(['owner', 'admin', 'project_manager']);
 
     // recipientAcknowledges (tail): one handoff_acknowledgement event (ANY actor
     // channel) closes the design-only ending — issue family (owner/admin).

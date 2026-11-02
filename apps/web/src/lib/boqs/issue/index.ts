@@ -19,7 +19,7 @@ import { issueEngagementOf } from './sole-engagement';
 export { freezeAndRecordIssue } from './freeze';
 export { loadDocumentNames, type DocumentNames } from './document-names';
 export { renderAndStoreClientBoqPdf } from './render';
-export { getBoqIssueReleasable } from './releasable';
+export { getBoqIssueReadiness } from './releasable';
 export { projectHasLiveContractOnIssuedBoq } from './live-contract';
 
 /**
@@ -122,7 +122,7 @@ async function loadIssueSource(
   // client ever sees this document. Its client, not the project's, is the one
   // the BOQ is for (the project's client may have changed since).
   const engagement = await issueEngagementOf(ctx, row);
-  if (!engagement) return 'engagement_not_found';
+  if (!engagement) return 'boq_needs_delivery';
 
   const names = await loadDocumentNames(ctx, { clientId: engagement.clientId, projectId: row.projectId });
   if (!names) return 'boq_not_found';

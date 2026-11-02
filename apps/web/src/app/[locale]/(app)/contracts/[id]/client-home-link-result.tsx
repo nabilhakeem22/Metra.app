@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { DesignFirstLink } from '@/components/contracts/design-first-link';
 import { Button } from '@/components/ui/button';
 import type { ClientHomeShown } from './client-home-shown';
 
@@ -31,8 +32,11 @@ export function ClientHomeLinkResult({ shown }: { shown: ClientHomeShown }) {
     );
   }
   return (
-    <p className="text-caption text-destructive" role="alert">
-      {shown.error}
-    </p>
+    <div>
+      <p className="text-caption text-destructive" role="alert">
+        {shown.error}
+      </p>
+      <DesignFirstLink target={shown.target} />
+    </div>
   );
 }

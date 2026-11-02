@@ -90,10 +90,11 @@ describe('AC9: the issued BOQ under a contract stays issued', () => {
         generateExecutionContractCore(owner, { boqId: issued.boqId, taxRate: '14', supervisionPct: '0' }),
         issueNewVersion(issued),
       ]);
-      // Exactly one of the two wins, and the loser names why.
+      // Exactly one of the two wins, and the loser names why: a generate that reads
+      // the new draft before its issue locks the BOQ is refused for the draft (R-F1).
       expect([generated.ok, reissued.result.ok].filter(Boolean)).toHaveLength(1);
       if (generated.ok) expect(reissued.result).toEqual({ ok: false, error: 'boq_has_contract' });
-      else expect(generated).toEqual({ ok: false, error: 'boq_not_issued' });
+      else expect(['boq_not_issued', 'boq_version_in_progress']).toContain(generated.error);
       const [row] = await ownerQuery<{ n: number }>(
         `select count(*)::int as n from public.contracts c join public.boqs b on b.id = c.source_boq_id
           where b.status = 'superseded' and b.id = $1`,

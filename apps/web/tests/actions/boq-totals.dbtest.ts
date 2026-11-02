@@ -5,7 +5,7 @@ import {
 } from '@/lib/aggregates/proposal-totals';
 import { commitImportCore, createBoqCore } from '@/lib/boqs/core';
 import { deleteBoqLineCore } from '@/lib/boqs/edit';
-import { getProjectBoq } from '@/lib/boqs/queries';
+import { getBoqTabDocument } from '@/lib/boqs/queries';
 import { computeBoqTotals } from '@/lib/boqs/totals';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
@@ -168,7 +168,7 @@ describe('the set-based total recompute', () => {
 
   it('zeroes a section that has lost every line rather than leaving it stale', async () => {
     const { ctx, projectId, boqId } = await seedThreeSectionBoq();
-    const boq = await getProjectBoq(ctx, projectId, { showCost: true });
+    const { boq } = await getBoqTabDocument(ctx, projectId, { showCost: true, canBuild: false });
     const flooring = boq!.sections.find((s) => s.title === 'Flooring')!;
     const subtotalBefore = (await persistedSections(boqId)).find(
       (s) => s.id === flooring.id,

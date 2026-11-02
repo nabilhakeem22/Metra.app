@@ -24,6 +24,7 @@ export function BoqTab({
   canBuild,
   canSeeCost,
   clientCanOpenOnIssue,
+  issueNeedsDelivery,
   issueBlockedByContract,
   execution,
 }: {
@@ -35,6 +36,8 @@ export function BoqTab({
   /** The portal's BOQ rule on the engagement an issue would deliver through:
    *  decides which sentence the Issue confirm says. */
   clientCanOpenOnIssue: boolean;
+  /** The project has no single delivery to issue through: Issue is off and the tab says why. */
+  issueNeedsDelivery: boolean;
   /** A live contract stands on the project's issued BOQ, so a draft cannot
    *  replace it: Issue is off and the tab says why. */
   issueBlockedByContract: boolean;
@@ -59,6 +62,7 @@ export function BoqTab({
       canEdit={canEdit}
       canSeeCost={canSeeCost}
       clientCanOpenOnIssue={clientCanOpenOnIssue}
+      issueNeedsDelivery={issueNeedsDelivery}
       issueBlockedByContract={issueBlockedByContract}
       execution={execution}
     />

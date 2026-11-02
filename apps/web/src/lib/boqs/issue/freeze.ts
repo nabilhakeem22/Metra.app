@@ -88,7 +88,7 @@ async function supersedeOthers(
  * BOQ FOR SHARE (lib/contracts/core/create-from-boq.ts), so it has committed by
  * now and this read sees it.
  */
-async function refuseIfContracted(tx: MetraDb, issuedBoqIds: string[]): Promise<void> {
+export async function refuseIfContracted(tx: MetraDb, issuedBoqIds: string[]): Promise<void> {
   if (issuedBoqIds.length === 0) return;
   const [standing] = await tx
     .select({ id: contracts.id })

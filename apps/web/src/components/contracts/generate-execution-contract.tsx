@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { DesignFirstLink } from '@/components/contracts/design-first-link';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
@@ -15,6 +16,7 @@ import {
   contractChargeFieldErrors,
   type ContractChargeField,
 } from '@/lib/contracts/charges-input';
+import { designFirstTargetOf, type DesignFirstTarget } from '@/lib/engagements/design-first';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 
 /** The DOM id of a rate box: the dialog's refusals sit under these. */
@@ -35,6 +37,7 @@ export function GenerateExecutionContract({ boqId }: { boqId: string }) {
   const [open, setOpen] = useState(false);
   const [rates, setRates] = useState(DEFAULT_CONTRACT_CHARGES);
   const [pending, startTransition] = useTransition();
+  const [refusedFor, setRefusedFor] = useState<DesignFirstTarget | null>(null);
   const errors = useFieldErrors({ fields: CONTRACT_CHARGE_FIELDS, translate: te });
 
   function submit() {
@@ -42,6 +45,7 @@ export function GenerateExecutionContract({ boqId }: { boqId: string }) {
     startTransition(async () => {
       try {
         const res = await generateExecutionContract({ boqId, ...rates });
+        setRefusedFor(designFirstTargetOf(res));
         if (errors.applyResult(res) || !res.data) return;
         setOpen(false);
         router.push(`/contracts/${res.data}`);
@@ -84,6 +88,7 @@ export function GenerateExecutionContract({ boqId }: { boqId: string }) {
       >
         {rateBox('taxRate')}
         {rateBox('supervisionPct')}
+        <DesignFirstLink target={refusedFor} />
       </FormSheet>
     </>
   );

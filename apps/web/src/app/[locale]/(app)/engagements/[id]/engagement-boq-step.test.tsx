@@ -46,6 +46,7 @@ const sent = {
   lineCount: 14,
   documentNumber: 'BQ-2026-0014',
   total: '159900.0000',
+  projectHasDraft: false,
 };
 
 function renderStep(data: BoqStepData) {

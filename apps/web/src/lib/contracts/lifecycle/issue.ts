@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { requireDesignFinished } from '@/lib/engagements/pair-home';
 import { validateSchedule } from '@/lib/execution/money/schedule';
 import { isRecord } from '@/lib/guards/is-record';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
@@ -27,6 +28,8 @@ async function lockContractForIssue(tx: MetraDb, contractId: string) {
     .select({
       status: contracts.status,
       sourceBoqId: contracts.sourceBoqId,
+      projectId: contracts.projectId,
+      clientId: contracts.clientId,
       originalValue: contracts.originalValue,
       taxAmount: contracts.taxAmount,
     })
@@ -108,7 +111,8 @@ export interface IssuedContract {
  * write the event. Owner/admin only (contracts_issue). The transition IS the
  * admission gate — a concurrent 2nd issue finds status<>'draft' -> 0 rows ->
  * contract_not_draft, no 2nd token, no 2nd event. An execution contract also
- * needs a valid schedule; a refusal writes no token and no event. Returns the
+ * needs a finished design on its pair and a valid schedule; a refusal writes no
+ * token and no event. Returns the
  * RAW token and whether it is an execution contract (read under the lock); the
  * action wrapper turns that into the link the studio hands the client.
  */
@@ -125,6 +129,7 @@ export async function issueContractCore(
     { capability: 'contracts_issue', action: 'approve' },
     async (tx, audit) => {
       const contract = await lockContractForIssue(tx, contractId);
+      if (contract.sourceBoqId !== null) await requireDesignFinished(tx, contract);
       await requireValidSchedule(tx, contractId, contract);
       const { raw, hash } = mintShareToken();
       await issueDraftContract(tx, contractId, hash, shareExpiryFromNow());

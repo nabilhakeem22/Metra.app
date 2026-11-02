@@ -13,6 +13,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
+import { requireDesignFinished } from '@/lib/engagements/pair-home';
 import { ENDING_DECIDERS } from '@/lib/engagements/transitions/trigger-roles';
 import { isRecord } from '@/lib/guards/is-record';
 import { isUuid } from '@/lib/uuid';
@@ -38,7 +39,12 @@ export function mayRecordSignedOffline(role: OrgContext['role']): boolean {
  */
 async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: string): Promise<void> {
   const [locked] = await tx
-    .select({ status: contracts.status, sourceBoqId: contracts.sourceBoqId })
+    .select({
+      status: contracts.status,
+      sourceBoqId: contracts.sourceBoqId,
+      projectId: contracts.projectId,
+      clientId: contracts.clientId,
+    })
     .from(contracts)
     .where(eq(contracts.id, contractId))
     .limit(1)
@@ -46,6 +52,7 @@ async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: str
   if (!locked) fail('record_not_found');
   if (locked.sourceBoqId === null) fail('contract_not_execution');
   if (locked.status !== 'issued') fail('contract_not_signable');
+  await requireDesignFinished(tx, locked);
   const issuedOn = await contractIssuedOnInCairo(tx, contractId);
   const beforeIssue = dayBeforeIssue(signedOn, issuedOn);
   if (beforeIssue) failFields({ signedOn: beforeIssue });
@@ -61,8 +68,9 @@ async function signIssuedContract(tx: MetraDb, contractId: string, signedOn: str
  * Record that the client signed an ISSUED execution contract on paper, on
  * `signedOn` (not after today, not before the issue day, in Cairo). A draft,
  * signed or terminated contract is `contract_not_signable`;
- * a proposal contract `contract_not_execution`; any role but owner, admin or
- * project manager `forbidden`.
+ * a proposal contract `contract_not_execution`; design still open or closed on its
+ * pair `design_open` / `design_only_closed`; any role but owner, admin or project
+ * manager `forbidden`.
  */
 export async function recordContractSignedOfflineCore(
   ctx: OrgContext,

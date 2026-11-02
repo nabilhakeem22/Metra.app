@@ -40,6 +40,7 @@ export {
   finalizeBOQ,
   chooseDesignOnly,
   chooseExecution,
+  continueToExecution,
   recipientAcknowledges,
   abandonEngagement,
 } from './closing-transitions';

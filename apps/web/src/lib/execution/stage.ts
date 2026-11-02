@@ -144,7 +144,8 @@ export function executionStage(facts: ExecutionFacts): ExecutionStageResult {
   }
   switch (contract.status) {
     case 'terminated':
-      return { stage: 'terminated', next: null };
+      // A new contract comes from a new BOQ version, started on the BOQ tab.
+      return step('terminated', 'open_boq');
     case 'draft':
       return step('draft', contract.scheduleValid ? 'send_contract' : 'set_schedule');
     case 'issued':

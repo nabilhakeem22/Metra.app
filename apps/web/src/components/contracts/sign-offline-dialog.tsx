@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { DesignFirstLink } from '@/components/contracts/design-first-link';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
@@ -11,6 +12,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
 import { todayInCairo } from '@/lib/automation/clock';
 import { recordContractSignedOffline } from '@/lib/contracts/actions';
+import { designFirstTargetOf, type DesignFirstTarget } from '@/lib/engagements/design-first';
 import {
   SIGN_OFFLINE_FIELDS,
   offlineSignatureFieldErrors,
@@ -37,6 +39,7 @@ export function SignOfflineDialog({ contractId }: { contractId: string }) {
   const [signedOn, setSignedOn] = useState(today);
   const [note, setNote] = useState('');
   const [pending, startTransition] = useTransition();
+  const [refusedFor, setRefusedFor] = useState<DesignFirstTarget | null>(null);
   const errors = useFieldErrors({ fields: SIGN_OFFLINE_FIELDS, translate: te });
 
   function submit() {
@@ -44,6 +47,7 @@ export function SignOfflineDialog({ contractId }: { contractId: string }) {
     startTransition(async () => {
       try {
         const res = await recordContractSignedOffline({ contractId, signedOn, note });
+        setRefusedFor(designFirstTargetOf(res));
         if (errors.applyResult(res)) return;
         setOpen(false);
         router.refresh();
@@ -77,6 +81,7 @@ export function SignOfflineDialog({ contractId }: { contractId: string }) {
         <FormField id={signOfflineControlId('note')} label={t('note')} {...errors.bind('note')}>
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
         </FormField>
+        <DesignFirstLink target={refusedFor} />
       </FormSheet>
     </>
   );

@@ -14,6 +14,7 @@ import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
+import { requirePairWithoutDelivery } from '@/lib/engagements/pair-home';
 import { isUuid } from '@/lib/uuid';
 import { copyProposalContentToContract } from './create-copy';
 import {
@@ -143,6 +144,7 @@ export async function generateContractCore(
     },
     async (tx, audit) => {
       const proposal = await loadAcceptedProposal(tx, proposalId);
+      await requirePairWithoutDelivery(tx, proposal);
       const percentages = await loadInheritedPercentages(tx, proposal);
       const number = await allocateContractNumber(tx, ctx.orgId);
       const contractId = await persistContractHeader(

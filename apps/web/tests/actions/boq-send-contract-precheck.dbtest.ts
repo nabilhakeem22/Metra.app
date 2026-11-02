@@ -48,9 +48,9 @@ const boqCount = async (engagementId: string) =>
   ))[0].n;
 
 /**
- * A project whose issued BOQ has a live contract (its delivery is in execution,
- * which frees the project's one-active-engagement slot), and a NEW delivery on
- * the same project with a BOQ proposal ready to send.
+ * A project whose issued BOQ has a live contract, and a NEW delivery on the same
+ * project with a BOQ proposal ready to send. A pair has one delivery, so the old
+ * row is abandoned first: an old-rows state, kept here for the refusal it proves.
  */
 async function contractedProjectWithNewDelivery(org: BoqOrg) {
   const firstEngagementId = await engagementAtBoq(org);
@@ -66,6 +66,7 @@ async function contractedProjectWithNewDelivery(org: BoqOrg) {
     supervisionPct: '0',
   });
   expect(generated).toMatchObject({ ok: true });
+  await raw.query(`update public.design_engagements set state = 'abandoned' where id = '${firstEngagementId}'`);
 
   const engagementId = await engagementAtBoq(org);
   const proposalId = await boqProposalWith(org.ctx, engagementId, TWO_SECTIONS);

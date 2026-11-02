@@ -14,6 +14,7 @@ import {
   chooseExecution,
   confirmAndPayDeposit,
   confirmConcept,
+  continueToExecution,
   draftReady,
   finalizeBOQ,
   flagAsBuiltVariance,
@@ -52,6 +53,7 @@ export const DIRECT_TRIGGER_ACTIONS: Partial<
   finalizeBOQ,
   chooseDesignOnly,
   chooseExecution,
+  continueToExecution,
   recipientAcknowledges,
   abandon: abandonEngagement,
 };

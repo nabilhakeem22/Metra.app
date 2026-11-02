@@ -5,6 +5,7 @@ import { GenerateExecutionContract } from '@/components/contracts/generate-execu
 import { SignOfflineDialog } from '@/components/contracts/sign-offline-dialog';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/routing';
+import { boqStepHref } from '@/lib/boqs/step';
 import type { ExecutionCardView } from '@/lib/execution/card-view';
 import {
   NEXT_ACTION_TARGET,
@@ -27,6 +28,20 @@ function mayFollow(view: ExecutionCardView, target: Extract<NextActionTarget, { 
   return view.may.openContract;
 }
 
+/** In place of Create while a draft stands on the project: the server would refuse it, so say why and go to the tab. */
+function BoqVersionInProgress({ projectId }: { projectId: string }) {
+  const t = useTranslations('execution.card');
+  const te = useTranslations('errors');
+  return (
+    <div className="w-full space-y-2">
+      <p className="text-body text-muted-foreground">{te('boq_version_in_progress')}</p>
+      <Button asChild variant="default" className="w-full whitespace-normal text-center">
+        <Link href={boqStepHref(projectId)}>{t('next.open_boq')}</Link>
+      </Button>
+    </div>
+  );
+}
+
 /**
  * The one control for the next action, or null when this role cannot take it
  * here. A plain function, not a component: the caller needs to know it is null
@@ -35,7 +50,8 @@ function mayFollow(view: ExecutionCardView, target: Extract<NextActionTarget, { 
 function nextActionControl(view: ExecutionCardView, target: NextActionTarget, label: string) {
   if (target.kind === 'dialog') {
     if (target.dialog === 'generate_contract') {
-      return view.may.generateContract && view.boqId ? <GenerateExecutionContract boqId={view.boqId} /> : null;
+      if (!view.may.generateContract || !view.boqId) return null;
+      return view.versionInProgress ? <BoqVersionInProgress projectId={view.projectId} /> : <GenerateExecutionContract boqId={view.boqId} />;
     }
     return view.may.signOffline && view.contract ? <SignOfflineDialog contractId={view.contract.id} /> : null;
   }

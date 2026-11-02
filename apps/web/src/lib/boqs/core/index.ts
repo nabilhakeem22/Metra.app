@@ -8,3 +8,4 @@
 export { MAX_BOQ_LINES, createBoqCore, type CreateBoqInput } from './create';
 export { commitImportCore } from './commit-import';
 export { recomputeBoqTotals } from './recompute';
+export { startBoqVersionCore } from './start-version';

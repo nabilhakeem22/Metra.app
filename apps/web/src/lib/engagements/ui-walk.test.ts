@@ -516,8 +516,11 @@ const EXECUTION_WALK: Record<ExecutionStage, ExecutionFacts> = {
   terminated: { hasIssuedBoq: true, contract: executionContract({ status: 'terminated' }) },
 };
 
-/** The stages that end the job: nothing is left to do, so no action is shown. */
-const EXECUTION_STAGES_WITHOUT_ACTION: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['settled', 'terminated']);
+/** Nothing is left to do, so no action is shown. A terminated contract's action is the BOQ tab: a new version, for a new contract. */
+const EXECUTION_STAGES_WITHOUT_ACTION: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['settled']);
+
+/** The stages that end the job: the phase is complete or closed, so no step is current. */
+const EXECUTION_STAGES_WITHOUT_CURRENT_STEP: ReadonlySet<ExecutionStage> = new Set<ExecutionStage>(['settled', 'terminated']);
 
 function executionContract(overrides: Partial<ExecutionContractFacts>): ExecutionContractFacts {
   return {
@@ -591,7 +594,7 @@ describe('the execution rail places every derived stage and says whose move it i
       });
       const view = buildPhaseView(EXECUTION_PHASE, location, 'studio');
       const current = view.steps.filter((step) => step.status === 'current');
-      expect(current, `"${stage}" is live but no step is current`).toHaveLength(EXECUTION_STAGES_WITHOUT_ACTION.has(stage) ? 0 : 1);
+      expect(current, `"${stage}" is live but no step is current`).toHaveLength(EXECUTION_STAGES_WITHOUT_CURRENT_STEP.has(stage) ? 0 : 1);
       for (const catalog of Object.values(messageCatalogs) as Catalog[]) {
         const flow = catalog.engagements.flow;
         for (const step of view.steps) expect(flow.execution[step.key as keyof Catalog['engagements']['flow']['execution']]).toBeTruthy();

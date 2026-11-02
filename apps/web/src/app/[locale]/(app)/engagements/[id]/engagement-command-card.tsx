@@ -7,6 +7,7 @@ import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardActionError } from './command-card-action-error';
 import { CommandCardClosedClaims } from './command-card-closed-claims';
+import { CommandCardContinueExecution } from './command-card-continue-execution';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardHeadline } from './command-card-headline';
 import { deriveCommandCardModel } from './command-card-model';
@@ -79,6 +80,10 @@ function DesignStepCard(props: EngagementCommandCardProps) {
           pending={pending}
           runAction={props.runAction}
         />
+      )}
+
+      {closed && props.secondaryTriggers.includes('continueToExecution') && (
+        <CommandCardContinueExecution engagementId={engagementId} pending={pending} runAction={props.runAction} />
       )}
 
       {closed && <CommandCardActionError error={props.actionError} />}

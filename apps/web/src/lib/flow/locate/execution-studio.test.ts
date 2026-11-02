@@ -28,7 +28,7 @@ describe('locateExecutionForStudio', () => {
       const at = locateExecutionForStudio(facts);
       const label = JSON.stringify(m);
       expect(at.step, label).toBe(EXPECTED_STEP[stage]);
-      if (next === null) expect(at.whoseMove, label).toBeNull();
+      if (next === null || stage === 'terminated') expect(at.whoseMove, label).toBeNull();
       else if (!WAITS_ON_CLIENT.has(next.kind)) expect(at.whoseMove, label).toBe('studio');
       // A wait is taken back only from the client, so only by the studio, and only on a client wait.
       if (at.takenBack !== null) {

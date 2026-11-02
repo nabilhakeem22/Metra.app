@@ -1,69 +1,37 @@
-// Does this project have room for another delivery? Extracted verbatim from
-// `createEngagementCore` (round A1): the two read-guards that run inside the
-// create transaction BEFORE a document number is spent. Code-level guards,
-// RLS-scoped; the one-active-per-project unique index (0032) is the backstop
-// for the race between them and the insert, and stays in the core.
+// Is there room for a delivery of this client on this project? The read-guards
+// of `createEngagementCore`, run AFTER its allocateNumber: that per-org lock also
+// serialises the light insert (lib/client-home/ensure.ts), so the two insert
+// sites read each other's rows. Code-level guards, RLS-scoped; the
+// one-active-per-project unique index (0032) is the backstop for the race
+// between two creates, and stays in the core.
 import { designEngagements, type MetraDb } from '@metra/db';
-import { and, count, eq, inArray, ne, type SQL } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { failFields } from '@/lib/actions/field-errors';
-import { PROJECT_DELIVERY_CAP } from './project-delivery-offer';
-import { ACTIVE_STATES } from './states';
-
-// The non-terminal (in-flight) states a Delivery can occupy — materialized once for
-// the one-delivery-per-project guard's `state IN (…)` probe. A Delivery in a
-// TERMINAL state (closed_design_only / execution / abandoned) has left its Project
-// and does NOT block a fresh start.
-const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
-
-/**
- * The deliveries a project's lifetime cap counts: not abandoned, and not a LIGHT
- * delivery (entry_phase 'execution', ruling D14): a light delivery is the client
- * page of an execution contract, not a sold design delivery. One predicate for
- * the create guard below and the project panel's count (queries/by-project.ts).
- */
-export function deliveriesCountedTowardCap(projectId: string): SQL | undefined {
-  return and(
-    eq(designEngagements.projectId, projectId),
-    ne(designEngagements.state, 'abandoned'),
-    eq(designEngagements.entryPhase, 'design'),
-  );
-}
+import { deliveryDocumentNumber } from './design-first';
+import type { ProjectClient } from './pair-home';
+import { isTerminal } from './states';
 
 /**
  * Refuses under the project select: `project_delivery_exists` when the project
- * already holds an in-flight delivery, and `project_delivery_limit_reached` when
- * it has used its two non-abandoned deliveries. Writes nothing.
+ * holds an in-flight delivery of any client, and `project_client_has_delivery`
+ * when this client has any delivery on it but an abandoned one: a client on a
+ * project has one delivery, so one link (design-first.ts). Writes nothing.
  */
-export async function assertProjectHasDeliverySlot(
-  tx: MetraDb,
-  projectId: string,
-): Promise<void> {
-  // One-delivery-per-project guard (Slice C2): a Project may hold at most one
-  // in-flight Delivery. If a non-terminal row already exists for this project,
-  // refuse before allocating a number so nothing is written. TERMINAL deliveries
-  // (closed_design_only / execution / abandoned) do not block a fresh start.
-  // Code-level guard, RLS-scoped — no DB constraint.
-  const [existing] = await tx
-    .select({ id: designEngagements.id })
+export async function assertProjectHasDeliverySlot(tx: MetraDb, pair: ProjectClient): Promise<void> {
+  const deliveries = await tx
+    .select({
+      number: designEngagements.number,
+      createdAt: designEngagements.createdAt,
+      state: designEngagements.state,
+      clientId: designEngagements.clientId,
+    })
     .from(designEngagements)
-    .where(
-      and(
-        eq(designEngagements.projectId, projectId),
-        inArray(designEngagements.state, ACTIVE_ENGAGEMENT_STATES),
-      ),
-    )
-    .limit(1);
-  if (existing) failFields({ projectId: { code: 'project_delivery_exists' } });
-
-  // Lifetime cap (Slice C2-hardening): at most TWO counted deliveries per project
-  // (original + one extension; deliveriesCountedTowardCap: abandoned and light
-  // ones do not count). Checked BEFORE allocating a number so a rejected create
-  // writes nothing and spends none.
-  const [{ value: countedDeliveries }] = await tx
-    .select({ value: count() })
-    .from(designEngagements)
-    .where(deliveriesCountedTowardCap(projectId));
-  if (countedDeliveries >= PROJECT_DELIVERY_CAP) {
-    failFields({ projectId: { code: 'project_delivery_limit_reached' } });
+    .where(and(eq(designEngagements.projectId, pair.projectId), ne(designEngagements.state, 'abandoned')));
+  if (deliveries.some((delivery) => !isTerminal(delivery.state))) {
+    failFields({ projectId: { code: 'project_delivery_exists' } });
+  }
+  const own = deliveries.find((delivery) => delivery.clientId === pair.clientId);
+  if (own) {
+    failFields({ projectId: { code: 'project_client_has_delivery', params: { delivery: deliveryDocumentNumber(own) } } });
   }
 }

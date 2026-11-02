@@ -141,7 +141,7 @@ describe('the execution card, stage by stage', () => {
     expect(await stageOf(engagementId)).toMatchObject({ stage: 'settled', next: null });
 
     await ownerQuery(`update public.contracts set status = 'terminated' where id = $1`, [contractId]);
-    expect(await stageOf(engagementId)).toMatchObject({ stage: 'terminated', next: null });
+    expect(await stageOf(engagementId)).toMatchObject({ stage: 'terminated', next: { kind: 'open_boq' } });
   });
 
   it('shows the live contract before a newer terminated one, and nothing of another delivery', async () => {

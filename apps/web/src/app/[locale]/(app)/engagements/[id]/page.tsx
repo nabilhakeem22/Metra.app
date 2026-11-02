@@ -63,6 +63,7 @@ export default async function EngagementDetailPage({
     data.execution &&
     executionCardView(data.execution, {
       projectId: header.projectId,
+      versionInProgress: data.boqStep.current?.projectHasDraft ?? false,
       may: {
         generateContract: can(ctx.role, 'contracts_generate', 'create'),
         signOffline: mayRecordSignedOffline(ctx.role),

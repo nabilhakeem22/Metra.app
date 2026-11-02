@@ -71,7 +71,8 @@ export type EngagementActionCode =
   | 'payment_kind_mismatch'
   | 'ending_requires_explicit_choice'
   | 'project_delivery_exists'
-  | 'project_delivery_limit_reached'
+  // One non-abandoned delivery per client per project: one link. Params {delivery}.
+  | 'project_client_has_delivery'
   | 'claim_not_found'
   | 'claim_already_settled'
   | 'claim_pending_for_milestone'

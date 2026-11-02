@@ -69,9 +69,9 @@ describe('legalTriggersFrom', () => {
     );
   });
 
-  it('offers nothing from a terminal state', () => {
+  it('offers nothing from a terminal state, but the one way on from a closed design-only', () => {
     expect(legalTriggersFrom('execution')).toEqual([]);
-    expect(legalTriggersFrom('closed_design_only')).toEqual([]);
+    expect(legalTriggersFrom('closed_design_only')).toEqual(['continueToExecution']);
     expect(legalTriggersFrom('abandoned')).toEqual([]);
   });
 
@@ -111,7 +111,7 @@ describe('legalTriggersFrom', () => {
       boq: ['finalizeBOQ', 'abandon'],
       execution_decision: ['chooseDesignOnly', 'chooseExecution', 'abandon'],
       design_only_handoff: ['recipientAcknowledges', 'abandon'],
-      closed_design_only: [],
+      closed_design_only: ['continueToExecution'],
       execution: [],
       abandoned: [],
       change_triage: ['attestAsBuiltClean', 'abandon'],

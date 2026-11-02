@@ -18,6 +18,8 @@ export interface ExecutionCardView {
   flow: ExecutionFlowFacts;
   projectId: string;
   boqId: string | null;
+  /** A draft stands on the project, so a contract on `boqId` would be refused (`boq_version_in_progress`). */
+  versionInProgress: boolean;
   /** `signed`: when, how and (online) by what name the contract was signed; null before (H6.2 functional F4). */
   contract: { id: string; documentNumber: string; signed: ContractSigning | null } | null;
   /** The schedule row the next payment request would bill, by its labels; null when none is next. */
@@ -42,7 +44,7 @@ export interface ExecutionCardView {
 
 export function executionCardView(
   card: ExecutionCockpitFacts,
-  context: { projectId: string; may: ExecutionCardView['may'] },
+  context: { projectId: string; versionInProgress: boolean; may: ExecutionCardView['may'] },
 ): ExecutionCardView {
   const { stage, next } = executionStage(card.flow.stage);
   return {
@@ -51,6 +53,7 @@ export function executionCardView(
     flow: card.flow,
     projectId: context.projectId,
     boqId: card.boqId,
+    versionInProgress: context.versionInProgress,
     contract: card.contract
       ? {
           id: card.contract.id,

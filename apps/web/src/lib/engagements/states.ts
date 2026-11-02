@@ -70,7 +70,11 @@ export const STAGE_NUMBER: Record<DesignState, number> = {
   change_triage: 8,
 };
 
-/** The three terminal states — no trigger leaves them. */
+/**
+ * The three terminal states: the design is over, so no files and no slot. Only one
+ * trigger leaves them: `continueToExecution`, from `closed_design_only`, when the
+ * client of a design-only delivery later decides to build on the same link.
+ */
 export const TERMINAL_STATES = new Set<DesignState>([
   'closed_design_only',
   'execution',

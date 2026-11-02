@@ -9,6 +9,19 @@ import {
 import { DESIGN_STATES } from './states';
 import { TRANSITIONS, type Trigger } from './transitions';
 
+describe('continueToExecution', () => {
+  it('is never the forward move, nor an ending, so a closed delivery proposes nothing by itself', () => {
+    expect(resolveForwardTrigger('closed_design_only')).toBeNull();
+    expect(isEndingTrigger('continueToExecution')).toBe(false);
+    expect(endingChoicesFrom('closed_design_only')).toEqual([]);
+    expect(endingChoicesFrom('execution')).toEqual([]);
+  });
+
+  it('reaches the closed card through the secondary triggers', () => {
+    expect(secondaryTriggersOf(['continueToExecution'], null)).toEqual(['continueToExecution']);
+  });
+});
+
 describe('ENDING_TRIGGERS', () => {
   it('is exactly the two execution_decision exits', () => {
     expect([...ENDING_TRIGGERS].sort()).toEqual(['chooseDesignOnly', 'chooseExecution']);

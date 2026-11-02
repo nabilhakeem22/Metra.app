@@ -5,10 +5,7 @@ import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { listEntityLogs } from '@/lib/logs/queries';
 import { getClientOptions } from '@/lib/clients/queries';
-import {
-  countProjectDeliveries,
-  getEngagementByProject,
-} from '@/lib/engagements/queries';
+import { getEngagementByProject } from '@/lib/engagements/queries';
 import { DOCUMENT_ENTITIES } from '@/lib/documents/entities';
 import { listDocuments } from '@/lib/documents/queries';
 import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
@@ -67,7 +64,6 @@ export default async function ProjectProfilePage({
   const deliveryPanel = can(ctx.role, 'engagements_design', 'read')
     ? {
         delivery: await getEngagementByProject(ctx, id),
-        deliveryCount: await countProjectDeliveries(ctx, id),
         clientId: project.clientId,
         projectId: id,
         canStart: canStartDelivery,
@@ -110,7 +106,6 @@ export default async function ProjectProfilePage({
       {deliveryPanel && (
         <ProjectDeliveryPanel
           delivery={deliveryPanel.delivery}
-          deliveryCount={deliveryPanel.deliveryCount}
           clientId={deliveryPanel.clientId}
           projectId={deliveryPanel.projectId}
           projectName={{ nameEn: project.nameEn, nameAr: project.nameAr }}
