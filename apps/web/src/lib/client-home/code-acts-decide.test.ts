@@ -94,7 +94,7 @@ describe('decideVariationWithCodeByToken', () => {
   it('a blank token is a dead link, with no round trip; Arabic-Indic digits fold to Latin', async () => {
     expect(await decideVariationWithCodeByToken('  ', DECIDE)).toEqual({ ok: false, error: 'token_invalid' });
     expect(sdf.readSdfJson).not.toHaveBeenCalled();
-    await decideVariationWithCodeByToken('tok', { ...DECIDE, code: '٠٤٢٩١٧' });
+    await decideVariationWithCodeByToken('tok', { ...DECIDE, code: '\u0660\u0664\u0662\u0669\u0661\u0667' });
     expect(sentParams()[3]).toBe(hashOf(ORDER, '042917'));
   });
 });

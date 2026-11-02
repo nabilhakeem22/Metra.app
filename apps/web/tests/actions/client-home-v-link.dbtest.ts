@@ -4,9 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // order awaiting the client's decision sends its holder to the client home's
 // Execution tab, through the REAL token functions and the real re-derive. Any
 // other link renders its own document: decided, lapsed, a terminated contract, a
-// proposal contract, an order the home does not list. /v's own decision answers
-// `moved` for a BOQ contract's order, and still decides a proposal contract's.
-// Every token function is counted at lib/share/sdf-call (the real one, spied).
+// proposal contract, an order the home does not list. /v's own decision:
+// client-home-v-moved.dbtest.ts. Every token function is counted at lib/share/sdf-call (the real one, spied).
 
 const sdfCalls = vi.hoisted(() => ({ names: [] as string[] }));
 vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
@@ -20,9 +19,7 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
     },
   };
 });
-vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'user-agent': 'vitest-client', 'cf-connecting-ip': '10.1.2.3' }) }));
 
-import { respondToVariation } from '@/app/[locale]/v/[token]/actions';
 import type { Locale } from '@/i18n/routing';
 import { contractHomeRedirect, variationHomeRedirect } from '@/lib/client-home/redirect';
 import { getContractByToken } from '@/lib/contracts/public';
@@ -34,7 +31,7 @@ import { getVariationByToken } from '@/lib/variations/public';
 import { homePathOf as contractPathOf, mintHomeLink } from './client-home-c-link-fixture';
 import { seedHome, seedLightHome, type Home } from './client-home-fixture';
 import { seedProposalContract } from './contract-from-boq-fixture';
-import { closeExecutionFixture, ownerQuery, seedVariation, tamper } from './execution-fixture';
+import { closeExecutionFixture, ownerQuery, seedExecutionContract, seedVariation, tamper } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 const SECRET = 'h7-share-link-secret-0123456789abcdef0123456789ab';
@@ -90,12 +87,12 @@ async function expectNeverAsked(raw: string) {
 }
 
 describe('an open order of a home that shows it (AC15)', () => {
-  it('leads to the home, on the order, in the asked locale; the order, the target, the list, and the count the page goes by', async () => {
+  it('leads to the home, on the order, in the asked locale; three reads: the order, the target, the home the page goes by', async () => {
     const { homeRaw, order } = await liveHome();
     expect(await redirectOf(order.raw, 'ar-EG')).toBe(pathOf('ar-EG', homeRaw, order.id));
     sdfCalls.names.length = 0;
     expect(await redirectOf(order.raw)).toBe(pathOf('en', homeRaw, order.id));
-    expect(sdfCalls.names).toEqual(['app_variation_by_token', 'app_client_home_target_by_token', 'app_home_variations_by_token', 'app_home_by_token']);
+    expect(sdfCalls.names).toEqual(['app_variation_by_token', 'app_client_home_target_by_token', 'app_home_by_token']);
   });
 
   it('a light delivery too', async () => {
@@ -180,6 +177,16 @@ describe('every other link shows its own document (AC16, with the H6.3 lessons)'
     expect(await redirectOf(order.raw)).toBe(pathOf('en', homeRaw, order.id));
   });
 
+  it('an order of an older contract stays on /v: the home stands on the newer one', async () => {
+    const { home, order, homeRaw } = await liveHome();
+    expect(await redirectOf(order.raw)).toBe(pathOf('en', homeRaw, order.id));
+    await ownerQuery(`update public.boqs set status = 'superseded' where id = $1`, [home.contract.boqId]);
+    const newer = await seedExecutionContract(owner.orgId, { state: 'signed', delivery: home.delivery });
+    expect(await redirectOf(order.raw)).toBeNull();
+    const onTheNewer = await orderOf(newer as unknown as Home['contract']);
+    expect(await redirectOf(onTheNewer.raw)).toBe(pathOf('en', homeRaw, onTheNewer.id));
+  });
+
   it('an order past the newest 10 the home lists stays on /v, until the list reaches it', async () => {
     const { home, homeRaw, order } = await liveHome();
     await tamper(`update public.variation_orders set created_at = now() - interval '1 day' where id = $1`, [order.id]);
@@ -189,37 +196,5 @@ describe('every other link shows its own document (AC16, with the H6.3 lessons)'
     expect(await redirectOf(newer[0].raw)).toBe(pathOf('en', homeRaw, newer[0].id));
     await ownerQuery(`update public.variation_orders set status = 'approved' where id = $1`, [newer[0].id]);
     expect(await redirectOf(order.raw)).toBe(pathOf('en', homeRaw, order.id));
-  });
-});
-
-describe('/v after H7.2 (AC19)', () => {
-  const stateOf = async (orderId: string, contractId: string) => {
-    const [row] = await ownerQuery<{ status: string; events: number; told: number }>(
-      `select v.status::text,
-              (select count(*)::int from public.variation_order_events e where e.variation_order_id = v.id and e.kind in ('approved', 'rejected')) as events,
-              (select count(*)::int from public.notifications n where n.entity_id = $2 and n.body_key like 'client_variation_%') as told
-         from public.variation_orders v where v.id = $1`,
-      [orderId, contractId],
-    );
-    return row;
-  };
-
-  it.each(['with', 'without'] as const)('a BOQ order %s a home: moved; nothing changes, nobody is told', async (kind) => {
-    const { home, order } = await liveHome();
-    if (kind === 'without') await revokeDeliveryLinkCore(owner, home.delivery.id);
-    expect(await respondToVariation(order.raw, 'approve', 'Link Client')).toEqual({ ok: false, error: 'moved' });
-    expect(await stateOf(order.id, home.contract.contractId)).toEqual({ status: 'issued', events: 0, told: 0 });
-  });
-
-  it('a proposal order approves with one event; a second call is already_responded', async () => {
-    const contractId = await seedProposalContract(owner.orgId);
-    await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [contractId]);
-    const [project] = await ownerQuery<{ project_id: string }>(`select project_id from public.contracts where id = $1`, [contractId]);
-    const link = mintShareToken();
-    const order = await seedVariation(owner.orgId, { contractId, projectId: project.project_id }, 'issued', { tokenHash: link.hash });
-    expect(await respondToVariation(link.raw, 'approve', 'Link Client')).toEqual({ ok: true });
-    expect(await stateOf(order.id, contractId)).toMatchObject({ status: 'approved', events: 1 });
-    expect(await respondToVariation(link.raw, 'reject', 'Link Client')).toEqual({ ok: false, error: 'already_responded' });
-    expect(await stateOf(order.id, contractId)).toMatchObject({ status: 'approved', events: 1 });
   });
 });

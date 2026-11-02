@@ -140,7 +140,7 @@ export function variationHomeRedirect(rawToken: string, variation: PublicVariati
       ? {
           kind: 'variation',
           focusOf: ({ focus_id: id }) => (isUuid(id) ? `variation:${id.toLowerCase()}` : null),
-          shownBy: (homeRaw) => homeShowsOpenChangeOrder(homeRaw, variation.id),
+          shownBy: (homeRaw) => homeShowsOpenChangeOrder(homeRaw, variation),
         }
       : null,
     locale,

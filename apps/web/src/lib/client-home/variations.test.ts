@@ -148,32 +148,43 @@ describe('getOpenChangeOrderLines', () => {
 });
 
 describe('homeShowsOpenChangeOrder', () => {
-  const listing = { open: [documentOf()], expired: [], decided: [] };
+  const ON_THE_HOME_CONTRACT = { id: ORDER, contract_number: 4 };
+  /** The home's payload counting `open` change orders the client can decide. */
+  const homeCounting = (open: number) => {
+    const home = homePayload('decide_change_order') as { execution: { flow_source: { contract: { money: Record<string, unknown> } } } };
+    home.execution.flow_source.contract.money = { ...home.execution.flow_source.contract.money, open_variations: open, issued_variations: open };
+    return home;
+  };
 
-  it('true for an order on the list of a home whose page counts it', async () => {
-    sdf.readSdfJson.mockResolvedValueOnce(listing).mockResolvedValueOnce(homePayload('decide_change_order'));
-    expect(await homeShowsOpenChangeOrder('tok', ORDER)).toBe(true);
-    expect(JSON.stringify(sdf.readSdfJson.mock.calls[1][0])).toContain('app_home_by_token');
+  it('counted, on the contract the home stands on: true on the home read alone', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(10));
+    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(true);
+    expect(sdf.readSdfJson).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(sdf.readSdfJson.mock.calls[0][0])).toContain('app_home_by_token');
   });
 
-  it('false, with no second read, for an order not on the list or a link that shows none', async () => {
-    sdf.readSdfJson.mockResolvedValueOnce(listing);
-    expect(await homeShowsOpenChangeOrder('tok', OTHER)).toBe(false);
-    sdf.readSdfJson.mockResolvedValueOnce(null);
-    expect(await homeShowsOpenChangeOrder('tok', ORDER)).toBe(false);
-    expect(sdf.readSdfJson).toHaveBeenCalledTimes(2);
+  it('an order of another contract of the delivery: false', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(1));
+    expect(await homeShowsOpenChangeOrder('tok', { id: ORDER, contract_number: 5 })).toBe(false);
   });
 
-  it('false for an order on the list of a contract awaiting its signature: the home counts none, so its page lists none', async () => {
-    sdf.readSdfJson.mockResolvedValueOnce(listing).mockResolvedValueOnce(homePayload('sign_contract'));
-    expect(await homeShowsOpenChangeOrder('tok', ORDER)).toBe(false);
+  it('a contract awaiting its signature: the home counts none, so its page lists none', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(homePayload('sign_contract'));
+    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
   });
 
-  it('a failed list read throws for the caller to decide; a failed home read is false, logged by its reader', async () => {
+  it('past the cap of the list, only the list can say', async () => {
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockResolvedValueOnce({ open: [documentOf()], expired: [], decided: [] });
+    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(true);
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockResolvedValueOnce({ open: [documentOf({ id: OTHER })], expired: [], decided: [] });
+    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
+  });
+
+  it('a failed home read is false, logged by its reader; a failed list read throws for the caller to decide', async () => {
     sdf.readSdfJson.mockRejectedValueOnce(new Error('down'));
-    await expect(homeShowsOpenChangeOrder('tok', ORDER)).rejects.toThrow('down');
-    sdf.readSdfJson.mockResolvedValueOnce(listing).mockRejectedValueOnce(new Error('down'));
-    expect(await homeShowsOpenChangeOrder('tok', ORDER)).toBe(false);
+    expect(await homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).toBe(false);
     expect(logged).toContain('client home read failed');
+    sdf.readSdfJson.mockResolvedValueOnce(homeCounting(11)).mockRejectedValueOnce(new Error('down'));
+    await expect(homeShowsOpenChangeOrder('tok', ON_THE_HOME_CONTRACT)).rejects.toThrow('down');
   });
 });

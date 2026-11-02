@@ -17,6 +17,9 @@ import { optionalPageRead } from './optional-read';
 import { getHomeByToken } from './read';
 import type { HomeChangeOrder } from './types';
 
+/** How many open orders the home lists: the SQL's own cap. */
+const OPEN_ORDERS_LISTED = 10;
+
 /** The orders the home can have decided NOW, newest first (at most 10), or null for a link that shows none. */
 async function readOpenOrders(rawToken: string): Promise<PublicVariation[] | null> {
   const token = normalizeRawToken(rawToken);
@@ -36,17 +39,21 @@ export async function readOpenChangeOrders(rawToken: string): Promise<HomeChange
 }
 
 /**
- * Whether the page of the home behind `rawToken` shows the order `variationId`
- * for a decision now: it is on the list, and the page reads the list. The page
- * goes by the home's count, which holds a SIGNED contract's orders only (the
- * SQL's money facts), so an order issued on a contract still awaiting signature
- * is on the list and not on the page. A failed list read throws: the caller decides.
+ * Whether the page of the home behind `rawToken` shows `variation`, known to be
+ * open, for a decision now. The page goes by the home's count, which holds a
+ * SIGNED contract's orders only (the SQL's money facts), so an order on a
+ * contract still awaiting signature is not on the page; and the home stands on
+ * one contract, so an order of an older one is not either. Up to the list's cap
+ * the count says it all; past it, only the list can say (one more read). A home
+ * read that failed is false, logged by its reader; a failed list read throws:
+ * the caller decides.
  */
-export async function homeShowsOpenChangeOrder(rawToken: string, variationId: string): Promise<boolean> {
-  const open = await readOpenOrders(rawToken);
-  if (open === null || !open.some((order) => order.id === variationId)) return false;
+export async function homeShowsOpenChangeOrder(rawToken: string, variation: Pick<PublicVariation, 'id' | 'contract_number'>): Promise<boolean> {
   const read = await getHomeByToken(rawToken);
-  return read.status === 'ok' && (read.home.execution?.openVariationCount ?? 0) > 0;
+  const execution = read.status === 'ok' ? read.home.execution : null;
+  if (!execution || execution.openVariationCount === 0 || execution.contract?.number !== variation.contract_number) return false;
+  if (execution.openVariationCount <= OPEN_ORDERS_LISTED) return true;
+  return (await readOpenOrders(rawToken))?.some((order) => order.id === variation.id) ?? false;
 }
 
 /**

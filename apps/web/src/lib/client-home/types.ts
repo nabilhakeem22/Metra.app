@@ -17,6 +17,8 @@ type PortalFirm = PublicDelivery['firm'];
 /** The home's execution contract, as the client may see it. */
 export interface HomeContract {
   id: string;
+  /** The studio's running number, unique in the studio: what a change order's document names its contract by. */
+  number: number;
   /** C-YYYY-NNNN. */
   documentNumber: string;
   status: PortalContractStatus;

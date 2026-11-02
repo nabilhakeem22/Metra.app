@@ -8,7 +8,7 @@ import type { PublicVariation, VariationTokenDocument } from './public-types';
 const RATE_TEXT = /^\d+(\.\d+)?$/;
 
 /**
- * The recorded rejection channel, or null — mapped DEFENSIVELY, exactly as
+ * The recorded rejection channel, or null, mapped DEFENSIVELY, exactly as
  * `contract_active` is: anything that is not the string 'client' or 'staff'
  * becomes null, including the `undefined` an un-applied function returns. null
  * then falls through the decided-message ladder to today's wording, so an app
