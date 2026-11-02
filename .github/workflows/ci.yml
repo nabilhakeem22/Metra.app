@@ -199,6 +199,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          # Search Console / Bing ownership tags (optional; blank = no tag).
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }}
+          NEXT_PUBLIC_BING_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_BING_SITE_VERIFICATION }}
+          # The sign-in Turnstile site key (optional; blank = no widget; docs/DEPLOY.md).
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
         # Generate the gitignored binding typings before the type-check. The
         # `--env-interface=CloudflareEnv ./cloudflare-env.d.ts` flags MUST match
         # how the file is generated locally: plain `wrangler types` emits a
@@ -219,6 +224,10 @@ jobs:
         # does not copy pre-rendered HTML into .open-next/assets; this does, and
         # fails if a page stopped being static. Before the secret scan, so the
         # scan covers the HTML. See docs/DEPLOY.md.
+        # The same verification tags go into the "/" redirector page here.
+        env:
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }}
+          NEXT_PUBLIC_BING_SITE_VERIFICATION: ${{ vars.NEXT_PUBLIC_BING_SITE_VERIFICATION }}
         run: node scripts/emit-static-pages.mjs
 
       - name: Assert no secret was baked into the Worker bundle

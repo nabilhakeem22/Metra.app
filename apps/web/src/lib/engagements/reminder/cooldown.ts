@@ -7,13 +7,10 @@
 import { auditLog, designEngagements, type MetraDb } from '@metra/db';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/result';
+import { REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from './audit-values';
 
 /** One email reminder per delivery per this many minutes. */
 export const REMINDER_EMAIL_COOLDOWN_MINUTES = 15;
-
-/** The audit `after.reminder` values this rule reads. */
-export const REMINDER_EMAIL_REQUESTED = 'email';
-export const REMINDER_EMAIL_FAILED = 'email_failed';
 
 /**
  * Refuse `reminder_too_soon` when an email reminder for this delivery was

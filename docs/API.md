@@ -54,6 +54,7 @@ commit them to source control or embed them in client-side code.
 | | |
 |---|---|
 | **Format** | `application/json` request/response; errors are `application/problem+json`. |
+| **Caching** | Every response, a 200 or a problem, carries `cache-control: no-store` and `x-content-type-options: nosniff`: an answer is one key's view of one studio and is never cached. |
 | **Field names** | `snake_case`. |
 | **IDs** | UUID v4 strings, stable across requests. |
 | **Money** | String, always **two decimal places**, e.g. `"1250.00"`. EGP throughout v1. Strings (not floats) to preserve precision. |

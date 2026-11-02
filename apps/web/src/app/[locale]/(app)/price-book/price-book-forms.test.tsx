@@ -131,6 +131,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('price-book forms (%s)', (locale) => 
         market={{ bulletin: null, refs: {} }}
         sections={SECTIONS}
         canManage
+        showsCost
       />,
     );
     fireEvent.change(document.getElementById('pb-new-section')!, { target: { value: 'Joinery' } });

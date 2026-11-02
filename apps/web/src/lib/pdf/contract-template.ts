@@ -8,6 +8,7 @@ import { dirFor } from '@/i18n/routing';
 import { esc, pickEscaped } from '@/lib/pdf/html';
 import { pricedSectionsTableHtml } from './priced-sections-table';
 import { fontFaceCss } from './template';
+import { PDF_CSP_META } from './render-request-policy';
 
 /**
  * Contract PDF. Same table shape as the proposal PDF (sections + lines + totals),
@@ -45,6 +46,7 @@ export async function buildContractHtml(
 <html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
+${PDF_CSP_META}
 <style>
   ${await fontFaceCss()}
   * { box-sizing: border-box; }

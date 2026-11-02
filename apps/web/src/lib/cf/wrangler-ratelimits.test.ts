@@ -11,7 +11,7 @@ import { configuredRateLimits, WEB_ROOT } from '@/test/wrangler-rate-limits';
 
 /** Every `*_RATE_LIMITER` binding name the limiter modules ask for. */
 function bindingNamesInCode(): string[] {
-  const files = ['src/lib/api/rate-limit.ts', 'src/lib/share/portal-rate-limit.ts', 'src/lib/cf/studio-read-rate-limit.ts'];
+  const files = ['src/lib/api/rate-limit.ts', 'src/lib/share/portal-rate-limit.ts', 'src/lib/cf/studio-read-rate-limit.ts', 'src/lib/auth/otp-throttle.ts'];
   const names = files.flatMap((file) =>
     [...readFileSync(resolve(WEB_ROOT, file), 'utf8').matchAll(/'([A-Z_]+_RATE_LIMITER)'/g)].map((match) => match[1]),
   );
@@ -21,7 +21,7 @@ function bindingNamesInCode(): string[] {
 describe('wrangler.jsonc ratelimits', () => {
   const entries = configuredRateLimits();
 
-  it('declares the six bindings, each over 60 seconds', () => {
+  it('declares the eight bindings, each over 60 seconds', () => {
     expect(entries.map(({ name, simple }) => [name, simple.period])).toEqual([
       ['API_RATE_LIMITER', 60],
       ['API_PREAUTH_RATE_LIMITER', 60],
@@ -29,14 +29,25 @@ describe('wrangler.jsonc ratelimits', () => {
       ['PORTAL_READ_RATE_LIMITER', 60],
       ['STUDIO_READ_RATE_LIMITER', 60],
       ['STUDIO_SEARCH_RATE_LIMITER', 60],
+      ['AUTH_OTP_IP_RATE_LIMITER', 60],
+      ['AUTH_OTP_IDENTIFIER_RATE_LIMITER', 60],
     ]);
   });
 
   it('keeps the settled ceilings, and a whole positive READ ceiling', () => {
     const ceiling = (name: string) => entries.find((entry) => entry.name === name)?.simple.limit;
     expect([ceiling('API_RATE_LIMITER'), ceiling('API_PREAUTH_RATE_LIMITER'), ceiling('PORTAL_ACT_RATE_LIMITER'), ceiling('STUDIO_READ_RATE_LIMITER'), ceiling('STUDIO_SEARCH_RATE_LIMITER')]).toEqual([100, 300, 30, 30, 120]);
+    expect([ceiling('AUTH_OTP_IP_RATE_LIMITER'), ceiling('AUTH_OTP_IDENTIFIER_RATE_LIMITER')]).toEqual([10, 15]);
     expect(Number.isInteger(ceiling('PORTAL_READ_RATE_LIMITER'))).toBe(true);
     expect(ceiling('PORTAL_READ_RATE_LIMITER')).toBeGreaterThan(0);
+  });
+
+  // Go-live security fix round, T4: the IP bucket is charged first, so one
+  // source spends at most the IP ceiling on any one address. With the
+  // per-address ceiling above it, no single source can lock a named address out.
+  it('keeps the per-address sign-in ceiling above the per-IP one', () => {
+    const ceiling = (name: string) => entries.find((entry) => entry.name === name)?.simple.limit ?? 0;
+    expect(ceiling('AUTH_OTP_IDENTIFIER_RATE_LIMITER')).toBeGreaterThan(ceiling('AUTH_OTP_IP_RATE_LIMITER'));
   });
 
   it('gives every binding its own integer namespace id', () => {

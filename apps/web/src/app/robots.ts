@@ -1,43 +1,26 @@
 import type { MetadataRoute } from 'next';
+import { signedInDisallows, tokenDisallows } from '@/lib/seo/private-paths';
 import { getSiteUrl } from '@/lib/seo/site-url';
 
-// Metra is an auth-gated SaaS: the only genuinely public surface is the
-// landing/login page at `/<locale>`. Everything else is private — the authed
-// `(app)` trees, onboarding, the `(auth)` OTP step, and the tokenized share
-// links (`p`/`c`/`v`/`invite`). Route groups don't appear in the URL, so the
-// disallow patterns target the real locale-prefixed paths via a `*` wildcard
-// that matches both `en` and `ar-EG`.
-export default function robots(): MetadataRoute.Robots {
-  const baseUrl = getSiteUrl();
+// Pre-rendered at build time and served as a static asset (emit-static-pages),
+// so a crawler never spends Worker CPU on it.
+//
+// Two groups (owner decision D5). Every crawler, AI crawlers included (D7), may
+// read the landing pages and none may read a signed-in section. Googlebot and
+// Bingbot may also FETCH the token links (/c /d /invite /p /v): they then see
+// the noindex header and meta and drop a leaked link from the index, which a
+// disallow alone would not do. The login pages stay crawlable for the same
+// reason: their noindex has to be seen.
+const SEARCH_BOTS = ['Googlebot', 'Bingbot'];
 
+const API_DISALLOW = '/api/';
+
+export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: '*',
-      allow: '/',
-      disallow: [
-        // Authed (app) shell
-        '/*/dashboard',
-        '/*/clients',
-        '/*/contracts',
-        '/*/projects',
-        '/*/proposals',
-        '/*/price-book',
-        '/*/engagements',
-        '/*/team',
-        '/*/settings',
-        '/*/notifications',
-        // Onboarding + auth OTP steps
-        '/*/onboarding',
-        '/*/login',
-        // Tokenized public share links
-        '/*/p/',
-        '/*/c/',
-        '/*/v/',
-        '/*/d/',
-        '/*/invite/',
-      ],
-    },
-    host: baseUrl,
-    sitemap: `${baseUrl}/sitemap.xml`,
+    rules: [
+      { userAgent: '*', allow: '/', disallow: [API_DISALLOW, ...signedInDisallows(), ...tokenDisallows()] },
+      { userAgent: SEARCH_BOTS, allow: '/', disallow: [API_DISALLOW, ...signedInDisallows()] },
+    ],
+    sitemap: `${getSiteUrl()}/sitemap.xml`,
   };
 }

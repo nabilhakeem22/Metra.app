@@ -12,3 +12,5 @@ than re-deriving the rule.
   - `lockOrgMemberships(tx, orgId)` — advisory xact lock (serialize owner writes).
   - `ownerCount(tx)` — owners in the current org context.
   - `ensureNotLastOwner(tx)` — the last-owner invariant (an org keeps ≥1 owner).
+- **money4.ts**
+  - Pure scale-4 money primitives (`parseMoney4`, `formatMoney4`, `pctOf`, the input guards). Re-exported by `proposal-totals.ts`, which keeps the line, section and document totals.

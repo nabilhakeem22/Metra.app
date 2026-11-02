@@ -6,6 +6,7 @@
 // and they are the same strings `autoDetectMapping` already recognises, so a
 // returned template maps itself with nothing for the studio to confirm.
 
+import { neutralizeFormula } from '@/lib/import/formula-guard';
 import { BOQ_UNITS } from '../edit-input';
 import { CANONICAL_HEADERS, IMPORT_FIELDS, type ImportField } from './map';
 
@@ -47,16 +48,21 @@ const EXAMPLE: Record<ImportField, string> = {
 export const TEMPLATE_UNITS = BOQ_UNITS;
 
 /**
- * RFC 4180 quoting: wrap when the value contains a delimiter, a quote or a
- * newline, and double any quote inside. Without it a description containing a
- * comma — which most of them do — silently becomes two columns.
+ * One cell: trimmed as the importer trims every field (parse-csv.ts), then
+ * formula-guarded (lib/import/formula-guard.ts: a price-book name starting with
+ * `=` must not run in Excel). The guard judges the text the importer will read,
+ * so a leading-whitespace + apostrophe name comes back as typed. Then RFC 4180
+ * quoting: wrap when the value contains a delimiter, a quote or a newline, and
+ * double any quote inside. Without it a description containing a comma (most of
+ * them do) silently becomes two columns.
  */
 function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const guarded = neutralizeFormula(value.trim());
+  return /[",\r\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 /** One price-book item, as the template lists it. */
-interface TemplateItem {
+export interface TemplateItem {
   code: string;
   description: string;
   unit: string;

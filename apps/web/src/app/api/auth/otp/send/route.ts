@@ -7,4 +7,4 @@ import { otpEndpoint } from '@/lib/auth/otp-route';
 // static login page cannot post server actions (lib/auth/otp-contract.ts).
 export const dynamic = 'force-dynamic';
 
-export const POST = otpEndpoint('otp send route failed', parseOtpSendRequest, sendOtpCore);
+export const POST = otpEndpoint('otp send route failed', 'send', parseOtpSendRequest, sendOtpCore);

@@ -37,11 +37,22 @@ export type CommonActionCode =
   | 'otp_verify_failed'
   // Supabase refused to send a sign-in code, by cause (lib/auth/otp-failure.ts).
   | 'otp_rate_limited'
+  // Too many code CHECKS (our throttle or Supabase's): the code held is still
+  // good, so wait and type it again, never ask for a new one (fix round 2, F6).
+  | 'otp_verify_rate_limited'
   // A member asked for an expensive studio read too often in a short time
   // (lib/cf/studio-read-rate-limit.ts): wait a minute and ask again.
   | 'rate_limited'
+  // The studio used today's email allowance (lib/email/daily-caps.ts): the
+  // delivery reminder refuses, since its email IS the action.
+  | 'daily_email_cap_reached'
   | 'otp_sms_unavailable'
   | 'otp_email_unavailable'
+  // Supabase refused the sign-in challenge token (lib/auth/otp-failure.ts), or
+  // the widget failed in the browser.
+  | 'otp_captcha_failed'
+  // Client only: the login form has no challenge token yet, so nothing was sent.
+  | 'otp_captcha_pending'
   | 'immutable'
   | 'code_required'
   | 'code_taken'

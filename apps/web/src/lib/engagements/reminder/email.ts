@@ -7,15 +7,13 @@ import { failureOf } from '@/lib/actions/failure-of';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { claimDailyEmail } from '@/lib/email/daily-caps';
 import { sendDeliveryReminderEmail } from '@/lib/email/delivery-senders';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { deliveryPortalUrl, portalLocale } from '../portal-url';
 import { DELIVERY_LINK_GATE, readLiveDeliveryLink } from '../share-reveal';
-import {
-  REMINDER_EMAIL_FAILED,
-  REMINDER_EMAIL_REQUESTED,
-  refuseIfRemindedRecently,
-} from './cooldown';
+import { REMINDER_EMAIL_FAILED, REMINDER_EMAIL_REQUESTED } from './audit-values';
+import { refuseIfRemindedRecently } from './cooldown';
 import { readReminderRecipient } from './recipient';
 
 /**
@@ -23,8 +21,12 @@ import { readReminderRecipient } from './recipient';
  * `engagement_not_found`, `engagement_not_active`, the link codes of
  * readLiveDeliveryLink, `client_email_missing` (no address on the client or
  * its primary contact), `reminder_too_soon` (one went out within
- * REMINDER_EMAIL_COOLDOWN_MINUTES), `reminder_email_failed` (Resend refused or
- * did not answer within EMAIL_TIMEOUT_MS).
+ * REMINDER_EMAIL_COOLDOWN_MINUTES), `daily_email_cap_reached` (the studio's
+ * daily client email cap, claimed in the same transaction as the audit row it
+ * counts, lib/email/daily-caps.ts: no audit row, no send), `busy` (that
+ * cap's lock could not be taken: no audit row, no send),
+ * `reminder_email_failed` (Resend refused or did not answer within
+ * EMAIL_TIMEOUT_MS).
  *
  * The read, the cooldown check and the audit row commit BEFORE the send, so no
  * database transaction waits on the mail provider. That audit row records the
@@ -44,6 +46,7 @@ export async function emailDeliveryReminderCore(
     const recipient = await readReminderRecipient(tx, ctx.orgId, link.clientId);
     if (!recipient.email) fail('client_email_missing');
     await refuseIfRemindedRecently(tx, input.engagementId);
+    if (!(await claimDailyEmail(tx, ctx.orgId, 'client_email'))) fail('daily_email_cap_reached');
     await audit({
       entity: 'design_engagement',
       entityId: input.engagementId,

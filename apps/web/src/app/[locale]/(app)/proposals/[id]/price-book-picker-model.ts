@@ -7,6 +7,9 @@ import { nameIn } from '@/lib/price-book/name-order';
 import type { CostItemOption } from './builder-model';
 import type { SectionOption } from './section-combobox';
 
+/** The DOM id of the listbox option at a flat index (also read for aria-activedescendant). */
+export const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}`;
+
 interface PickerEntry {
   item: CostItemOption;
   name: string;

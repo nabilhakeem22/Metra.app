@@ -1,30 +1,17 @@
 'use client';
 
-import { FileSignature, Loader2, Plus } from 'lucide-react';
+import { FileSignature, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusChip } from '@/components/ui/status-chip';
-import { Link, useRouter } from '@/i18n/routing';
+import { useRouter } from '@/i18n/routing';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
-import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import { formatMoney } from '@/lib/format/money';
-import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import { generateContract } from '@/lib/contracts/actions';
 import type { ContractListRow } from '@/lib/contracts/queries';
-import { CONTRACT_STATUS_TONE } from '@/lib/ui/record-status-tones';
-
-interface Generatable {
-  id: string;
-  number: number;
-  titleAr: string | null;
-  titleEn: string | null;
-  issueDate: string | null;
-  createdAt: string;
-}
+import { ContractsGeneratePicker, type Generatable } from './contracts-generate-picker';
+import { ContractsTable } from './contracts-table';
 
 export function ContractsClient({
   items,
@@ -83,30 +70,13 @@ export function ContractsClient({
       )}
 
       {picking && (
-        <Card>
-          <CardContent className="space-y-2 py-4">
-            <p className="text-body font-medium">{t('generateFromProposal')}</p>
-            {generatable.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between border-b py-2 last:border-0"
-              >
-                <span className="font-mono text-caption" dir="ltr">
-                  {formatProposalNumber(p.number, proposalYear(p.issueDate, p.createdAt))}
-                </span>
-                <span className="flex-1 px-3 text-body">
-                  {pickLocale({ nameAr: p.titleAr, nameEn: p.titleEn }, 'name', locale).value}
-                </span>
-                <Button variant="secondary" size="sm" disabled={pending} onClick={() => generate(p.id)}>
-                  {pending ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : null}
-                  {t('generate')}
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <ContractsGeneratePicker
+          generatable={generatable}
+          pending={pending}
+          locale={locale}
+          t={t}
+          onGenerate={generate}
+        />
       )}
 
       {items.length === 0 ? (
@@ -121,49 +91,7 @@ export function ContractsClient({
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-body">
-                <thead>
-                  <tr className="border-b text-caption text-muted-foreground">
-                    <th className="px-4 py-2 text-start font-medium">{t('number')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('client')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('project')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('status.draft')}</th>
-                    <th className="px-4 py-2 text-end font-medium">{t('value')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((c) => (
-                    <tr key={c.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="px-4 py-2 font-mono text-caption" dir="ltr">
-                        <Link href={`/contracts/${c.id}`} className="text-primary hover:underline">
-                          {formatDocNumber('C', c.number, docYear(null, c.createdAt))}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {pickLocale({ nameAr: c.clientNameAr, nameEn: c.clientNameEn }, 'name', locale).value || '—'}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {pickLocale({ nameAr: c.projectNameAr, nameEn: c.projectNameEn }, 'name', locale).value || '—'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <StatusChip
-                          tone={CONTRACT_STATUS_TONE[c.status]}
-                          label={t(`status.${c.status}`)}
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-end" dir="ltr">
-                        {formatMoney(c.originalValue, locale)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <ContractsTable items={items} locale={locale} t={t} />
       )}
       {pager}
     </div>

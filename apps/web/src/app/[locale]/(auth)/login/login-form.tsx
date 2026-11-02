@@ -9,6 +9,7 @@ import { ByLoginMode } from './login-mode';
 import { LoginRequestStep } from './login-request-step';
 import { LoginVerifyStep } from './login-verify-step';
 import { ModeSwitchLink } from './mode-switch-link';
+import { useCaptcha } from './use-captcha';
 import { useOtpFlow } from './use-otp-flow';
 
 /**
@@ -23,7 +24,8 @@ import { useOtpFlow } from './use-otp-flow';
 export function LoginForm() {
   const t = useTranslations('login');
   const th = useTranslations('hints.auth');
-  const flow = useOtpFlow();
+  const captcha = useCaptcha();
+  const flow = useOtpFlow(captcha.take);
   const stepRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalid(stepRef, flow.errors.invalidAttempt);
 
@@ -77,6 +79,9 @@ export function LoginForm() {
             />
           )}
         </div>
+
+        {/* The sign-in challenge: outside the step switch, so one widget lives across both steps. */}
+        {captcha.slotRef && <div ref={captcha.slotRef} className="flex justify-center" />}
 
         <p
           role="status"

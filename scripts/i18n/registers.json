@@ -18,6 +18,16 @@
   "default": "eg",
   "rules": [
     {
+      "prefix": "landing.seo.",
+      "register": "msa",
+      "why": "Search titles and descriptions and the share card: read by anyone in a search result or a WhatsApp preview, not on-screen studio copy (lead ruling on the SEO plan, Oct 27)."
+    },
+    {
+      "prefix": "landing.notFound.",
+      "register": "msa",
+      "why": "The generic 404 page: any visitor can land on it, a client following a broken link included."
+    },
+    {
       "prefix": "delivery.",
       "register": "msa",
       "why": "The end-client delivery portal. The client opens this, not the studio."

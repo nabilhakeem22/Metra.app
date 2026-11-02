@@ -200,6 +200,9 @@ describe('AC1 — org isolation across all 4 resources', () => {
   it('clients list under org-A key never returns an org-B row', async () => {
     const res = await clientsList(bearer(`${BASE}/clients`, a.ownerKey));
     expect(res.status).toBe(200);
+    // Go-live security: a 200 is never cached and never sniffed.
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     const body = await asJson<ListBody>(res);
     const ids = body.data.map((r) => r.id);
     expect(ids).toContain(a.clientId);

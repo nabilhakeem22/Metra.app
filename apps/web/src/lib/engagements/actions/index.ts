@@ -1,6 +1,8 @@
 // Barrel for the engagement server-action layer. The single 481-line `actions.ts`
-// was split by area (SRP): `lifecycle` (create + the wired transition wrappers +
-// ROM data-entry), `payments` (record + log-and-advance), `deliverables` (artifact
+// was split by area (SRP): `data-entry` (create, off-plan flag, ROM
+// acknowledgement, event correction), `concept-transitions`, `design-transitions`
+// and `closing-transitions` (the wired transition wrappers, by phase of the
+// delivery), `payments` (record + log-and-advance), `deliverables` (artifact
 // + deliverable uploads/download), `share` (client delivery links), `reminder`
 // (show and resend the existing link), `offline-approval` (an approval the
 // client gave the studio directly) and `client-expected` (the date the client
@@ -12,6 +14,11 @@
 // unchanged. Pure structural refactor — no action, signature, or behaviour changed.
 export {
   createEngagement,
+  setEngagementOffPlan,
+  recordEventCorrection,
+  recordRomAcknowledgement,
+} from './data-entry';
+export {
   submitDesignFee,
   confirmAndPayDeposit,
   spatialBaseReady,
@@ -19,22 +26,23 @@ export {
   selectConcept,
   requestRevision,
   confirmConcept,
+} from './concept-transitions';
+export {
   rendersReady,
   flagAsBuiltVariance,
   attestAsBuiltClean,
   approveDesign,
   rejectDesign,
   designChangeRaised,
+} from './design-transitions';
+export {
   draftReady,
   finalizeBOQ,
   chooseDesignOnly,
   chooseExecution,
   recipientAcknowledges,
   abandonEngagement,
-  setEngagementOffPlan,
-  recordEventCorrection,
-  recordRomAcknowledgement,
-} from './lifecycle';
+} from './closing-transitions';
 export { recordHandoffAcknowledgement } from './handoff';
 export { setEngagementRom, issueRom } from './rom';
 export { setClientExpectedDate } from './client-expected';

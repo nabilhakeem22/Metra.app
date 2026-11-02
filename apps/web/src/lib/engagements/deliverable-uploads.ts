@@ -163,10 +163,7 @@ export async function getDeliverableUrlCore(
     // origin. The upload extension allowlist makes that hard; `safeDownloadName`
     // makes it inert, because Storage answers `Content-Disposition: attachment`
     // when a download name is passed and drops an active extension either way.
-    const url = await getSignedUrl(ctx, fileId, {
-      ttlSeconds: 300,
-      download: safeDownloadName(owned.originalName),
-    });
+    const url = await getSignedUrl(ctx, fileId, { download: safeDownloadName(owned.originalName) });
     return { ok: true, url };
   } catch (error) {
     // Storage did not sign: an outage, not a missing file (that is answered above).

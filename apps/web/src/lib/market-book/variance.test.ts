@@ -20,6 +20,12 @@ describe('marketVariance', () => {
   it('has no figure without an official price', () => {
     expect(marketVariance({ unit: 'sqm', unitCost: '420' }, { unit: 'sqm', price: null })).toEqual({ variancePct: null, reason: 'no_price' });
   });
+
+  it('has no figure when the cost is hidden, so the public price cannot give the cost away', () => {
+    expect(marketVariance({ unit: 'sqm', unitCost: null }, { unit: 'sqm', price: '400' })).toEqual({ variancePct: null, reason: 'ok' });
+    expect(marketVariance({ unit: 'sqm', unitCost: null }, { unit: 'sqm', price: null })).toEqual({ variancePct: null, reason: 'no_price' });
+    expect(marketVariance({ unit: 'pcs', unitCost: null }, { unit: 'sqm', price: '400' })).toEqual({ variancePct: null, reason: 'unit_mismatch' });
+  });
 });
 
 describe('priceVariance (units already matched)', () => {

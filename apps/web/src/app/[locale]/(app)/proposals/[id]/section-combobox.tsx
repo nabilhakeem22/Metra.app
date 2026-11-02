@@ -3,8 +3,9 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { AnchoredLayer } from '@/components/ui/anchored-layer';
 import { Input } from '@/components/ui/input';
-import { ListboxOption } from '@/components/ui/listbox-option';
 import { useOutsidePointerDown } from '@/hooks/use-outside-pointer-down';
+import { filterSectionOptions, isSavedSectionName } from './section-combobox-filter';
+import { SectionComboboxOptions } from './section-combobox-options';
 
 export interface SectionOption {
   id: string;
@@ -54,20 +55,10 @@ export function SectionCombobox({
   // React's id: the same on the server and the client, so aria-controls survives hydration.
   const listId = useId();
 
-  const label = (o: SectionOption) =>
-    (isAr ? o.nameAr || o.nameEn : o.nameEn || o.nameAr) ?? '';
-
-  const filtered = useMemo(() => {
-    const q = current.trim().toLowerCase();
-    const list = q
-      ? options.filter(
-          (o) =>
-            (o.nameEn ?? '').toLowerCase().includes(q) ||
-            (o.nameAr ?? '').toLowerCase().includes(q),
-        )
-      : options;
-    return list.slice(0, 8);
-  }, [options, current]);
+  const filtered = useMemo(
+    () => filterSectionOptions(options, current),
+    [options, current],
+  );
 
   // A press outside the field and its list closes the list.
   useOutsidePointerDown(open, [rootRef, layerRef], () => setOpen(false));
@@ -91,10 +82,7 @@ export function SectionCombobox({
   function maybeCreate() {
     const name = current.trim();
     if (!name) return;
-    const exists = options.some((o) =>
-      (isAr ? o.nameAr : o.nameEn)?.trim().toLowerCase() === name.toLowerCase(),
-    );
-    if (!exists) {
+    if (!isSavedSectionName(options, name, isAr)) {
       onCreate({ nameEn: isAr ? null : name, nameAr: isAr ? name : null });
     }
   }
@@ -146,20 +134,14 @@ export function SectionCombobox({
           maxHeight={LIST_MAX_HEIGHT}
           className="border border-border bg-popover py-1 text-body shadow-card"
         >
-          <ul id={listId} role="listbox">
-            {filtered.map((o, i) => (
-              <ListboxOption
-                key={o.id}
-                active={i === active}
-                dir={isAr ? 'rtl' : 'ltr'}
-                className="items-center"
-                onPick={() => pick(o)}
-                onHover={() => setActive(i)}
-              >
-                {label(o)}
-              </ListboxOption>
-            ))}
-          </ul>
+          <SectionComboboxOptions
+            options={filtered}
+            listId={listId}
+            active={active}
+            isAr={isAr}
+            onPick={pick}
+            onHover={setActive}
+          />
         </AnchoredLayer>
       )}
     </div>

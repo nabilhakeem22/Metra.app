@@ -8,4 +8,4 @@ import { otpEndpoint } from '@/lib/auth/otp-route';
 // post-login path (dashboard or onboarding), so the form needs no second call.
 export const dynamic = 'force-dynamic';
 
-export const POST = otpEndpoint('otp verify route failed', parseOtpVerifyRequest, verifyOtpCore);
+export const POST = otpEndpoint('otp verify route failed', 'verify', parseOtpVerifyRequest, verifyOtpCore);

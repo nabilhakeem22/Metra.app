@@ -25,19 +25,23 @@ function codeRefusal(token: string): ActionResult | null {
   return hasFieldErrors(errors) ? fieldsFailed(errors) : null;
 }
 
-/** Ask Supabase to send a sign-in code by email, or by SMS (site engineers). */
-export async function sendOtpCore({ channel, identifier }: OtpSendRequest): Promise<ActionResult> {
+/**
+ * Ask Supabase to send a sign-in code by email, or by SMS (site engineers).
+ * The Turnstile token goes to Supabase, which checks it when its CAPTCHA
+ * setting is on; it is never logged and never kept.
+ */
+export async function sendOtpCore({ channel, identifier, captchaToken }: OtpSendRequest): Promise<ActionResult> {
   const refused = identifierRefusal(channel, identifier);
   if (refused) return refused;
   const supabase = await createSupabaseServerClient();
   if (channel === 'email') {
     const { error } = await supabase.auth.signInWithOtp({
       email: identifier,
-      options: { shouldCreateUser: true },
+      options: { shouldCreateUser: true, captchaToken },
     });
     return error ? otpSendFailure('sendEmailOtp failed', error, 'email') : ok();
   }
-  const { error } = await supabase.auth.signInWithOtp({ phone: identifier });
+  const { error } = await supabase.auth.signInWithOtp({ phone: identifier, options: { captchaToken } });
   return error ? otpSendFailure('sendPhoneOtp failed', error, 'phone') : ok();
 }
 

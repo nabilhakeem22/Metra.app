@@ -8,6 +8,7 @@ import { dirFor } from '@/i18n/routing';
 import { pickEscaped } from '@/lib/pdf/html';
 import { pricedSectionsTableHtml } from './priced-sections-table';
 import { fontFaceCss } from './template';
+import { PDF_CSP_META } from './render-request-policy';
 
 /**
  * Proposal PDF. Groups lines under section headings, each with a subtotal row,
@@ -43,6 +44,7 @@ export async function buildProposalHtml(
 <html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
+${PDF_CSP_META}
 <style>
   ${await fontFaceCss()}
   * { box-sizing: border-box; }

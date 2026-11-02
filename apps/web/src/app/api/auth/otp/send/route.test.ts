@@ -44,7 +44,7 @@ describe('POST /api/auth/otp/send', () => {
 
   it('sends a phone code by SMS', async () => {
     expect(await send(JSON.stringify({ channel: 'phone', identifier: '+201001234567' }))).toEqual({ status: 200, body: { ok: true } });
-    expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledWith({ phone: '+201001234567' });
+    expect(doubles.supabaseAuth.signInWithOtp).toHaveBeenCalledWith({ phone: '+201001234567', options: { captchaToken: undefined } });
   });
 
   it.each<[string, Record<string, string | undefined>]>([
@@ -81,6 +81,17 @@ describe('POST /api/auth/otp/send', () => {
     });
     expect(doubles.supabaseAuth.signInWithOtp).not.toHaveBeenCalled();
   });
+
+  it.each(['+20 1OO 123 4567', '+20 100 123 4567 ext 9', 'owner@firm.example', 'abc', ' + - '])(
+    'refuses the phone %j as phone_format and never texts a number nobody typed (F2)',
+    async (typed) => {
+      expect(await send(JSON.stringify({ channel: 'phone', identifier: typed }))).toEqual({
+        status: 200,
+        body: { ok: false, error: 'check_fields', fields: { phone: { code: 'phone_format' } } },
+      });
+      expect(doubles.supabaseAuth.signInWithOtp).not.toHaveBeenCalled();
+    },
+  );
 
   it('answers a Supabase rate limit with its code', async () => {
     doubles.supabaseAuth.signInWithOtp.mockResolvedValueOnce({ error: { code: 'over_email_send_rate_limit', status: 429 } });

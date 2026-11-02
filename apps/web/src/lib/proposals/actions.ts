@@ -93,11 +93,11 @@ export async function sendProposal(id: string): Promise<
   const link = `${origin}/${locale}/p/${res.data}`;
   refreshApp();
   // The proposal is ALREADY sent. The email is best-effort and cannot fail this.
-  const email = await notifyClientOfSentProposal(ctx, {
-    proposalId: id,
-    acceptUrl: link,
-    locale,
-  });
+  // Past the studio's daily client email cap the link is returned to copy and
+  // only the email is skipped (lib/email/daily-caps.ts).
+  const email = res.emailAllowed
+    ? await notifyClientOfSentProposal(ctx, { proposalId: id, acceptUrl: link, locale })
+    : { emailSent: false, emailSkippedNoAddress: false };
   return { ok: true, link, ...email };
 }
 

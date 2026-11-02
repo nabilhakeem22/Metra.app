@@ -49,7 +49,7 @@ afterAll(async () => {
   await closeFixture();
 });
 
-const page = () => listPriceBookPage(owner, { sectionId: null, activeOnly: false, query: 'B3', page: 1 }, 'en');
+const page = () => listPriceBookPage(owner, { sectionId: null, activeOnly: false, query: 'B3', page: 1 }, 'en', true);
 const idOf = async (code: string) => (await page()).rows.find((row) => row.code === code)?.id as string;
 
 describe('readMarketColumn (AC 15)', () => {

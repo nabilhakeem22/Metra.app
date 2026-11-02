@@ -19,6 +19,9 @@ export const FIELD_CODE_PARAMS = {
   not_a_number: [],
   not_negative: [],
   email_format: [],
+  // A sign-in phone with something other than digits, one leading + and
+  // spaces, dashes, dots or brackets in it (lib/auth/otp-phone.ts).
+  phone_format: [],
   no_longer_exists: [],
   unprintable: [],
   // A payment schedule whose rows do not add up to what they must (100 for

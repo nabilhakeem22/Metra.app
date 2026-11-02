@@ -1,5 +1,6 @@
 import type { ProposalDetail } from '@/lib/proposals/queries';
-import { toApiMoney, toApiQty, toIso } from './shared';
+import { toApiMoney, toIso } from './shared';
+import { serializeProposalSection, type PublicProposalSection } from './proposal-sections';
 
 /** Minimal row the list endpoint serializes (camelCase, from the API query). */
 export interface ProposalSummaryRow {
@@ -48,34 +49,6 @@ export function serializeProposalSummary(
   };
 }
 
-interface PublicProposalLine {
-  id: string;
-  description_ar: string | null;
-  description_en: string | null;
-  cost_item_id: string | null;
-  qty: string;
-  unit: string;
-  unit_price: string;
-  discount_pct: string;
-  line_total: string;
-  sort_order: number;
-  // Cost/margin — present ONLY when the key's role can see margin.
-  unit_cost?: string;
-  line_cost?: string;
-  line_margin?: string;
-}
-
-interface PublicProposalSection {
-  id: string;
-  title_ar: string | null;
-  title_en: string | null;
-  sort_order: number;
-  section_subtotal: string;
-  lines: PublicProposalLine[];
-  section_cost?: string;
-  section_margin?: string;
-}
-
 export interface PublicProposal extends PublicProposalSummary {
   expiry_date: string | null;
   version: number;
@@ -97,16 +70,11 @@ export interface PublicProposal extends PublicProposalSummary {
   total_margin?: string;
 }
 
-/**
- * Serialize a full proposal. The upstream query already strips cost/margin when
- * the key cannot see margin; `costVisible` gates it again here so the public shape
- * never carries a cost key for a non-margin caller.
- */
-export function serializeProposal(
-  detail: ProposalDetail,
-  costVisible: boolean,
-): PublicProposal {
-  const out: PublicProposal = {
+type ProposalFields = Omit<PublicProposal, 'sections' | 'total_cost' | 'total_margin'>;
+
+/** The proposal's own fields; never cost or margin, which serializeProposal gates. */
+function proposalFields(detail: ProposalDetail): ProposalFields {
+  return {
     id: detail.id,
     number: detail.number,
     title_ar: detail.titleAr,
@@ -133,41 +101,21 @@ export function serializeProposal(
     notes_en: detail.notesEn,
     terms_ar: detail.termsAr,
     terms_en: detail.termsEn,
-    sections: detail.sections.map((s) => {
-      const lines: PublicProposalLine[] = s.lines.map((l) => {
-        const line: PublicProposalLine = {
-          id: l.id,
-          description_ar: l.descriptionAr,
-          description_en: l.descriptionEn,
-          cost_item_id: l.costItemId,
-          qty: toApiQty(l.qty),
-          unit: l.unit,
-          unit_price: toApiMoney(l.unitPrice),
-          discount_pct: toApiMoney(l.discountPct),
-          line_total: toApiMoney(l.lineTotal),
-          sort_order: l.sortOrder,
-        };
-        if (costVisible) {
-          line.unit_cost = toApiMoney(l.unitCost);
-          line.line_cost = toApiMoney(l.lineCost);
-          line.line_margin = toApiMoney(l.lineMargin);
-        }
-        return line;
-      });
-      const section: PublicProposalSection = {
-        id: s.id,
-        title_ar: s.titleAr,
-        title_en: s.titleEn,
-        sort_order: s.sortOrder,
-        section_subtotal: toApiMoney(s.sectionSubtotal),
-        lines,
-      };
-      if (costVisible) {
-        section.section_cost = toApiMoney(s.sectionCost);
-        section.section_margin = toApiMoney(s.sectionMargin);
-      }
-      return section;
-    }),
+  };
+}
+
+/**
+ * Serialize a full proposal. The upstream query already strips cost/margin when
+ * the key cannot see margin; `costVisible` gates it again here so the public shape
+ * never carries a cost key for a non-margin caller.
+ */
+export function serializeProposal(
+  detail: ProposalDetail,
+  costVisible: boolean,
+): PublicProposal {
+  const out: PublicProposal = {
+    ...proposalFields(detail),
+    sections: detail.sections.map((s) => serializeProposalSection(s, costVisible)),
   };
   if (costVisible) {
     out.total_cost = toApiMoney(detail.totalCost);

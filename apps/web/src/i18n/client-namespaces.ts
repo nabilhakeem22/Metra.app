@@ -25,7 +25,7 @@ import type { AbstractIntlMessages } from 'next-intl';
  *  client-namespaces.test.ts proves by scanning everything the route loads. */
 const errorsOf = (...keys: string[]) => keys.map((key) => `errors.${key}`);
 
-const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'forbidden', 'generic', 'malformed', 'otp_email_unavailable', 'otp_rate_limited', 'otp_sms_unavailable', 'otp_verify_failed', 'phone_invalid', 'phone_required', 'reference', 'uncertain', 'unreachable');
+const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'forbidden', 'generic', 'malformed', 'otp_captcha_failed', 'otp_captcha_pending', 'otp_email_unavailable', 'otp_rate_limited', 'otp_sms_unavailable', 'otp_verify_failed', 'otp_verify_rate_limited', 'phone_invalid', 'phone_required', 'reference', 'uncertain', 'unreachable');
 const ONBOARDING_ERRORS = errorsOf('amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'file_too_large', 'firm_type_unavailable', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'logo_image_unsupported', 'name_required', 'phone_required', 'record_not_found', 'reference', 'storage_unavailable', 'uncertain', 'unreachable');
 const INVITE_ERRORS = errorsOf('already_member', 'amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'invite_expired', 'invite_not_found', 'invite_wrong_account', 'last_owner', 'malformed', 'owner_immutable', 'pending_exists', 'record_not_found', 'reference', 'self', 'token_invalid', 'uncertain', 'unreachable');
 

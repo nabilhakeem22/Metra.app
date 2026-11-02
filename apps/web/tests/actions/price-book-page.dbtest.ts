@@ -48,7 +48,7 @@ describe('listPriceBookPage', () => {
     const glass = await section(orgId, 'Glass', 'الزجاج');
     await items(orgId, glass, Array.from({ length: 120 }, (_, n) => ({ code: `G-${n}`, nameEn: `Pane ${n + 1} mm`, nameAr: `لوح ${n + 1} مم` })));
 
-    const pages = await Promise.all([1, 2, 3].map((page) => listPriceBookPage(ctx, view({ page }), 'en')));
+    const pages = await Promise.all([1, 2, 3].map((page) => listPriceBookPage(ctx, view({ page }), 'en', true)));
     expect(pages.map((page) => page.rows.length)).toEqual([PRICE_BOOK_PAGE_SIZE, PRICE_BOOK_PAGE_SIZE, 20]);
     expect(pages[0]).toMatchObject({ matched: 120, pageCount: 3, hasAnyItem: true, sectionCounts: { [glass]: 120 } });
     const all = pages.flatMap(codes);
@@ -56,7 +56,7 @@ describe('listPriceBookPage', () => {
     expect(all.slice(0, 3)).toEqual(['G-0', 'G-1', 'G-2']);
     expect(all.at(-1)).toBe('G-119');
 
-    const arabic = await listPriceBookPage(ctx, view({}), 'ar-EG');
+    const arabic = await listPriceBookPage(ctx, view({}), 'ar-EG', true);
     expect(codes(arabic).slice(0, 3)).toEqual(['G-0', 'G-1', 'G-2']);
   });
 
@@ -67,9 +67,9 @@ describe('listPriceBookPage', () => {
     await items(orgId, zinc, [{ code: 'Y-1', nameEn: 'Ya item', nameAr: 'بند ياء' }]);
     await items(orgId, alef, [{ code: 'A-1', nameEn: 'Alef item', nameAr: 'بند ألف' }]);
 
-    expect(codes(await listPriceBookPage(ctx, view({}), 'en'))).toEqual(['Y-1', 'A-1']);
-    expect(codes(await listPriceBookPage(ctx, view({}), 'ar-EG'))).toEqual(['A-1', 'Y-1']);
-    expect(await listPriceBookPage(ctx, view({ page: 9 }), 'en')).toMatchObject({ page: 1, pageCount: 1 });
+    expect(codes(await listPriceBookPage(ctx, view({}), 'en', true))).toEqual(['Y-1', 'A-1']);
+    expect(codes(await listPriceBookPage(ctx, view({}), 'ar-EG', true))).toEqual(['A-1', 'Y-1']);
+    expect(await listPriceBookPage(ctx, view({ page: 9 }), 'en', true)).toMatchObject({ page: 1, pageCount: 1 });
   });
 
   it('filters by section and by active in SQL, and never lists an item under a retired section', async () => {
@@ -81,10 +81,10 @@ describe('listPriceBookPage', () => {
     await items(orgId, paint, [{ code: 'P-1', nameEn: 'Emulsion', nameAr: 'دهان بلاستيك' }]);
     await items(orgId, retired, [{ code: 'O-1', nameEn: 'Old thing', nameAr: 'حاجة قديمة' }]);
 
-    expect(codes(await listPriceBookPage(ctx, view({}), 'en'))).toEqual(['G-1', 'G-2', 'P-1']);
-    expect(codes(await listPriceBookPage(ctx, view({ sectionId: glass }), 'en'))).toEqual(['G-1', 'G-2']);
-    expect(codes(await listPriceBookPage(ctx, view({ activeOnly: true }), 'en'))).toEqual(['G-1', 'P-1']);
-    expect(await listPriceBookPage(ctx, view({ sectionId: glass, activeOnly: true }), 'en')).toMatchObject({ matched: 1, sectionCounts: { [glass]: 1 } });
+    expect(codes(await listPriceBookPage(ctx, view({}), 'en', true))).toEqual(['G-1', 'G-2', 'P-1']);
+    expect(codes(await listPriceBookPage(ctx, view({ sectionId: glass }), 'en', true))).toEqual(['G-1', 'G-2']);
+    expect(codes(await listPriceBookPage(ctx, view({ activeOnly: true }), 'en', true))).toEqual(['G-1', 'P-1']);
+    expect(await listPriceBookPage(ctx, view({ sectionId: glass, activeOnly: true }), 'en', true)).toMatchObject({ matched: 1, sectionCounts: { [glass]: 1 } });
   });
 
   it('searches the code and both names, every word in any order, Arabic spellings and digits folded (P1)', async () => {
@@ -96,7 +96,7 @@ describe('listPriceBookPage', () => {
       { code: 'MKT-p', nameEn: 'PP pipe', nameAr: 'مواسير بولى بروبلين مرنة' },
       { code: 'GYP-001', nameEn: 'Gypsum board', nameAr: 'جبسوم بورد' },
     ]);
-    const search = async (query: string) => codes(await listPriceBookPage(ctx, view({ query }), 'en')).sort();
+    const search = async (query: string) => codes(await listPriceBookPage(ctx, view({ query }), 'en', true)).sort();
 
     expect(await search('gyp-00')).toEqual(['GYP-001']);
     expect(await search('GYPSUM')).toEqual(['GYP-001']);
@@ -121,18 +121,18 @@ describe('listPriceBookPage', () => {
       { code: 'CLAD-2', nameEn: 'Cladding panel, wood colours', nameAr: wood },
       { code: 'NBSP-1', nameEn: 'Aaa first in English', nameAr: ' 	' },
     ]);
-    expect(codes(await listPriceBookPage(ctx, view({ query: wood }), 'ar-EG'))).toEqual(['CLAD-2']);
-    expect(codes(await listPriceBookPage(ctx, view({}), 'ar-EG'))).toEqual(['CLAD-2', 'CLAD-1', 'NBSP-1']);
+    expect(codes(await listPriceBookPage(ctx, view({ query: wood }), 'ar-EG', true))).toEqual(['CLAD-2']);
+    expect(codes(await listPriceBookPage(ctx, view({}), 'ar-EG', true))).toEqual(['CLAD-2', 'CLAD-1', 'NBSP-1']);
   });
 
   it('tells an empty book from a filter that matched nothing, and shows no other studio s items', async () => {
     const empty = await studio();
-    expect(await listPriceBookPage(empty.ctx, view({}), 'en')).toMatchObject({ rows: [], matched: 0, hasAnyItem: false });
+    expect(await listPriceBookPage(empty.ctx, view({}), 'en', true)).toMatchObject({ rows: [], matched: 0, hasAnyItem: false });
 
     const other = await studio();
     await items(other.orgId, await section(other.orgId, 'Glass', 'الزجاج'), [{ code: 'X-1', nameEn: 'Theirs', nameAr: 'بتاعهم' }]);
-    expect(await listPriceBookPage(empty.ctx, view({ query: 'theirs' }), 'en')).toMatchObject({ matched: 0, hasAnyItem: false });
-    expect(await listPriceBookPage(other.ctx, view({ query: 'nothing like it' }), 'en')).toMatchObject({ matched: 0, hasAnyItem: true });
+    expect(await listPriceBookPage(empty.ctx, view({ query: 'theirs' }), 'en', true)).toMatchObject({ matched: 0, hasAnyItem: false });
+    expect(await listPriceBookPage(other.ctx, view({ query: 'nothing like it' }), 'en', true)).toMatchObject({ matched: 0, hasAnyItem: true });
   });
 });
 

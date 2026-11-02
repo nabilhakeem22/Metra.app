@@ -7,6 +7,13 @@ import { ACTION_CODE_PROBLEM } from './action-code-problem';
 const PROBLEM_BASE = 'https://api.metra.app/problems/';
 const CONTENT_TYPE = 'application/problem+json';
 
+/** On EVERY v1 response, a 200 or a problem: never cached (each answer is one
+ *  key's view of one studio) and never sniffed as anything but its declared type. */
+export const API_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
+  'cache-control': 'no-store',
+  'x-content-type-options': 'nosniff',
+};
+
 /** The closed set of problem kinds the API surface can emit. */
 export type ApiProblemKind =
   | 'unauthorized'
@@ -61,7 +68,7 @@ export function problemResponse(
   const body = problemBody(kind, opts.detail);
   return new Response(JSON.stringify(body), {
     status: body.status,
-    headers: { 'content-type': CONTENT_TYPE, ...(opts.headers ?? {}) },
+    headers: { 'content-type': CONTENT_TYPE, ...API_RESPONSE_HEADERS, ...(opts.headers ?? {}) },
   });
 }
 

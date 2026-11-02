@@ -31,3 +31,20 @@ describe('otpIdentifierErrors: length', () => {
     expect(otpIdentifierErrors('email', ' '.repeat(MAX_IDENTIFIER_LENGTH + 5))).toEqual({ email: { code: 'required' } });
   });
 });
+
+describe('otpIdentifierErrors: phone (F2)', () => {
+  it.each(['+201001234567', '0100 123 4567', '+20 (100) 123-4567', '+20.100.123.4567', '+٢٠١٠٠١٢٣٤٥٦٧'])('accepts %j', (typed) => {
+    expect(otpIdentifierErrors('phone', typed)).toEqual({});
+  });
+
+  it.each(['+20 1OO 123 4567', '+20 100 123 4567 ext 9', 'owner@firm.example', 'abc', '+', ' + - ', '20+100'])(
+    'says phone_format, never required, under a filled phone box: %j',
+    (typed) => {
+      expect(otpIdentifierErrors('phone', typed)).toEqual({ phone: { code: 'phone_format' } });
+    },
+  );
+
+  it('still says required for an empty phone box', () => {
+    expect(otpIdentifierErrors('phone', '   ')).toEqual({ phone: { code: 'required' } });
+  });
+});

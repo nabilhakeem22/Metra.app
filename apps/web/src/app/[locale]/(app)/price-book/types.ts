@@ -8,7 +8,8 @@ export interface PriceBookItem {
   nameAr: string | null;
   sectionId: string;
   unit: CostItemUnit;
-  defaultUnitCost: string;
+  /** Null for a reader who may not see margin: the server never read it. */
+  defaultUnitCost: string | null;
   defaultUnitPrice: string;
   taxCode: string | null;
   etaItemCode: string | null;

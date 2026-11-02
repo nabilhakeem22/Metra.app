@@ -1,0 +1,75 @@
+<!doctype html>
+<!--
+  The source of public/og/og.ar-EG.png and public/og/og.en.png, the 1200x630
+  share cards the landing's og:image and twitter:image point at. Each headline
+  below is landing.seo.ogHeadline copied verbatim from the catalogs
+  (src/test/seo-images.test.ts keeps them equal). Western digits only.
+
+  Re-render after changing a headline, from apps/web, with the headless Edge
+  that ships with Windows 11 (one command per locale):
+
+  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --headless=new --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 --virtual-time-budget=5000 --screenshot=public\og\og.ar-EG.png "file:///C:/path/to/apps/web/scripts/og-image/og-card.html?locale=ar-EG"
+
+  and the same with og.en.png and ?locale=en. Each PNG must stay at most
+  300 KB (WhatsApp drops a larger preview image). Edge writes about 330 KB, so
+  quantize each one to a 256-colour palette afterwards, for example with sharp:
+  sharp(input).png({ palette: true, colours: 256, dither: 1, effort: 10 })
+  (about 40 KB). src/test/seo-images.test.ts checks the size and dimensions.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: 'Plex Arabic';
+    src: url('../../public/fonts/IBMPlexSansArabic-Bold.ttf') format('truetype');
+    font-weight: 700;
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 88px 96px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #2E6BE6 0%, #1A3F99 48%, #0B1B3F 100%);
+    color: #FFFFFF;
+    font-family: 'Plex Arabic', sans-serif;
+    font-weight: 700;
+  }
+  .lockup { display: flex; align-items: center; gap: 28px; }
+  .lockup svg { width: 104px; height: 104px; flex-shrink: 0; }
+  .name { font-size: 64px; line-height: 1; letter-spacing: 0; }
+  .headline { font-size: 76px; line-height: 1.3; margin: 0; text-wrap: balance; }
+</style>
+</head>
+<body>
+  <div class="lockup">
+    <!-- The Aperture mark, reversed (white drawing) for the brand-coloured ground. -->
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="9.6" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1" />
+      <g stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <path d="M5.8 16.2 L16 7.2 L26.2 16.2" />
+        <path d="M8.9 15.2 V25.2 H23.1 V15.2" />
+      </g>
+      <rect x="13.6" y="17.8" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" />
+    </svg>
+    <span class="name" id="name"></span>
+  </div>
+  <p class="headline" id="headline"></p>
+<script>
+var CARDS = {
+  'ar-EG': { dir: 'rtl', lang: 'ar-EG', name: 'ميترا', headline: 'من عرض السعر حتى التسليم، في نظام واحد.' },
+  en: { dir: 'ltr', lang: 'en', name: 'Metra', headline: 'From quote to handover, in one system.' }
+};
+var card = CARDS[new URLSearchParams(location.search).get('locale')] || CARDS['ar-EG'];
+document.documentElement.dir = card.dir;
+document.documentElement.lang = card.lang;
+document.getElementById('name').textContent = card.name;
+document.getElementById('headline').textContent = card.headline;
+</script>
+</body>
+</html>

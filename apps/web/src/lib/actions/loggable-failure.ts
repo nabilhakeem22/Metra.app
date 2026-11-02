@@ -59,7 +59,7 @@ const ORM_QUERY_WRAPPER = 'DrizzleQueryError';
  * package. Own properties only — a driver error that happens to inherit a
  * `query` from a prototype is not this.
  */
-function isOrmQueryWrapper(e: unknown): boolean {
+export function isOrmQueryWrapper(e: unknown): boolean {
   if (e === null || typeof e !== 'object') return false;
   // A Proxy can throw from hasOwnProperty. FAIL CLOSED (Round E S3): an object
   // that will not say what it carries is treated as carrying the parameters.

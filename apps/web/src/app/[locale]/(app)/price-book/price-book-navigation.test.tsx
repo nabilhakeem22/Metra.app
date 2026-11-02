@@ -67,7 +67,7 @@ function nextRequestSettledBy(): { settle: () => Promise<void> } {
 
 function show(view: PriceBookView = { ...FIRST_VIEW, page: 2 }, locale: 'en' | 'ar-EG' = 'en') {
   addressAt(view);
-  renderWithIntl(<PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} />, { locale });
+  renderWithIntl(<PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} showsCost />, { locale });
 }
 
 beforeEach(async () => {
@@ -123,7 +123,7 @@ describe('the paged price book', () => {
   describe('with slow answers', () => {
     const client = (view: PriceBookView) => (
       <NextIntlClientProvider locale="en" messages={messagesFor('en')} timeZone="UTC">
-        <PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} />
+        <PriceBookClient view={view} book={BOOK} market={{ bulletin: null, refs: {} }} sections={SECTIONS} canManage={false} showsCost />
       </NextIntlClientProvider>
     );
     const box = () => screen.getByPlaceholderText(messageAt('en', 'priceBook.search')) as HTMLInputElement;

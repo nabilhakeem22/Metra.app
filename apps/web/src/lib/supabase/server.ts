@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { supabaseAnonKey, supabaseUrl } from './config';
+import { hardenedSessionCookieOptions } from './session-cookie';
 
 /** Supabase client bound to the request cookies. Use in Server Components / Actions. */
 export async function createSupabaseServerClient() {
@@ -20,7 +21,7 @@ export async function createSupabaseServerClient() {
       ) {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, hardenedSessionCookieOptions(options));
           }
         } catch {
           // setAll from a Server Component is a no-op; middleware refreshes cookies.
