@@ -37,20 +37,21 @@ function DocumentLinkCard({ link }: { link: string }) {
 
 /**
  * The issued contract's client home: the client signs there with a code, or,
- * with no email on file, cannot sign online yet (functional F2). A failure says
- * to try the Client page control only when a retry can help (functional F3).
+ * with no email on file, cannot sign online yet (functional F2). A refusal has
+ * no page to promise, so it says neither (re-check L-new3), and it says to try
+ * the Client page control only when a retry can help (functional F3).
  */
 function HomeLinkCard({ answer }: { answer: ClientHomeAnswer }) {
   const t = useTranslations('contracts.clientPage.issued');
   const te = useTranslations('errors');
   const tc = useTranslations('engagements.command');
-  const body = answer.ok && !answer.clientHasEmail ? tc('noEmailSignature') : t('body');
+  const body = answer.ok ? (answer.clientHasEmail ? t('body') : tc('noEmailSignature')) : null;
   return (
     <Card>
       <CardContent className="space-y-3 py-4 text-body">
         <div>
           <p className="font-semibold">{t('title')}</p>
-          <p className="text-caption text-muted-foreground">{body}</p>
+          {body && <p className="text-caption text-muted-foreground">{body}</p>}
         </div>
         <ClientHomeLinkResult shown={clientHomeShownOf(answer, (failure) => describeFailure(failure, te))} />
         {homeRetryMayHelp(answer) && <p className="text-caption text-muted-foreground">{t('retry')}</p>}
