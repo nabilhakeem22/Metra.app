@@ -1,9 +1,10 @@
 import 'server-only';
-import { clientContacts, clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
+import { clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { EntryPhase } from '@/lib/flow/types';
 import type { ClientExpectedRecord } from '../client-expected-view';
+import { clientHasEmailSql } from './client-has-email';
 import { entryPhaseOf } from './entry-phase';
 
 /**
@@ -96,16 +97,7 @@ export function getEngagementHeader(
         clientExpectedState: designEngagements.clientExpectedState,
         clientExpectedSetAt: designEngagements.clientExpectedSetAt,
         // In this one statement, so the flag costs no round trip of its own.
-        clientHasEmail: sql<boolean>`(
-          lower(coalesce(
-            (select nullif(btrim(${clientContacts.email}), '') from ${clientContacts}
-              where ${clientContacts.orgId} = ${designEngagements.orgId}
-                and ${clientContacts.clientId} = ${designEngagements.clientId}
-                and ${clientContacts.isPrimary}
-              limit 1),
-            nullif(btrim(${clients.email}), '')
-          )) ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:].]+$'
-        ) is true`,
+        clientHasEmail: clientHasEmailSql(designEngagements.orgId, designEngagements.clientId),
         createdAt: designEngagements.createdAt,
         updatedAt: designEngagements.updatedAt,
       })

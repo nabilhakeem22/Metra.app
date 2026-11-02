@@ -7,7 +7,7 @@ import { describeFailure } from '@/lib/actions/error-message';
 import type { ClientHomeAnswer } from '@/lib/client-home/types';
 import { ClientHomeLinkResult } from './client-home-link-result';
 import { clientHomeShownOf } from './client-home-shown';
-import type { SharedLink } from './shared-link';
+import { homeRetryMayHelp, type SharedLink } from './shared-link';
 
 /**
  * What the studio sends the client after an act, shown once: a document's own
@@ -35,19 +35,25 @@ function DocumentLinkCard({ link }: { link: string }) {
   );
 }
 
-/** The issued contract's client home: the client signs there with a code; a failure says to try the Client page control. */
+/**
+ * The issued contract's client home: the client signs there with a code, or,
+ * with no email on file, cannot sign online yet (functional F2). A failure says
+ * to try the Client page control only when a retry can help (functional F3).
+ */
 function HomeLinkCard({ answer }: { answer: ClientHomeAnswer }) {
   const t = useTranslations('contracts.clientPage.issued');
   const te = useTranslations('errors');
+  const tc = useTranslations('engagements.command');
+  const body = answer.ok && !answer.clientHasEmail ? tc('noEmailSignature') : t('body');
   return (
     <Card>
       <CardContent className="space-y-3 py-4 text-body">
         <div>
           <p className="font-semibold">{t('title')}</p>
-          <p className="text-caption text-muted-foreground">{t('body')}</p>
+          <p className="text-caption text-muted-foreground">{body}</p>
         </div>
         <ClientHomeLinkResult shown={clientHomeShownOf(answer, (failure) => describeFailure(failure, te))} />
-        {!answer.ok && <p className="text-caption text-muted-foreground">{t('retry')}</p>}
+        {homeRetryMayHelp(answer) && <p className="text-caption text-muted-foreground">{t('retry')}</p>}
       </CardContent>
     </Card>
   );

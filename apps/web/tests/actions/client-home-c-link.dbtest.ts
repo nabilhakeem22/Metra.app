@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // H6.3 end to end (AC1 to AC3, AC10): an old contract link (/c) of a BOQ
-// contract sends its holder to the client home's Execution tab, through the
-// REAL token function and the real re-derive; every other link renders /c as
-// before, after exactly one read. Every token function is counted at
-// lib/share/sdf-call (the real one, spied), and nothing printed names a token
-// or a hash. What a whole /c request reads: client-home-c-reads.dbtest.ts.
+// contract awaiting its signature sends its holder to the client home's
+// Execution tab, through the REAL token functions and the real re-derive; when
+// no home can be shown it renders /c as before. Every token function is counted
+// at lib/share/sdf-call (the real one, spied), and nothing printed names a token
+// or a hash. The links that never ask: client-home-c-gate.dbtest.ts. What a
+// whole /c request reads: client-home-c-reads.dbtest.ts.
 
 const sdfCalls = vi.hoisted(() => ({ names: [] as string[] }));
 vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
@@ -19,13 +20,11 @@ vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
     },
   };
 });
-import { contractHomeRedirect } from '@/lib/client-home/redirect';
 import type { OrgContext } from '@/lib/db/context';
 import { revokeDeliveryLinkCore, rotateDeliveryLinkCore } from '@/lib/engagements/share';
-import { hashShareToken, mintShareToken } from '@/lib/share/token';
-import { homePathOf as pathOf, mintHomeLink } from './client-home-c-link-fixture';
+import { hashShareToken } from '@/lib/share/token';
+import { homePathOf as pathOf, mintHomeLink, redirectOf } from './client-home-c-link-fixture';
 import { seedHome, seedLightHome, type Home } from './client-home-fixture';
-import { seedProposalContract } from './contract-from-boq-fixture';
 import { closeExecutionFixture, ownerQuery, tamper } from './execution-fixture';
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
@@ -73,23 +72,19 @@ async function minted(home: Home): Promise<string> {
   return raw;
 }
 
-describe('a BOQ contract link leads to its home (AC1, AC2)', () => {
-  it('issued, signed and terminated, in both locales', async () => {
+describe('a BOQ contract awaiting its signature leads to its home (AC1, AC2)', () => {
+  it('in both locales', async () => {
     const home = await seedHome(owner.orgId, 'issued');
     const cRaw = contractRawOf(home);
     const homeRaw = await minted(home);
-    expect(await contractHomeRedirect(cRaw, 'ar-EG')).toBe(pathOf('ar-EG', homeRaw));
-    expect(await contractHomeRedirect(cRaw, 'en')).toBe(pathOf('en', homeRaw));
-    for (const status of ['signed', 'terminated']) {
-      await ownerQuery(`update public.contracts set status = $2 where id = $1`, [home.contract.contractId, status]);
-      expect(await contractHomeRedirect(cRaw, 'en')).toBe(pathOf('en', homeRaw));
-    }
+    expect(await redirectOf(cRaw, 'ar-EG')).toBe(pathOf('ar-EG', homeRaw));
+    expect(await redirectOf(cRaw, 'en')).toBe(pathOf('en', homeRaw));
   });
 
   it('a light delivery', async () => {
     const light = await seedLightHome(owner.orgId, 'issued');
     const homeRaw = await minted(light);
-    expect(await contractHomeRedirect(contractRawOf(light), 'ar-EG')).toBe(pathOf('ar-EG', homeRaw));
+    expect(await redirectOf(contractRawOf(light), 'ar-EG')).toBe(pathOf('ar-EG', homeRaw));
   });
 
   it('after the home link is replaced, the NEW link; the old one appears nowhere', async () => {
@@ -99,25 +94,18 @@ describe('a BOQ contract link leads to its home (AC1, AC2)', () => {
     const rotated = await rotateDeliveryLinkCore(owner, home.delivery.id);
     const newRaw = rotated.data as string;
     secrets.push(newRaw);
-    const answer = await contractHomeRedirect(cRaw, 'en');
+    const answer = await redirectOf(cRaw, 'en');
     expect(answer).toBe(pathOf('en', newRaw));
     expect(answer).not.toContain(oldRaw);
   });
 });
 
-describe('everything else renders /c as before, after exactly one read (AC3)', () => {
+describe('with no home to show, /c renders as before: the contract, then the target (AC3)', () => {
   const expectNull = async (cRaw: string) => {
     sdfCalls.names.length = 0;
-    expect(await contractHomeRedirect(cRaw, 'en')).toBeNull();
-    expect(sdfCalls.names).toEqual(['app_client_home_target_by_token']);
+    expect(await redirectOf(cRaw, 'en')).toBeNull();
+    expect(sdfCalls.names).toEqual(['app_contract_by_token', 'app_client_home_target_by_token']);
   };
-
-  it('an unknown token and a proposal contract', async () => {
-    await expectNull(mintShareToken().raw);
-    const proposalToken = mintShareToken();
-    await ownerQuery(`update public.contracts set status = 'issued', token_hash = $2 where id = $1`, [await seedProposalContract(owner.orgId), proposalToken.hash]);
-    await expectNull(proposalToken.raw);
-  });
 
   it.each([
     ['a revoked home', async (home: Home) => expect((await revokeDeliveryLinkCore(owner, home.delivery.id)).ok).toBe(true)],
@@ -140,10 +128,5 @@ describe('everything else renders /c as before, after exactly one read (AC3)', (
     process.env.SHARE_LINK_SECRET = SECRET;
     await ownerQuery(`update public.design_engagements set token_nonce = 'another-nonce' where id = $1`, [home.delivery.id]);
     await expectNull(cRaw);
-  });
-
-  it('a blank token: no read at all', async () => {
-    for (const blank of ['', '   ']) expect(await contractHomeRedirect(blank, 'en')).toBeNull();
-    expect(sdfCalls.names).toEqual([]);
   });
 });

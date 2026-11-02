@@ -10,3 +10,9 @@ import type { PublicContract } from './public-types';
 export function signsInClientHome(contract: Pick<PublicContract, 'source'>): boolean {
   return contract.source === 'boq';
 }
+
+/** Awaiting the client's signature, in its window: the SQL's own `signing_open` rule (no end date is no end). */
+export function isOpenForSigning(contract: Pick<PublicContract, 'status' | 'share_expires_at'>, now: number): boolean {
+  if (contract.status !== 'issued') return false;
+  return contract.share_expires_at === null || Date.parse(contract.share_expires_at) > now;
+}

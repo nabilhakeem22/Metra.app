@@ -2884,11 +2884,11 @@
       "moreActions": "Link actions",
       "confirmRotate": {
         "title": "Replace the client link?",
-        "body": "The link the client has now stops working. You send them the new one."
+        "body": "The link the client has now stops working. You send them the new one. Contract and change order links you sent before keep showing those documents."
       },
       "confirmRevoke": {
         "title": "Revoke the client link?",
-        "body": "The client can no longer open this delivery with it. Sharing again creates a new link.",
+        "body": "The client can no longer open this delivery with it. Sharing again creates a new link. Contract and change order links you sent before keep showing those documents.",
         "confirm": "Revoke link"
       },
       "codes": {

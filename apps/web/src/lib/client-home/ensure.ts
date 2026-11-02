@@ -18,10 +18,11 @@ import type { OrgContext } from '@/lib/db/context';
 import { readLiveDeliveryLink } from '@/lib/engagements/share-reveal';
 import { mintFirstDeliveryLink, renewLapsedDeliveryLink } from '@/lib/engagements/share';
 import { isUuid } from '@/lib/uuid';
+import { requireHomeShows } from './home-shows';
 import type { ClientHomeLink, ClientHomeLinkReason } from './types';
 
-/** The home, and its live link (the RAW token, never logged) or why the studio cannot be shown one. */
-type ClientHome = { engagementId: string } & ClientHomeLink;
+/** The home, whether its client can get a code, and its live link (the RAW token, never logged) or why the studio cannot be shown one. */
+type ClientHome = { engagementId: string; clientHasEmail: boolean } & ClientHomeLink;
 
 /**
  * Who may open a contract's client home: whoever issues contracts (owner and
@@ -107,20 +108,6 @@ async function insertLightHome(tx: MetraDb, ctx: OrgContext, projectId: string, 
   return { id: winner, created: false };
 }
 
-/**
- * The home must be at `execution` and show THIS contract (the one picker,
- * app_delivery_current_contract): an older contract of a project whose newer
- * BOQ stands in front of it has no home to send the client to.
- */
-async function requireHomeShows(tx: MetraDb, engagementId: string, contractId: string): Promise<void> {
-  const rows = (await tx.execute(
-    sql`select de.state::text as state, public.app_delivery_current_contract(de.id, de.org_id) as contract_id
-          from public.design_engagements de where de.id = ${engagementId}`,
-  )) as unknown as Array<{ state: string; contract_id: string | null }>;
-  const home = rows[0];
-  if (home?.state !== 'execution' || home.contract_id !== contractId) fail('client_home_unavailable');
-}
-
 /** The link-reveal refusals that leave the home without a link to hand back. */
 const UNSHOWN_LINK: ReadonlySet<string> = new Set(['delivery_links_not_configured', 'delivery_link_unrecoverable']);
 
@@ -164,7 +151,7 @@ export async function ensureClientHomeCore(
     const boq = await loadContractBoq(tx, contractId);
     const existing = boq.engagementId ?? (await findLightHome(tx, boq.projectId, boq.clientId));
     const home = existing ? { id: existing, created: false } : await insertLightHome(tx, ctx, boq.projectId, boq.clientId);
-    await requireHomeShows(tx, home.id, contractId);
+    const { clientHasEmail } = await requireHomeShows(tx, home.id, contractId);
     const { issued, ...link } = await homeLink(tx, home.id);
     await audit({
       entity: 'design_engagement',
@@ -173,6 +160,6 @@ export async function ensureClientHomeCore(
       before: { home: home.created ? null : 'existing' },
       after: { contract_id: contractId, home: home.created ? 'created' : 'existing', link: issued ?? link.linkReason },
     });
-    return { engagementId: home.id, ...link };
+    return { engagementId: home.id, clientHasEmail, ...link };
   });
 }

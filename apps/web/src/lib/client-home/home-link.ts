@@ -12,13 +12,13 @@ import type { ClientHomeAnswer } from './types';
  * The client home of one BOQ contract (ensureClientHomeCore: found, or a light
  * delivery created): its Execution tab's absolute URL in the studio user's
  * locale (`${origin}/<locale>/d/<token>?tab=execution`), why it cannot be
- * shown, or the refusal.
+ * shown, or the refusal; and whether a signing code could reach the client.
  */
 export async function clientHomeAnswer(ctx: OrgContext, contractId: string, origin: string): Promise<ClientHomeAnswer> {
   const res = await ensureClientHomeCore(ctx, { contractId });
   if (!res.ok) return { ...res, ok: false };
   if (!res.data) return unexpectedFailure('ensureClientHomeCore answered ok without a home');
-  const home = res.data;
-  if (home.link === null) return { ok: true, link: null, linkReason: home.linkReason };
-  return { ok: true, link: `${deliveryPortalUrl(origin, await requestLocaleOrDefault(), home.link)}?tab=execution` };
+  const { clientHasEmail, link, linkReason } = res.data;
+  if (link === null) return { ok: true, clientHasEmail, link: null, linkReason };
+  return { ok: true, clientHasEmail, link: `${deliveryPortalUrl(origin, await requestLocaleOrDefault(), link)}?tab=execution` };
 }

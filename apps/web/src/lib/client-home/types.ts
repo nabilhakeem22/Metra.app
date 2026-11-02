@@ -74,8 +74,12 @@ export type ClientHomeLinkReason = 'delivery_links_not_configured' | 'delivery_l
 /** The home's link as the studio is handed it, or why there is none. */
 export type ClientHomeLink = { link: string; linkReason?: never } | { link: null; linkReason: ClientHomeLinkReason };
 
-/** What the studio is answered when it asks for a contract's client home: the link, why there is none, or the refusal. */
-export type ClientHomeAnswer = (ActionResult & { ok: false }) | ({ ok: true } & ClientHomeLink);
+/**
+ * What the studio is answered when it asks for a contract's client home: the
+ * link, why there is none, or the refusal. `clientHasEmail`: whether a signing
+ * code could reach the client (never the address).
+ */
+export type ClientHomeAnswer = (ActionResult & { ok: false }) | ({ ok: true; clientHasEmail: boolean } & ClientHomeLink);
 
 /** A home whose Execution tab can be shown: the delivery is at `execution`. */
 export type HomeAtExecution = PortalHome & { execution: HomeExecution };

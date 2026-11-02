@@ -11,10 +11,13 @@ vi.mock('next-intl/server', () => ({ getLocale: async () => 'en' }));
 
 import { clientHomeAnswer } from '@/lib/client-home/home-link';
 import { getHomeByToken } from '@/lib/client-home/read';
-import { contractHomeRedirect } from '@/lib/client-home/redirect';
 import type { ClientHomeAnswer } from '@/lib/client-home/types';
 import { issueContractCore } from '@/lib/contracts/core';
 import type { OrgContext } from '@/lib/db/context';
+import { isIssuedExecutionContract } from '@/lib/contracts/queries/lookups';
+import { redirectOf } from './client-home-c-link-fixture';
+import { setClientEmail } from './client-home-fixture';
+import { seedProposalContract } from './contract-from-boq-fixture';
 import { seedBillableContract } from './execution-billing-fixture';
 import { closeExecutionFixture, ownerQuery } from './execution-fixture';
 import { seedDelivery } from './delivery-execution-fixture';
@@ -58,6 +61,34 @@ function homeRawOf(home: ClientHomeAnswer | null): string {
   return match[1];
 }
 
+describe('whether a signing code could reach the client (functional F2)', () => {
+  it.each([
+    ['an address on file', 'client@example.org', true],
+    ['no address', null, false],
+    ['one that is no address', 'not-an-address', false],
+  ])('%s', async (_case, email, expected) => {
+    const delivery = await seedDelivery(owner.orgId);
+    const contract = await seedBillableContract(owner.orgId, 'draft', delivery);
+    await setClientEmail(owner.orgId, delivery.clientId, email);
+    const { home } = await issueThenHome(owner, contract.contractId);
+    expect(home).toMatchObject({ ok: true, clientHasEmail: expected });
+  });
+});
+
+describe('a second Issue tap finds its home (reliability L4)', () => {
+  it('only a BOQ contract issued and not yet signed', async () => {
+    const contract = await seedBillableContract(owner.orgId, 'draft');
+    expect(await isIssuedExecutionContract(owner, contract.contractId)).toBe(false);
+    await issueContractCore(owner, { id: contract.contractId });
+    expect(await isIssuedExecutionContract(owner, contract.contractId)).toBe(true);
+    await ownerQuery(`update public.contracts set status = 'signed' where id = $1`, [contract.contractId]);
+    expect(await isIssuedExecutionContract(owner, contract.contractId)).toBe(false);
+    const proposal = await seedProposalContract(owner.orgId);
+    await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [proposal]);
+    expect(await isIssuedExecutionContract(owner, proposal)).toBe(false);
+  });
+});
+
 describe('issuing an execution contract hands out its home', () => {
   it('no delivery behind the BOQ: ONE light delivery, whose link opens the signing, and the /c link leads there', async () => {
     const contract = await seedBillableContract(owner.orgId, 'draft');
@@ -68,7 +99,7 @@ describe('issuing an execution contract hands out its home', () => {
     const homeRaw = homeRawOf(home);
     const read = await getHomeByToken(homeRaw);
     expect(read.status === 'ok' && read.home.execution?.location.reason).toBe('sign_contract');
-    expect(await contractHomeRedirect(issued.data!.rawToken, 'en')).toBe(`/en/d/${homeRaw}?tab=execution&focus=contract`);
+    expect(await redirectOf(issued.data!.rawToken, 'en')).toBe(`/en/d/${homeRaw}?tab=execution&focus=contract`);
   });
 
   it('a BOQ of a design delivery: that delivery, no new row', async () => {

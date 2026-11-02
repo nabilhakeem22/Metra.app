@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
-import { LOCALE_COOKIE_NAME, LOCALES, routing } from '@/i18n/routing';
+import { isLocale, LOCALE_COOKIE_NAME, routing } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
 import { portalReadVerdict } from '@/lib/share/portal-rate-limit';
 import { PORTAL_RETRY_AFTER_SECONDS } from '@/lib/share/portal-retry-after';
@@ -33,10 +33,6 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 function handOverOf(variant: string | null): HandOver | null {
   if (variant === null) return 'download';
   return variant === 'view' || variant === 'thumb' ? variant : null;
-}
-
-function isLocale(value: string): boolean {
-  return (LOCALES as readonly string[]).includes(value);
 }
 
 /** A PICTURE fetch (an `<img>`), not a link the client followed: a gallery tile, or anything the browser fetches as an image. */

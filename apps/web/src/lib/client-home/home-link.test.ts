@@ -24,14 +24,14 @@ beforeEach(() => {
 
 describe('clientHomeAnswer', () => {
   it("a home with a link: its Execution tab's URL in the studio's locale", async () => {
-    ensure.ensureClientHomeCore.mockResolvedValue({ ok: true, data: { engagementId: 'e-1', link: 'home-raw' } });
-    expect(await clientHomeAnswer(CTX, CONTRACT_ID, ORIGIN)).toEqual({ ok: true, link: `${ORIGIN}/en/d/home-raw?tab=execution` });
+    ensure.ensureClientHomeCore.mockResolvedValue({ ok: true, data: { engagementId: 'e-1', clientHasEmail: true, link: 'home-raw' } });
+    expect(await clientHomeAnswer(CTX, CONTRACT_ID, ORIGIN)).toEqual({ ok: true, clientHasEmail: true, link: `${ORIGIN}/en/d/home-raw?tab=execution` });
     expect(ensure.ensureClientHomeCore).toHaveBeenCalledWith(CTX, { contractId: CONTRACT_ID });
   });
 
   it('a home whose link cannot be shown: the reason', async () => {
-    ensure.ensureClientHomeCore.mockResolvedValue({ ok: true, data: { engagementId: 'e-1', link: null, linkReason: 'delivery_links_not_configured' } });
-    expect(await clientHomeAnswer(CTX, CONTRACT_ID, ORIGIN)).toEqual({ ok: true, link: null, linkReason: 'delivery_links_not_configured' });
+    ensure.ensureClientHomeCore.mockResolvedValue({ ok: true, data: { engagementId: 'e-1', clientHasEmail: false, link: null, linkReason: 'delivery_links_not_configured' } });
+    expect(await clientHomeAnswer(CTX, CONTRACT_ID, ORIGIN)).toEqual({ ok: true, clientHasEmail: false, link: null, linkReason: 'delivery_links_not_configured' });
   });
 
   it('a refusal as it came; an ok with no home is generic with a reference', async () => {

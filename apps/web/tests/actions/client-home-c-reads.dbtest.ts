@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// H6.3 (AC5): what one /c request reads, against the real database. A
-// redirect reads the home target alone, never its contract; a link with no
-// home reads the target, then the contract. Every token function is counted at
-// lib/share/sdf-call (the real one, spied).
+// H6.3 (AC5): what one /c request reads, against the real database. Every link
+// reads its contract, as on main; one awaiting its signature in the home also
+// asks for the target and that the home shows it. Every token function is
+// counted at lib/share/sdf-call (the real one, spied).
 
 const sdfCalls = vi.hoisted(() => ({ names: [] as string[] }));
 vi.mock('@/lib/share/sdf-call', async (importOriginal) => {
@@ -60,17 +60,23 @@ async function open(token: string) {
 }
 
 describe('what each /c request reads (AC5)', () => {
-  it('the redirect reads the target alone, never the contract', async () => {
+  it('the redirect: the contract, the target, the home shows it', async () => {
     const home = await seedHome(owner.orgId, 'issued');
     await mintHomeLink(owner, home);
     const thrown = await open(home.contract.rawToken as string).catch((error: unknown) => error);
     expect((thrown as { digest?: string }).digest).toMatch(/^NEXT_REDIRECT;replace;\/en\/d\/.+;307;$/);
-    expect(sdfCalls.names).toEqual(['app_client_home_target_by_token']);
+    expect(sdfCalls.names).toEqual(['app_contract_by_token', 'app_client_home_target_by_token', 'app_home_contract_sections_by_token']);
   });
 
-  it('a link with no home: the target, then the contract', async () => {
+  it('a link with no home: the contract, then the target', async () => {
     const home = await seedHome(owner.orgId, 'issued');
     await open(home.contract.rawToken as string);
-    expect(sdfCalls.names).toEqual(['app_client_home_target_by_token', 'app_contract_by_token']);
+    expect(sdfCalls.names).toEqual(['app_contract_by_token', 'app_client_home_target_by_token']);
+  });
+
+  it('a signed contract: only the contract, as on main (reliability M1)', async () => {
+    const home = await seedHome(owner.orgId, 'signed');
+    await open(home.contract.rawToken as string);
+    expect(sdfCalls.names).toEqual(['app_contract_by_token']);
   });
 });

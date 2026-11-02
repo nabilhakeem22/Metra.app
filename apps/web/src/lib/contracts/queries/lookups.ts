@@ -37,6 +37,18 @@ export async function getContractedProposalIds(
   });
 }
 
+/** Is this a BOQ contract issued and not yet signed: a second Issue tap's home to hand back. */
+export async function isIssuedExecutionContract(ctx: OrgContext, contractId: string): Promise<boolean> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select({ status: contracts.status, sourceBoqId: contracts.sourceBoqId })
+      .from(contracts)
+      .where(eq(contracts.id, contractId))
+      .limit(1);
+    return row?.status === 'issued' && row.sourceBoqId !== null;
+  });
+}
+
 /** The execution contract generated from a given BOQ, if any (for the BOQ tab). */
 export async function getContractIdForBoq(ctx: OrgContext, boqId: string): Promise<string | null> {
   return withOrgContext(ctx, async (tx) => {

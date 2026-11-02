@@ -109,7 +109,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
 
   test('H6.4: issuing an execution contract shows its client home, and a later act with no link keeps it', async () => {
     const home = 'https://studio.example/en/d/home-raw?tab=execution';
-    contracts.issueContract.mockResolvedValue({ ok: true, clientHome: { ok: true, link: home } });
+    contracts.issueContract.mockResolvedValue({ ok: true, clientHome: { ok: true, clientHasEmail: true, link: home } });
     renderDetail();
     await press(at('contracts.issue'));
     expect(screen.getByText(at('contracts.clientPage.issued.title'))).toBeTruthy();

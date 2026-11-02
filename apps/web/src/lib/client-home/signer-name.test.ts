@@ -34,6 +34,21 @@ describe('signerNameOf: the name a contract is signed with', () => {
     expect(Array.from(signerNameOf('a'.repeat(SIGNER_NAME_MAX * 8)) ?? '')).toHaveLength(SIGNER_NAME_MAX);
   });
 
+  it('keeps at most 3 combining marks on a letter, so a name cannot draw over its neighbours (security S4)', () => {
+    const accent = '\u0301';
+    expect(signerNameOf(`a${accent.repeat(200)}b`)).toBe(`a${accent.repeat(3)}…`);
+    expect(signerNameOf(`a${accent.repeat(4)}b`)).toBe(`a${accent.repeat(3)}b`);
+    expect(signerNameOf(`a${accent.repeat(3)}b`)).toBe(`a${accent.repeat(3)}b`);
+    expect(signerNameOf(`a${accent.repeat(2)}\u00ad${accent.repeat(2)}b`)).toBe(`a${accent.repeat(3)}b`);
+  });
+
+  it('keeps Arabic diacritics: a shadda with a vowel, and three marks on a letter', () => {
+    const name = 'مُحَمَّد';
+    expect(signerNameOf(name)).toBe(name);
+    const threeMarks = `م${'\u0651\u064e\u0670'}د`;
+    expect(signerNameOf(threeMarks)).toBe(threeMarks);
+  });
+
   it('keeps at most 120 characters, ending in an ellipsis', () => {
     const name = signerNameOf('أ'.repeat(130));
     expect(Array.from(name ?? '')).toHaveLength(SIGNER_NAME_MAX);

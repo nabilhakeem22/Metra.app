@@ -4,9 +4,7 @@ import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
-import { clientHomeAnswer } from '@/lib/client-home/home-link';
 import type { ClientHomeAnswer } from '@/lib/client-home/types';
-import type { OrgContext } from '@/lib/db/context';
 import { requestLocaleOrDefault } from '@/lib/engagements/portal-url';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import {
@@ -22,6 +20,7 @@ import {
   type SaveContractDraftInput,
   type SetContractChargesInput,
 } from './core';
+import { issuedContractHome, secondIssueAnswer } from './issued-home';
 import { saveContractScheduleCore, type SaveContractScheduleInput } from './schedule/save';
 
 export async function generateContract(
@@ -83,7 +82,9 @@ export async function saveContractDraft(
  * answer carries the home (`clientHome`: its link, why there is none, or the
  * refusal) and never a /c link. The issue has committed by then, so a home
  * that fails is still `ok: true`, with the failure inside `clientHome` (the
- * Client page control retries). A proposal contract answers its /c link.
+ * Client page control retries). A proposal contract answers its /c link. A
+ * second tap on a BOQ contract already issued (a lost answer, a stale tab) hands
+ * out the same home, not a bare `contract_not_draft` (reliability L4).
  */
 export async function issueContract(id: string): Promise<ActionResult & { clientHome?: ClientHomeAnswer }> {
   const ctx = await requireOrg();
@@ -93,22 +94,13 @@ export async function issueContract(id: string): Promise<ActionResult & { client
   const origin = await resolveRequestOrigin();
   if (!origin) return unexpectedFailure('issueContract: no request origin');
   const res = await issueContractCore(ctx, { id });
-  if (!res.ok) return res;
+  if (!res.ok) return res.error === 'contract_not_draft' ? secondIssueAnswer(ctx, id.trim(), origin, res) : res;
   if (!res.data) return unexpectedFailure('issueContractCore answered ok without a token');
   const answer = res.data.execution
     ? { ok: true, clientHome: await issuedContractHome(ctx, id.trim(), origin) }
     : { ok: true, link: `${origin}/${await requestLocaleOrDefault()}/c/${res.data.rawToken}` };
   refreshApp();
   return answer;
-}
-
-/** The just-issued contract's client home; a throw is a failure inside the answer, never a failed issue. */
-async function issuedContractHome(ctx: OrgContext, contractId: string, origin: string): Promise<ClientHomeAnswer> {
-  try {
-    return await clientHomeAnswer(ctx, contractId, origin);
-  } catch (error) {
-    return unexpectedFailure('issueContract: client home', error);
-  }
 }
 
 export async function terminateContract(id: string): Promise<ActionResult> {
