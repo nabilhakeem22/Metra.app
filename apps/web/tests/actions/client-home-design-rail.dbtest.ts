@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
+import { executeTransition } from '@/lib/engagements/executor';
 import { confirmPaymentClaimCore } from '@/lib/engagements/payment-claims';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import type { PublicDelivery } from '@/lib/engagements/public';
@@ -137,5 +138,16 @@ describe('the design rail on the real read', () => {
     const abandoned = await read(d);
     expect(locateDesignForClient(abandoned)).toEqual({ step: null, whoseMove: null, status: 'closed' });
     expect(awaitedDesignFee(abandoned)).toBeNull();
+  });
+
+  it('a delivery really continued from design only to execution stays complete on its one link', async () => {
+    const d = await seedDesignDelivery('h8-continued');
+    await recordPaymentCore(d.ctx, { engagementId: d.engagementId, kind: 'balance', amount: '25000' });
+    await forceState(d.engagementId, 'closed_design_only');
+    expect(await executeTransition(d.ctx, { engagementId: d.engagementId, trigger: 'continueToExecution' })).toMatchObject({ ok: true });
+    const continued = await read(d);
+    expect(continued.stageKey).toBe('construction');
+    expect(locateDesignForClient(continued)).toEqual({ step: 'handover', whoseMove: null, status: 'complete' });
+    expect(buildPhaseView(DESIGN_PHASE, locateDesignForClient(continued), 'client').currentStep).toBeNull();
   });
 });

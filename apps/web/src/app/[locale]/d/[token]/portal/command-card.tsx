@@ -14,7 +14,7 @@ import { HeroCard, type HeroLastAnswer, type HeroReview } from './hero-card';
 import { WhatsNext } from './whats-next';
 
 /** What the card reads off the delivery: where it stands, and what its hero reads. */
-export type CommandCardFacts = ClientDesignFacts & HeroReview;
+type CommandCardFacts = ClientDesignFacts & HeroReview;
 
 /**
  * The client's command card: the shared step card, read top to bottom every time:
