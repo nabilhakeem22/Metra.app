@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { createEngagementCore } from '@/lib/engagements/core';
+import { projectDeliveryOffer } from '@/lib/engagements/project-delivery-offer';
 import { getDeliveriesByProjects, getEngagementByProject } from '@/lib/engagements/queries/by-project';
 import { seedDelivery } from './contract-from-boq-fixture';
 import { seedLightHome } from './client-home-fixture';
@@ -112,6 +113,29 @@ describe('which delivery the panel shows (AC8)', () => {
     const active = await seedDelivery(orgId, pair, 'boq');
     await seedDelivery(orgId, pair, 'abandoned');
     expect(await readers()).toEqual([active, active]);
+  });
+
+  it("F3: a former client's newer finished row never hides the project client's own, and adds no statement", async () => {
+    for (const state of ['execution', 'closed_design_only']) {
+      const pair = await seedClientProject(orgId);
+      const own = await seedDelivery(orgId, pair, state);
+      await seedDelivery(orgId, { clientId: await seedOtherClient(orgId), projectId: pair.projectId }, state);
+      const shown = await getEngagementByProject(owner, pair.projectId);
+      expect(shown).toMatchObject({ id: own, clientId: pair.clientId });
+      expect(shown).not.toHaveProperty('projectClientId');
+      expect(projectDeliveryOffer(shown, pair.clientId).create).toBeNull();
+      const batched = (await getDeliveriesByProjects(owner, [pair.projectId]))[pair.projectId];
+      expect(batched).toEqual(shown);
+    }
+  });
+
+  it("F3: only a former client's finished row: shown, and Start is what the core allows", async () => {
+    const pair = await seedClientProject(orgId);
+    const former = await seedDelivery(orgId, { clientId: await seedOtherClient(orgId), projectId: pair.projectId }, 'execution');
+    const shown = await getEngagementByProject(owner, pair.projectId);
+    expect(shown?.id).toBe(former);
+    expect(projectDeliveryOffer(shown, pair.clientId).create).toBe('start');
+    expect(await create(pair)).toMatchObject({ ok: true });
   });
 
   it('a project with no delivery reads null, and the batch keeps it', async () => {
