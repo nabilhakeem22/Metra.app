@@ -23,8 +23,8 @@ describe('typedCode: the code a client sent', () => {
 });
 
 describe('CODE_PURPOSES and the act each names', () => {
-  it('lists the three acts of this build, each with the panel words for it', () => {
-    expect(CODE_PURPOSES).toEqual(['claim_request', 'claim_design_payment', 'sign_contract']);
-    expect(CODE_PURPOSES.map((purpose) => CODE_PURPOSE_ACT[purpose])).toEqual(['payment', 'payment', 'signature']);
+  it('lists the four acts, each with the panel words for it', () => {
+    expect(CODE_PURPOSES).toEqual(['claim_request', 'claim_design_payment', 'sign_contract', 'decide_variation']);
+    expect(CODE_PURPOSES.map((purpose) => CODE_PURPOSE_ACT[purpose])).toEqual(['payment', 'payment', 'signature', 'decision']);
   });
 });

@@ -5,8 +5,9 @@
 // `/[locale]/d/[token]?tab=design|execution&focus=contract|variation:<id>|request:<id>|instalment:<kind>|sign:<id>`:
 // a missing or unknown `tab` means the delivery's current phase; an unknown
 // `focus` is ignored. `request:` and `instalment:` open that payment's "I've
-// made this payment", and `sign:` the contract's signing, with its code box:
-// the link a code email carries (H5 functional F1).
+// made this payment", `sign:` the contract's signing, and `variation:` the
+// change order's decision, with its code box: the link a code email carries
+// (H5 functional F1).
 import { claimableMilestoneOf, type ClaimableMilestoneKind } from '@/lib/engagements/claimable-milestones';
 import { isUuid } from '@/lib/uuid';
 import type { CodePurpose } from './code-answers';
@@ -62,14 +63,16 @@ const CODE_ACT_FOCUS: Readonly<Record<CodePurpose, { tab: HomeTab; focus: string
   claim_request: { tab: 'execution', focus: 'request' },
   claim_design_payment: { tab: 'design', focus: 'instalment' },
   sign_contract: { tab: 'execution', focus: 'sign' },
+  decide_variation: { tab: 'execution', focus: 'variation' },
 };
 
 /**
  * The home URL that opens ONE code-checked act on its code box, on the tab it
- * lives on: a payment's "I've made this payment" or the contract's signing.
- * What a code email links to, so the client back from their mail types the
- * code there (H5 functional F1). `target` is the act's subject as the code
- * was made for it: a request's or a contract's id, an instalment's kind.
+ * lives on: a payment's "I've made this payment", the contract's signing or a
+ * change order's decision. What a code email links to, so the client back from
+ * their mail types the code there (H5 functional F1). `target` is the act's
+ * subject as the code was made for it: a request's, a contract's or a change
+ * order's id, an instalment's kind.
  */
 export function homeCodeActHref(tokenSegment: string, act: { purpose: CodePurpose; target: string }): string {
   const { tab, focus } = CODE_ACT_FOCUS[act.purpose];

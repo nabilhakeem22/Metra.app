@@ -17,8 +17,8 @@ function targetOf(focus: HomeFocus): HTMLElement | null {
 /**
  * Scroll the Execution tab to what a link's `?focus=` names, once, when the
  * page opens, and only when the page shows it: a request of another delivery,
- * one beyond the newest 60, or a change order (the tab lists none of them by
- * id yet) leaves the page at its top. An unknown focus is ignored.
+ * one beyond the newest 60, or a change order not open for the client's
+ * decision leaves the page at its top. An unknown focus is ignored.
  */
 export function useFocusSection(focus: HomeFocus | null): void {
   useEffect(() => {

@@ -2188,17 +2188,7 @@
       "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
       "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it.",
       "heading": "Variation order",
-      "netDelta": "Net change",
-      "charge": {
-        "works": "Works value",
-        "tax": "VAT",
-        "supervision": "Supervision fee",
-        "total": "Total charge",
-        "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the duration of the works.",
-        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved.",
-        "revisedFinish": "Revised completion date: {date}, after {count, plural, one {{n} day} other {{n} days}} added by approved change orders.",
-        "finishAdded": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the duration of the works."
-      }
+      "decideInHome": "Decisions on this change order are now made from your page with {studio}. Ask {studio} for the link to your page to review it and record your decision there."
     },
     "timeExtension": {
       "label": "Days added to the finish date",
@@ -2405,7 +2395,8 @@
         }
       },
       "noEmailPayment": "The client has no email on file, so they cannot report a payment online. Add their email to the client's details.",
-      "noEmailSignature": "The client has no email on file, so they cannot sign the contract online. Add their email to the client's details, or record the paper signature."
+      "noEmailSignature": "The client has no email on file, so they cannot sign the contract online. Add their email to the client's details, or record the paper signature.",
+      "noEmailDecision": "The client has no email on file, so they cannot approve or reject the change order online. Add their email to the client's details, or record their paper decision."
     },
     "spine": {
       "proposal": "Proposal",
@@ -3385,8 +3376,39 @@
     "changeOrders": {
       "title": "Change orders",
       "awaiting": "Awaiting your decision",
-      "open": "{count, plural, one {One change order is waiting for your decision.} other {{countText} change orders are waiting for your decision.}}",
-      "answerWithLink": "Open the change order link {studio} sent you to review it and reply."
+      "number": "Change order no. {number}",
+      "unavailable": "We could not show the change orders just now. Please refresh the page.",
+      "moreThanShown": "The newest {shown} of {count} change orders awaiting your decision are shown here; the rest appear once you decide these.",
+      "lines": {
+        "show": "Show the items ({count})",
+        "hide": "Hide the items",
+        "gone": "This change order is no longer awaiting your decision. Please refresh the page.",
+        "loadFailed": "We could not show the items just now. Try again."
+      },
+      "decide": {
+        "intro": "Review the change order, then type your full name and record your decision. We will send you a verification code to confirm it.",
+        "nameLabel": "Your full name",
+        "nameRequired": "Please type your full name to record your decision.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "confirmTitle": {
+          "approve": "Approve change order no. {number}",
+          "reject": "Reject change order no. {number}"
+        },
+        "confirmBody": {
+          "approve": "You are approving change order no. {number}, total {total}, as {name}.",
+          "reject": "You are rejecting change order no. {number} as {name}, so it will not apply to your contract."
+        },
+        "confirm": {
+          "approve": "Approve",
+          "reject": "Reject"
+        },
+        "approved": "Change order no. {number} is approved, and {studio} has been told. Thank you.",
+        "rejected": "Change order no. {number} is rejected, and {studio} has been told.",
+        "already": "A decision was already recorded on change order no. {number}. The page now shows where it stands.",
+        "replyClosed": "The online reply period for change order no. {number} has ended, so your decision was not recorded. {studio} will contact you about it.",
+        "movedOn": "Change order no. {number} can no longer be decided here. The page now shows where it stands."
+      }
     },
     "code": {
       "intro": "We will send a 6-digit verification code to {hint}.",
@@ -3401,7 +3423,8 @@
       "resendIn": "You can ask for a new code in {time}.",
       "noChannel": {
         "payment": "{studio} has no email address for you, so you cannot report this payment online right now. Ask {studio} to add your email, or tell {studio} directly that you paid so they can record it.",
-        "signature": "{studio} has no email address for you, so the contract cannot be signed online yet. Ask {studio} to add your email, or sign it on paper with {studio}."
+        "signature": "{studio} has no email address for you, so the contract cannot be signed online yet. Ask {studio} to add your email, or sign it on paper with {studio}.",
+        "decision": "{studio} has no email address for you, so your decision on this change order cannot be recorded online yet. Ask {studio} to add your email, or give your decision on paper to {studio}."
       },
       "wait": {
         "minutes": "{minutes, plural, one {1 minute} other {{minutesText} minutes}}",
@@ -3411,11 +3434,13 @@
       "tooMany": {
         "spacing": {
           "payment": "A code was sent for this payment a moment ago. You can ask for a new one in {wait}.",
-          "signature": "A code to sign this contract was sent moments ago. You can ask for a new one in {wait}."
+          "signature": "A code to sign this contract was sent moments ago. You can ask for a new one in {wait}.",
+          "decision": "A code for this change order was sent moments ago. You can ask for a new one in {wait}."
         },
         "target": {
           "payment": "Too many codes were asked for this payment. You can ask for a new one in {wait}.",
-          "signature": "Many codes were asked for to sign this contract. You can ask for a new one in {wait}."
+          "signature": "Many codes were asked for to sign this contract. You can ask for a new one in {wait}.",
+          "decision": "Many codes were asked for this change order. You can ask for a new one in {wait}."
         },
         "delivery": "Your page has reached its daily limit of codes. You can ask for a new one in {wait}, or ask {studio} to reset your codes.",
         "studio": "{studio} has reached its daily limit of codes. You can ask for a new one in {wait}.",
@@ -3505,6 +3530,19 @@
       "schedule": {
         "title": "Payment schedule",
         "note": "Each amount is a share of the contract value, VAT included."
+      }
+    },
+    "changeOrder": {
+      "netDelta": "Net change",
+      "charge": {
+        "works": "Works value",
+        "tax": "VAT",
+        "supervision": "Supervision fee",
+        "total": "Total charge",
+        "addsDays": "Adds {count, plural, one {{n} day} other {{n} days}} to the duration of the works.",
+        "wouldAddDays": "Would add {count, plural, one {{n} day} other {{n} days}} to the duration of the works if approved.",
+        "revisedFinish": "Revised completion date: {date}, after {count, plural, one {{n} day} other {{n} days}} added by approved change orders.",
+        "finishAdded": "Approved change orders add {count, plural, one {{n} day} other {{n} days}} to the duration of the works."
       }
     }
   },

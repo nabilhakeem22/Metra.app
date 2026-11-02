@@ -32,6 +32,9 @@ const INVITE_ERRORS = errorsOf('already_member', 'amount_too_large', 'busy', 'ch
 /** What the client contract components (components/client-contract) read, on /c and in the client home. */
 const CLIENT_CONTRACT = ['portal.contract.lines', 'portal.contract.schedule', 'portal.contract.totals'];
 
+/** What the client change-order components (components/client-change-order) read, on /v and in the client home. */
+const CLIENT_CHANGE_ORDER = ['portal.changeOrder'];
+
 export const CLIENT_NAMESPACES = {
   /** app/[locale]/layout.tsx: the landing page and anything not scoped below. */
   root: ['app'],
@@ -53,11 +56,11 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/c: the client's contract link. */
   contractLink: ['contracts.ack', ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/d: the client's delivery page. */
-  deliveryLink: ['app', 'delivery', ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
+  deliveryLink: ['app', 'delivery', ...CLIENT_CHANGE_ORDER, ...CLIENT_CONTRACT, 'portal.errors', 'portal.units'],
   /** app/[locale]/p: the client's proposal link. */
   proposalLink: ['portal.errors', 'portal.units', 'proposals.p'],
   /** app/[locale]/v: the client's variation link. */
-  variationLink: ['portal.errors', 'variations.client'],
+  variationLink: [...CLIENT_CHANGE_ORDER, 'portal.errors', 'variations.client'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type MessageScope = keyof typeof CLIENT_NAMESPACES;

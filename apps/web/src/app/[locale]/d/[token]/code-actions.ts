@@ -33,7 +33,7 @@ import { isUuid } from '@/lib/uuid';
 
 const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
 
-/** The act's target as the database keys it (a request's or a contract's id lower-cased, a milestone kind), or null when it cannot name one. */
+/** The act's target as the database keys it (a request's, a contract's or a change order's id lower-cased, a milestone kind), or null when it cannot name one. */
 function targetOf(purpose: CodePurpose, target: unknown): string | null {
   if (purpose === 'claim_design_payment') return claimableMilestoneOf(target);
   return isUuid(target) ? target.toLowerCase() : null;
@@ -84,8 +84,8 @@ async function markUnsent(rawToken: string, challengeId: string, purpose: CodePu
 /**
  * Public (no-session): email the client a one-time code for ONE act on their
  * home. `purpose` and `target` name the act (a payment request's id, a
- * design-fee milestone kind, or the execution contract's id for signing it);
- * a code is good for that act only, for ten
+ * design-fee milestone kind, the execution contract's id for signing it, or a
+ * change order's id for deciding it); a code is good for that act only, for ten
  * minutes and five tries, and only the newest one works. A client with no
  * address on file is `no_channel`; an act that cannot be taken now is
  * `not_available`; either way nothing is written or sent. `send_failed` is

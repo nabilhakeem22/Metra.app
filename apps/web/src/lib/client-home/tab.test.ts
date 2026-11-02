@@ -64,12 +64,14 @@ describe('homeCodeActHref', () => {
     expect(homeCodeActHref('tok', { purpose: 'claim_request', target: id })).toBe(`/d/tok?tab=execution&focus=request:${id}`);
     expect(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'gate_a' })).toBe('/d/tok?tab=design&focus=instalment:gate_a');
     expect(homeCodeActHref('tok', { purpose: 'sign_contract', target: id })).toBe(`/d/tok?tab=execution&focus=sign:${id}`);
+    expect(homeCodeActHref('tok', { purpose: 'decide_variation', target: id })).toBe(`/d/tok?tab=execution&focus=variation:${id}`);
   });
 
   it('reads back as the focus it names', () => {
     const focusOf = (href: string) => requestedFocus(new URL(href, 'https://x.invalid').searchParams.get('focus') ?? undefined);
     expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_request', target: id }))).toEqual({ section: 'request', id });
     expect(focusOf(homeCodeActHref('tok', { purpose: 'sign_contract', target: id }))).toEqual({ section: 'sign', id });
+    expect(focusOf(homeCodeActHref('tok', { purpose: 'decide_variation', target: id }))).toEqual({ section: 'variation', id });
     expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'deposit' }))).toEqual({ section: 'instalment', kind: 'deposit' });
   });
 });

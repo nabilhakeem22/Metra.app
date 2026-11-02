@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { formatMoney, formatMoneyExact } from '@/lib/format/money';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
-import type { PublicVariation } from '@/lib/variations/public';
+import type { PublicVariation } from '@/lib/variations/public-types';
 import type { VariationDecidedKey } from '@/lib/variations/decided-message';
 import { PublicVariationView } from './public-variation';
 
@@ -31,6 +31,7 @@ function variationWith(
     contract_number: 7,
     share_expires_at: null,
     contractActive: true,
+    contractSource: 'proposal',
     rejectionChannel: null,
     charges: null,
     timeExtensionDays: null,
@@ -221,7 +222,7 @@ describe('PublicVariationView — the open decision', () => {
 /** PR B5 (D4a, A24): what the order charges the client and the days it adds. */
 describe('PublicVariationView — the charge breakdown', () => {
   const money = (value: string) => formatMoney(value, 'ar-EG');
-  const label = (key: string) => messageAt('ar-EG', `variations.client.charge.${key}`);
+  const label = (key: string) => messageAt('ar-EG', `portal.changeOrder.charge.${key}`);
 
   test('an execution contract\'s order shows works, VAT, supervision and the total charge', () => {
     renderWithIntl(
@@ -240,12 +241,12 @@ describe('PublicVariationView — the charge breakdown', () => {
       expect(row.textContent).toContain(money(figure));
       expect(row.querySelector('[dir="ltr"]')?.textContent).toBe(money(figure));
     }
-    expect(screen.queryByText(messageAt('ar-EG', 'variations.client.netDelta'))).toBeNull();
+    expect(screen.queryByText(messageAt('ar-EG', 'portal.changeOrder.netDelta'))).toBeNull();
   });
 
   test('a proposal contract\'s order shows the net change alone, exactly as before', () => {
     renderWithIntl(<PublicVariationView token={TOKEN} variation={variationWith({ charges: null })} />);
-    expect(screen.getByText(messageAt('ar-EG', 'variations.client.netDelta'))).toBeTruthy();
+    expect(screen.getByText(messageAt('ar-EG', 'portal.changeOrder.netDelta'))).toBeTruthy();
     expect(screen.queryByText(label('supervision'))).toBeNull();
   });
 

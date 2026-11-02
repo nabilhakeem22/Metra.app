@@ -9,7 +9,7 @@ import { useReturnFocus } from './use-return-focus';
 /**
  * "Are you sure?" before a client act that cannot be taken back from this page:
  * approving the concept or the design, confirming the handover, saying a
- * payment was made, and signing the contract. Cancel (or Escape, or a tap outside) only closes it: it
+ * payment was made, signing the contract, and deciding a change order. Cancel (or Escape, or a tap outside) only closes it: it
  * calls nothing. Confirm calls `onConfirm` once and shows `pending` until the
  * caller closes the dialog; `confirmDisabled` holds it until the act can be
  * sent (an act that needs a one-time code, before the code is typed), and

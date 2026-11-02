@@ -1,6 +1,6 @@
 // "Your verification code": the one-time code a CLIENT asked for on their
 // project page, before an act that binds them ("I paid", signing the
-// execution contract). Server-side, no
+// execution contract, deciding a change order). Server-side, no
 // next-intl context, so the copy is inlined. CLIENT register: Arabic is فصحى,
 // like every client-facing delivery surface. Latin digits, no dash, the
 // existing shell (no branding change).
@@ -20,7 +20,7 @@ import { emailShell } from './shell';
 export interface ClientCodeEmailInput {
   code: string;
   purpose: CodePurpose;
-  /** The request's PR number, the contract's C number, or the delivery's DE number for a design instalment. */
+  /** The request's PR number, the contract's C number, the change order's VO number, or the delivery's DE number for a design instalment. */
   documentNumber: string;
   studioName: string;
   /** The client's project page, where the code is typed. */
@@ -42,6 +42,8 @@ function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): s
         : `to confirm that you paid a design fee instalment on ${documentNumber}`;
     case 'sign_contract':
       return ar ? `لتوقيع عقد التنفيذ ${documentNumber}` : `to sign execution contract ${documentNumber}`;
+    case 'decide_variation':
+      return ar ? `لاعتماد أمر التغيير ${documentNumber} أو رفضه` : `to approve or reject change order ${documentNumber}`;
   }
 }
 

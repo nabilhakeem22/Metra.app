@@ -126,7 +126,7 @@ describe('contractHomeRedirect', () => {
   ])('a target of an unexpected shape (%s) is null, with one constant log line', async (_name, row) => {
     sdf.readSdfJson.mockResolvedValue(row);
     expect(await contractHomeRedirect(CONTRACT_RAW, contractOf(), 'en')).toBeNull();
-    expect(logged).toBe(JSON.stringify(['contractHomeRedirect: unexpected target shape']));
+    expect(logged).toBe(JSON.stringify(['documentHomeRedirect: unexpected target shape']));
   });
 
   it('a home link that cannot be re-derived is null: no nonce, no secret, a hash that does not match', async () => {

@@ -5,7 +5,7 @@ import { PublicProposalView } from '@/app/[locale]/p/[token]/public-proposal';
 import { PublicVariationView } from '@/app/[locale]/v/[token]/public-variation';
 import type { PublicContract } from '@/lib/contracts/public';
 import type { PublicProposal } from '@/lib/proposals/public';
-import type { PublicVariation } from '@/lib/variations/public';
+import type { PublicVariation } from '@/lib/variations/public-types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 
 // W3.6 (AC 30, as the lead ruled against R4): on /p, /c and /v an answer that
@@ -35,7 +35,7 @@ const CONTRACT = {
 } as unknown as PublicContract;
 const VARIATION = {
   number: 1, status: 'issued', title_ar: null, title_en: 'Doors', reason_ar: null, reason_en: null,
-  net_delta: '100', contractActive: true, rejectionChannel: null, org: ORG, lines: [],
+  net_delta: '100', contractActive: true, contractSource: 'proposal', rejectionChannel: null, org: ORG, lines: [],
 } as unknown as PublicVariation;
 
 interface Page {

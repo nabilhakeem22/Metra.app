@@ -6,7 +6,9 @@ import 'server-only';
 //   Design     app_delivery_by_token (at `execution`, the design record)
 // ONE state reads a second: while the contract awaits the client's signature,
 // the Execution tab shows the document open above the signing, so it reads
-// app_home_contract_by_token with the page (H6.2, A2).
+// app_home_contract_by_token with the page (H6.2, A2). And while change orders
+// wait for the client's decision, whatever the hero's reason, it reads
+// app_home_variations_by_token with the page (H7.1, A2).
 // With no tab the page opens on the delivery's current phase, and only the
 // design snapshot can say which that is without a second call: so the design
 // phase stays one call, as it was, and a delivery at `execution` reached by a
@@ -18,13 +20,14 @@ import 'server-only';
 import { readSigningDocument } from '@/lib/client-home/contract-signing';
 import { getHomeByToken } from '@/lib/client-home/read';
 import type { HomeTab } from '@/lib/client-home/tab';
-import type { HomeAtExecution, HomeExecution, PortalHome } from '@/lib/client-home/types';
+import type { HomeAtExecution, HomeChangeOrder, HomeExecution, PortalHome } from '@/lib/client-home/types';
+import { readOpenChangeOrders } from '@/lib/client-home/variations';
 import type { ContractDocument } from '@/lib/contracts/public-types';
 import { getDeliveryByToken, type DeliveryReadResult } from '@/lib/engagements/public';
 
 type HomeView =
   | { tab: 'design'; read: DeliveryReadResult }
-  | { tab: 'execution'; home: HomeAtExecution; signingDocument: ContractDocument | null }
+  | { tab: 'execution'; home: HomeAtExecution; signingDocument: ContractDocument | null; changeOrders: HomeChangeOrder[] | null }
   | { tab: 'redirect'; to: HomeTab };
 
 /** The document a page awaiting the client's signature shows open; in every other state none is read. */
@@ -33,11 +36,17 @@ async function signingDocumentOf(token: string, execution: HomeExecution): Promi
   return location.reason === 'sign_contract' && contract ? readSigningDocument(token, contract.id) : null;
 }
 
+/** The change orders waiting for the client's decision; none open reads nothing, and a failed read is null too. */
+async function changeOrdersOf(token: string, execution: HomeExecution): Promise<HomeChangeOrder[] | null> {
+  return execution.openVariationCount > 0 ? readOpenChangeOrders(token) : null;
+}
+
 /** The Execution tab's view of a home, or null when the delivery is not at execution. */
 async function atExecution(token: string, home: PortalHome): Promise<HomeView | null> {
   const { execution } = home;
   if (!execution) return null;
-  return { tab: 'execution', home: { ...home, execution }, signingDocument: await signingDocumentOf(token, execution) };
+  const [signingDocument, changeOrders] = await Promise.all([signingDocumentOf(token, execution), changeOrdersOf(token, execution)]);
+  return { tab: 'execution', home: { ...home, execution }, signingDocument, changeOrders };
 }
 
 /** The design tab's view: today's page, or the design record once the delivery is at execution. */

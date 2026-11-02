@@ -1,80 +1,22 @@
 import 'server-only';
 // The client home's code-checked acts, the server's half: "I paid" on a
 // payment request of the execution contract and on a design-fee instalment,
-// and signing the execution contract, each ONE token function
-// (app_home_claim_request_by_token, app_home_claim_design_payment_by_token,
-// app_home_contract_ack_by_token) that checks the code, takes the act and uses
-// the code up in the same statement. There is no other way to them from the
-// app (OD2 strict): the claim functions those wrap are never called directly
-// (no-unverified-claim.test.ts), and the contract acknowledgement the signing
-// wraps is called directly by /c's own action only, for a proposal contract:
-// a BOQ contract answers `moved` there (H6.3, no-unverified-sign.test.ts).
-// The raw code is hashed here with the act it is for and never sent, logged
-// or returned; the database checks it against the newest code of that act
-// (H5 functional F1), so the browser holds no code id.
-import { sql, type SQL } from 'drizzle-orm';
-import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
-import { hashShareToken } from '@/lib/share/token';
+// signing the execution contract, and approving or rejecting a change order,
+// each ONE token function (app_home_claim_request_by_token,
+// app_home_claim_design_payment_by_token, app_home_contract_ack_by_token,
+// app_home_variation_respond_by_token) run through ./code-act-run.ts. There is
+// no other way to them from the app (OD2 strict): the claim functions those wrap
+// are never called directly (no-unverified-claim.test.ts), and the contract
+// acknowledgement and the change-order decision they wrap are called directly
+// by /c's and /v's own actions only, for a proposal contract: a BOQ contract
+// answers `moved` there (H6.3, H7.2; no-unverified-sign.test.ts,
+// no-unverified-decision.test.ts).
+import { sql } from 'drizzle-orm';
 import { isUuid } from '@/lib/uuid';
-import { codeAnswerOf } from './code-act-answer';
-import { typedCode, type CodeAnswer, type CodePurpose, type SignContractAnswer } from './code-answers';
-import { logCodeActBusy } from './code-log';
-import { clientCodeHash } from './codes';
+import { provenCodeOf, runCodeAct, runProvenAct, type CodeProof } from './code-act-run';
+import { VARIATION_DECISIONS, type CodeAnswer, type NamedCodeAnswer, type VariationDecision } from './code-answers';
 import { readContractToSign } from './contract-signing';
-import { busyOnLockRefusal } from './lock-refusal';
 import { signerNameOf } from './signer-name';
-
-/** What every code-checked act is sent with: the client's code and where the act came from. */
-interface CodeProof {
-  code: unknown;
-  ip: string | null;
-  userAgent: string | null;
-}
-
-/** A link and a code that passed the checks no round trip is spent on. */
-interface ProvenCode {
-  token: string;
-  code: string;
-}
-
-/** A blank token is a dead link; a code that is not six digits is `code_wrong` with no try counted. */
-function provenCodeOf(rawToken: string, proof: CodeProof): ProvenCode | CodeAnswer {
-  const token = normalizeRawToken(rawToken);
-  if (!token) return { ok: false, error: 'token_invalid' };
-  const code = typedCode(proof.code);
-  if (code === null) return { ok: false, error: 'code_wrong' };
-  return { token, code };
-}
-
-/**
- * The act. `act` builds the call from the token's hash and the code's (bound
- * to `purpose` and `target`, the act's subject as the database keys it). A
- * lock refusal from the database rolled the act back whole: `busy`, the code
- * unused (H5 reliability R4). The wrapper's own `busy` is logged too (H6.2 R-L6).
- */
-async function runProvenAct(
-  proven: ProvenCode,
-  bound: { purpose: CodePurpose; target: string },
-  act: (tokenHash: string, codeHash: string) => SQL,
-): Promise<CodeAnswer> {
-  const query = act(hashShareToken(proven.token), clientCodeHash(bound.purpose, bound.target, proven.code));
-  return busyOnLockRefusal('codeAct', { ok: false, error: 'busy' } as const, async () => {
-    const answer = codeAnswerOf(await readSdfJson<unknown>(query, { write: true }));
-    if (!answer.ok && answer.error === 'busy') logCodeActBusy(bound.purpose);
-    return answer;
-  });
-}
-
-/** The checks no round trip is spent on, then the act. */
-async function runCodeAct(
-  rawToken: string,
-  proof: CodeProof,
-  bound: { purpose: CodePurpose; target: string },
-  act: (tokenHash: string, codeHash: string) => SQL,
-): Promise<CodeAnswer> {
-  const proven = provenCodeOf(rawToken, proof);
-  return 'ok' in proven ? proven : runProvenAct(proven, bound, act);
-}
 
 /**
  * "I paid" on ONE payment request of the home's execution contract, with a
@@ -128,7 +70,7 @@ export async function claimDesignPaymentWithCodeByToken(
 export async function signContractWithCodeByToken(
   rawToken: string,
   input: CodeProof & { contractId: unknown; name: unknown },
-): Promise<SignContractAnswer> {
+): Promise<NamedCodeAnswer> {
   if (!isUuid(input.contractId)) return { ok: false, error: 'wrong_target' };
   const contractId = input.contractId.toLowerCase();
   const name = signerNameOf(input.name);
@@ -143,6 +85,35 @@ export async function signContractWithCodeByToken(
   return runProvenAct(proven, { purpose: 'sign_contract', target: contractId }, (tokenHash, codeHash) =>
     sql`select public.app_home_contract_ack_by_token(
       ${tokenHash}, ${contractId}::uuid, ${codeHash}, ${name}, ${input.ip}, ${input.userAgent}, ${pdfHash}
+    ) as data`,
+  );
+}
+
+const decisionOf = (sent: unknown): VariationDecision | null => VARIATION_DECISIONS.find((known) => known === sent) ?? null;
+
+/**
+ * Approve or reject ONE change order of the home, with a code and the name the
+ * client typed. An id that is not a uuid and a decision that is neither answer
+ * `wrong_target`, no name `name_required`, and a code that is not six digits
+ * `code_wrong` with no try counted, each before any round trip. The database
+ * then checks the order is the home's (no try spent when it is not), checks
+ * the code, decides, uses the code up and tells the studio in one transaction.
+ * One code serves either decision: it is bound to the order, not the decision.
+ */
+export async function decideVariationWithCodeByToken(
+  rawToken: string,
+  input: CodeProof & { variationId: unknown; decision: unknown; name: unknown },
+): Promise<NamedCodeAnswer> {
+  const decision = decisionOf(input.decision);
+  if (!isUuid(input.variationId) || decision === null) return { ok: false, error: 'wrong_target' };
+  const variationId = input.variationId.toLowerCase();
+  const name = signerNameOf(input.name);
+  if (name === null) return { ok: false, error: 'name_required' };
+  const proven = provenCodeOf(rawToken, input);
+  if ('ok' in proven) return proven;
+  return runProvenAct(proven, { purpose: 'decide_variation', target: variationId }, (tokenHash, codeHash) =>
+    sql`select public.app_home_variation_respond_by_token(
+      ${tokenHash}, ${variationId}::uuid, ${decision}, ${codeHash}, ${name}, ${input.ip}, ${input.userAgent}
     ) as data`,
   );
 }

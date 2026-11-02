@@ -5,14 +5,15 @@ import { useTranslations } from 'next-intl';
 import type { NoEmailAct } from '@/lib/engagements/no-email-notice';
 
 /** The line for each act a missing email blocks. */
-const NOTICE_KEY: Readonly<Record<NoEmailAct, 'noEmailPayment' | 'noEmailSignature'>> = {
+const NOTICE_KEY: Readonly<Record<NoEmailAct, 'noEmailPayment' | 'noEmailSignature' | 'noEmailDecision'>> = {
   payment: 'noEmailPayment',
   signature: 'noEmailSignature',
+  decision: 'noEmailDecision',
 };
 
 /**
- * The one line the cockpit card shows while the client must pay, or sign the
- * contract, and has no email on file (lib/engagements/no-email-notice.ts says
+ * The one line the cockpit card shows while the client must pay, sign the
+ * contract or decide a change order, and has no email on file (lib/engagements/no-email-notice.ts says
  * when): they cannot do it online, because the code it needs has nowhere to
  * go. Egyptian copy; the studio adds the email to the client's details.
  */

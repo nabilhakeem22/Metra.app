@@ -27,7 +27,7 @@ export type CodeNotice =
   | { error: 'portal'; failure: ShownPortalFailure };
 
 export interface ClientCode {
-  /** What the code is for, as the panel words its sentences about this act: a payment, or a signature. */
+  /** What the code is for, as the panel words its sentences about this act: a payment, a signature, or a decision. */
   act: (typeof CODE_PURPOSE_ACT)[CodePurpose];
   /** The client has no address on file: no code can be sent, the panel says so. */
   noChannel: boolean;

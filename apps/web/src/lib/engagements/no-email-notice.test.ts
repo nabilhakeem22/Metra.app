@@ -24,9 +24,11 @@ describe('designMoveIsClientPayment', () => {
 });
 
 describe('executionNoEmailAct', () => {
-  it("the client's payment or signature; the studio's move (a closed signing window too), another step or none: null", () => {
+  it("the client's payment, signature or decision; the studio's move (a closed signing window, a lapsed change order too), another step or none: null", () => {
     expect(executionNoEmailAct({ kind: 'record_payment' }, 'client')).toBe('payment');
     expect(executionNoEmailAct({ kind: 'record_signed_offline' }, 'client')).toBe('signature');
+    expect(executionNoEmailAct({ kind: 'await_variation_answer' }, 'client')).toBe('decision');
+    expect(executionNoEmailAct({ kind: 'await_variation_answer' }, 'studio')).toBeNull();
     expect(executionNoEmailAct({ kind: 'record_signed_offline' }, 'studio')).toBeNull();
     expect(executionNoEmailAct({ kind: 'record_payment' }, 'studio')).toBeNull();
     expect(executionNoEmailAct({ kind: 'send_contract' }, 'client')).toBeNull();

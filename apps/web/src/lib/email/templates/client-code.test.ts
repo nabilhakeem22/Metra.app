@@ -36,6 +36,12 @@ describe('clientCodeEmailTemplate', () => {
     expect(email.text).toContain('إن لم تطلب هذا الرمز فتجاهل هذه الرسالة وأبلغ Diwan Studio.');
   });
 
+  it('names a change order by its VO number and says either decision (H7.1)', () => {
+    const ofLocale = (locale: string) => clientCodeEmailTemplate({ code: '042917', purpose: 'decide_variation', documentNumber: 'VO-2026-0003', studioName: 'Diwan Studio', homeUrl: HOME, locale });
+    expect(ofLocale('ar-EG').text).toContain('لاعتماد أمر التغيير VO-2026-0003 أو رفضه');
+    expect(ofLocale('en').text).toContain('to approve or reject change order VO-2026-0003');
+  });
+
   it('names a design instalment by its delivery', () => {
     const email = clientCodeEmailTemplate({
       code: '123456',

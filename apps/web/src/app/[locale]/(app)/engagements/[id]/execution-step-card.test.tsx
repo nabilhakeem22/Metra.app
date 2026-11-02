@@ -457,6 +457,10 @@ describe('the card at execution', () => {
     expect(locateExecutionForStudio(windowClosed.flow).whoseMove).toBe('studio');
     expect(notice(windowClosed, false)).toBeNull();
     expect(notice(view('send_contract'), false)).toBeNull();
+    const deciding = view('await_variation_answer');
+    expect(locateExecutionForStudio(deciding.flow).whoseMove).toBe('client');
+    expect(notice(deciding, false)).toBe(messageAt(locale, 'engagements.command.noEmailDecision'));
+    expect(notice(deciding, true)).toBeNull();
   });
 
   test.each<TestLocale>(['en', 'ar-EG'])('H6.2 F4: a signed contract says when, how, and the name the client signed with online (%s)', (locale) => {

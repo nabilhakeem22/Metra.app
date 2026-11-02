@@ -8,7 +8,8 @@ import type { ClientExecutionReason } from '@/lib/flow/locate/execution-client';
 // home answer canned payloads; only which functions are called, and how often,
 // is asserted. The one state that reads a second call is a contract
 // awaiting the client's signature: its document is shown open with the page
-// (H6.2, A2; AC1).
+// (H6.2, A2; AC1). So does a home with change orders open: their list is read
+// with the page, whatever the hero's reason (H7.1, A2; AC1).
 
 const db = vi.hoisted(() => ({
   calls: [] as string[],
@@ -79,6 +80,56 @@ const designPhaseHome = () => {
 afterEach(() => {
   db.calls = [];
   db.answers = {};
+});
+
+type Facts = { execution: { flow_source: { contract: Record<string, unknown> } } };
+
+/** A home whose facts count `open` change orders the client can decide and `lapsed` ones they cannot. */
+function withChangeOrders(reason: ClientExecutionReason, open: number, lapsed = 0): Record<string, unknown> {
+  const home = homePayload(reason) as unknown as Facts;
+  const { contract } = home.execution.flow_source;
+  const money = (homePayload('works_in_progress') as unknown as Facts).execution.flow_source.contract.money as object;
+  const counts = { open_variations: open + lapsed, issued_variations: open, expired_variations: lapsed };
+  return { ...home, execution: { ...home.execution, flow_source: { ...home.execution.flow_source, contract: { ...contract, money: { ...money, ...counts } } } } };
+}
+
+const ORDER_DOCUMENT = { id: 'v-1', number: 3, net_delta: '10000.0000', lines: [{ id: 'l-1', description_en: 'SEEDED LINE' }] };
+
+describe('the change orders read with the page (H7.1, AC1)', () => {
+  it('decide_change_order: the home, then the open list; the view holds the summary and no line', async () => {
+    answer('execution', homePayload('decide_change_order'));
+    db.answers.app_home_variations_by_token = { open: [ORDER_DOCUMENT], expired: [], decided: [] };
+    const view = await readHomeView('tok', 'execution');
+    expect(db.calls).toEqual(['app_home_by_token', 'app_home_variations_by_token']);
+    expect(view).toMatchObject({ tab: 'execution', changeOrders: [{ id: 'v-1', number: 3, lineCount: 1 }] });
+    expect(JSON.stringify(view)).not.toContain('SEEDED LINE');
+  });
+
+  it('awaiting a signature, an order issued on the contract: the home counts a signed contract only, so no list is read', async () => {
+    answer('execution', withChangeOrders('sign_contract', 1));
+    await readHomeView('tok', 'execution');
+    expect(db.calls).toEqual(['app_home_by_token', 'app_home_contract_by_token']);
+  });
+
+  it.each<ClientExecutionReason>(['works_in_progress', 'pay_request', 'terminated'])('%s with none open: the home alone, changeOrders null', async (reason) => {
+    answer('execution', homePayload(reason));
+    const view = await readHomeView('tok', 'execution');
+    expect(db.calls).toEqual(['app_home_by_token']);
+    expect(view).toMatchObject({ tab: 'execution', changeOrders: null });
+  });
+
+  it('only a lapsed order: the home alone', async () => {
+    answer('execution', withChangeOrders('works_in_progress', 0, 1));
+    await readHomeView('tok', 'execution');
+    expect(db.calls).toEqual(['app_home_by_token']);
+  });
+
+  it('no tab, at execution: the same set after the design snapshot', async () => {
+    answer('execution', homePayload('decide_change_order'));
+    db.answers.app_home_variations_by_token = { open: [ORDER_DOCUMENT], expired: [], decided: [] };
+    await readHomeView('tok', null);
+    expect(db.calls).toEqual(['app_delivery_by_token', 'app_home_by_token', 'app_home_variations_by_token']);
+  });
 });
 
 describe('reads per view', () => {

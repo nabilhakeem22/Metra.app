@@ -9,6 +9,7 @@ import type { PortalExecution, PortalContractStatus } from '@/lib/engagements/pu
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import type { ClientExecutionLocation } from '@/lib/flow/locate/execution-client';
 import type { EntryPhase, PhaseKey } from '@/lib/flow/types';
+import type { PublicVariation } from '@/lib/variations/public-types';
 
 /** The studio, as every client page shows it (lib/engagements/public/studio-rows.ts). */
 type PortalFirm = PublicDelivery['firm'];
@@ -27,6 +28,16 @@ export interface HomeContract {
   revisedFinish: string | null;
   /** When it was terminated (an ISO instant); null unless it was. */
   terminatedAt: string | null;
+}
+
+/** A change order awaiting the client's decision, as the page holds it: its lines load on a tap. */
+export interface HomeChangeOrder extends Pick<
+  PublicVariation,
+  'id' | 'number' | 'title_ar' | 'title_en' | 'reason_ar' | 'reason_en' | 'net_delta' | 'charges' | 'timeExtensionDays' | 'finish'
+> {
+  /** What approving it costs the client: the charge total (works + VAT + supervision), or net_delta without rates. A scale-4 string. */
+  total: string;
+  lineCount: number;
 }
 
 /** What the home says about the delivery's execution, beyond the money card. */

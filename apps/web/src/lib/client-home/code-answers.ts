@@ -7,25 +7,30 @@ import { latinDigits } from '@/lib/format/latin-digits';
 import type { PortalFailure } from '@/lib/share/portal-act-failure';
 
 /**
- * The acts a code is asked for in this build: "I paid" on a payment request
- * of the execution contract and on a design-fee instalment, and signing the
- * execution contract. A change-order decision joins when its act is built
- * (plan H7.1); the database already knows all four.
+ * The acts a code is asked for: "I paid" on a payment request of the execution
+ * contract and on a design-fee instalment, signing the execution contract, and
+ * approving or rejecting a change order.
  */
-export type CodePurpose = 'claim_request' | 'claim_design_payment' | 'sign_contract';
+export type CodePurpose = 'claim_request' | 'claim_design_payment' | 'sign_contract' | 'decide_variation';
 
-export const CODE_PURPOSES: readonly CodePurpose[] = ['claim_request', 'claim_design_payment', 'sign_contract'];
+export const CODE_PURPOSES: readonly CodePurpose[] = ['claim_request', 'claim_design_payment', 'sign_contract', 'decide_variation'];
 
 /**
  * What the client is doing with a code, as the code panel words it: saying a
- * payment was made, or signing. Total over the purposes, so a new act names
- * its words here before the panel can speak of it.
+ * payment was made, signing, or deciding a change order. Total over the
+ * purposes, so a new act names its words here before the panel can speak of it.
  */
-export const CODE_PURPOSE_ACT: Readonly<Record<CodePurpose, 'payment' | 'signature'>> = {
+export const CODE_PURPOSE_ACT: Readonly<Record<CodePurpose, 'payment' | 'signature' | 'decision'>> = {
   claim_request: 'payment',
   claim_design_payment: 'payment',
   sign_contract: 'signature',
+  decide_variation: 'decision',
 };
+
+/** What a client answers a change order with. */
+export type VariationDecision = 'approve' | 'reject';
+
+export const VARIATION_DECISIONS: readonly VariationDecision[] = ['approve', 'reject'];
 
 /** A code is six digits. */
 export const CODE_LENGTH = 6;
@@ -133,5 +138,5 @@ export type CodeAnswer =
   | { ok: false; error: CodeActRefusal }
   | ({ ok: false } & PortalFailure);
 
-/** What signing the contract came to: a code-checked act's answers, or no name to sign with (nothing sent). */
-export type SignContractAnswer = CodeAnswer | { ok: false; error: 'name_required' };
+/** What an act taken in the client's name came to (signing, deciding): a code-checked act's answers, or no name (nothing sent). */
+export type NamedCodeAnswer = CodeAnswer | { ok: false; error: 'name_required' };

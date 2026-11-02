@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import { createTranslator } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeFocus } from '@/lib/client-home/tab';
-import type { HomeAtExecution } from '@/lib/client-home/types';
+import type { HomeAtExecution, HomeChangeOrder } from '@/lib/client-home/types';
 import type { ContractDocument } from '@/lib/contracts/public-types';
 import { CLIENT_EXECUTION_REASONS, type ClientExecutionReason } from '@/lib/flow/locate/execution-client';
 import { bidiIsolate } from '@/lib/format/bidi';
@@ -17,6 +17,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('./execution-actions', () => ({}));
 vi.mock('./contract-actions', () => ({}));
 vi.mock('./code-actions', () => ({}));
+vi.mock('./variation-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),
@@ -24,6 +25,21 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 const { shapeHome } = await import('@/lib/client-home/shape');
 const { ExecutionTabView } = await import('./execution-tab');
+
+const CHANGE_ORDER: HomeChangeOrder = {
+  id: '00000000-0000-4000-8000-0000000000e1',
+  number: 3,
+  title_ar: 'تعديل الأرضيات',
+  title_en: 'Flooring change',
+  reason_ar: null,
+  reason_en: null,
+  net_delta: '10000.0000',
+  charges: { taxRate: '14.0000', supervisionPct: '10.0000' },
+  timeExtensionDays: 7,
+  finish: null,
+  total: '12400.0000',
+  lineCount: 2,
+};
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const DASH = /[–—]/;
@@ -34,8 +50,8 @@ function homeOf(reason: ClientExecutionReason, entryPhase: 'design' | 'execution
   return { ...home, execution: home.execution };
 }
 
-const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null, signingDocument: ContractDocument | null = null) =>
-  renderWithIntl(<ExecutionTabView token="tok-1" home={home} signingDocument={signingDocument} focus={focus} />, { locale });
+const show = (locale: TestLocale, home: HomeAtExecution, focus: HomeFocus | null = null, signingDocument: ContractDocument | null = null, changeOrders: HomeChangeOrder[] | null = null) =>
+  renderWithIntl(<ExecutionTabView token="tok-1" home={home} signingDocument={signingDocument} changeOrders={changeOrders} focus={focus} />, { locale });
 
 /** The document the page reads with a contract awaiting the client's signature. */
 const SIGNING_DOCUMENT = {
@@ -240,6 +256,7 @@ describe('a ?focus= link (H4 follow-up F4: an unknown focus is ignored)', () => 
 
   it('opens on the contract, and on a request the page lists', () => {
     const contract = show('en', homeOf('pay_request'), { section: 'contract' });
+    expect((document.getElementById('contract') as HTMLElement).className.split(' ')).toContain('scroll-mt-16');
     contract.unmount();
     show('en', homeOf('pay_request'), { section: 'request', id: REQUEST });
     expect(scrolled).toEqual(['contract', `request-${REQUEST}`]);
@@ -253,12 +270,16 @@ describe('a ?focus= link (H4 follow-up F4: an unknown focus is ignored)', () => 
     expect(scrolled).toEqual([`sign-${CONTRACT_ID}`]);
   });
 
-  it('leaves the page at its top for a request it does not list, and for a change order (none is listed by id)', () => {
+  it('a change order the page lists opens on its card; one it does not list leaves the page at its top', () => {
     const unknownRequest = show('en', homeOf('pay_request'), { section: 'request', id: ELSEWHERE });
     unknownRequest.unmount();
-    show('en', homeOf('decide_change_order'), { section: 'variation', id: ELSEWHERE });
+    const unlisted = show('en', homeOf('decide_change_order'), { section: 'variation', id: ELSEWHERE }, null, [CHANGE_ORDER]);
     expect(document.getElementById('change-orders')).not.toBeNull();
     expect(scrolled).toEqual([]);
+    unlisted.unmount();
+    show('en', homeOf('decide_change_order'), { section: 'variation', id: CHANGE_ORDER.id }, null, [CHANGE_ORDER]);
+    expect(scrolled).toEqual([`variation-${CHANGE_ORDER.id}`]);
+    expect((document.getElementById(`variation-${CHANGE_ORDER.id}`) as HTMLElement).className.split(' ')).toContain('scroll-mt-16');
   });
 });
 

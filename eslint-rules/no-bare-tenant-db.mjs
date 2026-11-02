@@ -330,14 +330,20 @@ const SDF_CALLER_ALLOWLIST = [
   'apps/web/src/lib/client-home/contract.ts',
   // Client home H5: the one-time code request (app_home_code_issue_by_token)
   // and the code-checked acts, "I paid" (app_home_claim_request_by_token,
-  // app_home_claim_design_payment_by_token) and, from H6.2, signing the
-  // contract (app_home_contract_ack_by_token): the same delivery token, no
-  // session; only the code's hash is passed.
+  // app_home_claim_design_payment_by_token), from H6.2 signing the contract
+  // (app_home_contract_ack_by_token) and from H7.1 deciding a change order
+  // (app_home_variation_respond_by_token): the same delivery token, no session;
+  // only the code's hash is passed. code-act-run.ts is the one runner they share.
   'apps/web/src/lib/client-home/codes.ts',
   'apps/web/src/lib/client-home/code-acts.ts',
-  // H6.3: where an old /c link sends its holder (app_client_home_target_by_token):
-  // the same contract token, no session; returns ids and the home's hash and
-  // nonce, never a money column.
+  'apps/web/src/lib/client-home/code-act-run.ts',
+  // H7.1: the change orders awaiting the client's decision
+  // (app_home_variations_by_token): the same delivery token, no session; each
+  // order is /v's own document, which omits every cost and margin column.
+  'apps/web/src/lib/client-home/variations.ts',
+  // H6.3, H7.2: where an old /c or /v link sends its holder
+  // (app_client_home_target_by_token): the same document token, no session;
+  // returns ids and the home's hash and nonce, never a money column.
   'apps/web/src/lib/client-home/redirect.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',

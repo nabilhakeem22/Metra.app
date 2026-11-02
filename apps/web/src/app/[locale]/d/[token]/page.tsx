@@ -51,7 +51,8 @@ export async function generateMetadata({
 // transient notice — a valid link during a database blip must not be called dead.
 // `?tab=` picks the Design or the Execution tab (./home-read.ts reads only that
 // tab's data); `?focus=` opens the home on one section, or on one payment's
-// "I've made this payment" with its code box (the link a code email carries).
+// "I've made this payment", the contract's signing or a change order's decision
+// with its code box (the link a code email carries).
 export default async function PublicDeliveryPage({
   params,
   searchParams,
@@ -66,7 +67,7 @@ export default async function PublicDeliveryPage({
   const { document, tab, focus } = await searchParams;
   const view = await renderedView(locale, token, tab);
   if (view.tab === 'execution') {
-    return <ExecutionTabView token={token} home={view.home} signingDocument={view.signingDocument} focus={requestedFocus(focus)} />;
+    return <ExecutionTabView token={token} home={view.home} signingDocument={view.signingDocument} changeOrders={view.changeOrders} focus={requestedFocus(focus)} />;
   }
   return (
     <PublicDeliveryView token={token} read={view.read} documentUnavailable={document === 'unavailable'} focus={requestedFocus(focus)} />

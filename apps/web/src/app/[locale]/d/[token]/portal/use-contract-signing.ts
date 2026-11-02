@@ -1,22 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition, type RefObject } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { signerNameOf } from '@/lib/client-home/signer-name';
 import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { signContractInHome } from '../contract-actions';
 import { signFailureOf, signFailureRefreshes, type ShownSignFailure } from './contract-sign-failure';
+import { useActNameBox, type ActNameBox } from './use-act-name-box';
 import { useClientCode, type ClientCode, type KnownCodeChannel } from './use-client-code';
 
 /** What the contract section says after a signing was answered: signed, already signed, or why not. */
 export type SignNotice = { kind: 'signed' | 'already' } | { kind: 'refused'; failure: ShownSignFailure };
 
 export interface ContractSigning {
-  /** The name box, as typed. */
-  name: string;
-  setName: (typed: string) => void;
-  /** [Sign] was pressed with no name: the box is marked and says why. */
-  nameMissing: boolean;
-  nameRef: RefObject<HTMLInputElement | null>;
+  /** The name box. */
+  box: ActNameBox;
   /** The signing is open: its dialog, with the code panel. */
   asking: boolean;
   /** The signing is in flight. */
@@ -52,11 +49,8 @@ export function useContractSigning(
   onChanged: () => void,
   typingFor: string | null,
 ): ContractSigning {
-  const [name, setNameValue] = useState('');
-  const [nameMissing, setNameMissing] = useState(false);
-  const [focusNameAfterClose, setFocusNameAfterClose] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
   const [asking, setAsking] = useState(false);
+  const box = useActNameBox(asking);
   const [pending, startTransition] = useTransition();
   // Up from Confirm until its answer: a double tap in one tick signs once.
   const sending = useRef(false);
@@ -68,33 +62,21 @@ export function useContractSigning(
   }
   const code = useClientCode(token, 'sign_contract', asking ? contractId : null, channel, () => settle({ kind: 'refused', failure: { error: 'wrong_state' } }), typingFor);
 
-  // The dialog hands focus back to [Sign] as it closes; the caret goes to the name box after that.
-  useEffect(() => {
-    if (!focusNameAfterClose || asking) return;
-    setFocusNameAfterClose(false);
-    setTimeout(() => nameRef.current?.focus(), 0);
-  }, [focusNameAfterClose, asking]);
-
   function start() {
     onNotice(null);
-    if (signerNameOf(name) === null) {
-      setNameMissing(true);
-      nameRef.current?.focus();
-      return;
-    }
+    if (signerNameOf(box.name) === null) return box.refuse();
     setAsking(true);
   }
 
   /** The name was refused in the dialog (a direct call's answer): close it and mark the box. */
   function nameRefused() {
     setAsking(false);
-    setNameMissing(true);
-    setFocusNameAfterClose(true);
+    box.refuseAfterDialog();
   }
 
   function confirm() {
     const proof = code.proof();
-    const signer = signerNameOf(name);
+    const signer = signerNameOf(box.name);
     if (!proof || sending.current) return;
     if (signer === null) return nameRefused();
     sending.current = true;
@@ -113,19 +95,5 @@ export function useContractSigning(
     });
   }
 
-  return {
-    name,
-    setName: (typed) => {
-      setNameMissing(false);
-      setNameValue(typed);
-    },
-    nameMissing,
-    nameRef,
-    asking,
-    pending,
-    code,
-    start,
-    dismiss: () => setAsking(false),
-    confirm,
-  };
+  return { box, asking, pending, code, start, dismiss: () => setAsking(false), confirm };
 }

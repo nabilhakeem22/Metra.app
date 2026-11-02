@@ -9,7 +9,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'user-agent'
 
 const boom = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/proposals/public', () => ({ respondToProposalByToken: boom }));
-vi.mock('@/lib/variations/public', () => ({ respondToVariationByToken: boom }));
+vi.mock('@/lib/variations/public', () => ({ getVariationByToken: async () => null, respondToVariationByToken: boom }));
 vi.mock('@/lib/contracts/public', () => ({
   acknowledgeContractByToken: boom,
   getContractByToken: async () => null,
