@@ -77,7 +77,8 @@ export async function chooseExecution(
  * Server-action wrapper for the `continueToExecution` transition:
  * closed_design_only -> execution, on the same row and so the same client link.
  * The `balanceCleared` guard requires the balance installment fully paid. No
- * side-effect, no payload. Revalidates the shell on success — never throws.
+ * side-effect, no payload. Revalidates the shell on success; never throws to
+ * the client.
  */
 export async function continueToExecution(
   engagementId: string,

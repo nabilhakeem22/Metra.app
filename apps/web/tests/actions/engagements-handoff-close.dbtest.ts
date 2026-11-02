@@ -259,11 +259,13 @@ describe('FULL WALK — both endings reached via executeTransition only; termina
     ).toBe(true);
     expect(await stateOf(b.engagementId)).toBe('closed_design_only');
 
-    // Both terminals reject EVERY declared trigger: no terminal state is in any
-    // trigger's from-set, so the executor answers illegal_trigger before guards.
+    // Both terminals reject every declared trigger before guards (illegal_trigger),
+    // but the one way on from a closed design-only: continueToExecution, covered in
+    // design-first-edge.dbtest.ts.
     const allTriggers = Object.keys(TRANSITIONS) as Trigger[];
     for (const terminal of [a, b]) {
-      for (const trigger of allTriggers) {
+      const refused = terminal === b ? allTriggers.filter((trigger) => trigger !== 'continueToExecution') : allTriggers;
+      for (const trigger of refused) {
         const res = await executeTransition(terminal.ctx, {
           engagementId: terminal.engagementId,
           trigger,

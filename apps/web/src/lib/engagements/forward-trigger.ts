@@ -12,7 +12,7 @@ import { TRANSITIONS, type Trigger } from './transitions';
 import { legalTriggersFrom } from './ui';
 
 // rejectDesign (bounce back) and abandon (off-ramp) are legal from many states but
-// are NOT the forward advance — the hero never proposes them as "what's next". Nor
+// are NOT the forward advance: the hero never proposes them as "what's next". Nor
 // is continueToExecution: a closed design-only delivery is over unless the client
 // decides to build, so the closed card offers it behind its own confirm.
 const NON_FORWARD_TRIGGERS = new Set<Trigger>(['rejectDesign', 'abandon', 'continueToExecution']);

@@ -4,7 +4,7 @@
 import { designEngagements, type MetraDb } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
-import { designFirstRefusal, executionGateOf, type ExecutionGate, type PairDelivery } from './design-first';
+import { designFirstTargetFor, executionGateOf, type ExecutionGate, type PairDelivery } from './design-first';
 import { entryPhaseOf } from './queries/entry-phase';
 
 export interface ProjectClient {
@@ -43,7 +43,6 @@ export async function requireDesignFinished(
   pair: ProjectClient,
 ): Promise<Extract<ExecutionGate, { kind: 'home' | 'no_delivery' }>> {
   const gate = await readExecutionGate(tx, pair);
-  const refusal = designFirstRefusal(gate);
-  if (refusal) fail(refusal.code, refusal.params);
-  return gate as Extract<ExecutionGate, { kind: 'home' | 'no_delivery' }>;
+  if (gate.kind === 'design_open' || gate.kind === 'design_only_closed') fail(gate.kind, designFirstTargetFor(gate.delivery));
+  return gate;
 }

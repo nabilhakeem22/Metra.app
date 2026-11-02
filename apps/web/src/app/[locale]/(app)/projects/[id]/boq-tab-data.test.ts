@@ -12,6 +12,7 @@ const reads = vi.hoisted(() => ({
   liveContract: vi.fn(),
   openedContexts: 0,
 }));
+vi.mock('server-only', () => ({}));
 vi.mock('@/lib/boqs/queries', () => ({ getProjectBoq: reads.boq }));
 vi.mock('@/lib/contracts/queries', () => ({ getContractIdForBoq: reads.contractId }));
 vi.mock('@/lib/boqs/issue', () => ({ getBoqIssueReadiness: reads.readiness, projectHasLiveContractOnIssuedBoq: reads.liveContract }));

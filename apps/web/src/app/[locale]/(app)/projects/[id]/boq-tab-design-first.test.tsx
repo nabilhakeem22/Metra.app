@@ -18,6 +18,10 @@ vi.mock('@/lib/boqs/actions', () => ({
   issueBoq: vi.fn(),
 }));
 vi.mock('@/lib/contracts/actions', () => ({ generateExecutionContract: vi.fn() }));
+vi.mock('@/i18n/routing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/i18n/routing')>()),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
+}));
 
 const BOQ = {
   id: 'boq-1',

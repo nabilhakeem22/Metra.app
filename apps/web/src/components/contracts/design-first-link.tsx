@@ -11,7 +11,7 @@ export function DesignFirstLink({ target }: { target: DesignFirstTarget | null |
   return (
     <Link
       href={`/engagements/${target.deliveryId}`}
-      className="inline-flex min-h-11 items-center text-body font-medium text-primary underline underline-offset-2"
+      className="inline-flex items-center text-body coarse:min-h-11 font-medium text-primary underline underline-offset-2"
     >
       {t('openDelivery', { delivery: target.delivery })}
     </Link>
