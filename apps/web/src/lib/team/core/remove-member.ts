@@ -4,14 +4,16 @@ import { eq } from 'drizzle-orm';
 import { ensureNotLastOwner } from '@/lib/aggregates/membership';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import { revokeKeysCreatedBy } from '@/lib/api-keys/revoke-creator-keys';
 import type { OrgContext } from '@/lib/db/context';
 import { closeSiteAccessOf } from '@/lib/site/close-site-access';
 import { lockedMembershipTarget } from './membership-target';
 
 /**
  * Remove a member from the studio. In the same transaction his live site
- * assignments and signed-in phones here are revoked (lib/site/close-site-access.ts),
- * so nothing on the site side outlives the membership.
+ * assignments and signed-in phones here are revoked (lib/site/close-site-access.ts)
+ * and so are the API keys he minted (lib/api-keys/revoke-creator-keys.ts), so
+ * nothing on the site side or the Public API outlives the membership.
  */
 export async function removeMemberCore(
   ctx: OrgContext,
@@ -32,6 +34,7 @@ export async function removeMemberCore(
       }
 
       await closeSiteAccessOf(tx, audit, { memberId: userId, closedBy: ctx.userId, via: 'member_removed' });
+      await revokeKeysCreatedBy(tx, audit, userId);
       await tx.delete(memberships).where(eq(memberships.id, target.id));
       await audit({
         entity: 'membership',
