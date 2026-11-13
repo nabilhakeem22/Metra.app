@@ -12,14 +12,21 @@ import {
   type ContractSectionsAnswer,
 } from '@/lib/contracts/public';
 import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
-import { portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
 import { requestProvenance } from '@/lib/share/request-provenance';
 
+/** An act the link's budget refused: nothing was read, sent or written. */
+type OverBudget = { ok: false; error: 'too_many' };
+
 /** The client's acknowledgement: its outcome, or an act that never landed. */
-export type ContractAnswer = { ok: boolean; error?: AckError | 'moved' } | ({ ok: false } & PortalFailure);
+export type ContractAnswer = { ok: boolean; error?: AckError | 'moved' } | OverBudget | ({ ok: false } & PortalFailure);
+
+const TOO_MANY: OverBudget = { ok: false, error: 'too_many' };
 
 /**
- * Public (no-session) electronic acknowledgement. Captures the client IP (the
+ * Public (no-session) electronic acknowledgement. It spends the link's ACT
+ * budget first (lib/share/portal-rate-limit.ts) and, past it, answers
+ * `too_many` with nothing read or sent. Captures the client IP (the
  * edge's `cf-connecting-ip` first, lib/share/request-provenance.ts) and user
  * agent, and a content hash of the exact document being acknowledged (the "PDF
  * hash" per A5; binding e-signature stays deferred). Nothing throws to the
@@ -29,7 +36,8 @@ export type ContractAnswer = { ok: boolean; error?: AckError | 'moved' } | ({ ok
  * nothing is sent to the database's acknowledgement.
  */
 export async function acknowledgeContract(token: string, actorName?: string): Promise<ContractAnswer> {
-  return answered('acknowledgeContract', (failure) => ({ ok: false as const, ...failure }), async () => {
+  return answered('acknowledgeContract', (failure) => ({ ok: false as const, ...failure }), async (): Promise<ContractAnswer> => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     // The exact document the client is acknowledging: what it is hashed over, and where it is signed.
     const contract = await getContractByToken(token);
     if (contract !== null && signsInClientHome(contract)) return { ok: false, error: 'moved' as const };

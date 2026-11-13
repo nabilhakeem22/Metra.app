@@ -7,7 +7,8 @@ import { hashShareToken } from './token';
 // Limiting bindings. Their ceilings live in apps/web/wrangler.jsonc ONLY (one
 // line each), so changing a ceiling is a one-line config change:
 //   PORTAL_ACT_RATE_LIMITER  every server action under /d/[token] (the review
-//                            acts, the payment claim, a comment).
+//                            acts, the payment claim, a comment), the accept
+//                            or reject on /p and the acknowledgement on /c.
 //   PORTAL_READ_RATE_LIMITER the document and logo routes and a document's
 //                            comment thread.
 // The page GET itself is not limited (owner decision).
