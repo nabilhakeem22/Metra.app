@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { recordWhatsappOpenedCore } from '@/lib/engagements/reminder/whatsapp-opened';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 import { fromThisSite } from '@/lib/http/same-site';
 
 // POST { engagementId }: the reminder dialog's "Open WhatsApp" was clicked
@@ -11,7 +12,7 @@ import { fromThisSite } from '@/lib/http/same-site';
 export const dynamic = 'force-dynamic';
 
 const answer = (body: object, status: number) =>
-  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
+  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...ROUTE_HANDLER_HEADERS } });
 
 const STATUS: Record<string, number> = { forbidden: 403, malformed: 400, engagement_not_found: 404, flow_not_enabled: 403 };
 

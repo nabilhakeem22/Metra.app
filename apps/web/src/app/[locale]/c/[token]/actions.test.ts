@@ -5,12 +5,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 // never throws to the page. A3 reliability R1: "show more sections" likewise.
 // H6.3 (AC8): a BOQ contract answers `moved` and is never sent to the
 // acknowledgement; a proposal contract, and a token with no snapshot, are sent
-// as before.
+// as before. P4a: the acknowledgement spends the link's ACT budget first; past
+// it the answer is `too_many`, and the contract is neither read nor sent.
 
 vi.mock('server-only', () => ({}));
 const reads = vi.hoisted(() => ({ allowed: vi.fn(async () => true), page: vi.fn(), sections: vi.fn() }));
-const ack = vi.hoisted(() => ({ snapshot: vi.fn(), send: vi.fn(), hash: vi.fn() }));
-vi.mock('@/lib/share/portal-rate-limit', () => ({ portalReadAllowed: reads.allowed }));
+const ack = vi.hoisted(() => ({ allowed: vi.fn(async () => true), snapshot: vi.fn(), send: vi.fn(), hash: vi.fn() }));
+vi.mock('@/lib/share/portal-rate-limit', () => ({ portalActAllowed: ack.allowed, portalReadAllowed: reads.allowed }));
 vi.mock('@/lib/contracts/public', () => ({
   getContractSectionLinesByToken: reads.page,
   getContractSectionsByToken: reads.sections,
@@ -26,6 +27,7 @@ beforeEach(() => {
   reads.allowed.mockReset().mockResolvedValue(true);
   reads.page.mockReset();
   reads.sections.mockReset();
+  ack.allowed.mockReset().mockResolvedValue(true);
   ack.snapshot.mockReset();
   ack.send.mockReset().mockResolvedValue({ ok: true });
   ack.hash.mockReset().mockReturnValue('h'.repeat(64));
@@ -56,6 +58,35 @@ describe('acknowledgeContract: where a contract is signed (H6.3, AC8)', () => {
     ack.send.mockResolvedValue({ ok: false, error: 'token_invalid' });
     expect(await acknowledgeContract('t', 'Client')).toEqual({ ok: false, error: 'token_invalid' });
     expect(ack.send).toHaveBeenCalledWith('t', { actorName: 'Client', ip: '10.0.0.1', userAgent: 'ua', pdfHash: null });
+  });
+});
+
+describe('acknowledgeContract: the link act budget (P4a)', () => {
+  test('past the budget: too_many, and the contract is neither read nor sent', async () => {
+    ack.allowed.mockResolvedValue(false);
+    ack.snapshot.mockResolvedValue({ source: 'proposal', status: 'issued' });
+    expect(await acknowledgeContract('t', 'Client')).toEqual({ ok: false, error: 'too_many' });
+    expect(ack.allowed).toHaveBeenCalledWith('t');
+    expect(ack.snapshot).not.toHaveBeenCalled();
+    expect(ack.hash).not.toHaveBeenCalled();
+    expect(ack.send).not.toHaveBeenCalled();
+    expect(reads.allowed).not.toHaveBeenCalled();
+  });
+
+  test('within the budget the act is charged once, to the act budget, before the contract is read', async () => {
+    const order: string[] = [];
+    ack.allowed.mockImplementation(async () => (order.push('budget'), true));
+    ack.snapshot.mockImplementation(async () => (order.push('read'), { source: 'proposal', status: 'issued' }));
+    expect(await acknowledgeContract('t', 'Client')).toEqual({ ok: true });
+    expect(order).toEqual(['budget', 'read']);
+    expect(ack.allowed).toHaveBeenCalledTimes(1);
+    expect(reads.allowed).not.toHaveBeenCalled();
+  });
+
+  test('a limiter that rejects (its binding missing on Cloudflare) is the referenced generic, and nothing is sent', async () => {
+    ack.allowed.mockRejectedValue(new Error('Rate limiting binding PORTAL_ACT_RATE_LIMITER is missing'));
+    expect(await acknowledgeContract('t', 'Client')).toMatchObject({ ok: false, error: 'generic', reference: expect.any(String) });
+    expect(ack.send).not.toHaveBeenCalled();
   });
 });
 

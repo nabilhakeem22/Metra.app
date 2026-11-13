@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { runDueAutomations } from '@/lib/automation/runner';
 import { runtimeSecret } from '@/lib/cf/secrets';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 
 // Session-less cron. Node-only (crypto + privileged DB); the i18n matcher skips
 // /api. The `metra-cron` Cloudflare Worker (workers/cron) is the only caller and
@@ -41,18 +42,17 @@ function authorized(req: Request): boolean {
   return timingSafeEqual(provided, expected);
 }
 
+const answer = (body: object, status: number) => NextResponse.json(body, { status, headers: ROUTE_HANDLER_HEADERS });
+
 export async function GET(req: Request) {
-  if (!authorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!authorized(req)) return answer({ error: 'Unauthorized' }, 401);
 
   try {
-    const summary = await runDueAutomations();
-    return NextResponse.json(summary, { status: 200 });
+    return answer(await runDueAutomations(), 200);
   } catch (err) {
     // The runner is designed never to throw; this is the last-resort net so a
     // single bad tick returns 500 rather than crashing the function.
     console.error('automation cron failed:', loggableFailure(err));
-    return NextResponse.json({ error: 'Automation run failed' }, { status: 500 });
+    return answer({ error: 'Automation run failed' }, 500);
   }
 }

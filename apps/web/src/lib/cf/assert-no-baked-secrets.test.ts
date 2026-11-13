@@ -1,9 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_SHAPED, removeStagedBuilds, runBakedSecretsScript as run } from '@/test/baked-secrets-script';
 
 // The script guards a discipline that is invisible to tsc, to lint and to every
 // other test: a re-added `process.env.SUPABASE_SERVICE_ROLE_KEY` compiles
@@ -11,55 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 // itself has to be trustworthy — including the case where it CANNOT find its
 // input, which must fail rather than pass.
 
-const here = dirname(fileURLToPath(import.meta.url));
-const script = resolve(here, '../../../scripts/assert-no-baked-secrets.mjs');
-
-const roots: string[] = [];
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
-/** A throwaway apps/web-shaped tree with `contents` as the emitted env module,
- *  plus any extra bundle files the case needs (path relative to .open-next). */
-function stage(contents: string | null, extras: Record<string, string> = {}): string {
-  const root = mkdtempSync(join(tmpdir(), 'baked-secrets-'));
-  roots.push(root);
-  mkdirSync(join(root, 'scripts'), { recursive: true });
-  copyFileSync(script, join(root, 'scripts', 'assert-no-baked-secrets.mjs'));
-  if (contents !== null) {
-    mkdirSync(join(root, '.open-next', 'cloudflare'), { recursive: true });
-    writeFileSync(join(root, '.open-next', 'cloudflare', 'next-env.mjs'), contents, 'utf8');
-  }
-  for (const [relativePath, body] of Object.entries(extras)) {
-    const full = join(root, '.open-next', relativePath);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, body, 'utf8');
-  }
-  return join(root, 'scripts', 'assert-no-baked-secrets.mjs');
-}
-
-function run(
-  contents: string | null,
-  extras: Record<string, string> = {},
-): { code: number; output: string } {
-  try {
-    const output = execFileSync(process.execPath, [stage(contents, extras)], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { code: 0, output };
-  } catch (cause) {
-    const error = cause as { status?: number; stdout?: string; stderr?: string };
-    return { code: error.status ?? 1, output: `${error.stdout ?? ''}${error.stderr ?? ''}` };
-  }
-}
-
-const CI_SHAPED = `process.env.NEXT_PUBLIC_SUPABASE_URL = "https://x.supabase.co";
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
-process.env.NEXT_PUBLIC_APP_URL = "https://app.metra.test";
-process.env.NODE_ENV = "production";
-process.env.NEXT_RUNTIME = "edge";
-`;
+afterEach(removeStagedBuilds);
 
 describe('assert-no-baked-secrets', () => {
   it('exits 0 on a build output that carries only public and framework keys', () => {

@@ -28,7 +28,9 @@ function codeRefusal(token: string): ActionResult | null {
 /**
  * Ask Supabase to send a sign-in code by email, or by SMS (site engineers).
  * The Turnstile token goes to Supabase, which checks it when its CAPTCHA
- * setting is on; it is never logged and never kept.
+ * setting is on; it is never logged and never kept. In a build that shows the
+ * widget the send route has already refused a request without one
+ * (app/api/auth/otp/send/route.ts).
  */
 export async function sendOtpCore({ channel, identifier, captchaToken }: OtpSendRequest): Promise<ActionResult> {
   const refused = identifierRefusal(channel, identifier);

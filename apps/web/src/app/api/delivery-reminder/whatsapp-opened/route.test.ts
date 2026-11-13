@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectRouteHandlerHeaders } from '@/test/route-handler-headers';
 
 // The WhatsApp click record: a cookie-authenticated POST from this site's pages
 // only, for a signed-in member, the workspace from the session.
@@ -56,5 +57,14 @@ describe('POST /api/delivery-reminder/whatsapp-opened', () => {
     const garbled = await POST(new Request('https://metra.app/x', { method: 'POST', headers: SAME_SITE, body: '{' }));
     expect(garbled.status).toBe(200);
     expect(deps.recordWhatsappOpenedCore).toHaveBeenLastCalledWith(CTX, undefined);
+  });
+
+  it('C6: the 200 and the 403 both carry the route-handler security headers, still uncached', async () => {
+    const answers = [await post(SAME_SITE), await post({ host: 'metra.app' })];
+    expect(answers.map((answer) => answer.status)).toEqual([200, 403]);
+    for (const answer of answers) {
+      expect(answer.headers.get('cache-control')).toBe('no-store');
+      expectRouteHandlerHeaders(answer);
+    }
   });
 });

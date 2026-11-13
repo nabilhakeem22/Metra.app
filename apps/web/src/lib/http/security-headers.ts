@@ -12,8 +12,8 @@ import { ENFORCED_CSP, reportOnlyCsp } from './content-security-policy';
 //   - public/_headers: the ONE static-asset file; its `/*` block must equal
 //     STATIC_ASSET_SECURITY_HEADERS, and its login block must carry
 //     LOGIN_ASSET_REPORT_ONLY_CSP (src/test/static-headers.test.ts).
-// /api/* is not covered (the middleware matcher excludes it); the Public API's
-// own two headers are in lib/api/errors.ts.
+// /api/* is not covered (the middleware matcher excludes it): every route
+// handler there sets ROUTE_HANDLER_HEADERS from lib/http/route-handler-headers.ts.
 //
 // CPU (Workers Free, 10 ms): the header lists are built once per isolate; a
 // request costs one path split and a few Headers.set calls.
