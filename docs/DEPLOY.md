@@ -144,8 +144,13 @@ paths:
   block differs from the module, or if any other block sets one of its header
   names (Cloudflare comma-joins a header two matching rules both set, which
   would break the policy).
-- **`/api/*`** is outside the middleware. The Public API adds `cache-control:
-  no-store` and `x-content-type-options: nosniff` to every answer itself.
+- **`/api/*`** is outside the middleware, and stays outside it (Worker CPU).
+  Every route handler there adds `x-content-type-options: nosniff` and
+  `referrer-policy: no-referrer` to every answer itself, from the one constant
+  in `src/lib/http/route-handler-headers.ts`; the PDF routes add
+  `x-frame-options: SAMEORIGIN` to the document as well. A `referrer-policy`
+  on a JSON answer does not change the policy of the page that fetched it, so
+  the login rule below still holds.
 
 **The CSP is two policies on purpose (owner decision D1).** The enforced one has
 only the four directives that cannot break a Next app (`frame-ancestors 'none';

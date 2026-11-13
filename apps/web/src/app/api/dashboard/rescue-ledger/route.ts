@@ -6,6 +6,7 @@ import { studioReadVerdict } from '@/lib/cf/studio-read-rate-limit';
 import { parseRange } from '@/lib/dashboard/range';
 import { loadRescueLedgerCore } from '@/lib/dashboard/rescue-ledger/core';
 import type { RescueLedgerResponse } from '@/lib/dashboard/rescue-ledger/types';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 
 // GET: the signed-in studio's rescue ledger for the dashboard window
 // (`?range=3|6|12`, anything else reads as the default). Its OWN Worker request,
@@ -23,7 +24,7 @@ export const dynamic = 'force-dynamic';
 const RETRY_AFTER_SECONDS = '60';
 
 const answer = (body: RescueLedgerResponse, status: number, headers: Record<string, string> = {}) =>
-  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
+  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...ROUTE_HANDLER_HEADERS, ...headers } });
 
 export async function GET(request: Request): Promise<Response> {
   if (!(await getSessionUser())) return answer({ ok: false, error: 'unauthorized' }, 401);
