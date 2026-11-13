@@ -3,6 +3,7 @@ import { documentCategories, files } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { boundedPage, type PageFilter } from '@/lib/db/list-bounds';
+import { documentDeleteScope, mayDeleteDocument } from './delete-scope';
 import type { DocumentEntitySpec } from './entities';
 
 /** A file stapled to a client or a project, as the documents tab renders it. */
@@ -16,9 +17,13 @@ export interface EntityDocument {
   categoryId: string | null;
   categoryNameEn: string | null;
   categoryNameAr: string | null;
+  /** Whether THIS member may delete it: their own upload, or any for a role that
+   *  edits the parent record (./delete-scope.ts). The server decides again on delete. */
+  deletable: boolean;
 }
 
-/** The tab's columns, as DATA. Storage bucket and object key stay server-side. */
+/** The tab's columns, as DATA. Storage bucket and object key stay server-side, and
+ *  so does the uploader: `createdBy` is read only to answer `deletable`. */
 const DOCUMENT_COLUMNS = {
   id: files.id,
   originalName: files.originalName,
@@ -27,6 +32,7 @@ const DOCUMENT_COLUMNS = {
   categoryId: files.categoryId,
   categoryNameEn: documentCategories.nameEn,
   categoryNameAr: documentCategories.nameAr,
+  createdBy: files.createdBy,
 } as const;
 
 /**
@@ -44,6 +50,7 @@ export function listDocuments(
 ): Promise<EntityDocument[]> {
   return withOrgContext(ctx, async (tx) => {
     const page = boundedPage(filter);
+    const deleteScope = documentDeleteScope(ctx.role, spec);
     const rows = await tx
       .select(DOCUMENT_COLUMNS)
       .from(files)
@@ -53,9 +60,10 @@ export function listDocuments(
       .orderBy(desc(files.createdAt))
       .limit(page.limit)
       .offset(page.offset);
-    return rows.map(({ createdAt, ...rest }) => ({
+    return rows.map(({ createdAt, createdBy, ...rest }) => ({
       ...rest,
       createdAt: createdAt.toISOString(),
+      deletable: mayDeleteDocument(deleteScope, createdBy, ctx.userId),
     }));
   });
 }

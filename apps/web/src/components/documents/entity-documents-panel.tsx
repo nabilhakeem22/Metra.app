@@ -109,7 +109,7 @@ export function EntityDocumentsPanel({
                         >
                           <Download className="size-4" aria-hidden />
                         </Button>
-                        {canManage && (
+                        {canManage && d.deletable && (
                           <OverflowMenu
                             label={tc('moreActions')}
                             disabled={pending}
