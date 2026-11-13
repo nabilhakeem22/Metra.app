@@ -44,6 +44,19 @@ Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
 `DEPLOY_ENABLED` must be `true` or the deploy job is skipped, so a merge with
 the flag unset ships nothing and reports nothing.
 
+The deploy job runs only for a CI run that was a **push to `main` of this
+repository**. A pull request never deploys, whatever its branch is called: a
+fork's branch named `main` would otherwise match the workflow's branch filter
+and bring its own `ci.yml`. Its first step also refuses any commit that is not
+the **current tip of `main`**, so re-running an old CI run cannot put an older
+build over a newer one; that run goes red instead. To put an older build back
+on purpose, use `npx wrangler rollback <version-id>` (*Rolling back*).
+
+Both workflows run with a read-only GitHub token (`permissions: contents:
+read`), and their two actions are pinned to a commit, with the tag in a
+comment. When you move an action to a newer release, change the commit and the
+comment together.
+
 ### Static pages are served before the Worker
 
 On the Workers Free plan every Worker request may use 10 ms of CPU, and a

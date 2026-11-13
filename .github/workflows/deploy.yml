@@ -19,11 +19,28 @@ concurrency:
   group: deploy-cloudflare
   cancel-in-progress: false
 
+# The job reads the repository and nothing else. Without this block the token
+# gets the repository default, which may be read/write.
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    # Only after CI succeeded on main, and only once the owner has armed it.
+    # Only after CI succeeded on a PUSH to THIS repository's main, and only once
+    # the owner has armed it.
+    #
+    # `branches: [main]` above is not that guarantee. It matches the branch NAME
+    # of the run that triggered this workflow, and for a pull request from a fork
+    # that name is the fork's own branch, which its author chooses. A fork branch
+    # called `main` carries its own copy of ci.yml, so it can make "CI" succeed
+    # and then have this job build and deploy its commit with the Cloudflare
+    # token. The three workflow_run conditions below refuse that: the run must be
+    # a push, to main, of this repository.
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.head_repository.full_name == github.repository
           && vars.DEPLOY_ENABLED == 'true' }}
     # Pinned, not ubuntu-latest: GitHub moves ubuntu-latest to Ubuntu 26 from
     # Oct 19 2026 (actions/runner-images#14748), and the first CI run after that
@@ -31,12 +48,38 @@ jobs:
     # Move to a newer image deliberately, in its own commit, CI and Deploy together.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Refuse a commit that is not the tip of main
+        # Before any repository code is checked out. A CI run can be re-run long
+        # after it first passed, and two runs can finish out of order; either
+        # would deploy an OLDER commit over a newer one with nothing to notice.
+        # Only the commit main points at right now may ship. To put an older
+        # build back, use `npx wrangler rollback <version-id>` (docs/DEPLOY.md,
+        # "Rolling back"), not a re-run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          main_tip="$(gh api "repos/${REPOSITORY}/commits/main" --jq .sha)"
+          if [ -z "${main_tip}" ]; then
+            echo "::error::could not read the tip of main; refusing to deploy."
+            exit 1
+          fi
+          if [ "${main_tip}" != "${VALIDATED_SHA}" ]; then
+            echo "::error::CI validated ${VALIDATED_SHA}, but main is at ${main_tip}. Only the tip of main is deployed."
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Deploy the exact commit CI validated.
           ref: ${{ github.event.workflow_run.head_sha }}
+          # The token is not left in .git/config: everything after this step
+          # (npm install scripts, the build) is third-party code, and it shares
+          # this runner with the Cloudflare token.
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           # Node 22: required by the pinned wrangler (4.123.0).
           node-version: 22
