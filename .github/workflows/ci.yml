@@ -27,6 +27,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# CI reads the repository and writes nothing to GitHub (the step summary needs
+# no scope). Without this block the token gets the repository default, which may
+# be read/write, and every install script and test in the job could use it.
+permissions:
+  contents: read
+
 jobs:
   test:
     # Pinned, not ubuntu-latest: GitHub moves ubuntu-latest to Ubuntu 26 from
@@ -57,14 +63,18 @@ jobs:
       PUPPETEER_SKIP_DOWNLOAD: 'true'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Full history: the "Migration batch size" step below counts the
           # migrations this ref ADDS relative to `main`, and a depth-1 checkout
           # has no merge base to count against.
           fetch-depth: 0
+          # The checkout token stays in .git/config (the default): the
+          # "Migration batch size" step runs `git fetch origin main`. With
+          # `permissions: contents: read` above the token can only read, and
+          # this job holds no other secret.
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           # Node 22: required by the pinned wrangler (4.123.0); everything else
           # is compatible.
