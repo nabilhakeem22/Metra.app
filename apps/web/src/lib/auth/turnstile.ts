@@ -3,7 +3,9 @@ import type { Locale } from '@/i18n/routing';
 // Cloudflare Turnstile, the sign-in challenge (go-live T3), as constants. PURE
 // and CLIENT-SAFE, no env read: the CSP data module, the script loader and the
 // login form's captcha hook share them. Supabase checks the token (its CAPTCHA
-// setting); this app never validates a token with Cloudflare itself.
+// setting); this app never validates a token with Cloudflare itself. What it
+// does check is that one was sent: in a build with the site key, the send route
+// refuses a request that carries none (app/api/auth/otp/send/route.ts).
 
 export const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 

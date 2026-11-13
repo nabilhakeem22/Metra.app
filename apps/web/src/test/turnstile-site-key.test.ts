@@ -5,8 +5,10 @@ import { TURNSTILE_SITE_KEY_VARIABLE, turnstileSiteKey } from '../../scripts/tur
 import { WEB_ROOT } from './wrangler-rate-limits';
 
 // One rule for the sign-in Turnstile site key, read by the build gate in
-// next.config.mjs and by the login form's captcha hook. Cloudflare's published
-// test keys stand in for real ones; a secret key is longer, so it fails.
+// next.config.mjs, by the login form's captcha hook and by the send route
+// (which requires a token in exactly the builds that show the widget).
+// Cloudflare's published test keys stand in for real ones; a secret key is
+// longer, so it fails.
 
 const SECRET_SHAPED = '1x0000000000000000000000000000000AA';
 
@@ -48,5 +50,10 @@ describe('the readers of the rule', () => {
   it('the captcha hook reads the variable literally, so Next inlines it into the client chunk', () => {
     const hook = readFileSync(resolve(WEB_ROOT, 'src/app/[locale]/(auth)/login/use-captcha.ts'), 'utf8');
     expect(hook).toContain('turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)');
+  });
+
+  it('the send route reads the variable literally too, so one build value decides both the widget and the rule', () => {
+    const route = readFileSync(resolve(WEB_ROOT, 'src/app/api/auth/otp/send/route.ts'), 'utf8');
+    expect(route).toContain('turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)');
   });
 });
