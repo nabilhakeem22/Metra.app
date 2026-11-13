@@ -3,6 +3,7 @@ import { and, count, eq, gt, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { can } from '@/lib/permissions/can';
 import { isUuid } from '@/lib/uuid';
 
 /** The comments table aliased `later`: a LATER message on the same document. */
@@ -35,11 +36,15 @@ function laterStaffReply(tx: MetraDb, later: LaterComment) {
  *
  * Counts messages, not documents: three unanswered questions on one drawing read as
  * three, which is what the studio has to work through.
+ *
+ * Gated like the thread it counts: a role without `engagements_design`/`read`
+ * gets 0 and no query runs.
  */
 export async function countAwaitingReplyCore(
   ctx: OrgContext,
   engagementId: string,
 ): Promise<number> {
+  if (!can(ctx.role, 'engagements_design', 'read')) return 0;
   if (!isUuid(engagementId)) return 0;
   // The same table again, aliased, so the subquery can refer to a LATER message on
   // the same document without colliding with the outer row.
