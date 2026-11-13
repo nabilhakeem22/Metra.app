@@ -9,17 +9,24 @@ import { apiKeys, type MetraDb } from '@metra/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { AuditEntry } from '@/lib/audit';
 
-/** Revokes every live key `memberId` created in this org, one audit row each. Caller's transaction. */
+/**
+ * Revokes every live key `memberId` created in `orgId`, one audit row each.
+ * Caller's transaction.
+ *
+ * The org is in the statement itself, not left to row-level security alone: a
+ * member can belong to several studios and mint keys in each, and removing him
+ * from one must never reach the others, whatever connection this runs on.
+ */
 export async function revokeKeysCreatedBy(
   tx: MetraDb,
   audit: (entry: AuditEntry) => Promise<void>,
-  memberId: string,
+  creator: { orgId: string; memberId: string },
 ): Promise<void> {
   const now = new Date();
   const revoked = await tx
     .update(apiKeys)
     .set({ revokedAt: now, updatedAt: now })
-    .where(and(eq(apiKeys.createdBy, memberId), isNull(apiKeys.revokedAt)))
+    .where(and(eq(apiKeys.orgId, creator.orgId), eq(apiKeys.createdBy, creator.memberId), isNull(apiKeys.revokedAt)))
     .returning({ id: apiKeys.id });
 
   for (const key of revoked) {

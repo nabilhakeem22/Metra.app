@@ -109,7 +109,9 @@ describe('removeMemberCore revokes the keys the removed member created (AC1)', (
     expect(keyRows.map((row) => row.at)).toEqual([removal.at, removal.at]);
   });
 
-  it('a refused removal revokes nothing', async () => {
+  // Not a proof of ORDER: a refusal rolls the whole transaction back, so this
+  // holds wherever the revoke sits. It pins the outcome a studio relies on.
+  it('a refused removal leaves every key live', async () => {
     const { adminId } = await adminWithKeys();
     const ownerKey = await mintKey(ownerCtx(), 'owner key');
     expect(await removeMemberCore(ctxFor(orgId, adminId, 'admin'), ownerId)).toEqual({ ok: false, error: 'owner_immutable' });

@@ -34,7 +34,7 @@ export async function removeMemberCore(
       }
 
       await closeSiteAccessOf(tx, audit, { memberId: userId, closedBy: ctx.userId, via: 'member_removed' });
-      await revokeKeysCreatedBy(tx, audit, userId);
+      await revokeKeysCreatedBy(tx, audit, { orgId: ctx.orgId, memberId: userId });
       await tx.delete(memberships).where(eq(memberships.id, target.id));
       await audit({
         entity: 'membership',
