@@ -15,14 +15,10 @@ import '../globals.css';
 //
 // next/font/local takes ONE `declarations` list per call, never one per file.
 // Manrope is a single subset, so it carries the Latin unicode-range Google
-// served with it.
+// served with it. It is ONE variable file (weight axis 200 to 800), as Google
+// served it: `400 700` is the span the app uses, not four downloads.
 const manrope = localFont({
-  src: [
-    { path: '../fonts/manrope/manrope-latin-400-normal.woff2', weight: '400', style: 'normal' },
-    { path: '../fonts/manrope/manrope-latin-500-normal.woff2', weight: '500', style: 'normal' },
-    { path: '../fonts/manrope/manrope-latin-600-normal.woff2', weight: '600', style: 'normal' },
-    { path: '../fonts/manrope/manrope-latin-700-normal.woff2', weight: '700', style: 'normal' },
-  ],
+  src: [{ path: '../fonts/manrope/manrope-latin-wght-normal.woff2', weight: '400 700', style: 'normal' }],
   declarations: [
     {
       prop: 'unicode-range',

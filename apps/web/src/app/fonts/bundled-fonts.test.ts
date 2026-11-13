@@ -22,7 +22,9 @@ const layoutSource = readFileSync(LAYOUT_PATH, 'utf8');
 const GOOGLE_FONT_MODULE = ['next', 'font', 'google'].join('/');
 const GOOGLE_FONT_HOSTS = ['googleapis', 'gstatic'].map((name) => `fonts.${name}.com`);
 
-const MANROPE_WEIGHTS = ['400', '500', '600', '700'];
+// Manrope is ONE variable file (`wght` in its name) and the layout declares the
+// span of weights the app uses from it. Tajawal is one static file per weight.
+const MANROPE_WEIGHT_SPAN = '400 700';
 const TAJAWAL_WEIGHTS = ['400', '500', '700'];
 
 // ORDER is part of the contract for Tajawal. Its faces carry no unicode-range
@@ -31,7 +33,7 @@ const TAJAWAL_WEIGHTS = ['400', '500', '700'];
 // served. next/font also measures the fallback font from the last 400 file,
 // and only the Latin one has the letters that measurement needs.
 const COMMITTED_FONT_FILES = [
-  ...MANROPE_WEIGHTS.map((weight) => `manrope/manrope-latin-${weight}-normal.woff2`),
+  'manrope/manrope-latin-wght-normal.woff2',
   ...['arabic', 'latin'].flatMap((subset) =>
     TAJAWAL_WEIGHTS.map((weight) => `tajawal/tajawal-${subset}-${weight}-normal.woff2`),
   ),
@@ -52,6 +54,13 @@ function layoutFontEntries(): FontSourceEntry[] {
     weight: weight!,
     style: style!,
   }));
+}
+
+/** What a file's name promises: `-500-normal`, or `-wght-normal` for the variable file. */
+function labelNamedBy(file: string): { weight: string; style: string } | null {
+  const named = /-(\d{3}|wght)-([a-z]+)\.woff2$/.exec(file);
+  if (!named) return null;
+  return { weight: named[1] === 'wght' ? MANROPE_WEIGHT_SPAN : named[1]!, style: named[2]! };
 }
 
 function fontFilesOnDisk(): string[] {
@@ -79,7 +88,7 @@ describe('the fonts are files in the repository', () => {
     expect(entries).toHaveLength(layoutSource.match(/\.(woff2?|ttf|otf|eot)'/g)?.length ?? 0);
   });
 
-  it('loads the four Manrope and six Tajawal files, Arabic before Latin', () => {
+  it('loads the one Manrope and six Tajawal files, Arabic before Latin', () => {
     expect(entries.map((entry) => entry.file)).toEqual(COMMITTED_FONT_FILES);
   });
 
@@ -90,8 +99,8 @@ describe('the fonts are files in the repository', () => {
   });
 
   it('labels each file with the weight and style in its name', () => {
-    const mislabelled = entries.filter((entry) => !entry.file.endsWith(`-${entry.weight}-${entry.style}.woff2`));
-    expect(mislabelled).toEqual([]);
+    const declared = entries.map(({ file, weight, style }) => ({ file, label: { weight, style } }));
+    expect(declared).toEqual(entries.map(({ file }) => ({ file, label: labelNamedBy(file) })));
   });
 
   it('commits no font file the layout does not load', () => {
