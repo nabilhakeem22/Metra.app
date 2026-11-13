@@ -22,3 +22,18 @@ export function documentDeleteScope(role: MemberRole, spec: DocumentEntitySpec):
 export function mayDeleteDocument(scope: DocumentDeleteScope, createdBy: string | null, userId: string): boolean {
   return scope === 'any' || createdBy === userId;
 }
+
+/**
+ * What a listed row tells the page: would the delete core accept this member's
+ * delete of this document? The core checks the upload right first and the scope
+ * second, so both are asked here. Without the first, a member who uploaded a
+ * file and was later made a viewer would be told the file is theirs to delete.
+ */
+export function isDeletableBy(
+  member: { role: MemberRole; userId: string },
+  spec: DocumentEntitySpec,
+  createdBy: string | null,
+): boolean {
+  if (!can(member.role, spec.writeCapability, 'create')) return false;
+  return mayDeleteDocument(documentDeleteScope(member.role, spec), createdBy, member.userId);
+}

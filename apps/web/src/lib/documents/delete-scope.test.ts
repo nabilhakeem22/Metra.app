@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { can } from '@/lib/permissions/can';
 import { MEMBER_ROLES } from '@/lib/permissions/member-roles';
 import type { MemberRole } from '@/lib/permissions/roles';
-import { documentDeleteScope, mayDeleteDocument } from './delete-scope';
+import { documentDeleteScope, isDeletableBy, mayDeleteDocument } from './delete-scope';
 import { DOCUMENT_ENTITIES, type DocumentEntity } from './entities';
 
 // Security batch 3, A6: deleting a document used to be gated on UPLOAD alone, so
@@ -50,5 +50,28 @@ describe('mayDeleteDocument', () => {
 
   it('never treats a document with no uploader as the member own', () => {
     expect(mayDeleteDocument('own', null, me)).toBe(false);
+  });
+});
+
+describe.each(ENTITIES)('isDeletableBy on %s documents: what a listed row tells the page', (entity) => {
+  const spec = DOCUMENT_ENTITIES[entity];
+  const me = '11111111-1111-4111-8111-111111111111';
+  const colleague = '22222222-2222-4222-8222-222222222222';
+
+  it.each(MAY_DELETE_ANY)('%s may delete a colleague upload', (role) => {
+    expect(isDeletableBy({ role, userId: me }, spec, colleague)).toBe(true);
+  });
+
+  it.each(MAY_DELETE_OWN_ONLY)('%s may delete their own upload and not a colleague one', (role) => {
+    expect(isDeletableBy({ role, userId: me }, spec, me)).toBe(true);
+    expect(isDeletableBy({ role, userId: me }, spec, colleague)).toBe(false);
+  });
+
+  it('a member who uploaded a file and can no longer upload is not told it is theirs to delete', () => {
+    const cannotUpload = MEMBER_ROLES.filter((role) => !can(role, spec.writeCapability, 'create'));
+    expect(cannotUpload.length).toBeGreaterThan(0);
+    for (const role of cannotUpload) {
+      expect(isDeletableBy({ role, userId: me }, spec, me)).toBe(false);
+    }
   });
 });

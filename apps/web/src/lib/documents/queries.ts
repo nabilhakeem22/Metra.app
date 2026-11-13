@@ -3,7 +3,7 @@ import { documentCategories, files } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { boundedPage, type PageFilter } from '@/lib/db/list-bounds';
-import { documentDeleteScope, mayDeleteDocument } from './delete-scope';
+import { isDeletableBy } from './delete-scope';
 import type { DocumentEntitySpec } from './entities';
 
 /** A file stapled to a client or a project, as the documents tab renders it. */
@@ -17,8 +17,9 @@ export interface EntityDocument {
   categoryId: string | null;
   categoryNameEn: string | null;
   categoryNameAr: string | null;
-  /** Whether THIS member may delete it: their own upload, or any for a role that
-   *  edits the parent record (./delete-scope.ts). The server decides again on delete. */
+  /** Whether THIS member may delete it: they may upload here, and it is their own
+   *  upload, or any for a role that edits the parent record (./delete-scope.ts).
+   *  The server decides again on delete. */
   deletable: boolean;
 }
 
@@ -50,7 +51,6 @@ export function listDocuments(
 ): Promise<EntityDocument[]> {
   return withOrgContext(ctx, async (tx) => {
     const page = boundedPage(filter);
-    const deleteScope = documentDeleteScope(ctx.role, spec);
     const rows = await tx
       .select(DOCUMENT_COLUMNS)
       .from(files)
@@ -63,7 +63,7 @@ export function listDocuments(
     return rows.map(({ createdAt, createdBy, ...rest }) => ({
       ...rest,
       createdAt: createdAt.toISOString(),
-      deletable: mayDeleteDocument(deleteScope, createdBy, ctx.userId),
+      deletable: isDeletableBy(ctx, spec, createdBy),
     }));
   });
 }
