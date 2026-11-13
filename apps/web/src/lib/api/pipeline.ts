@@ -81,8 +81,8 @@ function problemForThrown(error: unknown): Response {
  * The Public API (v1) request pipeline:
  *   pre-auth rate-limit (per caller; 429 BEFORE the key lookup touches the DB)
  *   -> auth (Bearer mtk_… -> resolve; 401 on any failure)
+ *   -> authorize (never the client role, then can(role, capability, action); 403 BEFORE any org read)
  *   -> per-key rate-limit (429 + Retry-After; no DB/handler work)
- *   -> authorize (can(role, capability, action); 403 BEFORE any org read)
  *   -> derive costVisible (canSeeMargin, live-role)
  *   -> handler (all reads inside withOrgContext -> RLS + membership factor)
  *   -> serialize (application/json)

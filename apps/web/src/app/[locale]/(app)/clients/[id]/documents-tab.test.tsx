@@ -53,6 +53,7 @@ const documents: EntityDocument[] = [
     categoryId: null,
     categoryNameEn: null,
     categoryNameAr: null,
+    deletable: true,
   },
 ];
 
