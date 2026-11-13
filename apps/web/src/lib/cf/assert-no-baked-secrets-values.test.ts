@@ -66,6 +66,30 @@ describe('assert-no-baked-secrets: a file over the old 8 MiB limit is scanned (C
   });
 });
 
+describe('assert-no-baked-secrets: where a window starts invents nothing and hides nothing (C8)', () => {
+  /** The offset of the first byte the second window carries over from the first. */
+  const FIRST_CARRIED_BYTE = SCAN_CHUNK_BYTES - SCAN_OVERLAP_BYTES;
+  /** A module long enough to need a second window, with `text` starting at `offset`. */
+  const moduleWithTextAt = (text: string, offset: number) =>
+    `${' '.repeat(offset)}${text}${' '.repeat(SCAN_CHUNK_BYTES + 1024 - offset - text.length)}`;
+
+  it.each([
+    ['a Resend key', 'store_abcdefghij0123456789', 'sto'.length],
+    ['a Supabase secret key', 'asb_secret_AbCdEfGhIjKlMnOpQrStUvWxYz012345', 'a'.length],
+  ])('a longer word is not %s because the second window starts inside it', (_kind, word, lettersBeforeTheCut) => {
+    const { code, output } = run(CI_SHAPED, { [HANDLER]: moduleWithTextAt(word, FIRST_CARRIED_BYTE - lettersBeforeTheCut) });
+    expect(output).toContain('5 key(s)');
+    expect(code).toBe(0);
+  });
+
+  it('still catches a real key that starts exactly where the second window does', () => {
+    const { code, output } = run(CI_SHAPED, { [HANDLER]: moduleWithTextAt(`"${RESEND_KEY}"`, FIRST_CARRIED_BYTE - '"'.length) });
+    expect(code).not.toBe(0);
+    expect(output).toContain('Resend API key');
+    expect(output).not.toContain(RESEND_KEY);
+  });
+});
+
 describe('assert-no-baked-secrets: the new-format Supabase keys (C8)', () => {
   it('catches an sb_secret_ value by shape, under any name, and never prints it', () => {
     const { code, output } = run(`${CI_SHAPED}process.env.NEXT_PUBLIC_DECOY = "${SUPABASE_SECRET_KEY}";\n`);

@@ -17,7 +17,10 @@ const VALUE_PATTERNS = [
   { what: 'a Resend API key', pattern: /\bre_[A-Za-z0-9]{16,}/ },
   {
     what: 'a Postgres URL carrying a password',
-    pattern: /postgres(?:ql)?:\/\/[^\s"']*:[^\s"'@]+@/,
+    // Both runs are bounded. Unbounded, this pattern is quadratic on a long
+    // run with no whitespace or quote (measured: 2.5 s on 80 KB), and the
+    // server handler bundle, megabytes of minified code, is now scanned.
+    pattern: /postgres(?:ql)?:\/\/[^\s"']{0,512}:[^\s"'@]{1,512}@/,
   },
   // The new-format Supabase SECRET key. Its public twin, `sb_publishable_`,
   // belongs in the bundle and is not matched.
@@ -87,27 +90,44 @@ export const SCAN_CHUNK_BYTES = 4 * 1024 * 1024;
 export const SCAN_OVERLAP_BYTES = 64 * 1024;
 
 /**
- * The one window every file is read through: the carried tail, then a chunk.
- * Allocated once for the run. Only the bytes just written are ever read back,
- * so nothing of one file is scanned as part of the next.
+ * The byte in front of every window, standing for the text the window cannot
+ * see. Two of the patterns open with `\b`, and `\b` is true at the start of a
+ * string, so a window that began on the `r` of `store_…` would report a Resend
+ * key that is not there, and a deploy would fail on a byte alignment.
+ *
+ * At the start of a file nothing precedes the text, so a word may start there:
+ * a line break. In front of a carried tail the real preceding byte is unknown,
+ * so no word may start there: a letter. That hides nothing. A value starting on
+ * the first carried byte ended inside the previous window, which saw it whole.
  */
-const scanWindow = Buffer.alloc(SCAN_OVERLAP_BYTES + SCAN_CHUNK_BYTES);
+const FILE_START_GUARD = 0x0a;
+const CARRIED_TAIL_GUARD = 0x78;
+const GUARD_BYTES = 1;
+
+/**
+ * The one window every file is read through: the guard byte, the carried tail,
+ * then a chunk. Allocated once for the run. Only the bytes just written are
+ * ever read back, so nothing of one file is scanned as part of the next.
+ */
+const scanWindow = Buffer.alloc(GUARD_BYTES + SCAN_OVERLAP_BYTES + SCAN_CHUNK_BYTES);
 
 /** The kind of secret the file at `path` holds, or null. */
 function secretKindInFile(path) {
   const file = openSync(path, 'r');
   try {
     let carried = 0;
+    scanWindow[0] = FILE_START_GUARD;
     for (;;) {
-      const read = readSync(file, scanWindow, carried, SCAN_CHUNK_BYTES, null);
+      const read = readSync(file, scanWindow, GUARD_BYTES + carried, SCAN_CHUNK_BYTES, null);
       if (read === 0) return null;
-      const scanned = carried + read;
+      const scanned = GUARD_BYTES + carried + read;
       // latin1 maps one byte to one character, so a chunk cut inside a
       // multi-byte character cannot hide or invent an ASCII secret.
       const kind = secretKindIn(scanWindow.toString('latin1', 0, scanned));
       if (kind) return kind;
-      carried = Math.min(SCAN_OVERLAP_BYTES, scanned);
-      scanWindow.copy(scanWindow, 0, scanned - carried, scanned);
+      carried = Math.min(SCAN_OVERLAP_BYTES, scanned - GUARD_BYTES);
+      scanWindow.copy(scanWindow, GUARD_BYTES, scanned - carried, scanned);
+      scanWindow[0] = CARRIED_TAIL_GUARD;
     }
   } finally {
     closeSync(file);
