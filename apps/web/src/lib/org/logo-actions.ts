@@ -54,10 +54,38 @@ async function findLogoUpload(ctx: OrgContext, fileId: string) {
   return logoUpload;
 }
 
+/** The file the org's logo points at now, or null when it has none. */
+async function currentLogoFileId(ctx: OrgContext): Promise<string | null> {
+  const [org] = await withOrgContext(ctx, (tx) =>
+    tx.select({ logoFileId: organizations.logoFileId }).from(organizations).where(eq(organizations.id, ctx.orgId)).limit(1),
+  );
+  return org?.logoFileId ?? null;
+}
+
+/**
+ * Removes a refused upload's bytes, best effort, unless removing them could
+ * leave the org without the logo it shows today:
+ *   - Storage could not describe the object. That is an outage, not a verdict
+ *     on the file, and the file may be the logo in use.
+ *   - The file IS the logo in use (re-submitted, or attached before this rule
+ *     existed). The org keeps pointing at it, so its bytes stay.
+ */
+async function removeRefusedUpload(
+  ctx: OrgContext,
+  fileId: string,
+  upload: { bucket: string; objectKey: string },
+  refusal: string,
+): Promise<void> {
+  if (refusal === 'storage_unavailable') return;
+  if ((await currentLogoFileId(ctx)) === fileId) return;
+  await removeStoredObject(upload.bucket, upload.objectKey).catch(() => undefined);
+}
+
 /**
  * Points the org at an uploaded logo file — only if the file is a logo upload in
  * the org AND what Storage actually holds passes the same rule (the declared type
- * and size are only the uploader's word). A refused upload is removed, best effort.
+ * and size are only the uploader's word). A refused upload is removed, best
+ * effort, except where `removeRefusedUpload` keeps it.
  */
 export async function setOrgLogo(fileId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
@@ -71,7 +99,7 @@ export async function setOrgLogo(fileId: string): Promise<ActionResult> {
     ? logoRefusal({ originalName: owned.originalName, contentType: stored.contentType, size: stored.size ?? 0 })
     : 'storage_unavailable';
   if (refusal) {
-    await removeStoredObject(owned.bucket, owned.objectKey).catch(() => undefined);
+    await removeRefusedUpload(ctx, fileId, owned, refusal);
     return err(refusal);
   }
 
