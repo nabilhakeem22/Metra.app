@@ -8,12 +8,14 @@ import { revokeKeysCreatedBy } from '@/lib/api-keys/revoke-creator-keys';
 import type { OrgContext } from '@/lib/db/context';
 import { closeSiteAccessOf } from '@/lib/site/close-site-access';
 import { lockedMembershipTarget } from './membership-target';
+import { writeMembership } from './membership-write';
 
 /**
  * Remove a member from the studio. In the same transaction his live site
  * assignments and signed-in phones here are revoked (lib/site/close-site-access.ts)
  * and so are the API keys he minted (lib/api-keys/revoke-creator-keys.ts), so
- * nothing on the site side or the Public API outlives the membership.
+ * nothing on the site side or the Public API outlives the membership. A caller
+ * demoted under the request is `forbidden` (./membership-write.ts).
  */
 export async function removeMemberCore(
   ctx: OrgContext,
@@ -35,7 +37,7 @@ export async function removeMemberCore(
 
       await closeSiteAccessOf(tx, audit, { memberId: userId, closedBy: ctx.userId, via: 'member_removed' });
       await revokeKeysCreatedBy(tx, audit, { orgId: ctx.orgId, memberId: userId });
-      await tx.delete(memberships).where(eq(memberships.id, target.id));
+      await writeMembership(() => tx.delete(memberships).where(eq(memberships.id, target.id)));
       await audit({
         entity: 'membership',
         entityId: target.id,
