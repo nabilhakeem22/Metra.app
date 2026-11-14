@@ -15,17 +15,20 @@
 // predicate in the token SDF.
 import {
   ENGAGEMENT_ARTIFACT_KINDS,
-  designEngagements,
   engagementArtifacts,
-  files,
   type EngagementArtifactKind,
+  type MetraDb,
 } from '@metra/db';
-import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
+import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
-import { artifactRecordingFile, assertConceptOptionSlot } from './artifact-fences';
-import { takesDesignFiles } from './states';
+import {
+  artifactRecordingFile,
+  assertConceptOptionSlot,
+  assertFileIsEngagementUpload,
+  requireDesignableEngagement,
+} from './artifact-fences';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { isUuid } from '@/lib/uuid';
 import { readFields, readOptionalText } from '@/lib/validation/field-rules';
@@ -42,13 +45,54 @@ export interface RecordArtifactInput {
   note?: string | null;
 }
 
+interface AttestedArtifact {
+  engagementId: string;
+  kind: EngagementArtifactKind;
+  fileId: string | null;
+  contentHash: string | null;
+  label: string | null;
+  note: string | null;
+}
+
+/** Inserts the artifact row, attested by the caller, and audits it; answers its id. */
+async function insertAttestedArtifact(
+  tx: MetraDb,
+  ctx: OrgContext,
+  artifact: AttestedArtifact,
+  audit: (entry: AuditEntry) => Promise<void>,
+): Promise<string> {
+  const { engagementId, kind, fileId, contentHash, label, note } = artifact;
+  const [row] = await tx
+    .insert(engagementArtifacts)
+    .values({
+      orgId: ctx.orgId,
+      engagementId,
+      kind,
+      fileId,
+      contentHash,
+      label,
+      attestedBy: ctx.userId,
+      note,
+    })
+    .returning({ id: engagementArtifacts.id });
+
+  await audit({
+    entity: 'design_engagement',
+    entityId: engagementId,
+    action: 'create',
+    before: null,
+    after: { artifact_id: row.id, kind },
+  });
+  return row.id;
+}
+
 /**
  * Record (and thereby attest) one artifact against an engagement. Gated on the
  * `engagements_design` capability (create). Flow: validate the artifact `kind`
- * (else `invalid`); open the RLS tx; assert the engagement resolves in-org
+ * (else `malformed`); open the RLS tx; assert the engagement resolves in-org
  * (`engagement_not_found` if absent/foreign) and is NOT terminal (else
  * `engagement_not_active`); verify any supplied `fileId` is this engagement's own
- * in-org upload (else `invalid`); insert one `engagement_artifacts` row with
+ * in-org upload (else `record_not_found`); insert one `engagement_artifacts` row with
  * `attested_by = ctx.userId` and `attested_at = now()`. Returns the new artifact
  * id. Never throws to the client — coded ActionResult only.
  */
@@ -80,15 +124,7 @@ export async function recordArtifactCore(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const engagement = await requireInOrg(
-        tx,
-        designEngagements,
-        input.engagementId,
-        { id: designEngagements.id, state: designEngagements.state },
-        'engagement_not_found',
-      );
-      // No recording an artifact against a finished engagement (abandoned / closed).
-      if (!takesDesignFiles(engagement.state)) fail('engagement_not_active');
+      await requireDesignableEngagement(tx, input.engagementId);
       // A retried attach of the SAME upload (its first answer lost in transport)
       // is the artifact already recorded, never a second one.
       if (fileId !== null) {
@@ -96,49 +132,9 @@ export async function recordArtifactCore(
         if (recorded) return recorded;
       }
       if (input.kind === 'concept_option') await assertConceptOptionSlot(tx, input.engagementId);
-
-      // A supplied file must be THIS engagement's own upload. RLS scopes the read to
-      // the caller's org, so a foreign file simply does not resolve; the entity /
-      // entity_id predicates additionally stop an unrelated in-org file (a client
-      // logo, a proposal attachment) being smuggled onto an artifact. Mirrors
-      // attachDeliverableCore — same three predicates, same `invalid` code.
-      if (fileId !== null) {
-        const [owned] = await tx
-          .select({ id: files.id })
-          .from(files)
-          .where(
-            and(
-              eq(files.id, fileId),
-              eq(files.entity, 'engagement'),
-              eq(files.entityId, input.engagementId),
-            ),
-          )
-          .limit(1);
-        if (!owned) fail('record_not_found');
-      }
-
-      const [row] = await tx
-        .insert(engagementArtifacts)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: input.engagementId,
-          kind: input.kind,
-          fileId,
-          contentHash,
-          label,
-          attestedBy: ctx.userId,
-          note,
-        })
-        .returning({ id: engagementArtifacts.id });
-
-      await audit({
-        entity: 'design_engagement',
-        entityId: input.engagementId,
-        action: 'create',
-        before: null,
-        after: { artifact_id: row.id, kind: input.kind },
-      });
-      return row.id;
+      if (fileId !== null) await assertFileIsEngagementUpload(tx, input.engagementId, fileId);
+      const artifact = { engagementId: input.engagementId, kind: input.kind, fileId, contentHash, label, note };
+      return insertAttestedArtifact(tx, ctx, artifact, audit);
     },
   );
 }
