@@ -39,7 +39,7 @@ async function invitationStatus(invitationId: string): Promise<string> {
 }
 
 /** A studio with one owner and a pending invitation for a new person. */
-async function studioWithInvite(role: 'viewer' | 'admin' = 'viewer') {
+async function studioWithInvite(role: 'viewer' | 'admin' | 'owner' = 'viewer') {
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const email = `joiner-${randomUUID()}@example.com`;
@@ -87,6 +87,15 @@ describe('joining by invitation (AC26)', () => {
   it.each(['admin', 'owner', 'project_manager'])('claiming a viewer invitation and inserting %s is MT150, and the claim rolls back', async (role) => {
     const { orgId, email, invitationId, joiner } = await studioWithInvite();
     expect(await runAs(orgId, joiner, email, [claim(invitationId), ownMembership(orgId, joiner, role)])).toBe('MT150');
+    expect(await invitationStatus(invitationId)).toBe('pending');
+    expect((await raw.memberships(orgId)).some((row) => row.user_id === joiner)).toBe(false);
+  });
+
+  // The invitations policy does not hold the role an invitation names, so any
+  // member could write a row that says owner. The trigger does not believe it.
+  it('an invitation that says owner admits nobody as owner, and the claim rolls back', async () => {
+    const { orgId, email, invitationId, joiner } = await studioWithInvite('owner');
+    expect(await runAs(orgId, joiner, email, [claim(invitationId), ownMembership(orgId, joiner, 'owner')])).toBe('MT150');
     expect(await invitationStatus(invitationId)).toBe('pending');
     expect((await raw.memberships(orgId)).some((row) => row.user_id === joiner)).toBe(false);
   });

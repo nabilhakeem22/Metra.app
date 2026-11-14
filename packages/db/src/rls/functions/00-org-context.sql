@@ -296,7 +296,10 @@ $$;
 --   * an UPDATE that leaves the role as it was is not judged;
 --   * a NON-MEMBER may insert only their OWN row: as `owner` when the studio
 --     has no member yet (createOrg), otherwise with exactly the role of the
---     invitation claimed in this transaction (acceptInvite);
+--     invitation claimed in this transaction (acceptInvite), and NEVER as
+--     owner. The invitations policy does not hold the role an invitation
+--     names (any member may write an invitation row), so an invitation that
+--     says owner is not believed: owner is granted by an owner, to a member;
 --   * anyone else must be an owner or admin of the studio to grant, change or
 --     remove a role, and an OWNER to grant owner, demote an owner or remove one.
 -- The last-owner rule stays the app's, under its advisory lock.
@@ -343,6 +346,8 @@ begin
         v_refusal := 'a non-member may add only their own membership';
       elsif not v_facts.org_has_members and v_new <> 'owner' then
         v_refusal := 'the first member of a studio is its owner';
+      elsif v_facts.org_has_members and v_new = 'owner' then
+        v_refusal := 'an invitation never grants owner';
       elsif v_facts.org_has_members and v_facts.invited_role is distinct from v_new then
         v_refusal := 'a joining member takes the role of the invitation claimed in this transaction';
       end if;
