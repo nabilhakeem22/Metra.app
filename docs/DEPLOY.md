@@ -28,16 +28,28 @@ CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
 
 Manual deploy (fallback, from a machine with `wrangler login` done):
 
-The build carries `--dangerouslyUseUnsupportedNextVersion` until the Next 16
-upgrade: OpenNext refuses Next 15 after its support window ended on Oct 21
-2026, and the flag skips only that date check (owner decision, Oct 22).
+The build no longer carries `--dangerouslyUseUnsupportedNextVersion`. The flag
+was added on Oct 22 2026: the OpenNext pinned then (1.20.2) refused Next 15
+once its two-year support window ended on Oct 21. The OpenNext pinned now
+(`@opennextjs/cloudflare` 1.20.15) supports a Next major until the second
+next major is released, so Next 15 passes the check without the flag. The
+list of released majors ships inside the pinned package, so the answer
+changes only when the pin moves.
 
 ```bash
 cd apps/web
-NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build
 node scripts/emit-static-pages.mjs
 npx wrangler deploy
 ```
+
+Since wrangler 4.150.0, `wrangler deploy` also uploads a source map of the
+Worker whenever `upload_source_maps` is not set in `wrangler.jsonc`, and it is
+not set. Measured with the pinned 4.156.0: a map of about 24 MB (4.7 MB
+gzipped) beside a script of about 17 MB. Cloudflare uses it to map the stack
+trace of an uncaught exception in the logs and in `wrangler tail`; code
+inside the Worker cannot read it. `"upload_source_maps": false` turns the
+upload off.
 
 Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
 `main` triggers `deploy.yml`, which builds and `wrangler deploy`s the worker.

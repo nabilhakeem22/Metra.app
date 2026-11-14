@@ -7,7 +7,7 @@
  * Why: on the Workers Free plan every Worker request has a 10 ms CPU budget,
  * and rendering these pages costs far more, so they failed with Error 1102.
  * Served as assets they cost no Worker CPU at all. A robots.txt that answers
- * 1102 or 5xx makes Google pause crawling the whole site. OpenNext 1.20.2
+ * 1102 or 5xx makes Google pause crawling the whole site. OpenNext 1.20.15
  * copies only BUILD_ID, .next/static and public/ into .open-next/assets;
  * pre-rendered output goes to its cache, which the default (dummy) incremental
  * cache never reads. So without this copy even a fully static page renders in

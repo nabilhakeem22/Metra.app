@@ -81,7 +81,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          # Node 22: required by the pinned wrangler (4.123.0).
+          # Node 22: required by the pinned wrangler (4.156.0, engines.node >=22.0.0).
           node-version: 22
           cache: npm
 
@@ -109,11 +109,10 @@ jobs:
         # `wrangler types` emits a Cloudflare.Env/global Env shape, not the
         # `interface CloudflareEnv` the code + OpenNext expect (would fail tsc on
         # Property 'HYPERDRIVE' does not exist on type 'CloudflareEnv').
-        # --dangerouslyUseUnsupportedNextVersion: owner decision Oct 22 2026.
-        # OpenNext refuses Next 15 after its 2-year support window (Oct 21 2026);
-        # the flag skips only that date check (same bundle). Remove it with the
-        # Next 16 upgrade, which is the next planned piece of work.
-        run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+        # No --dangerouslyUseUnsupportedNextVersion: the pinned OpenNext
+        # (1.20.15, @opennextjs/aws 4.1.14) supports a Next major until the
+        # second next major is released, so Next 15 passes its support check.
+        run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build
 
       - name: Emit the pre-rendered pages as static assets
         working-directory: apps/web
