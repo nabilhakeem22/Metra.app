@@ -30,11 +30,7 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   // type change), which resets the ACL exactly as a new function's.
   { file: 'functions/00-org-context.sql', signature: 'public.app_current_user_orgs()', grantsApp: true },
   { file: 'functions/00-org-context.sql', signature: 'public.app_claim_invitation(uuid)', grantsApp: true },
-  {
-    file: 'functions/40-delivery-read.sql',
-    signature: 'public.app_concept_option_positions(uuid)',
-    grantsApp: true,
-  },
+  { file: 'functions/40-delivery-read.sql', signature: 'public.app_concept_option_positions(uuid)', grantsApp: true },
   {
     file: 'functions/50-delivery-write.sql',
     signature:
@@ -57,11 +53,7 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     signature: 'public.app_delivery_act_notified_by_token(text, text, text)',
     grantsApp: true,
   },
-  {
-    file: 'functions/40-delivery-read.sql',
-    signature: 'public.app_document_media(text)',
-    grantsApp: true,
-  },
+  { file: 'functions/40-delivery-read.sql', signature: 'public.app_document_media(text)', grantsApp: true },
   {
     file: 'functions/60-delivery-documents.sql',
     signature: 'public.app_delivery_logo_by_token(text)',
@@ -185,6 +177,9 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_home_target_by_token(text, text)', grantsApp: true },
+  // Security batch 3 (P2): the sign-in pause's read and its counter, called by the connection role only.
+  { file: 'functions/90-sign-in.sql', signature: 'public.app_sign_in_pause_seconds(text)', grantsApp: false },
+  { file: 'functions/90-sign-in.sql', signature: 'public.app_sign_in_failure_record(text)', grantsApp: false },
 ];
 
 /**

@@ -76,6 +76,20 @@ create policy account_isolation on public.accounts
   )
   with check (false);
 
+-- sign_in_failures (0067, security batch 3, P2): wrong sign-in codes counted
+-- per identifier hash, BEFORE any session or org exists, so no org or member
+-- predicate can apply. The policy refuses every row to every role: the only
+-- way in is the two SECURITY DEFINER functions in functions/90-sign-in.sql,
+-- which run as their owner (BYPASSRLS, so `false` never blocks them), and
+-- metra_app holds no privilege on the table at all (roles.sql). The migration
+-- already enabled and forced RLS; repeated here so a re-run converges.
+alter table public.sign_in_failures enable row level security;
+alter table public.sign_in_failures force  row level security;
+drop policy if exists no_direct_access on public.sign_in_failures;
+create policy no_direct_access on public.sign_in_failures
+  using (false)
+  with check (false);
+
 -- memberships: read/most-writes require membership; WITH CHECK additionally
 -- permits inserting the caller's OWN row during a legitimate bootstrap.
 alter table public.memberships enable row level security;

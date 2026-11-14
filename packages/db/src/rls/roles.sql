@@ -31,6 +31,14 @@ grant select on public.accounts to metra_app;
 -- them by the same CLI. verify-rls-applied.ts reads these six back as SELECT-only.
 grant select on public.market_categories, public.market_items, public.market_bulletins, public.market_price_observations, public.market_item_details, public.market_seed_book to metra_app;
 
+-- sign_in_failures (0067, security batch 3, P2): wrong sign-in codes counted
+-- per identifier hash, before any session or org exists. NOTHING for metra_app:
+-- only the two definer functions in functions/90-sign-in.sql read or write it,
+-- as their owner, and the Worker calls those on the connection role, never
+-- inside an org context. `revoke all`, so a re-run removes any privilege
+-- granted by hand; verify-rls-applied.ts reads the table back as holding none.
+revoke all on public.sign_in_failures from metra_app;
+
 -- Full DML on business tables...
 grant select, insert, update, delete on public.organizations to metra_app;
 grant select, insert, update, delete on public.memberships   to metra_app;
@@ -703,6 +711,16 @@ revoke execute on function public.app_contract_terminated_at(uuid, uuid) from pu
 revoke execute on function public.app_contract_terminated_at(uuid, uuid) from metra_app;
 revoke execute on function public.app_home_flow_source(uuid) from public;
 revoke execute on function public.app_home_flow_source(uuid) from metra_app;
+-- Security batch 3 (P2): the sign-in pause's read and its counter
+-- (functions/90-sign-in.sql). INTERNAL in the same sense as the helpers above:
+-- no grant at all, metra_app included. Only the connection role calls them,
+-- before any session exists; a role that could call the counter could pause
+-- anyone's sign-in. Both are also locked down in place, right after their
+-- CREATE.
+revoke execute on function public.app_sign_in_pause_seconds(text) from public;
+revoke execute on function public.app_sign_in_pause_seconds(text) from metra_app;
+revoke execute on function public.app_sign_in_failure_record(text) from public;
+revoke execute on function public.app_sign_in_failure_record(text) from metra_app;
 
 do $$
 declare
@@ -971,6 +989,8 @@ begin
       execute format('revoke execute on function public.app_client_code_consume(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_terminated_at(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_home_flow_source(uuid) from %I', r);
+      execute format('revoke execute on function public.app_sign_in_pause_seconds(text) from %I', r);
+      execute format('revoke execute on function public.app_sign_in_failure_record(text) from %I', r);
     end if;
   end loop;
 end
