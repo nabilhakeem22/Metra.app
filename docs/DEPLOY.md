@@ -477,6 +477,36 @@ every owner step below is done by hand, once.
   zero, `ext 9`) is refused as `phone_format` and never sent.
   Like every binding it counts per data centre, and a binding **missing** on
   Cloudflare makes sign-in answer 500, by design.
+- **Ten wrong sign-in codes pause that address or phone until its hour ends**
+  (security batch 3, P2; `apps/web/src/lib/auth/sign-in-lockout.ts`). The
+  throttle above counts per data centre; this count is global: one row per
+  identifier in `sign_in_failures` (migration 0067), keyed by
+  `sha256('sign-in:' + identifier)` of the same canonical string, never the
+  address. The hour starts at the identifier's first wrong code and is fixed;
+  the tenth wrong or expired code inside it pauses checking codes for that
+  identifier until the hour ends (Supabase answers a wrong code and an expired
+  one alike, so both count). A right code clears nothing, and asking for a new
+  code does not lift a pause. A paused check answers `otp_sign_in_paused` with
+  the minutes left, rounded up, and Supabase is not asked. The threshold and
+  the hour are written only in
+  `packages/db/src/rls/functions/90-sign-in.sql`. Cost per code check: one
+  database read before Supabase, one write only after a wrong code, nothing
+  more on a success. A database **error** in either call is logged
+  (`sign-in pause check failed`, `sign-in failure record failed`) and the
+  check goes ahead; a **missing** Hyperdrive binding on Cloudflare refuses the
+  check with a logged `generic` (`sign-in pause store missing`), because
+  Supabase sign-in works without Postgres and the pause would otherwise be off
+  with nothing saying so. It depends on Hyperdrive caching staying off (owner
+  step 1): a cached "not paused" would allow extra guesses. Anyone who knows an
+  address can pause its sign-in for up to an hour with ten wrong codes (the
+  accepted trade). To lift one pause early, in the Supabase SQL editor (the
+  email trimmed and in lower case; a phone as `+` and its digits):
+
+  ```sql
+  -- Lift one sign-in pause. Replace the address, keep the 'sign-in:' prefix.
+  delete from public.sign_in_failures
+   where identifier_hash = encode(sha256(convert_to('sign-in:' || 'user@example.com', 'UTF8')), 'hex');
+  ```
 - **Sign-in sends carry a Turnstile token** (security test T3), once the
   `NEXT_PUBLIC_TURNSTILE_SITE_KEY` Actions variable is set. The login page shows
   a Managed widget, interaction-only (most people see nothing), and each send

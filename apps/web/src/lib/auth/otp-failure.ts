@@ -37,10 +37,22 @@ const SEND_ANSWERS: Readonly<Record<string, (channel: OtpChannel) => ActionResul
 };
 
 /** A wrong code and an expired one are one answer: Supabase says otp_expired for both (D8). */
+const WRONG_OR_EXPIRED_CODE = 'otp_expired';
+
 const VERIFY_ANSWERS: Readonly<Record<string, () => ActionResult>> = {
   ...Object.fromEntries(RATE_LIMITED.map((code) => [code, () => err('otp_verify_rate_limited')])),
-  otp_expired: () => fieldsFailed({ token: { code: 'otp_verify_failed' } }),
+  [WRONG_OR_EXPIRED_CODE]: () => fieldsFailed({ token: { code: 'otp_verify_failed' } }),
 };
+
+/**
+ * Did Supabase refuse the CODE itself? These are the failures the sign-in pause
+ * counts (sign-in-lockout.ts): a wrong code and an expired one alike, since
+ * Supabase does not tell them apart. A rate limit, an unknown code or a network
+ * failure says nothing about the code and is never counted.
+ */
+export function isWrongCodeFailure(failure: AuthFailure): boolean {
+  return failure.code === WRONG_OR_EXPIRED_CODE;
+}
 
 function answerFor<A>(answers: Readonly<Record<string, A>>, code: string | undefined): A | undefined {
   return code !== undefined && Object.hasOwn(answers, code) ? answers[code] : undefined;

@@ -548,6 +548,7 @@
     "otp_verify_failed": "That code is wrong or has expired. Type the newest code we sent, or ask for a new one.",
     "otp_rate_limited": "Too many codes were requested. Wait a minute, then ask for a new one.",
     "otp_verify_rate_limited": "Too many tries. Wait a minute, then type the code again.",
+    "otp_sign_in_paused": "Too many wrong codes were typed for this account, so signing in to it is paused. Try again in {minutes, plural, one {1 minute} other {{minutesText} minutes}}.",
     "rate_limited": "Too many requests in a short time. Wait a minute, then try again.",
     "daily_email_cap_reached": "Your studio has reached today's email limit. Try again tomorrow, or copy the link and send it yourself.",
     "otp_sms_unavailable": "We cannot send text messages right now. Sign in with your email instead.",
