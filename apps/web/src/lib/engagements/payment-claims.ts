@@ -9,19 +9,15 @@ import 'server-only';
 // (RLS scopes the read) so a caller can never resolve a foreign org's claim. Money
 // is validated with exact scale-4 BigInt (never parseFloat) — the studio may EDIT
 // the amount at confirm time, so it is re-validated here, not trusted from the claim.
-import { clientPaymentClaims, paymentEvents } from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
+import { clientPaymentClaims } from '@metra/db';
+import { and, eq } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { invariant } from '@/lib/actions/invariant';
 import type { ActionResult } from '@/lib/actions/result';
-import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
-// LEAF module (states.ts is itself the leaf — not a barrel): the terminal-state
-// predicate, so a claim made while active can't record money after the engagement
-// went terminal — mirroring recordPaymentCore.
-import { isTerminal } from '@/lib/engagements/states';
-import { lockEngagementForMoney, milestoneOutstanding4 } from './milestone-settlement';
+import { recordClaimPayment } from './payment-claim-ledger';
+import { assertClaimStillPayable, lockClaimForConfirm, markClaimConfirmed } from './payment-claim-rows';
 import { readPaymentAmount } from './payment-field-rules';
 
 export interface ConfirmPaymentClaimInput {
@@ -63,22 +59,7 @@ export async function confirmPaymentClaimCore(
     ctx,
     { capability: 'engagements_finance', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      // Row-lock the claim BEFORE writing money: a concurrent confirm/dismiss must
-      // wait here and then re-read the committed status, so the two cannot interleave
-      // (no read-then-write race that could leave a real payment against a dismissed
-      // claim). RLS still scopes this to the caller's org (foreign -> no row).
-      const [claim] = await tx
-        .select({
-          id: clientPaymentClaims.id,
-          engagementId: clientPaymentClaims.engagementId,
-          milestoneKind: clientPaymentClaims.milestoneKind,
-          status: clientPaymentClaims.status,
-          confirmedPaymentEventId: clientPaymentClaims.confirmedPaymentEventId,
-        })
-        .from(clientPaymentClaims)
-        .where(eq(clientPaymentClaims.id, input.claimId))
-        .for('update')
-        .limit(1);
+      const claim = await lockClaimForConfirm(tx, input.claimId);
       // Absent or foreign (RLS-filtered to empty) -> not resolvable.
       if (!claim) fail('claim_not_found');
       if (claim.status === 'confirmed') {
@@ -91,125 +72,11 @@ export async function confirmPaymentClaimCore(
       // Dismissed (or any non-pending) -> not resolvable.
       if (claim.status !== 'pending') fail('claim_not_found');
 
-      // Terminal guard (mirrors recordPaymentCore): never record money once the
-      // engagement finished, even if the claim was made while it was active. The
-      // engagement row is LOCKED, as recordPaymentCore locks it, so a hand-logged
-      // payment for the same milestone and this confirm serialise.
-      const engagement = await lockEngagementForMoney(tx, claim.engagementId);
-      if (isTerminal(engagement.state)) fail('engagement_not_active');
-
-      // Already paid in full (the studio logged it by hand, or another path did):
-      // confirming would write a SECOND ledger row for money received once. The
-      // studio dismisses the claim instead.
-      const outstanding = await milestoneOutstanding4(
-        tx,
-        claim.engagementId,
-        engagement.designFee,
-        claim.milestoneKind,
-      );
-      if (outstanding !== null && outstanding <= 0n) fail('claim_already_settled');
-
-      // Record the real payment, keyed so a raced / replayed confirm dedups to
-      // the first-written payment (no second ledger row).
-      //
-      // The key is NAMESPACED, not the bare claim id: recordPaymentCore accepts a
-      // caller-supplied idempotency key but requires it to be a UUID, so a bare
-      // claim id was forgeable. Anyone who knew a pending claim's id could
-      // pre-insert a 1.00 EGP payment under that key, and this insert would then
-      // conflict and adopt it — confirming the client's claim against a payment of
-      // the attacker's choosing. `claim:<uuid>` is not a UUID, so recordPaymentCore
-      // can never mint a row in this namespace.
-      const claimKey = `claim:${claim.id}`;
-      const inserted = await tx
-        .insert(paymentEvents)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: claim.engagementId,
-          kind: claim.milestoneKind,
-          amount,
-          recordedBy: ctx.userId,
-          idempotencyKey: claimKey,
-        })
-        .onConflictDoNothing({
-          target: [
-            paymentEvents.orgId,
-            paymentEvents.engagementId,
-            paymentEvents.idempotencyKey,
-          ],
-          where: sql`idempotency_key is not null`,
-        })
-        .returning({ id: paymentEvents.id });
-
-      let paymentId: string;
-      if (inserted.length > 0) {
-        paymentId = inserted[0].id;
-        await audit({
-          entity: 'design_engagement',
-          entityId: claim.engagementId,
-          action: 'create',
-          before: null,
-          after: {
-            payment_id: paymentId,
-            kind: claim.milestoneKind,
-            amount,
-            claim_id: claim.id,
-          },
-        });
-      } else {
-        // Lost the idempotency race / replay: return the winning row's id (mirrors
-        // recordPaymentCore — `already: true`, no second audit). The winner is
-        // re-read and CHECKED: adopting a row whose kind or amount differs from
-        // what this confirmation is for would resolve the claim against the wrong
-        // money, so a mismatch aborts the whole transaction instead.
-        const [existing] = await tx
-          .select({
-            id: paymentEvents.id,
-            kind: paymentEvents.kind,
-            amount: paymentEvents.amount,
-          })
-          .from(paymentEvents)
-          .where(
-            and(
-              eq(paymentEvents.orgId, ctx.orgId),
-              eq(paymentEvents.engagementId, claim.engagementId),
-              eq(paymentEvents.idempotencyKey, claimKey),
-            ),
-          )
-          .limit(1);
-        if (
-          !existing ||
-          existing.kind !== claim.milestoneKind ||
-          parseMoney4(existing.amount) !== parseMoney4(amount)
-        ) {
-          invariant(false, 'claim payment event does not match the claim');
-        }
-        paymentId = existing.id;
-        already = true;
-      }
-
-      // Flip the claim -> confirmed, guarded on status='pending' and `.returning()`:
-      // under the row lock this always matches, but if it ever matches 0 rows the
-      // row changed under us — THROW so the WHOLE tx (incl. the payment insert above)
-      // rolls back, rather than committing a payment with the claim left unresolved.
-      const flipped = await tx
-        .update(clientPaymentClaims)
-        .set({
-          status: 'confirmed',
-          confirmedPaymentEventId: paymentId,
-          resolvedBy: ctx.userId,
-          resolvedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(clientPaymentClaims.id, claim.id),
-            eq(clientPaymentClaims.status, 'pending'),
-          ),
-        )
-        .returning({ id: clientPaymentClaims.id });
-      if (flipped.length === 0) fail('claim_not_found');
-
-      return paymentId;
+      await assertClaimStillPayable(tx, claim);
+      const recorded = await recordClaimPayment(tx, ctx, { claim, amount }, audit);
+      if (recorded.adopted) already = true;
+      await markClaimConfirmed(tx, ctx, claim, recorded.paymentId);
+      return recorded.paymentId;
     },
   );
 
