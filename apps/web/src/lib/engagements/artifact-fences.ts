@@ -80,7 +80,7 @@ export async function assertFileIsEngagementUpload(
   // the caller's org, so a foreign file simply does not resolve; the entity /
   // entity_id predicates additionally stop an unrelated in-org file (a client
   // logo, a proposal attachment) being smuggled onto an artifact. Mirrors
-  // attachDeliverableCore — same three predicates, same `invalid` code.
+  // attachDeliverableCore — same three predicates, same `record_not_found` code.
   const [owned] = await tx
     .select({ id: files.id })
     .from(files)

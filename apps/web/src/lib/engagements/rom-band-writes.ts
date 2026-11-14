@@ -66,10 +66,11 @@ export async function appendRomBandEvent(
   audit: (entry: AuditEntry) => Promise<void>,
 ): Promise<void> {
   const { romLow, romHigh } = band;
-  // ...and append the band to the LEDGER, in the same transaction, gated on
-  // the admission above. The columns are the CURRENT value, which is what a
-  // guard asking "what is it now" needs and what a studio asking "what did we
-  // tell them in August" cannot use, because a revision overwrites them.
+  // Append the band to the LEDGER, in the same transaction as admitRomBand and
+  // only once it has admitted the band (setEngagementRomCore calls the two in
+  // that order). The columns are the CURRENT value, which is what a guard asking
+  // "what is it now" needs and what a studio asking "what did we tell them in
+  // August" cannot use, because a revision overwrites them.
   // `rom_acknowledgement` already snapshots the acknowledged band; this is the
   // missing half -- every band ISSUED, acknowledged or not.
   //

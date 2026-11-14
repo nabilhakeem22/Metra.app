@@ -59,11 +59,12 @@ async function adoptRacedClaimPayment(
   ctx: OrgContext,
   entry: ClaimPaymentEntry,
 ): Promise<string> {
-  // Lost the idempotency race / replay: return the winning row's id (mirrors
-  // recordPaymentCore — `already: true`, no second audit). The winner is
-  // re-read and CHECKED: adopting a row whose kind or amount differs from
-  // what this confirmation is for would resolve the claim against the wrong
-  // money, so a mismatch aborts the whole transaction instead.
+  // Lost the idempotency race / replay: return the winning row's id, with no
+  // second audit (mirrors recordPaymentCore). recordClaimPayment reports it as
+  // `adopted`, and the core answers `already: true`. The winner is re-read and
+  // CHECKED: adopting a row whose kind or amount differs from what this
+  // confirmation is for would resolve the claim against the wrong money, so a
+  // mismatch aborts the whole transaction instead.
   const { claim, claimKey, amount } = entry;
   const [existing] = await tx
     .select({

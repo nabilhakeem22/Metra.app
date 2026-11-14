@@ -89,10 +89,10 @@ async function insertAttestedArtifact(
 /**
  * Record (and thereby attest) one artifact against an engagement. Gated on the
  * `engagements_design` capability (create). Flow: validate the artifact `kind`
- * (else `invalid`); open the RLS tx; assert the engagement resolves in-org
+ * (else `malformed`); open the RLS tx; assert the engagement resolves in-org
  * (`engagement_not_found` if absent/foreign) and is NOT terminal (else
  * `engagement_not_active`); verify any supplied `fileId` is this engagement's own
- * in-org upload (else `invalid`); insert one `engagement_artifacts` row with
+ * in-org upload (else `record_not_found`); insert one `engagement_artifacts` row with
  * `attested_by = ctx.userId` and `attested_at = now()`. Returns the new artifact
  * id. Never throws to the client — coded ActionResult only.
  */

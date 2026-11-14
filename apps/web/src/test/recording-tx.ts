@@ -2,6 +2,16 @@
 // a journal as the builder calls it was made of, each argument rendered (tables,
 // columns and SQL with its bound parameters), and resolves the next scripted
 // result. It runs no query; what it proves is the statement text and its order.
+//
+// WHAT IT DOES NOT MODEL:
+//  - An aborted transaction. After a statement fails, Postgres refuses every
+//    later one; here a later statement still answers with the next result.
+//  - A nested `tx.transaction(cb)`. It is journalled as one entry and `cb` is
+//    never run.
+//  - A failure scripted as an `Error`. A queued Error RESOLVES like any other
+//    result; to make a statement fail, queue a thenable that rejects.
+//  - A statement inspected before it is awaited. Reading `then` is what finishes
+//    it, so `expect(statement).rejects` journals it twice; await it instead.
 import type { MetraDb } from '@metra/db';
 import { Column, SQL, Table, getTableName, is } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';

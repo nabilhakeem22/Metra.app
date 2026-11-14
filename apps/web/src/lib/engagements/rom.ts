@@ -24,17 +24,20 @@ export interface SetEngagementRomInput {
 
 /**
  * Set the rough build-cost range (ROM) on an engagement. Gated on the
- * `engagements_design` capability (update). Flow: open the RLS tx; assert the
- * engagement resolves in-org (`engagement_not_found` if absent/foreign) and is
- * NOT terminal (`engagement_not_active`); validate that both `romLow` and
- * `romHigh` are well-formed positive scale-4 money strings and
- * `romHigh >= romLow` (else `rom_range_invalid`); persist the canonical scale-4
- * values so the STORED band is exactly the one the app validated (the DB
- * numeric(18,4) would otherwise round a >4-decimal input); append ONE
- * `rom_range_set` event carrying that same band, so what the firm quoted
- * survives the next revision; and CLEAR `rom_issued_at`, so a revised band is
- * hidden from the client until it is deliberately re-issued. Returns ok. Never
- * throws to the client — coded ActionResult only.
+ * `engagements_design` capability (update). Flow: shape-check the engagement id
+ * before any transaction (else `malformed`); open the RLS tx; validate that both
+ * `romLow` and `romHigh` are well-formed positive scale-4 money strings and
+ * `romHigh >= romLow`, refusing under the field before any row is touched
+ * (`check_fields`, with `rom_range_invalid` for an empty, zero or inverted
+ * band); write the canonical scale-4 values in ONE update that admits only an
+ * engagement that is NOT terminal, so the STORED band is exactly the one the app
+ * validated (the DB numeric(18,4) would otherwise round a >4-decimal input), and
+ * that CLEARS `rom_issued_at`, so a revised band is hidden from the client until
+ * it is deliberately re-issued; when that update admits nothing, answer
+ * `engagement_not_active` if the engagement resolves in-org and
+ * `engagement_not_found` if it is absent/foreign; append ONE `rom_range_set`
+ * event carrying that same band, so what the firm quoted survives the next
+ * revision. Returns ok. Never throws to the client — coded ActionResult only.
  */
 export async function setEngagementRomCore(
   ctx: OrgContext,

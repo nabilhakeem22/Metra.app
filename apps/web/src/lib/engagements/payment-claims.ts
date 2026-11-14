@@ -37,7 +37,7 @@ export interface ConfirmPaymentClaimInput {
  * row); lock the engagement row and assert it is not terminal (`engagement_not_active`,
  * mirroring recordPaymentCore) and that the milestone still has money outstanding
  * (`claim_already_settled` when it was already paid in full) BEFORE inserting; INSERT one `payment_events` row (kind = the
- * claim's milestone, `recorded_by = ctx.userId`, `idempotency_key = claimId`); then
+ * claim's milestone, `recorded_by = ctx.userId`, `idempotency_key = 'claim:<claimId>'`); then
  * UPDATE the claim -> confirmed guarded on status='pending' with `.returning()` — if
  * it matches 0 rows the row changed under us, so THROW to roll back the payment
  * insert too (belt and suspenders on top of the row lock). Returns the payment id in

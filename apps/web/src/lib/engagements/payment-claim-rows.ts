@@ -79,8 +79,9 @@ export async function markClaimConfirmed(
 ): Promise<void> {
   // Flip the claim -> confirmed, guarded on status='pending' and `.returning()`:
   // under the row lock this always matches, but if it ever matches 0 rows the
-  // row changed under us — THROW so the WHOLE tx (incl. the payment insert above)
-  // rolls back, rather than committing a payment with the claim left unresolved.
+  // row changed under us — THROW so the WHOLE tx (incl. the payment insert made
+  // in payment-claim-ledger.ts) rolls back, rather than committing a payment with
+  // the claim left unresolved.
   const flipped = await tx
     .update(clientPaymentClaims)
     .set({
