@@ -41,6 +41,11 @@ revoke all on public.sign_in_failures from metra_app;
 
 -- Full DML on business tables...
 grant select, insert, update, delete on public.organizations to metra_app;
+-- ...except DELETE on organizations (security batch 3, A5). No app path deletes
+-- a studio; the fixture purge deletes as the connection role. The revoke
+-- removes the grant on already-provisioned databases; on a fresh one it is a
+-- no-op after the line above. verify-rls-applied.ts reads it back.
+revoke delete on public.organizations from metra_app;
 grant select, insert, update, delete on public.memberships   to metra_app;
 grant select, insert, update, delete on public.files         to metra_app;
 grant select, insert, update, delete on public.invitations   to metra_app;
@@ -280,13 +285,28 @@ grant select, insert, update on public.engagement_artifacts to metra_app;
 -- settled (update, reserved for the Step-9 revision_co settle path). SELECT +
 -- INSERT + UPDATE — never DELETE.
 grant select, insert, update on public.engagement_change_orders to metra_app;
--- client_payment_claims (Client Delivery Portal Phase 3): the client "mark as
--- paid" INSERT is done by the SECURITY DEFINER token SDF (owner, bypasses RLS), so
--- the metra_app grant here governs the STUDIO cockpit paths — read the pending
--- claims (select) and confirm/dismiss them (UPDATE the status + resolution
--- columns). UPDATE is intentional here, unlike the append-only ledgers below. No
--- DELETE — a resolved claim is retained.
-grant select, insert, update on public.client_payment_claims to metra_app;
+-- client_payment_claims (Client Delivery Portal Phase 3): the client's "I paid"
+-- on a design payment. ONLY the client's link functions write one, as their
+-- owner, so metra_app gets NO INSERT (security batch 3, A5): no app path can
+-- make up a claim the client never sent. The studio confirms or dismisses it:
+-- UPDATE IS COLUMN-LEVEL, the answer's columns only, so what the client claimed
+-- (the amount, the note, the name, IP and user agent) is never rewritten. The
+-- mirror of contract_payment_claims above. No DELETE: a resolved claim is
+-- retained. `revoke all` first, so a re-run removes the earlier table-level
+-- INSERT and UPDATE, and BEFORE the column grant: revoking a table privilege
+-- takes the column privileges with it. The list is checked three ways:
+-- apps/web/src/lib/db/narrowed-update-grants.test.ts derives it from every
+-- update site in the app, and verify-rls-applied.ts reads it back column by
+-- column against scripts/column-grant-sets.ts.
+revoke all on public.client_payment_claims from metra_app;
+grant select on public.client_payment_claims to metra_app;
+grant update (
+  status,
+  confirmed_payment_event_id,
+  resolved_by,
+  resolved_at,
+  updated_at
+) on public.client_payment_claims to metra_app;
 -- document_categories (clients + projects spec): the firm manages its own filing
 -- vocabulary, so SELECT + INSERT + UPDATE. NO DELETE, deliberately: files reference
 -- a category, and retiring one must not be able to pull it out from under them —
@@ -304,9 +324,21 @@ grant select, insert on public.engagement_document_comments to metra_app;
 revoke update, delete on public.engagement_document_comments from metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
--- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
--- stamp (update). NO delete — revocation sets revoked_at, keys are never removed.
-grant select, insert, update on public.api_keys to metra_app;
+-- api_keys (Public API v1): mint (insert), list (select), revoke (update). NO
+-- delete: revocation sets revoked_at, keys are never removed. UPDATE IS
+-- COLUMN-LEVEL (security batch 3, A5): the revoke's two columns and nothing
+-- else. A key resolves through `created_by`'s LIVE role, so a rewritten
+-- `created_by` would hand a key another member's role; `token_hash`, `org_id`
+-- and `expires_at` are as final. The last-used stamp needs no grant: the
+-- resolver (functions/20-api-keys.sql) writes it as its owner. `revoke all`
+-- first and BEFORE the column grant, as for client_payment_claims above, and
+-- checked the same three ways.
+revoke all on public.api_keys from metra_app;
+grant select, insert on public.api_keys to metra_app;
+grant update (
+  revoked_at,
+  updated_at
+) on public.api_keys to metra_app;
 -- workspace_entitlements (Epic A2): the per-workspace flow/limit/feature row is
 -- written ONCE at bootstrap (createOrg / seed INSERT after the owner membership)
 -- and never edited by any v1 code path, so INSERT-only. This is load-bearing:

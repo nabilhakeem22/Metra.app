@@ -97,4 +97,12 @@ export const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   site_material_receipts: ['delete'],
   site_notes: ['delete'],
   client_verification_codes: ['insert', 'update', 'delete'],
+  // Security batch 3 (A5). No table-level UPDATE: a revoke is a column-level UPDATE (./column-grants.ts); never deleted.
+  api_keys: ['update', 'delete'],
+  // SELECT only at table level: only the client's link functions write a claim; the answer is a column-level UPDATE.
+  client_payment_claims: ['insert', 'update', 'delete'],
+  // No DELETE: no app path deletes a studio.
+  organizations: ['delete'],
+  // Nothing at all (P2): only the definer functions in rls/functions/90-sign-in.sql read or write it.
+  sign_in_failures: ['select', 'insert', 'update', 'delete'],
 };

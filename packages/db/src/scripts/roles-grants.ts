@@ -26,7 +26,7 @@
 //
 // COLUMN-LEVEL GRANTS ARE NOT TABLE-LEVEL PRIVILEGES and are skipped here.
 // `grant update (state, …) on design_engagements` confers no table-level UPDATE,
-// which is the entire point of wave 7's narrowing — `design-engagement-grant.ts`
+// which is the entire point of wave 7's narrowing — `column-update-grant.ts`
 // reads that statement, and this file must not double-count it.
 //
 // Pure text in, privileges out: no fs, no postgres, importable from either side.

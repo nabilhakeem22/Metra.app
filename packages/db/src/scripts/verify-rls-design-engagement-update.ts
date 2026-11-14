@@ -1,7 +1,7 @@
 // The `design_engagements` UPDATE authority read-back: no table-level UPDATE for
 // metra_app, and a column-level UPDATE naming exactly what roles.sql grants.
 import { readFileSync } from 'node:fs';
-import { GRANTED_UPDATE_TABLE, grantedUpdateColumns } from './design-engagement-grant';
+import { DESIGN_ENGAGEMENTS_TABLE, grantedUpdateColumnsOf } from './column-update-grant';
 import { APP_ROLE } from './roles-grants';
 import { ROLES_SQL, type Sql } from './verify-rls-shared';
 
@@ -66,13 +66,13 @@ function privilegeLevelProblems(privilege: UpdatePrivilege): string[] {
   const problems: string[] = [];
   if (privilege.tableLevel) {
     problems.push(
-      `  - ${APP_ROLE} has TABLE-LEVEL update on ${GRANTED_UPDATE_TABLE}, which subsumes ` +
+      `  - ${APP_ROLE} has TABLE-LEVEL update on ${DESIGN_ENGAGEMENTS_TABLE}, which subsumes ` +
         'every column grant — the narrowing in rls/roles.sql is cosmetic on this database',
     );
   }
   if (!privilege.columnLevel) {
     problems.push(
-      `  - ${APP_ROLE} has NO update at all on ${GRANTED_UPDATE_TABLE} — every state ` +
+      `  - ${APP_ROLE} has NO update at all on ${DESIGN_ENGAGEMENTS_TABLE} — every state ` +
         'transition, ROM issue, render stamp and share-token mint will fail with 42501',
     );
   }
@@ -82,19 +82,19 @@ function privilegeLevelProblems(privilege: UpdatePrivilege): string[] {
 /** Both halves, compared against the columns roles.sql grants. */
 function columnDriftProblems(privilege: UpdatePrivilege, columns: string[]): string[] {
   const problems = privilegeLevelProblems(privilege);
-  const granted = new Set(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')));
+  const granted = new Set(grantedUpdateColumnsOf(readFileSync(ROLES_SQL, 'utf8'), DESIGN_ENGAGEMENTS_TABLE));
   const applied = new Set(columns);
   const missing = [...granted].filter((column) => !applied.has(column)).sort();
   const surplus = [...applied].filter((column) => !granted.has(column)).sort();
   if (missing.length > 0) {
     problems.push(
-      `  - ${GRANTED_UPDATE_TABLE} column update is MISSING ${missing.join(', ')} — ` +
+      `  - ${DESIGN_ENGAGEMENTS_TABLE} column update is MISSING ${missing.join(', ')} — ` +
         'rls/roles.sql grants them and this database does not have them',
     );
   }
   if (surplus.length > 0) {
     problems.push(
-      `  - ${GRANTED_UPDATE_TABLE} column update carries ${surplus.join(', ')}, which ` +
+      `  - ${DESIGN_ENGAGEMENTS_TABLE} column update carries ${surplus.join(', ')}, which ` +
         'rls/roles.sql does not grant — a privilege nothing in the repository asked for',
     );
   }
@@ -110,7 +110,7 @@ export async function designEngagementUpdateProblems(sql: Sql): Promise<string[]
   const privilege = await readUpdatePrivilege(sql);
   if (!privilege || !privilege.tableExists) {
     return [
-      `  - ${GRANTED_UPDATE_TABLE} is not in this database at all, so nothing here ` +
+      `  - ${DESIGN_ENGAGEMENTS_TABLE} is not in this database at all, so nothing here ` +
         'says anything about its UPDATE authority. Run the migrations first.',
     ];
   }
