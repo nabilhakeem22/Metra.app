@@ -1,0 +1,17 @@
+/*
+ * The font shown while Manrope loads: Arial, resized to Manrope's own metrics,
+ * so the text does not re-wrap or jump when Manrope replaces it.
+ *
+ * next/font generated this rule while the font came from Google. With the
+ * single variable file it measures the wrong weight (see [locale]/layout.tsx),
+ * so the layout turns its own stand-in off and names this one. The four values
+ * are the ones production served before the fonts were bundled.
+ */
+@font-face {
+  font-family: 'Manrope Fallback';
+  src: local('Arial');
+  ascent-override: 103.31%;
+  descent-override: 29.07%;
+  line-gap-override: 0%;
+  size-adjust: 103.19%;
+}
