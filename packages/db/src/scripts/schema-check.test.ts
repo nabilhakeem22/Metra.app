@@ -188,8 +188,8 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 151 declared, 151 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 413 declared, 413 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 152 declared, 152 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 415 declared, 415 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: functions — 102 declared, 102 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
