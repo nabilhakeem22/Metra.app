@@ -59,9 +59,9 @@
 // does not have it". POLICIES ARE THE EXCEPTION (Stage 2, security review S4):
 // they are permissive and OR together, so an extra one widens access, and it
 // is reported. So are TRUNCATE, REFERENCES and TRIGGER for metra_app on any
-// table (roles.sql grants none), and the three column-level grants
-// (./column-grants.ts): INSERT on contract_line_measurements, UPDATE on
-// contract_cost_entries and on contract_payment_claims.
+// table (roles.sql grants none), and the column-level grants of
+// ./column-grants.ts: INSERT on contract_line_measurements, and UPDATE on
+// contract_cost_entries, both claim tables and api_keys.
 //
 // EVERY PRIVILEGE READ RESOLVES ITS TABLE THROUGH `pg_class` rather than through
 // a `'public.<name>'::text` argument. The text form raises 42P01 on a table the
@@ -76,7 +76,7 @@
 // `(text)`) reads green here.
 import { readFileSync } from 'node:fs';
 import { columnGrantProblems, columnGrantsSummary } from './column-grants';
-import { GRANTED_UPDATE_TABLE, grantedUpdateColumns } from './design-engagement-grant';
+import { DESIGN_ENGAGEMENTS_TABLE, grantedUpdateColumnsOf } from './column-update-grant';
 import { declaredFunctions, declaredPolicies, declaredTriggers } from './rls-catalogue';
 import { APP_ROLE } from './roles-grants';
 import { declaredTables } from './schema-catalogue';
@@ -146,8 +146,8 @@ export async function verifyRlsApplied(sql: Sql): Promise<string[]> {
 export function verifiedGrantsSummary(): string {
   const narrowed = Object.keys(NARROWED_TABLES).sort();
   return (
-    `grants verified — ${GRANTED_UPDATE_TABLE} update narrowed to ` +
-    `${String(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')).length)} columns with no ` +
+    `grants verified — ${DESIGN_ENGAGEMENTS_TABLE} update narrowed to ` +
+    `${String(grantedUpdateColumnsOf(readFileSync(ROLES_SQL, 'utf8'), DESIGN_ENGAGEMENTS_TABLE).length)} columns with no ` +
     `table-level update, and ${String(narrowed.length)} narrowed table(s) ` +
     `(${narrowed.join(', ')}) holding exactly what rls/roles.sql leaves them; ` +
     `${columnGrantsSummary()}; no ` +

@@ -929,8 +929,9 @@ and code deployed before it never sends one.
 ### Database step runbooks
 
 Each database step has its own runbook under [`docs/db-steps/`](db-steps/). Every one of them
-has been run: on 2026-11-13 production's migration ledger held 67 entries (0000 to 0066), the
-same 67 the journal holds. They stay in the repository for three reasons: *Rolling back* below
+up to 0066 has been run: on 2026-11-13 production's migration ledger held 67 entries (0000 to
+0066), the same 67 the journal held that day. The last row, 0067, has not been run yet. They
+stay in the repository for three reasons: *Rolling back* below
 points at their "Undo, if ever needed" parts, each one records what was measured on production
 when it ran, and the 0059 and 0060 files hold SQL blocks that the test suites read
 (`apps/web/tests/actions/runbook-sql.ts`, `packages/db/src/schema/organizations-checks.test.ts`).
@@ -951,6 +952,7 @@ when it ran, and the 0059 and 0060 files hold SQL blocks that the test suites re
 | Stage 2 DB step B, the client "I paid" (apply-rls only, no migration) | [0064b-stage-2-step-b.md](db-steps/0064b-stage-2-step-b.md) |
 | 0065, client home DB step C | [0065-client-home-step-c.md](db-steps/0065-client-home-step-c.md) |
 | 0066, client codes DB step D | [0066-client-codes-step-d.md](db-steps/0066-client-codes-step-d.md) |
+| 0067, security batch 3 (sign-in pause table, narrower grants, membership role writer) | [0067-security-batch-3.md](db-steps/0067-security-batch-3.md) |
 
 A new database step gets a new file in that folder and a row in this table, not a section here.
 

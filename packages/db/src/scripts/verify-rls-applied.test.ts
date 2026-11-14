@@ -2,8 +2,8 @@ import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CLAIM_UPDATE_COLUMNS, COST_ENTRY_UPDATE_COLUMNS } from './column-grants';
-import { grantedUpdateColumns } from './design-engagement-grant';
+import { API_KEY_UPDATE_COLUMNS, CLAIM_UPDATE_COLUMNS, CLIENT_CLAIM_UPDATE_COLUMNS, COST_ENTRY_UPDATE_COLUMNS } from './column-grant-sets';
+import { DESIGN_ENGAGEMENTS_TABLE, grantedUpdateColumnsOf } from './column-update-grant';
 import {
   TABLE_PRIVILEGES,
   granteesOf,
@@ -46,21 +46,27 @@ interface Catalogues {
   extraPolicies?: string[];
   /** TRUNCATE / REFERENCES / TRIGGER rows the database answers for metra_app. */
   hiddenPrivileges?: Array<{ name: string; privilege: string }>;
-  /** The column-level INSERT read-back on contract_line_measurements. */
-  measurementColumns?: Array<{ name: string; granted: boolean }>;
-  /** The column-level UPDATE read-back on contract_cost_entries (DB step B). */
-  costEntryColumns?: Array<{ name: string; granted: boolean }>;
-  /** The column-level UPDATE read-back on contract_payment_claims (DB step B). */
-  claimColumns?: Array<{ name: string; granted: boolean }>;
-  /** The column-level SELECT read-back on client_verification_codes (DB step C). */
-  codeColumns?: Array<{ name: string; granted: boolean }>;
+  /** A column-level read-back (./column-grants.ts) this database answers differently, by table. */
+  columnGrants?: Record<string, Array<{ name: string; granted: boolean }>>;
 }
+
+/** The tables read back column by column: is metra_app meant to hold the rule's privilege on this column? */
+const COLUMN_GRANTED: Record<string, (column: string) => boolean> = {
+  contract_line_measurements: (column) => column !== 'seq',
+  contract_cost_entries: (column) => COST_ENTRY_UPDATE_COLUMNS.has(column),
+  contract_payment_claims: (column) => CLAIM_UPDATE_COLUMNS.has(column),
+  client_verification_codes: (column) => column !== 'code_hash',
+  client_payment_claims: (column) => CLIENT_CLAIM_UPDATE_COLUMNS.has(column),
+  api_keys: (column) => API_KEY_UPDATE_COLUMNS.has(column),
+};
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
 
-/** The twenty-four tables `verify-rls-applied.ts` reads back, in the order it asks. */
+/** The twenty-eight tables `verify-rls-applied.ts` reads back, in the order it asks. */
 const NARROWED_TABLE_NAMES = [
+  'api_keys',
   'boqs',
+  'client_payment_claims',
   'client_verification_codes',
   'contract_cost_entries',
   'contract_line_measurements',
@@ -75,8 +81,10 @@ const NARROWED_TABLE_NAMES = [
   'market_items',
   'market_price_observations',
   'market_seed_book',
+  'organizations',
   'payment_requests',
   'project_assignments',
+  'sign_in_failures',
   'site_devices',
   'site_location_consents',
   'site_material_receipts',
@@ -88,7 +96,7 @@ const NARROWED_TABLE_NAMES = [
 
 /** Exactly what roles.sql grants — the shape a correctly applied database has. */
 function appliedGrant(): { tableLevel: boolean; columns: string[] } {
-  return { tableLevel: false, columns: grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')) };
+  return { tableLevel: false, columns: grantedUpdateColumnsOf(readFileSync(ROLES_SQL, 'utf8'), DESIGN_ENGAGEMENTS_TABLE) };
 }
 
 /** Exactly what roles.sql leaves metra_app with on `table`, after its revokes. */
@@ -108,31 +116,9 @@ function fixtureSql(catalogues: Catalogues) {
     }
     // The column read-back (./column-grants.ts): its table is a bound value.
     if (text.includes('has_column_privilege') && text.includes(') as granted')) {
-      const table = values.find(
-        (value) =>
-          value === 'contract_line_measurements' ||
-          value === 'contract_cost_entries' ||
-          value === 'contract_payment_claims' ||
-          value === 'client_verification_codes',
-      );
-      const columns = [...(declaredTables().get(String(table)) ?? [])];
-      if (table === 'client_verification_codes') {
-        return Promise.resolve(catalogues.codeColumns ?? columns.map((name) => ({ name, granted: name !== 'code_hash' })));
-      }
-      if (table === 'contract_cost_entries') {
-        return Promise.resolve(
-          catalogues.costEntryColumns ?? columns.map((name) => ({ name, granted: COST_ENTRY_UPDATE_COLUMNS.has(name) })),
-        );
-      }
-      if (table === 'contract_payment_claims') {
-        return Promise.resolve(
-          catalogues.claimColumns ?? columns.map((name) => ({ name, granted: CLAIM_UPDATE_COLUMNS.has(name) })),
-        );
-      }
-      return Promise.resolve(
-        catalogues.measurementColumns ??
-          columns.map((name) => ({ name, granted: name !== 'seq' })),
-      );
+      const table = String(values.find((value) => typeof value === 'string' && value in COLUMN_GRANTED));
+      const columns = [...(declaredTables().get(table) ?? [])];
+      return Promise.resolve(catalogues.columnGrants?.[table] ?? columns.map((name) => ({ name, granted: COLUMN_GRANTED[table](name) })));
     }
     if (text.includes('pg_policies')) {
       return Promise.resolve(
@@ -245,7 +231,7 @@ describe('verifyRlsApplied', () => {
     expect(columns).toContain('seq');
     const problems = await verifyRlsApplied(
       fixtureSql({
-        measurementColumns: columns.map((name) => ({ name, granted: name !== 'note' })),
+        columnGrants: { contract_line_measurements: columns.map((name) => ({ name, granted: name !== 'note' })) },
       }),
     );
     expect(problems).toEqual([
@@ -253,7 +239,7 @@ describe('verifyRlsApplied', () => {
         'rls/roles.sql grants insert on every other column only',
       '  - metra_app may NOT insert contract_line_measurements.note: every measurement write will fail with 42501',
     ]);
-    expect(await verifyRlsApplied(fixtureSql({ measurementColumns: [] }))).toEqual([
+    expect(await verifyRlsApplied(fixtureSql({ columnGrants: { contract_line_measurements: [] } }))).toEqual([
       '  - contract_line_measurements is not in this database at all. Run the migrations first.',
     ]);
   });
@@ -263,10 +249,9 @@ describe('verifyRlsApplied', () => {
     expect(columns).toEqual(expect.arrayContaining(['contract_id', 'recorded_by', 'amount']));
     const problems = await verifyRlsApplied(
       fixtureSql({
-        costEntryColumns: columns.map((name) => ({
-          name,
-          granted: name === 'contract_id' || (COST_ENTRY_UPDATE_COLUMNS.has(name) && name !== 'amount'),
-        })),
+        columnGrants: {
+          contract_cost_entries: columns.map((name) => ({ name, granted: name === 'contract_id' || (COST_ENTRY_UPDATE_COLUMNS.has(name) && name !== 'amount') })),
+        },
       }),
     );
     expect(problems).toEqual([
@@ -281,10 +266,9 @@ describe('verifyRlsApplied', () => {
     expect(columns).toEqual(expect.arrayContaining(['claimed_amount', 'actor_ip', 'status']));
     const problems = await verifyRlsApplied(
       fixtureSql({
-        claimColumns: columns.map((name) => ({
-          name,
-          granted: name === 'actor_ip' || (CLAIM_UPDATE_COLUMNS.has(name) && name !== 'resolved_by'),
-        })),
+        columnGrants: {
+          contract_payment_claims: columns.map((name) => ({ name, granted: name === 'actor_ip' || (CLAIM_UPDATE_COLUMNS.has(name) && name !== 'resolved_by') })),
+        },
       }),
     );
     expect(problems).toEqual([
@@ -292,6 +276,19 @@ describe('verifyRlsApplied', () => {
         "rls/roles.sql grants update on the answer's columns only",
       '  - metra_app may NOT update contract_payment_claims.resolved_by: every claim confirm or dismiss will fail with 42501',
     ]);
+  });
+
+  it.each([
+    { table: 'client_payment_claims', surplus: 'claimed_amount', needed: 'status', tail: 'every design-payment claim confirm or dismiss will fail with 42501' },
+    { table: 'api_keys', surplus: 'created_by', needed: 'revoked_at', tail: 'every API key revoke, and every member removal, will fail with 42501' },
+  ])('reports a $table column metra_app may update and must not, and one it needs (security batch 3, A5)', async ({ table, surplus, needed, tail }) => {
+    const columns = [...(declaredTables().get(table) ?? [])];
+    expect(columns).toEqual(expect.arrayContaining([surplus, needed]));
+    const granted = (name: string) => name === surplus || (COLUMN_GRANTED[table](name) && name !== needed);
+    const problems = await verifyRlsApplied(fixtureSql({ columnGrants: { [table]: columns.map((name) => ({ name, granted: granted(name) })) } }));
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toContain(`  - metra_app holds UPDATE on the column ${table}.${surplus}, which no `);
+    expect(problems[1]).toBe(`  - metra_app holds NO UPDATE on the column ${table}.${needed}: ${tail}`);
   });
 
   it('catches a policy file that never ran — the D7 failure shape, at the database', async () => {
@@ -352,7 +349,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('66 tables, 81 policies, 36 triggers, 102 functions');
+    expect(declaredCounts()).toBe('67 tables, 82 policies, 37 triggers, 105 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -361,17 +358,18 @@ describe('verifyRlsApplied', () => {
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
       'grants verified — design_engagements update narrowed to 19 columns with no ' +
-        'table-level update, and 24 narrowed table(s) (boqs, client_verification_codes, contract_cost_entries, ' +
+        'table-level update, and 28 narrowed table(s) (api_keys, boqs, client_payment_claims, client_verification_codes, contract_cost_entries, ' +
         'contract_line_measurements, contract_payment_claims, contract_payments, ' +
         'document_categories, engagement_document_comments, engagement_milestones, ' +
         'market_bulletins, market_categories, market_item_details, market_items, ' +
-        'market_price_observations, market_seed_book, payment_requests, project_assignments, ' +
-        'site_devices, site_location_consents, site_material_receipts, site_notes, site_photos, ' +
+        'market_price_observations, market_seed_book, organizations, payment_requests, project_assignments, ' +
+        'sign_in_failures, site_devices, site_location_consents, site_material_receipts, site_notes, site_photos, ' +
         'site_visits, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them; contract_line_measurements insertable on every ' +
         'column but seq; contract_cost_entries updatable on its 15 entry and void columns only; ' +
         'contract_payment_claims updatable on its 5 answer columns only; ' +
-        'client_verification_codes readable on every column but code_hash; no truncate, ' +
+        'client_verification_codes readable on every column but code_hash; client_payment_claims updatable on its 5 ' +
+        'answer columns only; api_keys updatable on its 2 revoke columns only; no truncate, ' +
         'references, trigger for metra_app on any table; no policy outside the manifest.',
     );
   });

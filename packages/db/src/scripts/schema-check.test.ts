@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 151 declared, 151 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 413 declared, 413 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 102 declared, 102 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 152 declared, 152 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 415 declared, 415 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 105 declared, 105 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,7 +202,7 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 102 declared, 102 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 105 declared, 105 NOT FOUND');
   });
 });
 
@@ -251,9 +251,9 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // enforce_client_code_guarded. 100 with the H3 fix round's one contract
     // picker app_delivery_current_contract and the client home's internal
     // helpers app_contract_terminated_at and app_home_flow_source. 102 with
-    // client codes DB step D's app_home_code_unsent_by_token (a token
-    // function) and app_client_codes_reset (the studio's reset).
-    expect(declaredFunctions().size).toBe(102);
+    // step D's app_home_code_unsent_by_token and app_client_codes_reset. 105
+    // with security batch 3: +2 sign-in pause, +2 membership role writer, -enforce_same_org.
+    expect(declaredFunctions().size).toBe(105);
   });
 });
 

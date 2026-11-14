@@ -14,14 +14,11 @@ import { RLS_APPLY_ORDER } from './manifest';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/rls
 
-const RETIRED_DROP =
-  'drop function if exists public.app_delivery_respond_by_token(text, text, text, text, text, text);';
-const SEVEN_ARGUMENT_CREATE =
-  'create or replace function public.app_delivery_respond_by_token(\n  p_hash text,\n  p_action text,\n  p_expected_issue_at timestamptz,';
+const RETIRED_DROP = 'drop function if exists public.app_delivery_respond_by_token(text, text, text, text, text, text);';
+const SEVEN_ARGUMENT_CREATE = 'create or replace function public.app_delivery_respond_by_token(\n  p_hash text,\n  p_action text,\n  p_expected_issue_at timestamptz,';
 
 /** The six-argument respond signature in any spelling: case, quotes, spaces and line breaks. */
-const SIX_ARGUMENT_SIGNATURE =
-  /"?app_delivery_respond_by_token"?\s*\(\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*\)/gi;
+const SIX_ARGUMENT_SIGNATURE = /"?app_delivery_respond_by_token"?\s*\(\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*,\s*text\s*\)/gi;
 
 /** A CREATE of the respond function and its parameter list, up to the closing parenthesis. */
 const RESPOND_CREATE = /create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?"?app_delivery_respond_by_token"?\s*\(([^)]*)\)/gi;
@@ -110,34 +107,28 @@ describe('the unbound home contract page reads stay dropped (step D)', () => {
 describe('the code functions that took a code id stay dropped (step D)', () => {
   const RETIRED = [
     {
-      name: 'app_home_code_issue_by_token',
-      oldArguments: 'text, uuid, text, text, text, text, text',
+      name: 'app_home_code_issue_by_token', oldArguments: 'text, uuid, text, text, text, text, text',
       createOpening: 'create or replace function public.app_home_code_issue_by_token(\n  p_hash text,\n  p_purpose text,',
     },
     {
-      name: 'app_client_code_check',
-      oldArguments: 'uuid, uuid, uuid, text, text, text',
+      name: 'app_client_code_check', oldArguments: 'uuid, uuid, uuid, text, text, text',
       createOpening: 'create or replace function public.app_client_code_check(\n  p_engagement_id uuid,\n  p_org_id uuid,\n  p_purpose text,',
     },
     {
-      name: 'app_home_contract_ack_by_token',
-      oldArguments: 'text, uuid, uuid, text, text, text, text, text',
+      name: 'app_home_contract_ack_by_token', oldArguments: 'text, uuid, uuid, text, text, text, text, text',
       createOpening: 'create or replace function public.app_home_contract_ack_by_token(\n  p_hash text,\n  p_contract_id uuid,\n  p_code_hash text,',
     },
     {
-      name: 'app_home_variation_respond_by_token',
-      oldArguments: 'text, uuid, text, uuid, text, text, text, text',
+      name: 'app_home_variation_respond_by_token', oldArguments: 'text, uuid, text, uuid, text, text, text, text',
       createOpening:
         'create or replace function public.app_home_variation_respond_by_token(\n  p_hash text,\n  p_variation_id uuid,\n  p_decision text,\n  p_code_hash text,',
     },
     {
-      name: 'app_home_claim_request_by_token',
-      oldArguments: 'text, uuid, uuid, text, text, text, text, text',
+      name: 'app_home_claim_request_by_token', oldArguments: 'text, uuid, uuid, text, text, text, text, text',
       createOpening: 'create or replace function public.app_home_claim_request_by_token(\n  p_hash text,\n  p_request_id uuid,\n  p_code_hash text,',
     },
     {
-      name: 'app_home_claim_design_payment_by_token',
-      oldArguments: 'text, text, uuid, text, text, text, text, text',
+      name: 'app_home_claim_design_payment_by_token', oldArguments: 'text, text, uuid, text, text, text, text, text',
       createOpening:
         'create or replace function public.app_home_claim_design_payment_by_token(\n  p_hash text,\n  p_milestone_kind text,\n  p_code_hash text,',
     },
@@ -154,5 +145,14 @@ describe('the code functions that took a code id stay dropped (step D)', () => {
     const mentions = RLS_APPLY_ORDER.flatMap((file) => [...rlsFile(file).matchAll(signatureOf(name, oldArguments))].map(() => file));
     expect(mentions).toEqual(['functions/75-client-home.sql']);
     expect(rlsFile('roles.sql')).not.toMatch(signatureOf(name, oldArguments));
+  });
+});
+
+// Security batch 3 (A4) DROPS enforce_same_org(), which no table ever attached: every file apply-rls runs names it once, in its DROP.
+describe('enforce_same_org stays dropped (security batch 3, A4)', () => {
+  it('is named once across the manifest, by its DROP in 00-org-context.sql, and never in roles.sql', () => {
+    const mentions = RLS_APPLY_ORDER.flatMap((file) => [...rlsFile(file).matchAll(/.*enforce_same_org.*/gi)].map((match) => `${file}: ${match[0]}`));
+    expect(mentions).toEqual(['functions/00-org-context.sql: drop function if exists public.enforce_same_org();']);
+    expect(rlsFile('roles.sql')).not.toMatch(/enforce_same_org/i);
   });
 });
