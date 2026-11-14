@@ -6,54 +6,17 @@
 -- do not reorder the manifest, and never split inside a function.
 -- rls/**.sql is exempt from the 150-line rule (stack-profile.md).
 
--- DEPRECATED for hot paths — prefer the declarative composite FK from
--- sameOrgFk() (packages/db/src/schema/org-ref.ts): (org_id, <name>_id) ->
--- target(org_id, id) enforces same-org at the DB with no per-row trigger.
--- Reserve enforce_same_org for non-composite / cross-schema targets only.
---
--- Reusable trigger function for composite same-org foreign keys. Not attached to
--- any table in P0 (no child business tables exist yet), but shipped so P1+ child
--- tables can guarantee a referenced row lives in the same org as the referrer.
---
--- Usage on a future table:
---   create trigger trg_lines_same_org
---     before insert or update on public.proposal_lines
---     for each row execute function enforce_same_org('proposals', 'proposal_id');
---   -- args: [0] referenced table (public schema), [1] this table's FK column.
-
-create or replace function public.enforce_same_org()
-returns trigger
-language plpgsql
-as $$
-declare
-  ref_table text := TG_ARGV[0];
-  fk_column text := TG_ARGV[1];
-  fk_value  uuid;
-  ref_org   uuid;
-begin
-  fk_value := (to_jsonb(NEW) ->> fk_column)::uuid;
-  if fk_value is null then
-    return NEW;
-  end if;
-
-  execute format('select org_id from public.%I where id = $1', ref_table)
-    into ref_org
-    using fk_value;
-
-  if ref_org is null then
-    raise exception
-      'enforce_same_org: referenced % row % not found', ref_table, fk_value;
-  end if;
-
-  if ref_org <> NEW.org_id then
-    raise exception
-      'enforce_same_org: cross-org reference blocked on %.% -> %',
-      TG_TABLE_NAME, fk_column, ref_table;
-  end if;
-
-  return NEW;
-end
-$$;
+-- RETIRED (security batch 3, A4): the per-row same-org trigger function. No
+-- table ever attached it: same-org references are the composite foreign keys
+-- of sameOrgFk() (packages/db/src/schema/org-ref.ts), which need no trigger.
+-- It was a SECURITY INVOKER function with no pinned search_path (a Supabase
+-- advisor finding) and nothing called it, so it is dropped rather than
+-- pinned. apply-rls never drops a function on its own, so this DROP is what
+-- removes it from a database provisioned before; `if exists` keeps a re-run
+-- quiet. Without CASCADE on purpose: were a trigger ever attached to it by
+-- hand, the DROP fails and this file rolls back whole, instead of silently
+-- removing that trigger.
+drop function if exists public.enforce_same_org();
 
 -- Bootstrap lookup for requireOrg: resolve which org(s) the CURRENT authenticated
 -- user belongs to BEFORE any org context exists. SECURITY DEFINER runs as the
