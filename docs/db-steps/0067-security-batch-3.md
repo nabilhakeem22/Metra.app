@@ -10,10 +10,10 @@ The database step of security fix round, batch 3: migration
 step D ([its runbook](0066-client-codes-step-d.md)): production then holds 67
 migrations, 81 policies (15 of them restrictive), 36 triggers and 102
 functions; this step leaves it at 68, 82 (15), 37 and 105. It is validated on
-branch `validate/sec-batch-3-db`, whose code is pinned at **`476ceebc`**: the
+branch `validate/sec-batch-3-db`, whose code is pinned at **`3ab5710b`**: the
 branch's last code commit (every commit after it changes only files under
 `docs/`). That branch is `main` at `73d3433d` (batch 3 push 1 merged) plus the
-five commits of push 2.
+commits of push 2.
 
 **Not rehearsed on a database yet.** The runbooks before this one were each
 run end to end on a local PostgreSQL 17 before the owner saw them. This one
@@ -48,7 +48,9 @@ in this branch's app code needs the new database before it is merged.
   the same; and the new table and its two functions have no caller until push
   3 of this batch.
 
-**What it changes.** No existing row is updated and nothing is backfilled.
+**What it changes.** No existing row is updated and nothing is backfilled,
+except by the optional step 4 (f), which revokes API keys a removed member
+left live.
 
 | Object | Change |
 |---|---|
@@ -73,7 +75,7 @@ git fetch origin
 git switch --detach origin/validate/sec-batch-3-db
 Copy-Item docs\db-steps\0067-security-batch-3.md $HOME\Desktop\runbook-0067.md
 git log --oneline -1    # a commit that changes only docs/ (this runbook); CI green on it
-git diff --stat 476ceebc HEAD    # MUST list only files under docs/: the code is exactly what CI proved (476ceebc)
+git diff --stat 3ab5710b HEAD    # MUST list only files under docs/: the code is exactly what CI proved (3ab5710b)
 git log --oneline HEAD..origin/main -- packages/db    # MUST print nothing: every database change on main is already in this code
 git diff --name-only 73d3433d HEAD -- packages/db/migrations    # MUST print exactly the three 0067 files below
 ```
@@ -87,7 +89,7 @@ packages/db/migrations/meta/_journal.json
 ```
 
 Read the rest from the copy on your Desktop. Three STOPs, tell the lead in
-each case: the `git diff --stat 476ceebc HEAD` lists a file outside `docs/`;
+each case: the `git diff --stat 3ab5710b HEAD` lists a file outside `docs/`;
 the `git log ... -- packages/db` prints any line; the migrations diff prints
 anything else.
 
@@ -125,7 +127,9 @@ tell the lead (step 3 would fail on it, and roll that file back).
 
 ```sql
 -- 0067 step 2 (c): what depends on the function this step drops. Run this one alone.
-select count(*) from pg_depend where refobjid = 'public.enforce_same_org()'::regprocedure;
+select count(*) from pg_depend
+ where refclassid = 'pg_proc'::regclass
+   and refobjid = 'public.enforce_same_org()'::regprocedure;
 ```
 
 (d) The grants now: 12 rows, `granted` true on every row except
@@ -196,7 +200,15 @@ if ($LASTEXITCODE -eq 0) { npm run assert-schema-applied -w @metra/db }
   first of all: `message: 'function public.enforce_same_org() does not exist, skipping',`.
 
 Only a line that starts `Migration failed:` or `apply-rls failed:` is a
-failure. Expected:
+failure.
+
+**If `db:apply-rls` ends red AFTER printing `RLS, roles and functions
+applied.`** the database IS changed: every file was applied and only the
+read-back that follows disagreed, so the two `verified` lines are replaced by
+a list of problems. The live site is expected to keep working. Run
+`npm run db:apply-rls` once more. If it is green, carry on. If it is red
+again, do step 5 anyway: if the site works, stop there and tell the lead the
+problem lines; if step 5 fails, run the undo below. Expected:
 
 - `db:migrate` exits 0 and prints `Migrations applied.`. Step 4 (a) is its count.
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
@@ -302,7 +314,12 @@ log open in a second window (`npx wrangler tail metra-web` from
 - sign in, and open the **Team** page (الفريق);
 - as owner, change a test member's role, then change it back;
 - open a client's **Documents** tab and delete a test upload;
-- open **Settings**, then API keys: the list loads; mint a test key and revoke it.
+- open **Settings**, then API keys: the list loads; mint a test key and revoke it;
+- invite a test address, accept the invitation in a private window, then
+  remove that member (the two writes that take the trigger's joining path
+  and its removal path);
+- with a second test account, create a new studio (the trigger's founding
+  path), then leave it as it is.
 
 Expected: each one works as before, and the log shows no `MT150`, no `42501`,
 no `42883` and no `mutateInOrg failed`. **If anything fails:** do not merge.
