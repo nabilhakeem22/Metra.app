@@ -307,8 +307,10 @@ $$;
 -- ONLY FOR metra_app. The connection role (migrations, the seed's fixtures,
 -- the owner's SQL, the fixture purge) writes as itself with no session, so it
 -- is not asked; the app always writes as metra_app (SET LOCAL ROLE). SECURITY
--- INVOKER, so `current_user` is the role that wrote. No app path maps MT150:
--- every one refuses earlier with its own code, so it reaching the app is a bug.
+-- INVOKER, so `current_user` is the role that wrote. Every app path refuses
+-- earlier with its own code. The one way MT150 reaches the app honestly is a
+-- race: the caller was demoted between reading their role and writing. The
+-- team cores answer that as `forbidden` (lib/team/core/membership-write.ts).
 --
 -- WHAT IT DOES NOT STOP: arbitrary SQL that already runs as metra_app and sets
 -- the session GUCs itself. Like the actor check (functions/35-execution.sql),

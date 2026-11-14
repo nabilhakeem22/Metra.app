@@ -91,3 +91,18 @@ const OWNER_ONLY_COLUMN_VIOLATION = 'MT120';
 export function isOwnerOnlyColumnViolation(error: unknown): boolean {
   return sqlstateOf(error) === OWNER_ONLY_COLUMN_VIOLATION;
 }
+
+/**
+ * Metra's reserved SQLSTATE MT150, raised by `enforce_membership_role_writer`
+ * (`rls/functions/00-org-context.sql`) when a membership is written by someone
+ * who is not an owner or admin of the org, or an owner's row by someone who is
+ * not an owner. The app gates first, on the role the request was opened with,
+ * so this is the database refusing a write that got past the app because that
+ * role changed under the request (an owner demoted while his own role change
+ * was in flight): a refusal with a name, not a defect.
+ */
+const MEMBERSHIP_WRITER_VIOLATION = 'MT150';
+
+export function isMembershipWriterViolation(error: unknown): boolean {
+  return sqlstateOf(error) === MEMBERSHIP_WRITER_VIOLATION;
+}

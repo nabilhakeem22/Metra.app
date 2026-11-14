@@ -13,8 +13,10 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/headers', async () => ({ cookies: async () => (await import('@/test/otp-route-doubles')).cookieStore }));
 vi.mock('@supabase/ssr', async () => ({ createServerClient: (await import('@/test/otp-route-doubles')).createServerClient }));
 vi.mock('@/lib/db/context', async () => ({ withUserContext: (await import('@/test/otp-route-doubles')).withUserContext }));
+// The sign-in pause's counter (lib/auth/sign-in-lockout.ts): nobody is paused here, and its store is bound.
+vi.mock('@/lib/auth/sign-in-failures-db', () => ({ readSignInPauseSeconds: async () => null, recordWrongSignInCode: async () => null }));
 const runtime = vi.hoisted(() => ({ env: {} as Record<string, unknown> }));
-vi.mock('@/lib/cf/context', () => ({ isCloudflareRuntime: () => true, cfEnv: () => runtime.env }));
+vi.mock('@/lib/cf/context', () => ({ isCloudflareRuntime: () => true, cfEnv: () => ({ HYPERDRIVE: { connectionString: 'hyperdrive-double' }, ...runtime.env }) }));
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ref.supabase.test');
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fake-anon-key');
 

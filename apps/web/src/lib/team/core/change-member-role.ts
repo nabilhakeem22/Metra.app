@@ -9,18 +9,21 @@ import type { OrgContext } from '@/lib/db/context';
 import { closeSiteAccessOf } from '@/lib/site/close-site-access';
 import { mayJoinSiteTeam } from '@/lib/site/access';
 import { isMemberRole, lockedMembershipTarget } from './membership-target';
+import { writeMembership } from './membership-write';
 
-/** Writes the new role onto the membership and audits the change. */
+/** Writes the new role onto the membership and audits the change. A caller demoted under the request is `forbidden`. */
 async function writeRoleChange(
   tx: MetraDb,
   audit: (entry: AuditEntry) => Promise<void>,
   target: { id: string; role: MemberRole },
   role: MemberRole,
 ): Promise<void> {
-  await tx
-    .update(memberships)
-    .set({ role, updatedAt: new Date() })
-    .where(eq(memberships.id, target.id));
+  await writeMembership(() =>
+    tx
+      .update(memberships)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(memberships.id, target.id)),
+  );
   await audit({
     entity: 'membership',
     entityId: target.id,

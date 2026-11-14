@@ -40,6 +40,10 @@ export type CommonActionCode =
   // Too many code CHECKS (our throttle or Supabase's): the code held is still
   // good, so wait and type it again, never ask for a new one (fix round 2, F6).
   | 'otp_verify_rate_limited'
+  // Ten wrong sign-in codes for one address or phone inside an hour: checking a
+  // code for it is paused until that hour ends (lib/auth/sign-in-lockout.ts).
+  // `minutes` is the wait, rounded up; a new code does not lift it.
+  | 'otp_sign_in_paused'
   // A member asked for an expensive studio read too often in a short time
   // (lib/cf/studio-read-rate-limit.ts): wait a minute and ask again.
   | 'rate_limited'

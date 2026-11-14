@@ -1,7 +1,8 @@
 // Barrel for the team cores. The single 185-line `core.ts` was split by
 // mutation: `change-member-role`, `remove-member` and `accept-invite`, with the
-// shared opening of the first two in `membership-target`. Every
-// `@/lib/team/core` import site keeps resolving unchanged.
+// shared opening of the first two in `membership-target` and the database's
+// refusal of their write in `membership-write`. Every `@/lib/team/core` import
+// site keeps resolving unchanged.
 //
 // PURE cores for the team mutations — no next/*, no getSessionUser, no cookies,
 // no server-only. Take an OrgContext + validated input; the 'use server'
