@@ -125,6 +125,30 @@ describe('the layout keeps the contract the stylesheets read', () => {
   });
 });
 
+// next/font sizes a stand-in from the font file's default weight. Manrope is
+// one variable file whose default is 200, so the generated stand-in is 3 to 8%
+// narrower than the text that replaces it. The layout turns that off for
+// Manrope and names a hand-written one carrying the metrics production served.
+describe("Manrope's stand-in while it loads keeps the metrics production served", () => {
+  const STAND_IN_FAMILY = 'Manrope Fallback';
+  const standIn = readFileSync(join(FONTS_DIRECTORY, 'manrope-fallback.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('the layout turns the generated stand-in off for Manrope and names the hand-written one', () => {
+    expect(layoutSource.match(/adjustFontFallback:\s*false/g)).toHaveLength(1);
+    expect(layoutSource).toContain(`fallback: ['${STAND_IN_FAMILY}']`);
+    expect(layoutSource).toContain("import '../fonts/manrope-fallback.css';");
+  });
+
+  it('the stylesheet defines that family once, from Arial, with the four metrics', () => {
+    expect(standIn.match(/@font-face/g)).toHaveLength(1);
+    expect(standIn).toContain(`font-family: '${STAND_IN_FAMILY}';`);
+    expect(standIn).toContain("src: local('Arial');");
+    for (const metric of ['ascent-override: 103.31%;', 'descent-override: 29.07%;', 'line-gap-override: 0%;', 'size-adjust: 103.19%;']) {
+      expect(standIn).toContain(metric);
+    }
+  });
+});
+
 describe('no build-time request for a font', () => {
   it('no module or stylesheet names the Google font loader or its hosts', () => {
     const stylesheets = readdirSync(SOURCE_DIRECTORY, { recursive: true, encoding: 'utf8' })

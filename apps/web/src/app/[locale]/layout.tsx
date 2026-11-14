@@ -8,6 +8,7 @@ import { dirFor, isLocale } from '@/i18n/routing';
 import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '../globals.css';
+import '../fonts/manrope-fallback.css';
 
 // Both families are files under app/fonts (the Fontsource builds of the Google
 // Fonts files, SIL OFL 1.1, licence beside each family), so a build fetches
@@ -17,6 +18,11 @@ import '../globals.css';
 // Manrope is a single subset, so it carries the Latin unicode-range Google
 // served with it. It is ONE variable file (weight axis 200 to 800), as Google
 // served it: `400 700` is the span the app uses, not four downloads.
+//
+// Its stand-in while it loads is written by hand (fonts/manrope-fallback.css).
+// next/font would size one from the file's DEFAULT weight, which for this
+// variable file is 200: a stand-in 3 to 8% narrower than the text that replaces
+// it, so lines re-wrap when Manrope arrives.
 const manrope = localFont({
   src: [{ path: '../fonts/manrope/manrope-latin-wght-normal.woff2', weight: '400 700', style: 'normal' }],
   declarations: [
@@ -28,6 +34,8 @@ const manrope = localFont({
   ],
   variable: '--font-manrope',
   display: 'swap',
+  adjustFontFallback: false,
+  fallback: ['Manrope Fallback'],
 });
 
 // Loaded weights = used weights. The app uses normal / medium / semibold /
