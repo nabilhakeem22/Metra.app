@@ -229,6 +229,154 @@ as $$
     );
 $$;
 
+-- ===========================================================================
+-- Who may write a membership's ROLE (security batch 3, A5). The memberships
+-- policy (policies/00-core.sql) says WHICH ORG a row may be written in; it
+-- says nothing about the role column, so any member could write any role,
+-- owner included, and the bootstrap insert was not held to the invitation's
+-- role. The app has always enforced both (lib/team/core); these two functions
+-- say it again at the database, behind trg_memberships_role_writer.
+-- ===========================================================================
+
+-- Who is writing a membership row, read as the owner so RLS cannot hide it.
+-- GUC-scoped, no argument: it answers only for the session's own org, user and
+-- email, so it never widens what the caller can learn.
+--   caller_role      the session user's role in the current org, or NULL
+--   org_has_members  whether the current org has any member yet
+--   invited_role     the role of the invitation the session user CLAIMED IN THIS
+--                    TRANSACTION (app_claim_invitation stamps accepted_at with
+--                    now(), the transaction's start), or NULL. An invitation
+--                    accepted in an earlier transaction authorises nothing.
+create or replace function public.app_membership_writer_facts()
+returns table (caller_role text, org_has_members boolean, invited_role text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    (select m.role::text from public.memberships m
+      where m.org_id  = nullif(current_setting('app.current_org_id', true), '')::uuid
+        and m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid),
+    exists (select 1 from public.memberships m
+      where m.org_id = nullif(current_setting('app.current_org_id', true), '')::uuid),
+    (select i.role::text from public.invitations i
+      where i.org_id      = nullif(current_setting('app.current_org_id', true), '')::uuid
+        and i.status      = 'accepted'
+        and i.accepted_by = nullif(current_setting('app.current_user_id', true), '')::uuid
+        and lower(i.email) = lower(nullif(current_setting('app.current_user_email', true), ''))
+        and i.accepted_at = now()
+      order by i.accepted_at desc limit 1);
+$$;
+
+-- Same-transaction lockdown: a NEW function is executable by PUBLIC from the
+-- moment CREATE commits, and roles.sql runs several files later. The trigger
+-- function below calls it AS THE CALLER, so metra_app keeps EXECUTE; the grant
+-- is guarded because on a fresh database roles.sql, which creates that role,
+-- has not run yet.
+revoke all on function public.app_membership_writer_facts() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.app_membership_writer_facts() from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_membership_writer_facts() to metra_app;
+  end if;
+end
+$$;
+
+-- The rule, on every membership INSERT, UPDATE and DELETE (SQLSTATE MT150,
+-- message `membership_write_refused`, the reason in DETAIL):
+--   * a membership never moves to another studio or person (org_id, user_id);
+--   * an UPDATE that leaves the role as it was is not judged;
+--   * a NON-MEMBER may insert only their OWN row: as `owner` when the studio
+--     has no member yet (createOrg), otherwise with exactly the role of the
+--     invitation claimed in this transaction (acceptInvite);
+--   * anyone else must be an owner or admin of the studio to grant, change or
+--     remove a role, and an OWNER to grant owner, demote an owner or remove one.
+-- The last-owner rule stays the app's, under its advisory lock.
+--
+-- ONLY FOR metra_app. The connection role (migrations, the seed's fixtures,
+-- the owner's SQL, the fixture purge) writes as itself with no session, so it
+-- is not asked; the app always writes as metra_app (SET LOCAL ROLE). SECURITY
+-- INVOKER, so `current_user` is the role that wrote. No app path maps MT150:
+-- every one refuses earlier with its own code, so it reaching the app is a bug.
+--
+-- WHAT IT DOES NOT STOP: arbitrary SQL that already runs as metra_app and sets
+-- the session GUCs itself. Like the actor check (functions/35-execution.sql),
+-- it is a guard against app bugs and against SQL injected into one statement,
+-- not a boundary against the app role.
+create or replace function public.enforce_membership_role_writer()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_facts   record;
+  v_old     text;
+  v_new     text;
+  v_refusal text;
+  v_session uuid := nullif(current_setting('app.current_user_id', true), '')::uuid;
+begin
+  if current_user <> 'metra_app' then
+    return coalesce(NEW, OLD);
+  end if;
+  if TG_OP <> 'INSERT' then v_old := OLD.role::text; end if;
+  if TG_OP <> 'DELETE' then v_new := NEW.role::text; end if;
+  if TG_OP = 'UPDATE' then
+    if NEW.org_id <> OLD.org_id or NEW.user_id <> OLD.user_id then
+      v_refusal := 'a membership never moves to another studio or person';
+    elsif v_new = v_old then
+      return NEW;
+    end if;
+  end if;
+  if v_refusal is null then
+    select * into v_facts from public.app_membership_writer_facts();
+    if TG_OP = 'INSERT' and v_facts.caller_role is null then
+      if NEW.user_id is distinct from v_session then
+        v_refusal := 'a non-member may add only their own membership';
+      elsif not v_facts.org_has_members and v_new <> 'owner' then
+        v_refusal := 'the first member of a studio is its owner';
+      elsif v_facts.org_has_members and v_facts.invited_role is distinct from v_new then
+        v_refusal := 'a joining member takes the role of the invitation claimed in this transaction';
+      end if;
+    elsif coalesce(v_facts.caller_role, '') not in ('owner', 'admin') then
+      v_refusal := 'only an owner or admin may grant, change or remove a role';
+    elsif (coalesce(v_old = 'owner', false) or coalesce(v_new = 'owner', false))
+          and v_facts.caller_role <> 'owner' then
+      v_refusal := 'only an owner may grant or remove owner';
+    end if;
+  end if;
+  if v_refusal is not null then
+    raise exception 'membership_write_refused' using errcode = 'MT150', detail = v_refusal;
+  end if;
+  return coalesce(NEW, OLD);
+end
+$$;
+
+-- Same-transaction lockdown, as above.
+revoke all on function public.enforce_membership_role_writer() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on function public.enforce_membership_role_writer() from %I', r);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.enforce_membership_role_writer() to metra_app;
+  end if;
+end
+$$;
+
 -- Atomically claim a pending invitation for the session user (marks it accepted
 -- with accepted_by=current user). Returns the id iff it was claimed. Guarded to
 -- the current org + the invite email matching the session email. VOLATILE.

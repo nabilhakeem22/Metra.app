@@ -112,6 +112,18 @@ create policy org_isolation on public.memberships
     )
   );
 
+-- Security batch 3 (A5): the policy above says in which org a membership may
+-- be written, not WHICH ROLE. This trigger does (SQLSTATE MT150 otherwise; the
+-- rule is on enforce_membership_role_writer in functions/00-org-context.sql):
+-- only an owner or admin grants, changes or removes a role, only an owner
+-- touches owner, and a bootstrap insert takes `owner` in an empty studio or
+-- the role of the invitation claimed in the same transaction. It judges
+-- metra_app only; the connection role is not asked.
+drop trigger if exists trg_memberships_role_writer on public.memberships;
+create trigger trg_memberships_role_writer
+  before insert or update or delete on public.memberships
+  for each row execute function public.enforce_membership_role_writer();
+
 -- files
 alter table public.files enable row level security;
 alter table public.files force  row level security;

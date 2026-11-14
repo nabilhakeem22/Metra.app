@@ -498,6 +498,16 @@ grant execute on function public.enforce_cost_entry_guarded() to metra_app;
 revoke execute on function public.enforce_cost_entry_guarded() from public;
 grant execute on function public.enforce_actor_is_session_user() to metra_app;
 revoke execute on function public.enforce_actor_is_session_user() from public;
+-- Security batch 3 (A5): the membership role writer's trigger function, an
+-- INVOKER that judges metra_app's writes, and the definer fact reader it calls
+-- AS THE CALLER, so metra_app keeps EXECUTE on both and nobody else has it.
+-- Both are also locked down in place, right after their CREATE
+-- (functions/00-org-context.sql); on a fresh database that file runs before
+-- this role exists, so these two grants are the ones that take effect there.
+grant execute on function public.app_membership_writer_facts() to metra_app;
+revoke execute on function public.app_membership_writer_facts() from public;
+grant execute on function public.enforce_membership_role_writer() to metra_app;
+revoke execute on function public.enforce_membership_role_writer() from public;
 -- Stage 3, the site diary (0064). The write gate and the manager gate are
 -- SECURITY DEFINER and called by the restrictive policies and the guards AS
 -- the caller, so metra_app keeps EXECUTE and nobody else has it; so do the
@@ -1018,6 +1028,8 @@ begin
       execute format('revoke execute on function public.app_client_code_consume(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_contract_terminated_at(uuid, uuid) from %I', r);
       execute format('revoke execute on function public.app_home_flow_source(uuid) from %I', r);
+      execute format('revoke execute on function public.app_membership_writer_facts() from %I', r);
+      execute format('revoke execute on function public.enforce_membership_role_writer() from %I', r);
       execute format('revoke execute on function public.app_sign_in_pause_seconds(text) from %I', r);
       execute format('revoke execute on function public.app_sign_in_failure_record(text) from %I', r);
     end if;

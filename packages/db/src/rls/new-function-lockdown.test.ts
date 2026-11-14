@@ -177,6 +177,9 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_request_by_token(text, uuid, text, text, text, text, text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_home_claim_design_payment_by_token(text, text, text, text, text, text, text)', grantsApp: true },
   { file: 'functions/75-client-home.sql', signature: 'public.app_client_home_target_by_token(text, text)', grantsApp: true },
+  // Security batch 3 (A5): the membership role writer's trigger function and the fact reader it calls as the caller.
+  { file: 'functions/00-org-context.sql', signature: 'public.app_membership_writer_facts()', grantsApp: true },
+  { file: 'functions/00-org-context.sql', signature: 'public.enforce_membership_role_writer()', grantsApp: true },
   // Security batch 3 (P2): the sign-in pause's read and its counter, called by the connection role only.
   { file: 'functions/90-sign-in.sql', signature: 'public.app_sign_in_pause_seconds(text)', grantsApp: false },
   { file: 'functions/90-sign-in.sql', signature: 'public.app_sign_in_failure_record(text)', grantsApp: false },
