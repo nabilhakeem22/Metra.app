@@ -58,20 +58,27 @@ $$;
 -- Counts one wrong code; answers the pause the identifier is now in (seconds)
 -- or NULL. A malformed hash is refused (22023) before anything is written.
 --
--- NO CRON. Each call first removes at most 50 rows of OTHER identifiers whose
--- window ended, oldest first, so the table holds the identifiers that failed
--- in the last hour plus a backlog that shrinks by up to 50 rows per recorded
--- failure. The 50 are picked ONCE, in a materialized CTE: as an IN subquery a
--- nested-loop plan re-ran the pick per row and deleted past the cap
--- (functions/75-client-home.sql measured that on its own purge). `skip
--- locked`, so the purge waits on nothing; the caller's own row is never among
--- the 50, the upsert below resets it instead.
+-- THE UPSERT comes FIRST and is one statement, so two wrong codes typed at
+-- once for one identifier are both counted. A window that ended starts again
+-- at 1. The count stops at 100 (the CHECK's ceiling); the pause does not
+-- depend on it past 10. `lock_timeout` 2 s: a call that cannot take its row
+-- fails with 55P03 instead of holding a sign-in request, and the app carries on.
 --
--- THE UPSERT is one statement, so two wrong codes typed at once for one
--- identifier are both counted. A window that ended starts again at 1. The
--- count stops at 100 (the CHECK's ceiling); the pause does not depend on it
--- past 10. `lock_timeout` 2 s: a call that cannot take its row fails with
--- 55P03 instead of holding a sign-in request, and the app carries on.
+-- NO CRON. After counting, each call removes at most 50 rows of OTHER
+-- identifiers whose window ended, oldest first, so the table holds the
+-- identifiers that failed in the last hour plus a backlog that shrinks by up
+-- to 50 rows per recorded failure. The 50 are picked ONCE, in a materialized
+-- CTE: as an IN subquery a nested-loop plan re-ran the pick per row and
+-- deleted past the cap (functions/75-client-home.sql measured that on its own
+-- purge). The caller's own row is never among the 50.
+--
+-- THE ORDER IS THE DEADLOCK FIX, together with `skip locked`. Purging first,
+-- two calls whose stale rows crossed each deleted the other's row and then
+-- waited on it in their upsert: a cycle, ended by Postgres after a second
+-- with one wrong code uncounted. Counting first, a call can wait only in its
+-- first statement, while it holds nothing; its purge then skips every locked
+-- row and waits on nothing. This holds for a call that is its own transaction,
+-- which is how the app calls it.
 create or replace function public.app_sign_in_failure_record(p_identifier_hash text)
 returns integer
 language plpgsql
@@ -87,6 +94,15 @@ begin
     raise exception 'sign_in_failure_hash_malformed' using errcode = '22023';
   end if;
 
+  insert into public.sign_in_failures as f (identifier_hash, window_started_at, failures)
+  values (p_identifier_hash, now(), 1)
+  on conflict (identifier_hash) do update
+     set failures = case when f.window_started_at <= now() - interval '1 hour' then 1
+                         else least(f.failures + 1, 100) end,
+         window_started_at = case when f.window_started_at <= now() - interval '1 hour' then now()
+                                  else f.window_started_at end
+  returning * into v_row;
+
   with stale as materialized (
     select o.identifier_hash
       from public.sign_in_failures o
@@ -99,15 +115,6 @@ begin
   delete from public.sign_in_failures s
    using stale d
    where s.identifier_hash = d.identifier_hash;
-
-  insert into public.sign_in_failures as f (identifier_hash, window_started_at, failures)
-  values (p_identifier_hash, now(), 1)
-  on conflict (identifier_hash) do update
-     set failures = case when f.window_started_at <= now() - interval '1 hour' then 1
-                         else least(f.failures + 1, 100) end,
-         window_started_at = case when f.window_started_at <= now() - interval '1 hour' then now()
-                                  else f.window_started_at end
-  returning * into v_row;
 
   if v_row.failures >= 10 then
     return greatest(1, ceil(extract(epoch from (v_row.window_started_at + interval '1 hour' - now())))::integer);
