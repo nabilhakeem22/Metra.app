@@ -28,8 +28,8 @@ async function sentence(locale: 'en' | 'ar-EG', seconds: number): Promise<string
 afterEach(() => vi.restoreAllMocks());
 
 describe('the sign-in pause sentence', () => {
-  const EN = 'Too many wrong codes were typed for this account, so signing in to it is paused. Try again in';
-  const AR = 'اتكتب كود غلط مرات كتير للحساب ده، فتسجيل الدخول بيه متوقف مؤقتًا. جرّب تاني بعد';
+  const EN = 'Too many wrong codes were typed for this email or phone, so signing in with it is paused. Try again in';
+  const AR = 'اتكتب كود غلط مرات كتير للإيميل أو الرقم ده، فتسجيل الدخول بيه متوقف مؤقتًا. جرّب تاني بعد';
 
   it.each([
     [45, '1 minute'],

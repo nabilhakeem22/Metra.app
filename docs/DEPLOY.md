@@ -484,14 +484,20 @@ every owner step below is done by hand, once.
   `sha256('sign-in:' + identifier)` of the same canonical string, never the
   address. The hour starts at the identifier's first wrong code and is fixed;
   the tenth wrong or expired code inside it pauses checking codes for that
-  identifier until the hour ends (Supabase answers a wrong code and an expired
-  one alike, so both count). A right code clears nothing, and asking for a new
+  identifier ON THIS APP'S VERIFY ROUTE until the hour ends (Supabase answers a
+  wrong code and an expired one alike, so both count). It does not cover
+  Supabase's own verify endpoint, which anyone holding the public key can call
+  directly: that path is bounded only by Supabase's settings (code length,
+  expiry, its own rate limits). A right code clears nothing, and asking for a new
   code does not lift a pause. A paused check answers `otp_sign_in_paused` with
   the minutes left, rounded up, and Supabase is not asked. The threshold and
   the hour are written only in
   `packages/db/src/rls/functions/90-sign-in.sql`. Cost per code check: one
   database read before Supabase, one write only after a wrong code, nothing
-  more on a success. A database **error** in either call is logged
+  more on a success. Each call waits at most 2 s
+  (`SIGN_IN_PAUSE_DEADLINE_MS`); a database that does not answer by then is
+  treated like an error, so a database incident cannot hold every sign-in.
+  A database **error** in either call is logged
   (`sign-in pause check failed`, `sign-in failure record failed`) and the
   check goes ahead; a **missing** Hyperdrive binding on Cloudflare refuses the
   check with a logged `generic` (`sign-in pause store missing`), because
