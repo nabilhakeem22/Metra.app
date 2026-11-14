@@ -3,18 +3,13 @@
 // importCostItemsCore writes through mutateInOrg. Partial success is a hard
 // contract: valid rows import, invalid rows are per-row errors, the whole file
 // is NEVER rejected.
-import { costItems, sections } from '@metra/db';
-import { eq } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
-import {
-  validateImportRows,
-  type ColumnMapping,
-  type ValidatedRow,
-} from './import';
+import type { ColumnMapping, ValidatedRow } from './import';
+import { insertValidRows, revalidateImportRows } from './import-rows';
 import {
   MAX_IMPORT_ROWS,
   parseSpreadsheet,
@@ -81,48 +76,10 @@ export async function importCostItemsCore(
     ctx,
     { capability: 'price_book', action: 'create' },
     async (tx, audit) => {
-      const existing = await tx
-        .select({ code: costItems.code })
-        .from(costItems);
-      // Case-SENSITIVE, matching the DB unique(org_id, code).
-      const existingCodes = new Set(existing.map((r) => r.code));
-
-      // The org's sections drive resolution; an unknown token -> category_invalid.
-      const orgSections = await tx
-        .select({
-          id: sections.id,
-          key: sections.key,
-          nameEn: sections.nameEn,
-          nameAr: sections.nameAr,
-        })
-        .from(sections)
-        .where(eq(sections.active, true));
-
-      const results = validateImportRows(
-        input.rows,
-        input.mapping,
-        existingCodes,
-        orgSections,
-      );
+      const results = await revalidateImportRows(tx, input);
       const valid = results.filter((r) => r.ok && r.data);
 
-      if (valid.length > 0) {
-        await tx.insert(costItems).values(
-          valid.map((r) => ({
-            orgId: ctx.orgId,
-            code: r.data!.code,
-            nameEn: r.data!.nameEn,
-            nameAr: r.data!.nameAr,
-            sectionId: r.data!.sectionId,
-            unit: r.data!.unit,
-            defaultUnitCost: r.data!.defaultUnitCost,
-            defaultUnitPrice: r.data!.defaultUnitPrice,
-            taxCode: r.data!.taxCode,
-            etaItemCode: r.data!.etaItemCode,
-            etaCodeType: r.data!.etaCodeType,
-          })),
-        );
-      }
+      await insertValidRows(tx, ctx, valid);
 
       const imported = valid.length;
       const skipped = results.length - imported;
