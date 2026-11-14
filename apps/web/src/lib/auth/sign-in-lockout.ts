@@ -4,14 +4,21 @@ import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
+import { withDeadline } from '@/lib/http/deadlines';
 import { isWrongCodeFailure, otpVerifyFailure, type AuthFailure } from './otp-failure';
 import { readSignInPauseSeconds, recordWrongSignInCode } from './sign-in-failures-db';
 
 // The sign-in pause (security batch 3, P2): the tenth wrong code typed for one
-// address or phone inside an hour pauses checking codes for it until that hour
-// ends. The Cloudflare throttle (otp-throttle.ts) counts per data centre; this
-// count is global, one row per identifier in Postgres. The threshold and the
-// hour live ONLY in packages/db/src/rls/functions/90-sign-in.sql.
+// address or phone inside an hour pauses checking codes for it ON THIS APP'S
+// VERIFY ROUTE until that hour ends. The Cloudflare throttle (otp-throttle.ts)
+// counts per data centre; this count is global, one row per identifier in
+// Postgres. The threshold and the hour live ONLY in
+// packages/db/src/rls/functions/90-sign-in.sql.
+//
+// WHAT IT DOES NOT COVER: Supabase's own verify endpoint, which anyone holding
+// the public key can call without passing through this route. That path is
+// bounded by Supabase's settings (code length, expiry, its own rate limits),
+// not by this count.
 //
 // ROUND TRIPS it adds to a code check: one read before Supabase is asked, and
 // one write only after Supabase refused the code. Nothing on a success: a right
@@ -20,11 +27,23 @@ import { readSignInPauseSeconds, recordWrongSignInCode } from './sign-in-failure
 // FAILURE MODES (plan A4, the rule of lib/cf/rate-limit-binding.ts):
 //  - A database ERROR in either call fails OPEN: one redacted log line, and the
 //    check goes on. A database blip must not stop every sign-in.
+//  - So does a database that does not ANSWER within SIGN_IN_PAUSE_DEADLINE_MS.
+//    Sign-in never waited on Postgres before this pause existed; the request
+//    database's own 15 s deadline would hold every code check that long, twice
+//    for a wrong code, for the length of a database incident.
 //  - A MISSING Hyperdrive binding on Cloudflare fails CLOSED: Supabase sign-in
 //    works without Postgres, so answering "not paused" there would switch the
 //    pause off for ever and nothing would say so.
 //
 // The identifier and its hash are never logged.
+
+/**
+ * How long a code check waits on the counter before going on without it. A
+ * healthy call is one primary-key statement; the record function's own lock
+ * wait is 2 s. A count that lands after its request stopped waiting is still
+ * counted, and a read nobody waited for changes nothing.
+ */
+export const SIGN_IN_PAUSE_DEADLINE_MS = 2_000;
 
 /** sha256 hex of 'sign-in:' + identifier. `identifier` is already canonical (otp-route.ts), the string Supabase receives. */
 export function signInIdentifierHash(identifier: string): string {
@@ -70,7 +89,7 @@ export async function signInPauseRefusal(identifier: string): Promise<ActionResu
   }
   const identifierHash = signInIdentifierHash(identifier);
   try {
-    const seconds = await readSignInPauseSeconds(identifierHash);
+    const seconds = await withDeadline(readSignInPauseSeconds(identifierHash), SIGN_IN_PAUSE_DEADLINE_MS, 'sign-in pause check');
     return seconds === null ? null : pausedAnswer(seconds);
   } catch (error) {
     console.error('sign-in pause check failed', { error: redactedFailure(error, identifier, identifierHash) });
@@ -82,7 +101,7 @@ export async function signInPauseRefusal(identifier: string): Promise<ActionResu
 async function pauseAfterWrongCode(identifier: string): Promise<number | null> {
   const identifierHash = signInIdentifierHash(identifier);
   try {
-    return await recordWrongSignInCode(identifierHash);
+    return await withDeadline(recordWrongSignInCode(identifierHash), SIGN_IN_PAUSE_DEADLINE_MS, 'sign-in failure record');
   } catch (error) {
     console.error('sign-in failure record failed', { error: redactedFailure(error, identifier, identifierHash) });
     return null;
