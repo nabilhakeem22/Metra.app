@@ -49,6 +49,8 @@ export async function foundStudio(tx: MetraDb, ctx: OrgContext, profile: StudioP
     taxRegistrationNumber,
     defaultLocale: 'ar-EG',
   });
+  // Written while the studio has no member: the one moment trg_memberships_role_writer
+  // (enforce_membership_role_writer, MT150 otherwise) admits owner from a non-member.
   await tx
     .insert(memberships)
     .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
@@ -58,7 +60,7 @@ export async function foundStudio(tx: MetraDb, ctx: OrgContext, profile: StudioP
 export async function provisionWorkspace(tx: MetraDb, ctx: OrgContext, flows: Flow[]): Promise<void> {
   // Per-workspace entitlements (A2): the flows resolved from the chosen firm
   // type (B1) — `interior` for the only selectable option today. MUST come
-  // AFTER the owner membership insert above — the org_isolation WITH CHECK calls
+  // AFTER the owner membership insert foundStudio makes — the org_isolation WITH CHECK calls
   // app_is_current_org_member(), which is false until the membership exists.
   // Plain INSERT (no conflict path): a brand-new org has no prior row.
   await tx
