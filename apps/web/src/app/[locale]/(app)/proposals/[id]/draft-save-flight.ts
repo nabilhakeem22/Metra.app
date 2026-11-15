@@ -53,39 +53,6 @@ export function createDraftSaveFlight(
   let flushing = false;
   let firstUnsavedAt: number | null = null;
   let sending: string | null = null;
-  // The draft of a send that never answered: it may have committed.
-  let unconfirmed: ProposalDraftState | null = null;
-
-  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
-    try {
-      const result = await save(draft, flight.revision);
-      if (result.ok) unconfirmed = null;
-      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
-      return result;
-    } catch {
-      // The answer never came back, so the save may or may not have committed:
-      // exactly what `uncertain` says, and lost-commit.ts settles which.
-      unconfirmed = draft;
-      return { ok: false, error: 'uncertain' };
-    }
-  }
-
-  async function sendRecovering(
-    save: SaveDraft,
-    draft: ProposalDraftState,
-    onRecovered: (idsByKey: Map<string, string>) => void,
-  ): Promise<{ result: SaveDraftResult; sent: ProposalDraftState }> {
-    const result = await sendOnce(save, draft);
-    if (result.ok || result.error !== 'draft_changed_elsewhere' || !unconfirmed) {
-      return { result, sent: draft };
-    }
-    const recovered = await recoverLostCommit(unconfirmed, draft);
-    if (!recovered) return { result, sent: draft };
-    unconfirmed = null;
-    flight.revision = recovered.revision;
-    onRecovered(recovered.idsByKey);
-    return { result: await sendOnce(save, recovered.draft), sent: recovered.draft };
-  }
 
   const flight: DraftSaveFlight = {
     revision: initial.revision,
@@ -147,5 +114,50 @@ export function createDraftSaveFlight(
       firstUnsavedAt = null;
     },
   };
+  const sendRecovering = createRecoveringSend(flight);
   return flight;
+}
+
+/**
+ * The send of one flight, with a memory: the draft of a send that never answered
+ * is kept, and when a later send is refused as stale that draft settles whose
+ * commit it was (lost-commit.ts). It reads the revision to save against from
+ * `flight` and adopts the recovered one onto it.
+ */
+function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
+  // The draft of a send that never answered: it may have committed.
+  let unconfirmed: ProposalDraftState | null = null;
+
+  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
+    try {
+      const result = await save(draft, flight.revision);
+      if (result.ok) unconfirmed = null;
+      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
+      return result;
+    } catch {
+      // The answer never came back, so the save may or may not have committed:
+      // exactly what `uncertain` says, and lost-commit.ts settles which.
+      unconfirmed = draft;
+      return { ok: false, error: 'uncertain' };
+    }
+  }
+
+  async function sendRecovering(
+    save: SaveDraft,
+    draft: ProposalDraftState,
+    onRecovered: (idsByKey: Map<string, string>) => void,
+  ): Promise<{ result: SaveDraftResult; sent: ProposalDraftState }> {
+    const result = await sendOnce(save, draft);
+    if (result.ok || result.error !== 'draft_changed_elsewhere' || !unconfirmed) {
+      return { result, sent: draft };
+    }
+    const recovered = await recoverLostCommit(unconfirmed, draft);
+    if (!recovered) return { result, sent: draft };
+    unconfirmed = null;
+    flight.revision = recovered.revision;
+    onRecovered(recovered.idsByKey);
+    return { result: await sendOnce(save, recovered.draft), sent: recovered.draft };
+  }
+
+  return sendRecovering;
 }
