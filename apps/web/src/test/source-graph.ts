@@ -55,7 +55,10 @@ function runtimeSpecifiers(file: ts.SourceFile): string[] {
       specifiers.push(node.moduleSpecifier.text);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const [argument] = node.arguments;
-      if (argument && ts.isStringLiteral(argument)) specifiers.push(argument.text);
+      // A template with no substitution names its module as plainly as a string
+      // does. A COMPUTED argument names nothing that can be resolved here and is
+      // not counted (write-phase-fence.test.ts keeps the list of those).
+      if (argument && ts.isStringLiteralLike(argument)) specifiers.push(argument.text);
     }
     ts.forEachChild(node, visit);
   };
