@@ -2,15 +2,23 @@
 // split (which is not edited): every value the core passes through, with a
 // SECOND value. The first file creates every project for one client and has the
 // insert answer one id, so a statement that hard-coded either passed it; here
-// the client and the new row's id are both different.
-// Same recording double and conventions. Every scenario is green on the unsplit
-// code and on the split code alike.
+// the client and the new row's id are both different. And the two writes that
+// follow the stages, the activity and the audit row: each awaited, and each
+// answered as the unsplit code answers when the database refuses it.
+// Same recording double and conventions, with one difference in the audit double
+// (below). Every scenario is green on the unsplit code and on the split code
+// alike.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { createRecordingTx } from '@/test/recording-tx';
 
+/** One later turn of the event loop, past every microtask already queued. */
+const laterTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 vi.mock('server-only', () => ({}));
 const db = createRecordingTx();
+/** What the audit row's insert answers: null lets it through, a failure refuses it. */
+const auditInsert: { refusal: object | null } = { refusal: null };
 vi.mock('@/lib/db/context', () => ({
   withOrgContext: async (ctx: unknown, fn: (tx: unknown) => unknown, options: unknown) => {
     db.journal.push('begin ' + db.render([ctx, options]));
@@ -21,8 +29,17 @@ vi.mock('@/lib/db/context', () => ({
     }
   },
 }));
+// Unlike the first file's, this audit double answers on a LATER turn and journals
+// when it SETTLES, the way an insert does. A core that does not await it has
+// answered by then: its 'end' is journalled before the audit row, and a refusal
+// of the row is a rejection nobody handles.
 vi.mock('@/lib/audit', () => ({
   recordAudit: async (_tx: unknown, entry: unknown) => {
+    await laterTurn();
+    if (auditInsert.refusal) {
+      db.journal.push('audit refused ' + db.render(entry));
+      throw auditInsert.refusal;
+    }
     db.journal.push('audit ' + db.render(entry));
   },
 }));
@@ -52,8 +69,11 @@ const INSERT_ACTIVITY =
   'insert(table:activities).values({orgId: "o-1", entityType: "project", entityId: "p-21", actorUserId: "u-1", kind: "project_created", note: null, meta: null})';
 const AUDIT_CREATED =
   'audit {entity: "project", entityId: "p-21", action: "create", before: null, after: {code: "PRJ-9", client_id: "99999999-9999-4999-8999-999999999999", status: "active"}}';
+const AUDIT_REFUSED =
+  'audit refused {entity: "project", entityId: "p-21", action: "create", before: null, after: {code: "PRJ-9", client_id: "99999999-9999-4999-8999-999999999999", status: "active"}}';
 
 const UP_TO_THE_INSERT = [BEGIN, READ_ENTITLEMENTS, COUNT_PROJECTS, READ_DUPLICATE_OF_TYPED, READ_CLIENT, INSERT_PROJECT];
+const UP_TO_THE_ACTIVITY = [...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, INSERT_ACTIVITY];
 
 const owner: OrgContext = { orgId: 'o-1', userId: 'u-1', role: 'owner' };
 
@@ -67,30 +87,90 @@ const templates = [
   { id: 't-2', key: 'civil', nameEn: 'Civil works', nameAr: null, sortOrder: 20, active: true },
 ];
 
-let log: ReturnType<typeof vi.spyOn>;
+/** A scripted result that makes its statement land two turns LATER, journalling `label` when it does. */
+const landsLater = (label: string, result: unknown) => ({
+  then: (resolve: (value: unknown) => void) => {
+    void laterTurn()
+      .then(laterTurn)
+      .then(() => {
+        db.journal.push(label);
+        resolve(result);
+      });
+  },
+});
 
-/** The journal, that every scripted result was consumed, and how many lines were logged. */
+/** A scripted result that makes its statement REJECT, the way the driver refuses it. */
+const rejectedWith = (failure: object) => ({
+  then: (_resolve: unknown, reject: (reason: unknown) => void) => reject(failure),
+});
+
+/** The logged tail's answer, whole: its reference is random. */
+const GENERIC = { ok: false, error: 'generic', reference: expect.any(String) };
+
+let log: ReturnType<typeof vi.spyOn>;
+/** Every rejection that nothing handled while a scenario ran. */
+const unhandled: unknown[] = [];
+const noteUnhandled = (reason: unknown) => void unhandled.push(reason);
+
+/** The core's answer, taken after whatever it left in flight has settled: a write it did not await lands, or is refused, in these turns. */
+async function settled<Answer>(call: Promise<Answer>): Promise<Answer> {
+  const answer = await call;
+  for (let turn = 0; turn < 3; turn += 1) await laterTurn();
+  return answer;
+}
+
+/** The journal, that every scripted result was consumed, how many lines were logged, and that no rejection escaped. */
 function expectTrace(journal: string[], logged: number): void {
   expect(db.journal).toEqual(journal);
   expect(db.pending()).toBe(0);
   expect(log).toHaveBeenCalledTimes(logged);
+  expect(unhandled).toEqual([]);
 }
 
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-14T10:00:00.000Z'));
+  process.on('unhandledRejection', noteUnhandled);
 });
 beforeEach(() => {
   db.reset();
+  auditInsert.refusal = null;
+  unhandled.length = 0;
   log = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => log.mockRestore());
-afterAll(() => vi.useRealTimers());
+afterAll(() => {
+  process.off('unhandledRejection', noteUnhandled);
+  vi.useRealTimers();
+});
 
 describe('createProjectCore, a second client and a second new row', () => {
   it('J20 the client that was sent is the one read, written and audited; the id the insert answered is the one the stages, the activity, the audit and the answer carry', async () => {
     db.respond(plan, count, [], client, row, templates, [], []);
-    expect(await createProjectCore(owner, project)).toEqual({ ok: true, data: 'p-21' });
+    expect(await settled(createProjectCore(owner, project))).toEqual({ ok: true, data: 'p-21' });
     expectTrace([...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, INSERT_STAGES, INSERT_ACTIVITY, AUDIT_CREATED, 'end'], 0);
+  });
+});
+
+describe('createProjectCore, the activity and the audit row are awaited', () => {
+  it('J21 an activity that lands two turns late has still landed before the audit row is written, and the audit row before the transaction ends', async () => {
+    db.respond(plan, count, [], client, row, [], landsLater('activity landed', []));
+    expect(await settled(createProjectCore(owner, project))).toEqual({ ok: true, data: 'p-21' });
+    expectTrace([...UP_TO_THE_ACTIVITY, 'activity landed', AUDIT_CREATED, 'end'], 0);
+  });
+
+  it('J22 an activity the database refuses is the answer: generic with one line, no audit row, and no rejection escapes', async () => {
+    db.respond(plan, count, [], client, row, [], rejectedWith({ code: '42501' }));
+    expect(await settled(createProjectCore(owner, project))).toEqual(GENERIC);
+    expectTrace([...UP_TO_THE_ACTIVITY, 'end'], 1);
+    expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
+  });
+
+  it('J23 an audit row the database refuses is the answer: generic with one line, inside the transaction, and no rejection escapes', async () => {
+    auditInsert.refusal = { code: '42501' };
+    db.respond(plan, count, [], client, row, [], []);
+    expect(await settled(createProjectCore(owner, project))).toEqual(GENERIC);
+    expectTrace([...UP_TO_THE_ACTIVITY, AUDIT_REFUSED, 'end'], 1);
+    expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
   });
 });
