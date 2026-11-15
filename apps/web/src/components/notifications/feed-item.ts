@@ -69,6 +69,36 @@ export function notificationHref(item: FeedItem): string | null {
   return build(item.entityId);
 }
 
+/** A param as the figure a sentence shows: its text, or 0 when it is absent. */
+const s = (v: unknown) => String(v ?? 0);
+// A number only SELECTS a plural form; the figure shown is always the string.
+const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+/** The digest sentence, and after it the delivery counts when the digest carries them. */
+function portfolioDigestBody(p: Record<string, unknown>, translate: BodyTranslate): string {
+  return [
+    translate('portfolio_digest', {
+      active: s(p.activeProjects),
+      awaiting: s(p.awaitingResponse),
+      expiring: s(p.expiringSoon),
+      overdue: s(p.overdueStages),
+    }),
+    // Digests written before Round C carry no delivery counts: they read as before.
+    typeof p.deliveriesYourMove === 'number'
+      ? translate('portfolio_digest_deliveries', {
+          yourMoveCount: count(p.deliveriesYourMove),
+          yourMove: s(p.deliveriesYourMove),
+          waitingCount: count(p.deliveriesWaiting),
+          waiting: s(p.deliveriesWaiting),
+          stalledCount: count(p.deliveriesStalled),
+          stalled: s(p.deliveriesStalled),
+        })
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * The localized body line for one notification.
  *
@@ -92,9 +122,6 @@ export function notificationBody(
   if (isClientRespondedBodyKey(item.bodyKey)) {
     return clientRespondedBody(item.bodyKey, p, translate, locale, milestoneLabel);
   }
-  const s = (v: unknown) => String(v ?? 0);
-  // A number only SELECTS a plural form; the figure shown is always the string.
-  const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
   switch (item.bodyKey) {
     case 'proposal_expiring':
       return translate('proposal_expiring', {
@@ -107,27 +134,7 @@ export function notificationBody(
         days: s(p.days),
       });
     case 'portfolio_digest':
-      return [
-        translate('portfolio_digest', {
-          active: s(p.activeProjects),
-          awaiting: s(p.awaitingResponse),
-          expiring: s(p.expiringSoon),
-          overdue: s(p.overdueStages),
-        }),
-        // Digests written before Round C carry no delivery counts: they read as before.
-        typeof p.deliveriesYourMove === 'number'
-          ? translate('portfolio_digest_deliveries', {
-              yourMoveCount: count(p.deliveriesYourMove),
-              yourMove: s(p.deliveriesYourMove),
-              waitingCount: count(p.deliveriesWaiting),
-              waiting: s(p.deliveriesWaiting),
-              stalledCount: count(p.deliveriesStalled),
-              stalled: s(p.deliveriesStalled),
-            })
-          : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
+      return portfolioDigestBody(p, translate);
     case 'delivery_waiting_on_client':
       return translate('delivery_waiting_on_client', {
         delivery: deliveryLabelOf(p, locale),

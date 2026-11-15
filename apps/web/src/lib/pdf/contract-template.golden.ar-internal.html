@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ar-EG" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' data:; font-src data:" />
+<style>
+  @font-face { font-family: 'Cairo'; font-weight: 400 900;
+    src: url(data:font/ttf;base64,QUJD) format('truetype'); }
+  * { box-sizing: border-box; }
+  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif; margin: 0; padding: 32px; color: #111418; font-size: 13px; }
+  h1 { font-family: 'Cairo'; font-weight: 800; font-size: 20px; margin: 0 0 2px; }
+  .meta { color: #5C6470; margin-block-end: 16px; font-size: 12px; }
+  .meta strong { color: #111418; }
+  table { width: 100%; border-collapse: collapse; margin-block-end: 16px; }
+  th, td { border: 1px solid #D5DAE2; padding: 6px 10px; }
+  th { background: #2E6BE6; color: #FFFFFF; text-align: start; font-size: 12px; }
+  td.desc { text-align: start; }
+  td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+  tr.section td { background: #E4E9F0; font-weight: 700; text-align: start; }
+  tr.subtotal td { background: #F5F7FA; font-weight: 600; }
+  .totals { width: 340px; margin-inline-start: auto; }
+  .totals td { border: none; padding: 4px 8px; }
+  .totals td.num { text-align: end; font-variant-numeric: tabular-nums; }
+  .totals tr.grand td { font-weight: 800; border-top: 2px solid #111418; }
+  .terms { margin-block-start: 16px; font-size: 12px; }
+  .footer { margin-block-start: 24px; color: #5C6470; font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>ميترا</h1>
+  <div class="meta">
+    <div><strong>C-2026-0123</strong> — عقد تشطيب</div>
+    <div>أكمي</div>
+  </div>
+
+  <table dir="rtl">
+    <thead>
+      <tr>
+        <th>الوصف</th>
+        <th class="num">الكمية</th>
+        <th class="num">التكلفة</th>
+        <th class="num">سعر الوحدة</th>
+        <th class="num">خصم</th>
+        <th class="num">الإجمالي</th>
+        <th class="num">الهامش</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+      <tr class="section"><td colspan="7">قسم 1</td></tr>
+      
+        <tr>
+          <td class="desc">بند 1</td>
+          <td class="num">2.5 m2</td>
+          <td class="num">60.00 ج.م</td>
+          <td class="num">100.50 ج.م</td>
+          <td class="num">0.00%</td>
+          <td class="num">251.25 ج.م</td>
+          <td class="num">101.25 ج.م</td>
+        </tr>
+        <tr>
+          <td class="desc">بند 2</td>
+          <td class="num">5 pcs</td>
+          <td class="num">120.50 ج.م</td>
+          <td class="num">200.50 ج.م</td>
+          <td class="num">5.00%</td>
+          <td class="num">501.25 ج.م</td>
+          <td class="num">199.00 ج.م</td>
+        </tr>
+      <tr class="subtotal">
+        <td colspan="6">—</td>
+        <td class="num">1,000.75 ج.م</td>
+        <td></td>
+      </tr>
+      <tr class="section"><td colspan="7">قسم 2</td></tr>
+      
+        <tr>
+          <td class="desc">بند 3</td>
+          <td class="num">7.5 m2</td>
+          <td class="num">0.00 ج.م</td>
+          <td class="num">300.50 ج.م</td>
+          <td class="num">0.00%</td>
+          <td class="num">751.25 ج.م</td>
+          <td class="num">0.00 ج.م</td>
+        </tr>
+      <tr class="subtotal">
+        <td colspan="6">—</td>
+        <td class="num">2,000.75 ج.م</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>المجموع الفرعي</td><td class="num">250,000.50 ج.م</td></tr>
+    <tr><td>الخصم</td><td class="num">12,500.25 ج.م</td></tr>
+    <tr><td>ضريبة القيمة المضافة (14.50%)</td><td class="num">33,250.04 ج.م</td></tr>
+    <tr><td>الإشراف (7.25%)</td><td class="num">23,750.02 ج.م</td></tr>
+    <tr class="grand"><td>قيمة العقد الأصلية</td><td class="num">294,500.81 ج.م</td></tr>
+    <tr class="grand"><td>القيمة بعد التعديلات</td><td class="num">1,300.00 ج.م</td></tr>
+    <tr><td>هامش الربح</td><td class="num">12,345.68 ج.م</td></tr>
+  </table>
+
+  <table class="terms totals">
+    <tr><td>نسبة الدفعة المقدمة</td><td class="num">10.50%</td></tr>
+    <tr><td>نسبة المحتجز</td><td class="num">2.75%</td></tr>
+    <tr><td>مدة السداد (يوم)</td><td class="num">45</td></tr>
+    <tr><td>تاريخ البدء</td><td class="num">2027-01-02</td></tr>
+    <tr><td>تاريخ الانتهاء</td><td class="num">2027-12-31</td></tr>
+  </table>
+
+  <div class="footer">ميترا · C-2026-0123</div>
+</body>
+</html>

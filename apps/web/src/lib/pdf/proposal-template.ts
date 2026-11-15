@@ -31,7 +31,6 @@ export async function buildProposalHtml(
   const { locale } = opts;
   const dir = dirFor(locale);
   const showCost = opts.variant === 'internal';
-  const m = (v: string) => formatMoney(v, locale);
   const num = formatProposalNumber(
     detail.number,
     proposalYear(detail.issueDate, detail.createdAt),
@@ -75,16 +74,23 @@ ${PDF_CSP_META}
 
   ${pricedSectionsTableHtml(detail.sections, { locale, dir, showCost })}
 
-  <table class="totals">
+  ${proposalTotalsHtml(detail, { locale, showCost })}
+
+  <div class="footer">${orgName} · ${num}</div>
+</body>
+</html>`;
+}
+
+/** The totals: subtotal to the total, and the margin on the internal variant. */
+function proposalTotalsHtml(detail: ProposalDetail, layout: { locale: string; showCost: boolean }): string {
+  const { locale, showCost } = layout;
+  const m = (v: string) => formatMoney(v, locale);
+  return `<table class="totals">
     <tr><td>${pickEscaped('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
     <tr><td>${pickEscaped('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
     <tr><td>${pickEscaped('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
     <tr><td>${pickEscaped('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
     <tr class="grand"><td>${pickEscaped('الإجمالي', 'Total', locale)}</td><td class="num">${m(detail.total)}</td></tr>
     ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pickEscaped('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
-  </table>
-
-  <div class="footer">${orgName} · ${num}</div>
-</body>
-</html>`;
+  </table>`;
 }
