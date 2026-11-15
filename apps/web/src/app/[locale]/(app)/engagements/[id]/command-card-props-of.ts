@@ -7,7 +7,7 @@ import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { designSummary } from '@/lib/engagements/design-summary';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
-import type { EngagementCommandCardProps } from './command-card-props';
+import type { EngagementCommandCardProps, ExecutionCockpit } from './command-card-props';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { openDeliveryReminder } from './share-anchor';
 import type { EngagementTab } from './tabs';
@@ -34,14 +34,7 @@ export function commandCardPropsOf(
     status: detail.status,
     canAdvance: detail.canAdvance,
     canRecordOfflineApproval: detail.canRecordOfflineApproval,
-    reviewRoundStartedAt: reviewRoundStartedAt({
-      state: header.state,
-      rendersReadyAt: header.rendersReadyAt,
-      enteredConceptReviewAt:
-        detail.transitions.find((transition) => transition.toState === 'concept_review')
-          ?.decidedAt ?? null,
-      createdAt: header.createdAt,
-    }).toISOString(),
+    reviewRoundStartedAt: reviewRoundStartOf(detail, header),
     conceptOptions: offlineConceptOptions(detail.artifacts, detail.gatePreview.clientDecision),
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,
@@ -69,20 +62,40 @@ export function commandCardPropsOf(
     // already hold (B11); the header's menu still opens the link itself.
     onNudge: openDeliveryReminder,
     clientExpected: detail.clientExpected,
-    // The design folds into one line at execution, counted from what the page
-    // already loaded (no extra read). A light delivery had no design to fold.
-    execution: detail.execution && {
-      view: detail.execution,
-      designSummary:
-        header.entryPhase === 'design'
-          ? designSummary({
-              feeSchedule: detail.feeSchedule,
-              payments: detail.payments,
-              paymentClaims: detail.paymentClaims,
-              awaitingReplyCount: detail.awaitingReplyCount,
-            })
-          : null,
-    },
+    execution: executionCockpitOf(detail, header),
     onOpenTab,
+  };
+}
+
+/** When the review round under answer began (ISO). `header` is the `detail.header` the caller already read. */
+function reviewRoundStartOf(detail: EngagementDetailProps, header: EngagementDetailProps['header']): string {
+  return reviewRoundStartedAt({
+    state: header.state,
+    rendersReadyAt: header.rendersReadyAt,
+    enteredConceptReviewAt:
+      detail.transitions.find((transition) => transition.toState === 'concept_review')
+        ?.decidedAt ?? null,
+    createdAt: header.createdAt,
+  }).toISOString();
+}
+
+/** What the execution step card renders from; null before execution. `header` as above. */
+function executionCockpitOf(
+  detail: EngagementDetailProps,
+  header: EngagementDetailProps['header'],
+): ExecutionCockpit | null {
+  // The design folds into one line at execution, counted from what the page
+  // already loaded (no extra read). A light delivery had no design to fold.
+  return detail.execution && {
+    view: detail.execution,
+    designSummary:
+      header.entryPhase === 'design'
+        ? designSummary({
+            feeSchedule: detail.feeSchedule,
+            payments: detail.payments,
+            paymentClaims: detail.paymentClaims,
+            awaitingReplyCount: detail.awaitingReplyCount,
+          })
+        : null,
   };
 }
