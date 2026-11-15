@@ -3,7 +3,9 @@
 // SECOND value. The first file edits one project for one client under one clock,
 // so a statement that hard-coded any of the three passed it; here the project,
 // the client and the clock are all different. And the audit row: awaited, and
-// answered as the unsplit code answers when the database refuses it.
+// answered as the unsplit code answers when the database refuses it. And two
+// edges of unchanged lines: a percentage key present with no value, and a blank
+// code sent together with another refusal.
 // Same recording double and conventions, with one difference in the audit double
 // (below). Every scenario is green on the unsplit code and on the split code
 // alike.
@@ -153,5 +155,26 @@ describe('updateProjectCore, an audit row the database refuses', () => {
     expect(await settled(updateProjectCore(owner, edit))).toEqual(GENERIC);
     expectTrace([...UP_TO_THE_CODE_CHECK, UPDATE_AT_THE_FIRST_CLOCK, AUDIT_REFUSED, 'end'], 1);
     expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
+  });
+});
+
+describe('updateProjectCore, a percentage key that is present with no value', () => {
+  it('U22 a percentage sent as undefined is a percentage NOT sent: neither is in the set', async () => {
+    db.respond(same, [], []);
+    const withEmptyKeys = { ...edit, advancePct: undefined, retentionPct: undefined };
+    expect(await settled(updateProjectCore(owner, withEmptyKeys))).toEqual(updated);
+    expectTrace([...UP_TO_THE_CODE_CHECK, UPDATE_AT_THE_FIRST_CLOCK, AUDIT_UPDATED, 'end'], 0);
+  });
+});
+
+describe('updateProjectCore, a blank code beside another refusal', () => {
+  it('U23 a blank code and no name are reported TOGETHER, each under its field', async () => {
+    const blankCodeAndNoName = { id: SECOND_PROJECT, code: '  ', clientId: SECOND_CLIENT, status: 'active' as const };
+    expect(await settled(updateProjectCore(owner, blankCodeAndNoName))).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { code: { code: 'code_required' }, name: { code: 'name_required' } },
+    });
+    expectTrace([], 0);
   });
 });

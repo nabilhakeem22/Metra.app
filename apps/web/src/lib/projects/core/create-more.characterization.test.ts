@@ -6,6 +6,7 @@
 // follow the stages, the activity and the audit row: each awaited, and each
 // answered as the unsplit code answers when the database refuses it. And an
 // insert that answers no row: the templates are still read before anything fails.
+// And a status sent as an empty string, which is not the same as none sent.
 // Same recording double and conventions, with one difference in the audit double
 // (below). Every scenario is green on the unsplit code and on the split code
 // alike.
@@ -211,5 +212,15 @@ describe('createProjectCore, the activity and the audit row are awaited', () => 
     expect(await settled(createProjectCore(owner, project))).toEqual(GENERIC);
     expectTrace([...UP_TO_THE_ACTIVITY, AUDIT_REFUSED, 'end'], 1);
     expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
+  });
+});
+
+describe('createProjectCore, a status sent as an empty string', () => {
+  it('J27 only a status that was NOT sent defaults to active: an empty one is checked as it is, and is malformed', async () => {
+    expect(await settled(createProjectCore(owner, { ...project, status: '' as never }))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    expectTrace([], 0);
   });
 });

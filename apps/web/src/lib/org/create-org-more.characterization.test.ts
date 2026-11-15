@@ -1,6 +1,7 @@
 // MORE CHARACTERIZATION of createOrgCore, beside the files committed before the
 // split (which are not edited): the audit row that closes the founding, awaited,
-// and answered as the unsplit code answers when the database refuses it.
+// and answered as the unsplit code answers when the database refuses it. And a
+// firm type sent as an empty string, which is not the same as none sent.
 // Same recording double and conventions, with one difference in the audit double
 // (below); the four catalogue inserts are computed from the exported defaults
 // with this file's own column mapping, as in the first file. Every scenario is
@@ -174,5 +175,15 @@ describe('createOrgCore, the audit row that closes the founding', () => {
     expect(await settled(createOrgCore(thirdFounder, delta))).toEqual(GENERIC);
     expectTrace([...UP_TO_THE_LAST_CATALOGUE, AUDIT_REFUSED, 'end'], 1);
     expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
+  });
+});
+
+describe('createOrgCore, a firm type sent as an empty string', () => {
+  it('O13 only a firm type that was NOT sent defaults to interior: an empty one is looked up as it is, and is firm_type_unavailable', async () => {
+    expect(await settled(createOrgCore(thirdFounder, { ...delta, firmType: '' as never }))).toEqual({
+      ok: false,
+      error: 'firm_type_unavailable',
+    });
+    expectTrace([], 0);
   });
 });

@@ -3,7 +3,9 @@
 // SECOND value. The first file changes one category and has the history header
 // answer one id, so a statement that hard-coded either passed it; here the
 // category and the header's id are both different. And the audit row: awaited,
-// and answered as the unsplit code answers when the database refuses it.
+// and answered as the unsplit code answers when the database refuses it. And
+// two edges of unchanged lines: a label that is empty rather than absent, and
+// "today" half an hour before midnight in UTC.
 // Same recording double and conventions, with one difference in the audit double
 // (below). Every scenario is green on the unsplit code and on the split code
 // alike.
@@ -88,6 +90,18 @@ const INSERT_ONE_LINE =
   'insert(table:price_change_lines).values([{orgId: "o-1", priceChangeId: "chg-2", costItemId: "ci-1", oldUnitCost: "100.0000", newUnitCost: "115.0000", oldUnitPrice: "150.0000", newUnitPrice: "172.5000"}])';
 const AUDIT_OF_ONE =
   'audit {entity: "price_change", entityId: "chg-2", action: "create", before: null, after: {section_id: "88888888-8888-4888-8888-888888888888", category: "88888888-8888-4888-8888-888888888888", pct_change: "15", target: "both", item_count: 1}}';
+
+// A change that touched no item, under a label that is the empty string.
+const INSERT_HEADER_LABELLED_EMPTY =
+  'insert(table:price_changes).values({orgId: "o-1", category: "", pctChange: "15", target: "both", effectiveDate: "2026-11-14", appliedBy: "u-1", itemCount: 0}).returning({id: price_changes.id})';
+const AUDIT_LABELLED_EMPTY =
+  'audit {entity: "price_change", entityId: "chg-2", action: "create", before: null, after: {section_id: "88888888-8888-4888-8888-888888888888", category: "", pct_change: "15", target: "both", item_count: 0}}';
+
+// A change that touched no item, made at 23:30 UTC on the last day of the year.
+const INSERT_HEADER_ON_THE_LAST_DAY =
+  'insert(table:price_changes).values({orgId: "o-1", category: "88888888-8888-4888-8888-888888888888", pctChange: "15", target: "both", effectiveDate: "2026-12-31", appliedBy: "u-1", itemCount: 0}).returning({id: price_changes.id})';
+const AUDIT_OF_NONE =
+  'audit {entity: "price_change", entityId: "chg-2", action: "create", before: null, after: {section_id: "88888888-8888-4888-8888-888888888888", category: "88888888-8888-4888-8888-888888888888", pct_change: "15", target: "both", item_count: 0}}';
 
 const owner: OrgContext = { orgId: 'o-1', userId: 'u-1', role: 'owner' };
 
@@ -175,5 +189,38 @@ describe('bulkUpdatePricesCore, an audit row the database refuses', () => {
       1,
     );
     expect(log.mock.calls[0]?.[0]).toBe('mutateInOrg failed');
+  });
+});
+
+describe('bulkUpdatePricesCore, a label that is empty rather than absent', () => {
+  // The label falls through to the next one only on null. An empty string is a
+  // label: it is what the history freezes, whatever stands behind it.
+  it.each([
+    ['key', '', 'Civil', 'مدني'],
+    ['English name, under no key', null, '', 'مدني'],
+    ['Arabic name, under no key and no English name', null, null, ''],
+  ])('B25 an empty %s is frozen as it is, not skipped', async (_which, key, nameEn, nameAr) => {
+    db.respond(section(key, nameEn, nameAr), [], header);
+    expect(await settled(bulkUpdatePricesCore(owner, change))).toEqual({
+      ok: true,
+      data: { changeId: 'chg-2', itemCount: 0 },
+    });
+    expectTrace([BEGIN, READ_SECTION, UPDATE_BOTH_BY_15, INSERT_HEADER_LABELLED_EMPTY, AUDIT_LABELLED_EMPTY, 'end'], 0);
+  });
+});
+
+describe('bulkUpdatePricesCore, today at the end of a UTC day', () => {
+  it('B26 with no date sent at 23:30 UTC, today is still that UTC day', async () => {
+    vi.setSystemTime(new Date('2026-12-31T23:30:00.000Z'));
+    try {
+      db.respond(section(null, null, null), [], header);
+      expect(await settled(bulkUpdatePricesCore(owner, change))).toEqual({
+        ok: true,
+        data: { changeId: 'chg-2', itemCount: 0 },
+      });
+    } finally {
+      vi.setSystemTime(new Date('2026-11-14T10:00:00.000Z'));
+    }
+    expectTrace([BEGIN, READ_SECTION, UPDATE_BOTH_BY_15, INSERT_HEADER_ON_THE_LAST_DAY, AUDIT_OF_NONE, 'end'], 0);
   });
 });
