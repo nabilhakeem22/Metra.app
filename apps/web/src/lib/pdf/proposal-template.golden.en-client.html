@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' data:; font-src data:" />
+<style>
+  
+  * { box-sizing: border-box; }
+  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif; margin: 0; padding: 32px; color: #111418; font-size: 13px; }
+  h1 { font-family: 'Cairo'; font-weight: 800; font-size: 20px; margin: 0 0 2px; }
+  .meta { color: #5C6470; margin-block-end: 16px; font-size: 12px; }
+  .meta strong { color: #111418; }
+  table { width: 100%; border-collapse: collapse; margin-block-end: 16px; }
+  th, td { border: 1px solid #D5DAE2; padding: 6px 10px; }
+  th { background: #2E6BE6; color: #FFFFFF; text-align: start; font-size: 12px; }
+  td.desc { text-align: start; }
+  td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+  tr.section td { background: #E4E9F0; font-weight: 700; text-align: start; }
+  tr.subtotal td { background: #F5F7FA; font-weight: 600; }
+  .totals { width: 320px; margin-inline-start: auto; }
+  .totals td { border: none; padding: 4px 8px; }
+  .totals td.num { text-align: end; font-variant-numeric: tabular-nums; }
+  .totals tr.grand td { font-weight: 800; border-top: 2px solid #111418; }
+  .footer { margin-block-start: 24px; color: #5C6470; font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>Metra</h1>
+  <div class="meta">
+    <div><strong>Q-2026-0004</strong> — Fit-out contract</div>
+    <div>Acme Interiors</div>
+  </div>
+
+  <table dir="ltr">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="num">Qty</th>
+        
+        <th class="num">Unit price</th>
+        <th class="num">Disc</th>
+        <th class="num">Total</th>
+        
+      </tr>
+    </thead>
+    <tbody>
+      
+      <tr class="section"><td colspan="5">Section 1</td></tr>
+      
+        <tr>
+          <td class="desc">Item 1</td>
+          <td class="num">2.5 m2</td>
+          
+          <td class="num">100.50 EGP</td>
+          <td class="num">0.00%</td>
+          <td class="num">251.25 EGP</td>
+          
+        </tr>
+        <tr>
+          <td class="desc">Item 2</td>
+          <td class="num">5 pcs</td>
+          
+          <td class="num">200.50 EGP</td>
+          <td class="num">5.00%</td>
+          <td class="num">501.25 EGP</td>
+          
+        </tr>
+      <tr class="subtotal">
+        <td colspan="4">—</td>
+        <td class="num">1,000.75 EGP</td>
+        
+      </tr>
+      <tr class="section"><td colspan="5">Section 2</td></tr>
+      
+        <tr>
+          <td class="desc">Item 3</td>
+          <td class="num">7.5 m2</td>
+          
+          <td class="num">300.50 EGP</td>
+          <td class="num">0.00%</td>
+          <td class="num">751.25 EGP</td>
+          
+        </tr>
+      <tr class="subtotal">
+        <td colspan="4">—</td>
+        <td class="num">2,000.75 EGP</td>
+        
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Subtotal</td><td class="num">1,000.00 EGP</td></tr>
+    <tr><td>Discount</td><td class="num">0.00 EGP</td></tr>
+    <tr><td>VAT (14.00%)</td><td class="num">140.00 EGP</td></tr>
+    <tr><td>Supervision (10.00%)</td><td class="num">100.00 EGP</td></tr>
+    <tr class="grand"><td>Total</td><td class="num">1,240.00 EGP</td></tr>
+    
+  </table>
+
+  <div class="footer">Metra · Q-2026-0004</div>
+</body>
+</html>
