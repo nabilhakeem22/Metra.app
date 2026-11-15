@@ -52,7 +52,7 @@ export async function claimProjectCode(
 }
 
 /** Seeds the new project's stages from the org's active stage templates, in process order. */
-export async function seedProjectStages(tx: MetraDb, ctx: OrgContext, projectId: string): Promise<void> {
+export async function seedProjectStages(tx: MetraDb, ctx: OrgContext, row: { id: string }): Promise<void> {
   // Seed this project's stages from the org's active stage templates (in
   // process order). Editable afterwards — start-from-any-phase.
   const templates = await tx
@@ -64,7 +64,7 @@ export async function seedProjectStages(tx: MetraDb, ctx: OrgContext, projectId:
     await tx.insert(projectStages).values(
       templates.map((tpl, i) => ({
         orgId: ctx.orgId,
-        projectId,
+        projectId: row.id,
         stageKey: tpl.key,
         nameEn: tpl.nameEn,
         nameAr: tpl.nameAr,

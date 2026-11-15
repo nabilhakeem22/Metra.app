@@ -32,7 +32,7 @@ export async function createProjectCore(
         .values({ orgId: ctx.orgId, ...v, code, number })
         .returning({ id: projects.id });
 
-      await seedProjectStages(tx, ctx, row.id);
+      await seedProjectStages(tx, ctx, row);
 
       await appendSystemActivity(tx, ctx, {
         entityType: 'project',
