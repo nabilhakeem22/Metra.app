@@ -1,27 +1,13 @@
 // PURE core for org creation (no next/*, no getSessionUser, no cookies). The
 // 'use server' createOrg wrapper does the session/existing-check/redirect and
 // delegates here. Exercised directly by tests/actions/createOrg.dbtest.ts.
-import {
-  documentCategories,
-  defaultDocumentCategories,
-  automationSettings,
-  DEFAULT_PROJECT_TYPES,
-  DEFAULT_SECTIONS,
-  DEFAULT_STAGE_TEMPLATES,
-  memberships,
-  organizations,
-  projectTypes,
-  sections,
-  stageTemplates,
-  workspaceEntitlements,
-} from '@metra/db';
-import { sql } from 'drizzle-orm';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { FLOWS } from '@/lib/entitlements/flows';
 import { firmTypeDef, type FirmTypeKey } from '@/lib/entitlements/firm-types';
+import { foundStudio, provisionWorkspace, seedStudioDefaults } from './founding-writes';
 import { readOrgProfile, type OrgProfileText } from './profile-field-rules';
 
 export interface OrgProfileInput extends OrgProfileText {
@@ -60,77 +46,9 @@ export async function createOrgCore(
   }
 
   return mutateInOrg(ctx, {}, async (tx, audit) => {
-    // Mint this org's owning account (above tenancy) via the bootstrap SDF — the
-    // ONLY path that creates an account row — then link it. metra_app has SELECT
-    // only on accounts; the SECURITY DEFINER function inserts as the BYPASSRLS
-    // owner. Runs inside this same bootstrap transaction, so a failure rolls back
-    // the org, membership AND the account together.
-    const accountRows = (await tx.execute(
-      sql`select id from public.app_bootstrap_account(${nameAr}, ${nameEn})`,
-    )) as unknown as Array<{ id: string }>;
-    const accountId = accountRows[0]?.id;
-    await tx.insert(organizations).values({
-      id: ctx.orgId,
-      accountId,
-      nameEn,
-      nameAr,
-      city,
-      taxRegistrationNumber,
-      defaultLocale: 'ar-EG',
-    });
-    await tx
-      .insert(memberships)
-      .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
-    // Per-workspace entitlements (A2): the flows resolved from the chosen firm
-    // type (B1) — `interior` for the only selectable option today. MUST come
-    // AFTER the owner membership insert above — the org_isolation WITH CHECK calls
-    // app_is_current_org_member(), which is false until the membership exists.
-    // Plain INSERT (no conflict path): a brand-new org has no prior row.
-    await tx
-      .insert(workspaceEntitlements)
-      .values({ orgId: ctx.orgId, enabledFlows: flows });
-    // Automation defaults (mirrors the 0016 backfill) so the cron acts on this
-    // org from day one; every field is user-configurable in Settings.
-    await tx.insert(automationSettings).values({ orgId: ctx.orgId });
-    // Seed the 8 default work sections (shared by Price Book + proposal builder).
-    await tx.insert(sections).values(
-      DEFAULT_SECTIONS.map((s) => ({
-        orgId: ctx.orgId,
-        key: s.key,
-        nameEn: s.nameEn,
-        nameAr: s.nameAr,
-      })),
-    );
-    // Seed the 5 default project types + 10 default stage templates.
-    await tx.insert(projectTypes).values(
-      DEFAULT_PROJECT_TYPES.map((tpe) => ({
-        orgId: ctx.orgId,
-        key: tpe.key,
-        nameEn: tpe.nameEn,
-        nameAr: tpe.nameAr,
-        sortOrder: tpe.sortOrder,
-      })),
-    );
-    await tx.insert(stageTemplates).values(
-      DEFAULT_STAGE_TEMPLATES.map((s) => ({
-        orgId: ctx.orgId,
-        key: s.key,
-        nameEn: s.nameEn,
-        nameAr: s.nameAr,
-        sortOrder: s.sortOrder,
-      })),
-    );
-    // The firm's starting filing vocabulary. Same defaults the 0040 migration
-    // backfilled onto every pre-existing org, from the one shared source.
-    await tx.insert(documentCategories).values(
-      defaultDocumentCategories().map((c) => ({
-        orgId: ctx.orgId,
-        key: c.key,
-        nameEn: c.nameEn,
-        nameAr: c.nameAr,
-        sortOrder: c.sortOrder,
-      })),
-    );
+    await foundStudio(tx, ctx, { nameEn, nameAr, city, taxRegistrationNumber });
+    await provisionWorkspace(tx, ctx, flows);
+    await seedStudioDefaults(tx, ctx);
     await audit({
       entity: 'organization',
       entityId: ctx.orgId,
