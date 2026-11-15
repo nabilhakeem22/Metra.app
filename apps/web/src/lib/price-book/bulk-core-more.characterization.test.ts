@@ -81,6 +81,14 @@ const AUDIT_NAMED_BY_ITS_ID =
 const AUDIT_REFUSED =
   'audit refused {entity: "price_change", entityId: "chg-2", action: "create", before: null, after: {section_id: "88888888-8888-4888-8888-888888888888", category: "88888888-8888-4888-8888-888888888888", pct_change: "15", target: "both", item_count: 2}}';
 
+// A change that touched exactly one item.
+const INSERT_HEADER_OF_ONE =
+  'insert(table:price_changes).values({orgId: "o-1", category: "88888888-8888-4888-8888-888888888888", pctChange: "15", target: "both", effectiveDate: "2026-11-14", appliedBy: "u-1", itemCount: 1}).returning({id: price_changes.id})';
+const INSERT_ONE_LINE =
+  'insert(table:price_change_lines).values([{orgId: "o-1", priceChangeId: "chg-2", costItemId: "ci-1", oldUnitCost: "100.0000", newUnitCost: "115.0000", oldUnitPrice: "150.0000", newUnitPrice: "172.5000"}])';
+const AUDIT_OF_ONE =
+  'audit {entity: "price_change", entityId: "chg-2", action: "create", before: null, after: {section_id: "88888888-8888-4888-8888-888888888888", category: "88888888-8888-4888-8888-888888888888", pct_change: "15", target: "both", item_count: 1}}';
+
 const owner: OrgContext = { orgId: 'o-1', userId: 'u-1', role: 'owner' };
 
 const change = { sectionId: SECOND_SECTION, pct: '15', target: 'both' as const };
@@ -143,6 +151,17 @@ describe('bulkUpdatePricesCore, a second category and a second header', () => {
       [BEGIN, READ_SECTION, UPDATE_BOTH_BY_15, INSERT_HEADER_NAMED_BY_ITS_ID, INSERT_LINES, AUDIT_NAMED_BY_ITS_ID, 'end'],
       0,
     );
+  });
+});
+
+describe('bulkUpdatePricesCore, the smallest change that touches anything', () => {
+  it('B24 a category with ONE item leaves a header counted one and a line insert of that one item', async () => {
+    db.respond(section(null, null, null), [two[0]], header, []);
+    expect(await settled(bulkUpdatePricesCore(owner, change))).toEqual({
+      ok: true,
+      data: { changeId: 'chg-2', itemCount: 1 },
+    });
+    expectTrace([BEGIN, READ_SECTION, UPDATE_BOTH_BY_15, INSERT_HEADER_OF_ONE, INSERT_ONE_LINE, AUDIT_OF_ONE, 'end'], 0);
   });
 });
 

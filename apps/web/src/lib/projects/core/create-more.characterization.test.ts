@@ -65,6 +65,8 @@ const READ_ACTIVE_TEMPLATES =
   'select().from(table:stage_templates).where(sql("stage_templates"."active" = $1 [true])).orderBy(sql("stage_templates"."sort_order" asc []), sql("stage_templates"."created_at" asc []))';
 const INSERT_STAGES =
   'insert(table:project_stages).values([{orgId: "o-1", projectId: "p-21", stageKey: "design", nameEn: "Design", nameAr: "تصميم", sortOrder: 0, status: "not_started", progressPct: "0"}, {orgId: "o-1", projectId: "p-21", stageKey: "civil", nameEn: "Civil works", nameAr: null, sortOrder: 1, status: "not_started", progressPct: "0"}])';
+const INSERT_ONE_STAGE =
+  'insert(table:project_stages).values([{orgId: "o-1", projectId: "p-21", stageKey: "design", nameEn: "Design", nameAr: "تصميم", sortOrder: 0, status: "not_started", progressPct: "0"}])';
 const INSERT_ACTIVITY =
   'insert(table:activities).values({orgId: "o-1", entityType: "project", entityId: "p-21", actorUserId: "u-1", kind: "project_created", note: null, meta: null})';
 const AUDIT_CREATED =
@@ -149,6 +151,17 @@ describe('createProjectCore, a second client and a second new row', () => {
     db.respond(plan, count, [], client, row, templates, [], []);
     expect(await settled(createProjectCore(owner, project))).toEqual({ ok: true, data: 'p-21' });
     expectTrace([...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, INSERT_STAGES, INSERT_ACTIVITY, AUDIT_CREATED, 'end'], 0);
+  });
+});
+
+describe('createProjectCore, the smallest template list that seeds anything', () => {
+  it('J24 a studio with ONE active template seeds that one stage', async () => {
+    db.respond(plan, count, [], client, row, [templates[0]], [], []);
+    expect(await settled(createProjectCore(owner, project))).toEqual({ ok: true, data: 'p-21' });
+    expectTrace(
+      [...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, INSERT_ONE_STAGE, INSERT_ACTIVITY, AUDIT_CREATED, 'end'],
+      0,
+    );
   });
 });
 
