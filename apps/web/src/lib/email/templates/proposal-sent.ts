@@ -52,6 +52,23 @@ export function proposalSentEmailTemplate(input: {
     ? 'إذا لم يعمل الزر، انسخ هذا الرابط في متصفحك:'
     : "If the button doesn't work, copy this link into your browser:";
 
+  return { subject, ...proposalSentBodies({ dir, intro, totalLine, expiryLine, cta, fallback, url }) };
+}
+
+/** The words of one proposal email, already chosen for its language; the intro and the two optional lines arrive escaped. */
+interface ProposalSentWords {
+  dir: 'rtl' | 'ltr';
+  intro: string;
+  totalLine: string | null;
+  expiryLine: string | null;
+  cta: string;
+  fallback: string;
+  url: string;
+}
+
+/** The HTML body and the plain-text body, laid out from those words. */
+function proposalSentBodies(words: ProposalSentWords): { html: string; text: string } {
+  const { dir, intro, totalLine, expiryLine, cta, fallback, url } = words;
   const meta = [totalLine, expiryLine]
     .filter(Boolean)
     .map(
@@ -79,5 +96,5 @@ export function proposalSentEmailTemplate(input: {
   ].filter((l) => l !== null && l !== undefined);
   const text = `${textLines.join('\n')}\n`;
 
-  return { subject, html, text };
+  return { html, text };
 }
