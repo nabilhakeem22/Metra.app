@@ -4,7 +4,8 @@
 // insert answer one id, so a statement that hard-coded either passed it; here
 // the client and the new row's id are both different. And the two writes that
 // follow the stages, the activity and the audit row: each awaited, and each
-// answered as the unsplit code answers when the database refuses it.
+// answered as the unsplit code answers when the database refuses it. And an
+// insert that answers no row: the templates are still read before anything fails.
 // Same recording double and conventions, with one difference in the audit double
 // (below). Every scenario is green on the unsplit code and on the split code
 // alike.
@@ -109,6 +110,9 @@ const rejectedWith = (failure: object) => ({
 /** The logged tail's answer, whole: its reference is random. */
 const GENERIC = { ok: false, error: 'generic', reference: expect.any(String) };
 
+/** What the log line says of reading the id of a row that is not there. */
+const NO_ROW_TO_READ = { name: 'TypeError', message: "Cannot read properties of undefined (reading 'id')" };
+
 let log: ReturnType<typeof vi.spyOn>;
 /** Every rejection that nothing handled while a scenario ran. */
 const unhandled: unknown[] = [];
@@ -162,6 +166,28 @@ describe('createProjectCore, the smallest template list that seeds anything', ()
       [...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, INSERT_ONE_STAGE, INSERT_ACTIVITY, AUDIT_CREATED, 'end'],
       0,
     );
+  });
+});
+
+describe('createProjectCore, an insert that answers no row', () => {
+  // No known database path answers no row to INSERT ... RETURNING; the double
+  // can. What is pinned is WHERE the unsplit code then fails: it reads the row's
+  // id only when it builds a stage row or the activity, so the templates are
+  // read first either way, and nothing is written after the insert.
+  it('J25 with templates to seed, they are read and the failure comes while the stage rows are built: generic, one line, no stage insert', async () => {
+    db.respond(plan, count, [], client, [], templates);
+    const answer = await settled(createProjectCore(owner, project));
+    expect(answer).toEqual(GENERIC);
+    expectTrace([...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, 'end'], 1);
+    expect(log.mock.calls[0]).toEqual(['mutateInOrg failed', { reference: answer.reference, failure: NO_ROW_TO_READ }]);
+  });
+
+  it('J26 with no template, they are still read and the failure comes at the activity: generic, one line, no activity', async () => {
+    db.respond(plan, count, [], client, [], []);
+    const answer = await settled(createProjectCore(owner, project));
+    expect(answer).toEqual(GENERIC);
+    expectTrace([...UP_TO_THE_INSERT, READ_ACTIVE_TEMPLATES, 'end'], 1);
+    expect(log.mock.calls[0]).toEqual(['mutateInOrg failed', { reference: answer.reference, failure: NO_ROW_TO_READ }]);
   });
 });
 
