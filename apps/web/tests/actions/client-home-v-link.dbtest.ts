@@ -62,7 +62,7 @@ afterAll(async () => {
   await closeFixture();
 });
 
-const pathOf = (locale: string, homeRaw: string, orderId: string) => `/${locale}/d/${homeRaw}?tab=execution&focus=variation:${orderId}`;
+const pathOf = (locale: string, homeRaw: string, orderId: string) => `/${locale}/d/${homeRaw}?tab=execution&focus=order:${orderId}`;
 
 /** The /v page's gate, as it reads: the link's order, then where it leads. */
 const landingOf = async (raw: string, locale: Locale = 'en') => variationLinkLanding(raw, await getVariationByToken(raw), locale);

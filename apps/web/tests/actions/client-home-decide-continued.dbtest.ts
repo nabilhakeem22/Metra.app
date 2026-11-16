@@ -72,7 +72,7 @@ describe('a design-only delivery that continued to execution', () => {
     if (before.tab !== 'execution' || !before.changeOrders) throw new Error('the home does not list the order');
     expect(before.changeOrders.map((listed) => listed.id)).toEqual([order.id]);
     expect((await variationLinkLanding(orderLink.raw, await getVariationByToken(orderLink.raw), 'en')).homePath).toBe(
-      `/en/d/${link}?tab=execution&focus=variation:${order.id}`,
+      `/en/d/${link}?tab=execution&focus=order:${order.id}`,
     );
 
     const { code } = await askForCode(outbox.sent, home, order.id);
