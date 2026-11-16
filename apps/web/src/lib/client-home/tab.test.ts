@@ -17,6 +17,7 @@ describe('requestedFocus', () => {
   it('opens the contract, one change order, one request or the signing of one contract by its id', () => {
     expect(requestedFocus('contract')).toEqual({ section: 'contract' });
     expect(requestedFocus(`variation:${ID}`)).toEqual({ section: 'variation', id: ID.toLowerCase() });
+    expect(requestedFocus(`order:${ID}`)).toEqual({ section: 'order', id: ID.toLowerCase() });
     expect(requestedFocus(`request:${ID}`)).toEqual({ section: 'request', id: ID.toLowerCase() });
     expect(requestedFocus(`sign:${ID}`)).toEqual({ section: 'sign', id: ID.toLowerCase() });
   });
@@ -33,6 +34,9 @@ describe('requestedFocus', () => {
       'variation:',
       'variation:not-a-uuid',
       `variation:${ID}:x`,
+      'order:',
+      'order:not-a-uuid',
+      `order:${ID}:x`,
       `site:${ID}`,
       ['contract'],
       'instalment:',

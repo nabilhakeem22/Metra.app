@@ -33,7 +33,8 @@ export async function variationLinkLanding(rawToken: string, variation: PublicVa
     asks
       ? {
           kind: 'variation',
-          focusOf: ({ focus_id: id }) => (isUuid(id) ? `variation:${id.toLowerCase()}` : null),
+          // `order:`, not `variation:`: no code was asked for, so the decision opens on its ask, not its code box.
+          focusOf: ({ focus_id: id }) => (isUuid(id) ? `order:${id.toLowerCase()}` : null),
           shownBy: async (homeRaw) => {
             const standing = await orderStandingInHome(homeRaw, variation);
             heard.waitsForSignature = standing === 'waits_for_signature';

@@ -2,12 +2,13 @@
 // open on. PURE and server-safe (a plain module, never 'use client', so the
 // server page and the client view import the same values).
 //
-// `/[locale]/d/[token]?tab=design|execution&focus=contract|variation:<id>|request:<id>|instalment:<kind>|sign:<id>`:
+// `/[locale]/d/[token]?tab=design|execution&focus=contract|variation:<id>|order:<id>|request:<id>|instalment:<kind>|sign:<id>`:
 // a missing or unknown `tab` means the delivery's current phase; an unknown
 // `focus` is ignored. `request:` and `instalment:` open that payment's "I've
 // made this payment", `sign:` the contract's signing, and `variation:` the
 // change order's decision, with its code box: the link a code email carries
-// (H5 functional F1).
+// (H5 functional F1). `order:` only scrolls to the change order: where an old
+// /v link lands, before any code was asked for.
 import { claimableMilestoneOf, type ClaimableMilestoneKind } from '@/lib/engagements/claimable-milestones';
 import { isUuid } from '@/lib/uuid';
 import type { CodePurpose } from './code-answers';
@@ -20,12 +21,13 @@ export type HomeTab = (typeof HOME_TABS)[number];
 export type HomeFocus =
   | { section: 'contract' }
   | { section: 'variation'; id: string }
+  | { section: 'order'; id: string }
   | { section: 'request'; id: string }
   | { section: 'sign'; id: string }
   | { section: 'instalment'; kind: ClaimableMilestoneKind };
 
 /** The focuses that name a uuid, lower-cased as the page's ids are. */
-const ID_SECTIONS = ['variation', 'request', 'sign'] as const;
+const ID_SECTIONS = ['variation', 'order', 'request', 'sign'] as const;
 
 /** A query value as Next hands it over: one string, a repeated key's list, or nothing. */
 type QueryValue = string | string[] | undefined;

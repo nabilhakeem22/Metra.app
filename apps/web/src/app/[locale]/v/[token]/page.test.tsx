@@ -79,9 +79,9 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the /v page when its own read does n
 
 describe('the /v page', () => {
   it('with a home: a 307 replace to exactly that path, asked with the order', async () => {
-    reads.variationLinkLanding.mockResolvedValue({ homePath: '/ar-EG/d/home-raw?tab=execution&focus=variation:v-id', waitsForSignature: false });
+    reads.variationLinkLanding.mockResolvedValue({ homePath: '/ar-EG/d/home-raw?tab=execution&focus=order:v-id', waitsForSignature: false });
     const thrown = await PublicVariationPage({ params }).catch((error: unknown) => error);
-    expect((thrown as { digest?: string }).digest).toBe('NEXT_REDIRECT;replace;/ar-EG/d/home-raw?tab=execution&focus=variation:v-id;307;');
+    expect((thrown as { digest?: string }).digest).toBe('NEXT_REDIRECT;replace;/ar-EG/d/home-raw?tab=execution&focus=order:v-id;307;');
     expect(reads.variationLinkLanding).toHaveBeenCalledWith('v-raw', VARIATION, 'ar-EG');
   });
 

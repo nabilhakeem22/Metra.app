@@ -15,7 +15,7 @@ import type { StudioContactFacts } from './use-studio-whatsapp';
 /**
  * One change order awaiting the client's decision: its number, title and reason,
  * what it costs and the time it adds, its items on a tap, and the decision. The
- * element id `variation-<id>` is what `?focus=variation:<id>` scrolls to. فصحى
+ * element id `variation-<id>` is what `?focus=variation:<id>` and `?focus=order:<id>` scroll to. فصحى
  * copy, Latin digits; a long unbroken title or reason wraps inside the card.
  */
 export function ChangeOrderCard({

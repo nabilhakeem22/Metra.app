@@ -63,7 +63,7 @@ describe('variationLinkLanding, its home path', () => {
     sdf.readSdfJson
       .mockResolvedValueOnce({ ...target, focus_id: ORDER.toUpperCase() })
       .mockResolvedValueOnce(homePayload('decide_change_order'));
-    expect(await homePathOf(` ${V_RAW} `, variationOf(), 'ar-EG')).toBe(`/ar-EG/d/${home.raw}?tab=execution&focus=variation:${ORDER}`);
+    expect(await homePathOf(` ${V_RAW} `, variationOf(), 'ar-EG')).toBe(`/ar-EG/d/${home.raw}?tab=execution&focus=order:${ORDER}`);
     const [asked] = sdf.readSdfJson.mock.calls[0] as [{ queryChunks: unknown[] }];
     expect(asked.queryChunks).toContain('variation');
     expect(asked.queryChunks).toContain(hashShareToken(V_RAW));
@@ -134,7 +134,7 @@ describe('an order waiting for its contract to be signed (the lead ruling after 
     const { home, target } = liveHome();
     sdf.readSdfJson.mockResolvedValueOnce(target).mockResolvedValueOnce(homePayload('decide_change_order'));
     expect(await variationLinkLanding(V_RAW, variationOf(), 'en')).toEqual({
-      homePath: `/en/d/${home.raw}?tab=execution&focus=variation:${ORDER}`,
+      homePath: `/en/d/${home.raw}?tab=execution&focus=order:${ORDER}`,
       waitsForSignature: false,
     });
     sdf.readSdfJson.mockReset().mockResolvedValueOnce(null);

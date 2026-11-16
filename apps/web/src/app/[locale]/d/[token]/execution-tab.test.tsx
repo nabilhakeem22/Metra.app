@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { createTranslator } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeFocus } from '@/lib/client-home/tab';
@@ -301,6 +301,19 @@ describe('a ?focus= link (H4 follow-up F4: an unknown focus is ignored)', () => 
     show('en', homeOf('decide_change_order'), { section: 'variation', id: CHANGE_ORDER.id }, null, [CHANGE_ORDER]);
     expect(scrolled).toEqual([`variation-${CHANGE_ORDER.id}`]);
     expect((document.getElementById(`variation-${CHANGE_ORDER.id}`) as HTMLElement).className.split(' ')).toContain('scroll-mt-16');
+  });
+
+  it.each([
+    ['order', 'ask'],
+    ['variation', 'box'],
+  ] as const)('a %s: focus opens the decision on the code panel\'s %s (an old /v link asked for no code; a code email did)', async (section, panel) => {
+    show('en', homeOf('decide_change_order'), { section, id: CHANGE_ORDER.id }, null, [CHANGE_ORDER]);
+    expect(scrolled).toEqual([`variation-${CHANGE_ORDER.id}`]);
+    const card = within(document.getElementById(`variation-${CHANGE_ORDER.id}`) as HTMLElement);
+    fireEvent.change(card.getByLabelText(messageAt('en', 'delivery.changeOrders.decide.nameLabel')), { target: { value: 'Hesham Adel' } });
+    fireEvent.click(card.getByRole('button', { name: messageAt('en', 'delivery.changeOrders.decide.approve') }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.querySelector('[data-code-panel]')?.getAttribute('data-code-panel')).toBe(panel);
   });
 });
 
