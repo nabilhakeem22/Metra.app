@@ -1,3 +1,4 @@
+import { DRAFT_ANSWER_DEADLINE_MS, NO_ANSWER, settleWithinDeadline } from './draft-answer-deadline';
 import { recoverLostCommit } from './lost-commit';
 import type { SaveDraft, SaveDraftResult } from './persist-draft';
 import type { ProposalDraftState } from './proposal-payload';
@@ -9,7 +10,9 @@ import type { ProposalDraftState } from './proposal-payload';
  * background requests meanwhile. It also carries the revision each save is
  * edited from, the snapshots of what is stored and of what is being sent, the
  * draft of a send that never answered (it may have committed: lost-commit.ts),
- * and the clock of the first unsaved change.
+ * and the clock of the first unsaved change. A save with no answer within the
+ * deadline (draft-answer-deadline.ts) is a send that never answered, so no save
+ * holds the flight for ever.
  */
 export interface DraftSaveFlight {
   /** Start a background save now, or queue exactly one more if one is running. */
@@ -128,18 +131,20 @@ function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
   // The draft of a send that never answered: it may have committed.
   let unconfirmed: ProposalDraftState | null = null;
 
-  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
-    try {
-      const result = await save(draft, flight.revision);
-      if (result.ok) unconfirmed = null;
-      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
-      return result;
-    } catch {
-      // The answer never came back, so the save may or may not have committed:
-      // exactly what `uncertain` says, and lost-commit.ts settles which.
-      unconfirmed = draft;
-      return { ok: false, error: 'uncertain' };
-    }
+  /** One save, answered within the deadline, and what its answer leaves unconfirmed. */
+  function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
+    return settleWithinDeadline(
+      () => save(draft, flight.revision),
+      DRAFT_ANSWER_DEADLINE_MS,
+      (answer) => {
+        // The answer never came back, so the save may or may not have committed:
+        // exactly what `uncertain` says, and lost-commit.ts settles which.
+        const result: SaveDraftResult = answer === NO_ANSWER ? { ok: false, error: 'uncertain' } : answer;
+        if (result.ok) unconfirmed = null;
+        else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
+        return result;
+      },
+    );
   }
 
   async function sendRecovering(
