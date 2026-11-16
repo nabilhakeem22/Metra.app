@@ -68,6 +68,34 @@ describe('createDraftSaveFlight: every unconfirmed send is remembered', () => {
     expect(handed(0)).toBe('a c | b');
   });
 
+  it('another draft object sent as the same snapshot (Retry after a render) is handed over once, the newer object', async () => {
+    const { save, recover, handed } = scriptedFlight([UNCERTAIN, UNCERTAIN, UNCERTAIN, UNCERTAIN, STALE]);
+    const flight = createDraftSaveFlight(() => null, { revision: 'r1', stored: 'snap-stored' });
+    const sendAs = (name: string, snapshot: string) => flight.send(save, draftNamed(name), snapshot, () => undefined);
+    await sendAs('a', 'snap-a');
+    await sendAs('b', 'snap-b');
+    await sendAs('b retry 1', 'snap-b');
+    await sendAs('b retry 2', 'snap-b');
+    await sendAs('c', 'snap-c');
+    expect(recover).toHaveBeenCalledTimes(1);
+    expect(handed(0)).toBe('b retry 2 c | a');
+  });
+
+  it('the send again after a recovery is remembered under the snapshot it was asked as', async () => {
+    const rekeyed = draftNamed('b+ids');
+    const { save, handed } = scriptedFlight(
+      [UNCERTAIN, STALE, UNCERTAIN, UNCERTAIN, STALE],
+      [{ revision: 'r2', idsByKey: new Map(), draft: rekeyed }],
+    );
+    const flight = createDraftSaveFlight(() => null, { revision: 'r1', stored: 'snap-stored' });
+    const sendAs = (name: string, snapshot: string) => flight.send(save, draftNamed(name), snapshot, () => undefined);
+    await sendAs('a', 'snap-a');
+    await sendAs('b', 'snap-b');
+    await sendAs('b retry', 'snap-b');
+    await sendAs('c', 'snap-c');
+    expect(handed(1)).toBe('b retry c | ');
+  });
+
   it('after ten lost sends the read is handed eight: the first and the newest seven', async () => {
     const { send, handed } = scriptedFlight([...Array.from({ length: 10 }, () => UNCERTAIN), STALE]);
     for (let n = 1; n <= 11; n += 1) await send(draftNamed(`d${n}`));

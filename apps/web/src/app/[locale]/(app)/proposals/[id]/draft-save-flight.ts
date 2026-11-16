@@ -2,7 +2,7 @@ import { DRAFT_ANSWER_DEADLINE_MS, NO_ANSWER, settleWithinDeadline } from './dra
 import { recoverLostCommit } from './lost-commit';
 import type { SaveDraft, SaveDraftResult } from './persist-draft';
 import type { ProposalDraftState } from './proposal-payload';
-import { unconfirmedAfter } from './unconfirmed-sends';
+import { unconfirmedAfter, type UnconfirmedSend } from './unconfirmed-sends';
 
 /**
  * The builder's single-flight save engine, free of React. ONE save at a time: a
@@ -100,7 +100,7 @@ export function createDraftSaveFlight(
       firstUnsavedAt = null;
       sending = snapshot;
       try {
-        return await sendRecovering(save, draft, onRecovered);
+        return await sendRecovering(save, { draft, snapshot }, onRecovered);
       } finally {
         sending = null;
       }
@@ -143,20 +143,20 @@ function whenSettled(save: Promise<unknown>, afterwards: () => void): Promise<vo
  * to save against from `flight` and adopts the recovered one onto it.
  */
 function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
-  // The drafts of the sends since the last confirmed save that never answered,
-  // newest first: one of them may have committed.
-  let unconfirmed: readonly ProposalDraftState[] = [];
+  // The sends since the last confirmed save that never answered, newest first:
+  // one of them may have committed.
+  let unconfirmed: readonly UnconfirmedSend[] = [];
 
   /** One save, answered within the deadline, and what its answer leaves unconfirmed. */
-  function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
+  function sendOnce(save: SaveDraft, sent: UnconfirmedSend): Promise<SaveDraftResult> {
     return settleWithinDeadline(
-      () => save(draft, flight.revision),
+      () => save(sent.draft, flight.revision),
       DRAFT_ANSWER_DEADLINE_MS,
       (answer) => {
         // The answer never came back, so the save may or may not have committed:
         // exactly what `uncertain` says, and lost-commit.ts settles which.
         const result: SaveDraftResult = answer === NO_ANSWER ? { ok: false, error: 'uncertain' } : answer;
-        unconfirmed = unconfirmedAfter(unconfirmed, draft, result);
+        unconfirmed = unconfirmedAfter(unconfirmed, sent, result);
         return result;
       },
     );
@@ -164,11 +164,12 @@ function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
 
   async function sendRecovering(
     save: SaveDraft,
-    draft: ProposalDraftState,
+    sent: UnconfirmedSend,
     onRecovered: (idsByKey: Map<string, string>) => void,
   ): Promise<{ result: SaveDraftResult; sent: ProposalDraftState }> {
-    const result = await sendOnce(save, draft);
-    const [latest, ...earlier] = unconfirmed;
+    const { draft, snapshot } = sent;
+    const result = await sendOnce(save, sent);
+    const [latest, ...earlier] = unconfirmed.map((lost) => lost.draft);
     if (result.ok || result.error !== 'draft_changed_elsewhere' || !latest) {
       return { result, sent: draft };
     }
@@ -179,7 +180,8 @@ function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
     unconfirmed = [];
     flight.revision = recovered.revision;
     onRecovered(recovered.idsByKey);
-    return { result: await sendOnce(save, recovered.draft), sent: recovered.draft };
+    // The send again is the same send, re-keyed with the stored ids: same snapshot.
+    return { result: await sendOnce(save, { draft: recovered.draft, snapshot }), sent: recovered.draft };
   }
 
   return sendRecovering;
