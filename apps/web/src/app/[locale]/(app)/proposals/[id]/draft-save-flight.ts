@@ -73,7 +73,7 @@ export function createDraftSaveFlight(
       }
       const started = persist();
       if (!started) return;
-      running = started.then(() => {
+      running = whenSettled(started, () => {
         running = null;
         if (!followUp || flushing) return;
         followUp = false;
@@ -121,6 +121,19 @@ export function createDraftSaveFlight(
   };
   const sendRecovering = createRecoveringSend(flight);
   return flight;
+}
+
+/**
+ * Runs `afterwards` once a background save settles, rejected or not, so a save
+ * that throws cannot hold the flight for the life of the tab. What it answers
+ * never rejects: a flush and a leave store wait on it. The failure is raised
+ * again as the unhandled rejection it always was, not hidden here.
+ */
+function whenSettled(save: Promise<unknown>, afterwards: () => void): Promise<void> {
+  return save.then(afterwards, (cause: unknown) => {
+    void Promise.reject(cause);
+    afterwards();
+  });
 }
 
 /**
