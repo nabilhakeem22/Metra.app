@@ -112,10 +112,11 @@ describe('createDraftSaveFlight: every unconfirmed send is remembered', () => {
     expect(recover).toHaveBeenCalledTimes(1);
   });
 
-  it('after ten lost sends the read is handed eight: the first and the newest seven', async () => {
-    const { send, handed } = scriptedFlight([...Array.from({ length: 10 }, () => UNCERTAIN), STALE]);
-    for (let n = 1; n <= 11; n += 1) await send(draftNamed(`d${n}`));
-    expect(handed(0)).toBe('d10 d11 | d9 d8 d7 d6 d5 d4 d1');
+  it('after 34 lost sends the read is handed 32: the first and the newest thirty-one', async () => {
+    const { send, handed } = scriptedFlight([...Array.from({ length: 34 }, () => UNCERTAIN), STALE]);
+    for (let n = 1; n <= 35; n += 1) await send(draftNamed(`d${n}`));
+    const earlier = Array.from({ length: 30 }, (_, n) => `d${33 - n}`).join(' ');
+    expect(handed(0)).toBe(`d34 d35 | ${earlier} d1`);
   });
 
   it('a real conflict forgets nothing: the next refusal is handed the same sends', async () => {

@@ -10,6 +10,8 @@ const sendNamed = (name: string, snapshot = name): UnconfirmedSend => ({
   snapshot,
 });
 const names = (sends: readonly UnconfirmedSend[]) => sends.map((sent) => sent.draft.id).join(' ');
+/** `d<from> d<from - 1> ... d<to>`, newest first. */
+const run = (from: number, to: number) => Array.from({ length: from - to + 1 }, (_, n) => `d${from - n}`).join(' ');
 
 /** Sends d1..dN, each answered uncertain in turn; the list is newest first. */
 function afterLostSends(count: number): readonly UnconfirmedSend[] {
@@ -63,28 +65,28 @@ describe('unconfirmedAfter', () => {
   });
 
   it('does not change the list it was handed', () => {
-    const earlier = afterLostSends(8);
-    unconfirmedAfter(earlier, sendNamed('d9'), UNCERTAIN);
+    const earlier = afterLostSends(32);
+    unconfirmedAfter(earlier, sendNamed('d33'), UNCERTAIN);
     unconfirmedAfter(earlier, sendNamed('d4 again', 'd4'), UNCERTAIN);
-    expect(names(earlier)).toBe('d8 d7 d6 d5 d4 d3 d2 d1');
+    expect(names(earlier)).toBe(run(32, 1));
   });
 
-  it('keeps 8 sends at most', () => {
-    expect(afterLostSends(7)).toHaveLength(7);
-    expect(afterLostSends(8)).toHaveLength(8);
-    expect(afterLostSends(9)).toHaveLength(8);
-    expect(afterLostSends(40)).toHaveLength(8);
+  it('keeps 32 sends at most', () => {
+    expect(afterLostSends(31)).toHaveLength(31);
+    expect(afterLostSends(32)).toHaveLength(32);
+    expect(afterLostSends(33)).toHaveLength(32);
+    expect(afterLostSends(100)).toHaveLength(32);
   });
 
-  it('past the bound the first send and the newest seven stay; the one dropped is the oldest but one', () => {
-    expect(names(afterLostSends(9))).toBe('d9 d8 d7 d6 d5 d4 d3 d1');
-    expect(names(afterLostSends(10))).toBe('d10 d9 d8 d7 d6 d5 d4 d1');
-    expect(names(afterLostSends(40))).toBe('d40 d39 d38 d37 d36 d35 d34 d1');
+  it('past the bound the first send and the newest thirty-one stay; the one dropped is the oldest but one', () => {
+    expect(names(afterLostSends(33))).toBe(`${run(33, 3)} d1`);
+    expect(names(afterLostSends(34))).toBe(`${run(34, 4)} d1`);
+    expect(names(afterLostSends(100))).toBe(`${run(100, 70)} d1`);
   });
 
   it('a retry of a kept send when the list is full drops nothing', () => {
-    const full = afterLostSends(8);
-    expect(names(unconfirmedAfter(full, full[7], UNCERTAIN))).toBe('d1 d8 d7 d6 d5 d4 d3 d2');
-    expect(names(unconfirmedAfter(full, sendNamed('d2 again', 'd2'), UNCERTAIN))).toBe('d2 again d8 d7 d6 d5 d4 d3 d1');
+    const full = afterLostSends(32);
+    expect(names(unconfirmedAfter(full, full[31], UNCERTAIN))).toBe(`d1 ${run(32, 2)}`);
+    expect(names(unconfirmedAfter(full, sendNamed('d2 again', 'd2'), UNCERTAIN))).toBe(`d2 again ${run(32, 3)} d1`);
   });
 });
