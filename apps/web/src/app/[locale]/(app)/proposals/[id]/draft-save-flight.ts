@@ -22,8 +22,9 @@ export interface DraftSaveFlight {
   /**
    * Send `draft` (whose snapshot is `snapshot`) through `save`. Refused as stale
    * while an earlier send's answer was lost: if what is stored is that send, it
-   * was ours, so adopt it (through `onRecovered`) and send again, once. Answers
-   * the draft last sent.
+   * was ours, so adopt it (through `onRecovered`) and send again, once. If what
+   * is stored cannot be read, the answer is `uncertain`, not the refusal: whose
+   * commit it was is still unknown. Answers the draft last sent.
    */
   send(
     save: SaveDraft,
@@ -157,6 +158,8 @@ function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
       return { result, sent: draft };
     }
     const recovered = await recoverLostCommit(unconfirmed, draft);
+    // Nothing is forgotten here: the next send is refused again and reads again.
+    if (recovered === 'unreadable') return { result: { ok: false, error: 'uncertain' }, sent: draft };
     if (!recovered) return { result, sent: draft };
     unconfirmed = null;
     flight.revision = recovered.revision;
