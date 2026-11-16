@@ -22,17 +22,35 @@ export interface RecoveredCommit {
  * whose rows the current draft most likely still has), that commit was this
  * tab's own: answer the revision and ids to adopt and the current draft re-keyed
  * with them. Null for a real conflict: the stored draft was read and is none of
- * them. `'unreadable'` when it could not be read, so whose commit it holds is
- * still unknown.
+ * them. `'unreadable'` when it could not be read (the read threw, was refused,
+ * or did not answer within the deadline), so whose commit it holds is still
+ * unknown. The answer is worked out in the turn the read answers: the deadline
+ * costs no microtask turn (lost-commit.timing.test.ts).
  */
-export async function recoverLostCommit(
+export function recoverLostCommit(
   latest: ProposalDraftState,
   current: ProposalDraftState,
   earlier: readonly ProposalDraftState[],
 ): Promise<RecoveredCommit | 'unreadable' | null> {
-  const stored = await readStoredDraft(current.id);
-  if (!stored) return 'unreadable';
-  const ours = [latest, ...earlier].find((sent) => storedDraftMatches(stored, buildProposalPayload(sent)));
+  return settleWithinDeadline(
+    () => readStoredDraftState(current.id),
+    DRAFT_ANSWER_DEADLINE_MS,
+    (answer) => {
+      const stored = answer === NO_ANSWER || !answer.ok ? null : (answer.data ?? null);
+      return stored ? commitAmong([latest, ...earlier], current, stored) : 'unreadable';
+    },
+  );
+}
+
+type StoredDraft = Parameters<typeof receiptOfStored>[0];
+
+/** The first of `sends` that the stored draft is, as the commit to adopt; null when it is none of them. */
+function commitAmong(
+  sends: readonly ProposalDraftState[],
+  current: ProposalDraftState,
+  stored: StoredDraft,
+): RecoveredCommit | null {
+  const ours = sends.find((sent) => storedDraftMatches(stored, buildProposalPayload(sent)));
   if (!ours) return null;
   const idsByKey = storedIdsByKey(ours.sections, receiptOfStored(stored));
   return {
@@ -40,13 +58,4 @@ export async function recoverLostCommit(
     idsByKey,
     draft: { ...current, sections: withStoredIds(current.sections, idsByKey) },
   };
-}
-
-/** The stored draft, or null when the read threw, was refused, or did not answer within the deadline. */
-function readStoredDraft(proposalId: string) {
-  return settleWithinDeadline(
-    () => readStoredDraftState(proposalId),
-    DRAFT_ANSWER_DEADLINE_MS,
-    (answer) => (answer === NO_ANSWER || !answer.ok ? null : (answer.data ?? null)),
-  );
 }

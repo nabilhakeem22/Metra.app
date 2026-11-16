@@ -62,7 +62,9 @@ export function settleWithinDeadline<Answer, Settled>(
     };
     const deadline = setTimeout(() => finish(NO_ANSWER), deadlineMs);
     try {
-      void call().then((answer) => finish(answer ?? NO_ANSWER), () => finish(NO_ANSWER));
+      // `Promise.resolve` is what `await` does: a promise is taken as it is (no
+      // turn more), and a call that answers a plain value is still answered.
+      void Promise.resolve(call()).then((answer) => finish(answer ?? NO_ANSWER), () => finish(NO_ANSWER));
     } catch {
       finish(NO_ANSWER);
     }

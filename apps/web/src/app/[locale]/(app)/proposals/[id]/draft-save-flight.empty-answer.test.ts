@@ -55,7 +55,33 @@ describe('settleWithinDeadline: an empty answer', () => {
   });
 });
 
+describe('settleWithinDeadline: a call that answers a plain value, not a promise', () => {
+  // `await` took a plain value as the answer; so does the wait with a deadline.
+  it('the value is the answer, and no timer is left', async () => {
+    const settle = vi.fn(told);
+    const plain = (() => 'ok') as unknown as () => Promise<string>;
+    await expect(settleWithinDeadline(plain, 1_000, settle)).resolves.toBe('answered ok');
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a save that answers a plain ok is stored, not uncertain', async () => {
+    const ok: SaveDraftResult = { ok: true };
+    const save = (() => ok) as unknown as SaveDraft;
+    const flight = createDraftSaveFlight(() => null, { revision: 'r1', stored: 'snap-stored' });
+    expect((await flight.send(save, draftNamed('a'), 'snap-a', noIds)).result).toBe(ok);
+  });
+});
+
 describe('createDraftSaveFlight: a save that answers nothing', () => {
+  it('each save with no answer is answered with an uncertain of its own, never a shared object', async () => {
+    const { flight, save } = flightAnswering([undefined, undefined]);
+    const first = await flight.send(save, draftNamed('a'), 'snap-a', noIds);
+    const second = await flight.send(save, draftNamed('b'), 'snap-b', noIds);
+    expect(second.result).toEqual(first.result);
+    expect(second.result).not.toBe(first.result);
+  });
+
   it.each([[undefined], [null]])('an answer of %s is answered uncertain, with the draft it sent', async (empty) => {
     const { flight, save } = flightAnswering([empty]);
     const draft = draftNamed('a');

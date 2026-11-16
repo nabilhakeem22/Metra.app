@@ -96,6 +96,22 @@ describe('createDraftSaveFlight: every unconfirmed send is remembered', () => {
     expect(handed(1)).toBe('b retry c | ');
   });
 
+  it('a recovery has emptied the list before it hands the ids on: a throw there does not bring the sends back', async () => {
+    const { save, recover } = scriptedFlight(
+      [UNCERTAIN, STALE, STALE],
+      [{ revision: 'r2', idsByKey: new Map(), draft: draftNamed('b+ids') }],
+    );
+    const flight = createDraftSaveFlight(() => null, { revision: 'r1', stored: 'snap-stored' });
+    await flight.send(save, draftNamed('a'), 'snap-a', () => undefined);
+    const refused = flight.send(save, draftNamed('b'), 'snap-b', () => {
+      throw new Error('the ids could not be adopted');
+    });
+    await expect(refused).rejects.toThrow('the ids could not be adopted');
+    expect(flight.revision).toBe('r2');
+    await flight.send(save, draftNamed('c'), 'snap-c', () => undefined);
+    expect(recover).toHaveBeenCalledTimes(1);
+  });
+
   it('after ten lost sends the read is handed eight: the first and the newest seven', async () => {
     const { send, handed } = scriptedFlight([...Array.from({ length: 10 }, () => UNCERTAIN), STALE]);
     for (let n = 1; n <= 11; n += 1) await send(draftNamed(`d${n}`));
