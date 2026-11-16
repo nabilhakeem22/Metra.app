@@ -9,14 +9,14 @@
 // `liveEvents` (event-provenance.ts) is the other half: it drops retracted rows
 // before the guards ever see them, so a withdrawn acknowledgement stops opening
 // the gate it opened. Without that half this is bookkeeping theatre.
-import { designEngagements, engagementEvents } from '@metra/db';
-import { and, eq } from 'drizzle-orm';
+import { designEngagements } from '@metra/db';
 import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { correctionFieldErrors } from './correction-field-rules';
+import { appendEventCorrection, requireRetractableEvent } from './event-correction-ledger';
 import { isTerminal } from './states';
 
 export interface RecordEventCorrectionInput {
@@ -70,62 +70,9 @@ export async function recordEventCorrectionCore(
       );
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
-      // Scoped to the PARENT as well as the org: RLS stops a foreign tenant, and
-      // this stops a valid id from a sibling engagement being retracted here.
-      const [target] = await tx
-        .select({
-          id: engagementEvents.id,
-          kind: engagementEvents.kind,
-        })
-        .from(engagementEvents)
-        .where(
-          and(
-            eq(engagementEvents.id, input.eventId),
-            eq(engagementEvents.engagementId, input.engagementId),
-          ),
-        )
-        .limit(1);
-      if (!target) fail('event_not_found');
-      // A correction is bookkeeping about the ledger, not an event in it. Letting
-      // one be retracted would mean un-retracting the row beneath it by a side
-      // effect nobody reading the ledger would expect.
-      if (target.kind === 'event_correction') fail('malformed');
-
-      // Retracting twice would write a second correction that changes nothing and
-      // muddies the record with a decision that was already taken.
-      const [existing] = await tx
-        .select({ id: engagementEvents.id })
-        .from(engagementEvents)
-        .where(eq(engagementEvents.supersedesEventId, input.eventId))
-        .limit(1);
-      if (existing) fail('already_corrected');
-
-      const [row] = await tx
-        .insert(engagementEvents)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: input.engagementId,
-          kind: 'event_correction',
-          actorUserId: ctx.userId,
-          supersedesEventId: input.eventId,
-          note: reason,
-        })
-        .returning({ id: engagementEvents.id });
-
-      await audit({
-        entity: 'design_engagement',
-        entityId: input.engagementId,
-        action: 'update',
-        before: null,
-        after: {
-          event_id: row.id,
-          kind: 'event_correction',
-          supersedes_event_id: input.eventId,
-          supersedes_kind: target.kind,
-          reason,
-        },
-      });
-      return row.id;
+      const target = await requireRetractableEvent(tx, input.engagementId, input.eventId);
+      const correction = { engagementId: input.engagementId, eventId: input.eventId, reason, supersedesKind: target.kind };
+      return appendEventCorrection(tx, ctx, correction, audit);
     },
   );
 }

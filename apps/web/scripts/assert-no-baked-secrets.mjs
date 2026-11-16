@@ -18,15 +18,17 @@
  * TWO PASSES, because a key name is not the only way a secret gets in:
  *   1. the KEYS assigned in the emitted env module — the shape OpenNext writes;
  *   2. the VALUES, over the whole `.open-next` tree — a service-role JWT, a
- *      Resend key or a Postgres URL with a password, however it got there.
+ *      Resend key, a Supabase secret key or a Postgres URL with a password,
+ *      however it got there (./baked-secret-values.mjs; no file is skipped for
+ *      its size).
  *
  * Runs immediately after `opennextjs-cloudflare build` in ci.yml and deploy.yml.
  * Never prints a VALUE — only the offending key name or the file's path.
  */
-import { Buffer } from 'node:buffer';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { filesHoldingSecrets } from './baked-secret-values.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)); // apps/web/scripts
 const bundleDir = resolve(here, '../.open-next');
@@ -88,72 +90,6 @@ function looksLikeEnvModule(source) {
   return KNOWN_SHAPES.some((shape) => shape.test(source));
 }
 
-/** Value shapes that cannot belong to a public var, whatever they are named. */
-const VALUE_PATTERNS = [
-  { what: 'a Resend API key', pattern: /\bre_[A-Za-z0-9]{16,}/ },
-  {
-    what: 'a Postgres URL carrying a password',
-    pattern: /postgres(?:ql)?:\/\/[^\s"']*:[^\s"'@]+@/,
-  },
-];
-
-/**
- * Does this text hold a SERVICE-ROLE JWT?
- *
- * The anon key is a JWT too and belongs in the bundle, so `eyJ…` on its own
- * proves nothing. The two are told apart by the JWT's own payload: decode the
- * middle segment and look for the role claim. Nothing decoded is ever printed.
- */
-function hasServiceRoleJwt(text) {
-  const jwt = /eyJ[A-Za-z0-9_-]{20,}\.(eyJ[A-Za-z0-9_-]{20,})\.[A-Za-z0-9_-]+/g;
-  for (const [, payload] of text.matchAll(jwt)) {
-    try {
-      if (Buffer.from(payload, 'base64url').toString('utf8').includes('service_role')) {
-        return true;
-      }
-    } catch {
-      // An `eyJ…` run that is not base64url is not a JWT. Not our business.
-    }
-  }
-  return false;
-}
-
-/**
- * Where a baked value can actually be: compiled modules and their data.
- *
- * NOT documentation. `node_modules/postgres/README.md` ships inside the bundle
- * and its usage example is `postgres://username:password@host:port/database` —
- * a shape-only scan cannot tell that from a real DSN, and failing a deploy over
- * a library's README is the kind of false alarm that gets a check deleted.
- */
-const SCANNED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.json', '.html']);
-
-/** Every file under `dir`, depth first. */
-function* filesUnder(dir) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) yield* filesUnder(path);
-    else if (entry.isFile()) yield path;
-  }
-}
-
-/** Paths under `.open-next` whose CONTENT looks like a secret. */
-function filesHoldingSecrets() {
-  const hits = [];
-  for (const path of filesUnder(bundleDir)) {
-    if (!SCANNED_EXTENSIONS.has(extname(path))) continue;
-    // A source map is megabytes of noise; a baked secret lives in a module, so
-    // skip the outliers by size rather than read them all.
-    if (statSync(path).size > 8 * 1024 * 1024) continue;
-    const text = readFileSync(path, 'latin1');
-    const hit =
-      VALUE_PATTERNS.find(({ pattern }) => pattern.test(text))?.what ??
-      (hasServiceRoleJwt(text) ? 'a service-role JWT' : null);
-    if (hit) hits.push(`  - ${relative(bundleDir, path)} (${hit})`);
-  }
-  return hits;
-}
-
 const source = readEnvFile();
 const keys = assignedKeys(source);
 
@@ -178,7 +114,7 @@ if (baked.length > 0) {
   );
 }
 
-const withSecretValues = filesHoldingSecrets();
+const withSecretValues = filesHoldingSecrets(bundleDir);
 if (withSecretValues.length > 0) {
   bail(
     'secret-shaped VALUE(s) in the build output:\n' +

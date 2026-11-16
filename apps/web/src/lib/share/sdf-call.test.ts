@@ -106,6 +106,28 @@ describe('the token-SDF shape assertion', () => {
     }
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('A7: refuses a public.app_* function whose name does not END in _by_token', async () => {
+    // The internal helpers (money facts, payment details) take a bare id and are
+    // revoked from the app role; that revoke does not bind this connection.
+    execute.mockClear();
+    const refused = [
+      sql`select public.app_contract_money_facts(${'id'}) as data`,
+      sql`select public.app_x_by_token_extra(${'hash'}) as data`,
+      sql`select public.app_by_token(${'hash'}) as data`,
+    ];
+    for (const query of refused) {
+      await expect(readSdfJson(query)).rejects.toThrow(/token SECURITY DEFINER functions only/);
+      await expect(readSdfCode(query)).rejects.toThrow(/token SECURITY DEFINER functions only/);
+    }
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('A7: still runs a real _by_token call, with or without a space before the bracket', async () => {
+    execute.mockResolvedValueOnce([{ data: 1 }]).mockResolvedValueOnce([{ code: 'ok' }]);
+    await expect(readSdfJson(sql`select public.app_home_contract_by_token(${'hash'}) as data`)).resolves.toBe(1);
+    await expect(readSdfCode(sql`select public.app_contract_ack_by_token (${'hash'}) as code`)).resolves.toBe('ok');
+  });
 });
 
 describe('readSdfCode', () => {

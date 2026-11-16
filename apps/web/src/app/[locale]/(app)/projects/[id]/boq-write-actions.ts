@@ -88,59 +88,74 @@ export function saveLine(
       .run({
         lineId: line.id,
         columns,
-        write: async () => {
-          try {
-            const result = await updateBoqLine({ lineId: line.id, patch });
-            // Drop the local edit so the revalidated record takes over — but only
-            // for cells that still hold the value this write carried. One the
-            // studio has re-typed keeps its override until its own write lands.
-            if (result.ok) context.edits.clearSaved(line.id, saved);
-            // The edit STAYS on screen when the server refuses it. Reverting to
-            // the stored value would throw away what the studio typed and leave
-            // them guessing which cell was wrong.
-            //
-            // AND THE REFUSAL IS LOGGED, not only toasted. A coded refusal —
-            // `amount_too_large`, `boq_not_draft`, a line that has vanished — is
-            // the COMMON failure of this screen and it left no trace anywhere:
-            // `mutateInOrg` logs what the server threw, never what it decided.
-            // On a 2,000-line sheet a toast that is gone in five seconds is the
-            // entire record, and it does not say which row.
-            else {
-              console.error('boq line save refused', {
-                lineId: line.id,
-                columns,
-                code: result.error,
-              });
-              const underCells = result.fields && context.cellErrors.show(line.id, result.fields);
-              if (!underCells) refuse(context, result);
-            }
-          } catch (cause) {
-            // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw
-            // it, so the server has nothing, and the toast below is gone in five
-            // seconds. Logged the way use-engagement-action.ts logs its twin, so
-            // `wrangler tail` carries a failed BOQ save at all.
-            console.error(
-              'boq line save failed before returning a result',
-              { lineId: line.id, columns },
-              loggableFailure(cause),
-            );
-            toast({ title: describeRejection(cause, context.errorText), variant: 'destructive' });
-          }
-        },
-        onDeadline: () => {
-          // The request never answered. The latch has already given the cell
-          // back; this is the only thing that tells anybody it happened.
-          console.error('boq line save passed its deadline with no answer', {
-            lineId: line.id,
-            columns,
-          });
-          toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
-        },
+        write: () => sendLinePatch(context, line, patch, columns, saved),
+        onDeadline: () => reportMissedDeadline(context, line, columns),
       })
       .finally(() => {
         context.edits.markSaving(line.id, false);
       }),
   );
+}
+
+/**
+ * Send one line's patch and act on the answer: drop the saved edits on ok, say
+ * a refusal under its cells or in a toast, and log whatever did not store.
+ */
+async function sendLinePatch(
+  context: WriteContext,
+  line: EditableLine,
+  patch: BoqLinePatch,
+  columns: Column[],
+  saved: RowEdits,
+): Promise<void> {
+  try {
+    const result = await updateBoqLine({ lineId: line.id, patch });
+    // Drop the local edit so the revalidated record takes over — but only
+    // for cells that still hold the value this write carried. One the
+    // studio has re-typed keeps its override until its own write lands.
+    if (result.ok) context.edits.clearSaved(line.id, saved);
+    // The edit STAYS on screen when the server refuses it. Reverting to
+    // the stored value would throw away what the studio typed and leave
+    // them guessing which cell was wrong.
+    //
+    // AND THE REFUSAL IS LOGGED, not only toasted. A coded refusal —
+    // `amount_too_large`, `boq_not_draft`, a line that has vanished — is
+    // the COMMON failure of this screen and it left no trace anywhere:
+    // `mutateInOrg` logs what the server threw, never what it decided.
+    // On a 2,000-line sheet a toast that is gone in five seconds is the
+    // entire record, and it does not say which row.
+    else {
+      console.error('boq line save refused', {
+        lineId: line.id,
+        columns,
+        code: result.error,
+      });
+      const underCells = result.fields && context.cellErrors.show(line.id, result.fields);
+      if (!underCells) refuse(context, result);
+    }
+  } catch (cause) {
+    // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw
+    // it, so the server has nothing, and the toast below is gone in five
+    // seconds. Logged the way use-engagement-action.ts logs its twin, so
+    // `wrangler tail` carries a failed BOQ save at all.
+    console.error(
+      'boq line save failed before returning a result',
+      { lineId: line.id, columns },
+      loggableFailure(cause),
+    );
+    toast({ title: describeRejection(cause, context.errorText), variant: 'destructive' });
+  }
+}
+
+/** A write the latch gave up on at its deadline: logged, and said in a toast. */
+function reportMissedDeadline(context: WriteContext, line: EditableLine, columns: Column[]): void {
+  // The request never answered. The latch has already given the cell
+  // back; this is the only thing that tells anybody it happened.
+  console.error('boq line save passed its deadline with no answer', {
+    lineId: line.id,
+    columns,
+  });
+  toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
 }
 
 export function cellBlur(

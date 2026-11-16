@@ -3,9 +3,10 @@ import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { ok, type ActionResult } from '@/lib/actions/result';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { OtpSendRequest, OtpVerifyRequest, OtpVerifyResult } from './otp-contract';
-import { otpSendFailure, otpVerifyFailure } from './otp-failure';
+import { otpSendFailure } from './otp-failure';
 import { otpCodeErrors, otpIdentifierErrors, type OtpChannel } from './otp-field-rules';
 import { postLoginPathFor } from './post-login-path';
+import { failedVerifyAnswer, signInPauseRefusal } from './sign-in-lockout';
 
 // The sign-in code cores behind app/api/auth/otp/{send,verify}.
 //
@@ -28,7 +29,9 @@ function codeRefusal(token: string): ActionResult | null {
 /**
  * Ask Supabase to send a sign-in code by email, or by SMS (site engineers).
  * The Turnstile token goes to Supabase, which checks it when its CAPTCHA
- * setting is on; it is never logged and never kept.
+ * setting is on; it is never logged and never kept. In a build that shows the
+ * widget the send route has already refused a request without one
+ * (app/api/auth/otp/send/route.ts).
  */
 export async function sendOtpCore({ channel, identifier, captchaToken }: OtpSendRequest): Promise<ActionResult> {
   const refused = identifierRefusal(channel, identifier);
@@ -46,18 +49,20 @@ export async function sendOtpCore({ channel, identifier, captchaToken }: OtpSend
 }
 
 /**
- * Check a typed code. On success Supabase writes the session cookies, and the
+ * Check a typed code. An identifier paused after too many wrong codes is
+ * refused before Supabase is asked, and a code Supabase refuses is counted
+ * (sign-in-lockout.ts). On success Supabase writes the session cookies, and the
  * answer names where to go next (the site app when the sign-in began there),
  * so the form needs no second round trip.
  */
 export async function verifyOtpCore({ channel, identifier, token, return: returnTo }: OtpVerifyRequest): Promise<OtpVerifyResult> {
-  const refused = codeRefusal(token);
+  const refused = codeRefusal(token) ?? (await signInPauseRefusal(identifier));
   if (refused) return refused;
   const supabase = await createSupabaseServerClient();
   const { data, error } =
     channel === 'email'
       ? await supabase.auth.verifyOtp({ email: identifier, token, type: 'email' })
       : await supabase.auth.verifyOtp({ phone: identifier, token, type: 'sms' });
-  if (error) return otpVerifyFailure(channel === 'email' ? 'verifyEmailOtp failed' : 'verifyPhoneOtp failed', error);
+  if (error) return failedVerifyAnswer(identifier, channel === 'email' ? 'verifyEmailOtp failed' : 'verifyPhoneOtp failed', error);
   return { ok: true, next: await postLoginPathFor(data.user?.id, returnTo) };
 }

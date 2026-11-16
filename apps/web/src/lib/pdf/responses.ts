@@ -4,10 +4,11 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { RendererBusyError } from '@/lib/pdf/renderer-busy';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 
 /** Every non-PDF answer this route family gives, in one shape. */
-export const json = (error: string, status: number, headers?: HeadersInit) =>
-  NextResponse.json({ error }, { status, headers });
+export const json = (error: string, status: number, headers: Record<string, string> = {}) =>
+  NextResponse.json({ error }, { status, headers: { ...ROUTE_HANDLER_HEADERS, ...headers } });
 
 export function pdfResponse(pdf: Uint8Array, fileName: string): Response {
   return new NextResponse(pdf as BodyInit, {
@@ -18,6 +19,11 @@ export function pdfResponse(pdf: Uint8Array, fileName: string): Response {
       // The internal copy carries the firm's margin: never cached, not even
       // privately, so it cannot be read back off a shared machine's disk.
       'cache-control': 'no-store',
+      ...ROUTE_HANDLER_HEADERS,
+      // Another site may not frame the document. This site may, though nothing
+      // does today: the proposal preview frames HTML (srcDoc), and the PDF
+      // links open in a new tab.
+      'x-frame-options': 'SAMEORIGIN',
     },
   });
 }

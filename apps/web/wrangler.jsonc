@@ -76,7 +76,8 @@
   // lib/share/portal-rate-limit.ts. Same rule: ON Cloudflare a missing binding
   // refuses the act or read rather than serving the portal unlimited.
   //   PORTAL_ACT_RATE_LIMITER   30 req / 60s, keyed per share link (a sha256
-  //     prefix of the token): every server action under /d/[token].
+  //     prefix of the token): every server action under /d/[token], the
+  //     accept or reject on /p and the acknowledgement on /c.
   //   PORTAL_READ_RATE_LIMITER its "limit" below / 60s (the one line to change),
   //     keyed the same way: the document and logo routes and a document's
   //     comment thread.

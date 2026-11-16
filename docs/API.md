@@ -34,8 +34,13 @@ A key acts with **the live role of the member who created it**:
 - Data is scoped to that member's organization — a key can never read another
   organization's data.
 - The key's permissions track the creator's **current** role. If the creator is
-  demoted, the key's access narrows on the next request; if the creator is
-  removed from the organization, the key stops working (`401`).
+  demoted, the key's access narrows on the next request.
+- If the creator is **removed** from the organization, every key they created
+  there is **revoked for good** (`401`). Inviting the same person back does not
+  bring a key back; they create a new one.
+- A key whose creator now holds the **`client`** role is refused on every
+  endpoint (`403`), including the ones that role could read in the app. The API
+  is for the studio's own team.
 - **Cost and margin fields** (`default_unit_cost`, `unit_cost`, `line_margin`,
   `total_cost`, `total_margin`) are included **only** if the creator's role is
   allowed to see margin (the same rule as in the app). Keys created by roles that
@@ -54,7 +59,7 @@ commit them to source control or embed them in client-side code.
 | | |
 |---|---|
 | **Format** | `application/json` request/response; errors are `application/problem+json`. |
-| **Caching** | Every response, a 200 or a problem, carries `cache-control: no-store` and `x-content-type-options: nosniff`: an answer is one key's view of one studio and is never cached. |
+| **Caching** | Every response, a 200 or a problem, carries `cache-control: no-store`, `x-content-type-options: nosniff` and `referrer-policy: no-referrer`: an answer is one key's view of one studio and is never cached. |
 | **Field names** | `snake_case`. |
 | **IDs** | UUID v4 strings, stable across requests. |
 | **Money** | String, always **two decimal places**, e.g. `"1250.00"`. EGP throughout v1. Strings (not floats) to preserve precision. |

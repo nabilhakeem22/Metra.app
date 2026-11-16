@@ -2,6 +2,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import type { ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 import { readSameOriginJson } from '@/lib/http/same-origin-json';
 import type { OtpIdentity } from './otp-contract';
 import { canonicalOtpIdentifier } from './otp-identifier';
@@ -24,7 +25,7 @@ import { otpThrottleRefusal, type OtpStep } from './otp-throttle';
 const RETRY_AFTER_SECONDS = '60';
 
 const answer = (body: ActionResult, status: number, extraHeaders: Record<string, string> = {}) =>
-  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...extraHeaders } });
+  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...ROUTE_HANDLER_HEADERS, ...extraHeaders } });
 
 export function otpEndpoint<Input extends OtpIdentity>(
   label: string,

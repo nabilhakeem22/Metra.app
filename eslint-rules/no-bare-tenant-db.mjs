@@ -280,6 +280,9 @@ const ALLOWLISTED_FILES = [
   // the metra_app role and the policies, so by definition it must execute as the
   // owning login BEFORE any scoped role exists. It reads no business table.
   'packages/db/src/scripts/apply-rls.ts',
+  // The pre-auth sign-in counter (security batch 3, P2): two fixed statements,
+  // no SQL from callers; definer functions keyed by an identifier hash.
+  'apps/web/src/lib/auth/sign-in-failures-db.ts',
 ];
 
 // Allowlisted directories (path fragments) — isolation tests deliberately read on

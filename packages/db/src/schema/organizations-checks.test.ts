@@ -73,12 +73,12 @@ describe('the migration and the schema say the same thing', () => {
 });
 
 describe("the runbook's pre-check tests exactly what 0060 adds", () => {
-  const deploy = readFileSync(resolve(here, '../../../../docs/DEPLOY.md'), 'utf8').replace(/\r\n/g, '\n');
+  const runbook = readFileSync(resolve(here, '../../../../docs/db-steps/0060-round-e.md'), 'utf8').replace(/\r\n/g, '\n');
   const fence = '```';
-  const start = deploy.indexOf(`${fence}sql\n-- 0060 step 2 (b): the studios a new CHECK would refuse. Expect 0 rows.\n`);
-  const preCheck = deploy.slice(start, deploy.indexOf(`\n${fence}`, start + fence.length));
+  const start = runbook.indexOf(`${fence}sql\n-- 0060 step 2 (b): the studios a new CHECK would refuse. Expect 0 rows.\n`);
+  const preCheck = runbook.slice(start, runbook.indexOf(`\n${fence}`, start + fence.length));
 
-  it('docs/DEPLOY.md holds the 0060 step 2 (b) block', () => {
+  it('docs/db-steps/0060-round-e.md holds the 0060 step 2 (b) block', () => {
     expect(start).toBeGreaterThan(-1);
   });
 

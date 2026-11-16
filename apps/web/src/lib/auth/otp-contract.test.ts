@@ -55,6 +55,35 @@ describe('parseOtpSendRequest: the Turnstile token (T3)', () => {
   });
 });
 
+describe('parseOtpSendRequest: the challenge a build shows is required (P3)', () => {
+  const EMAIL = { channel: 'email', identifier: 'mona@firm.example' };
+
+  it.each([
+    ['no token', EMAIL],
+    ['an empty token', { ...EMAIL, captchaToken: '' }],
+    ['a token of spaces', { ...EMAIL, captchaToken: '   ' }],
+    ['a token of other whitespace', { ...EMAIL, captchaToken: '\n\t' }],
+    ['a null token', { ...EMAIL, captchaToken: null }],
+  ])('refuses a send with %s when the token is required', (_case, body) => {
+    expect(parseOtpSendRequest(body, 'required')).toBeNull();
+  });
+
+  it('keeps a real token as sent when it is required', () => {
+    expect(parseOtpSendRequest({ ...EMAIL, captchaToken: 'tok' }, 'required')).toEqual({ ...EMAIL, captchaToken: 'tok' });
+  });
+
+  it('a malformed identity is refused whatever the token', () => {
+    expect(parseOtpSendRequest({ channel: 'fax', identifier: 'x', captchaToken: 'tok' }, 'required')).toBeNull();
+  });
+
+  it('optional, named or by default, is the behaviour of a build with no site key: unchanged', () => {
+    expect(parseOtpSendRequest(EMAIL, 'optional')).toEqual(EMAIL);
+    expect(parseOtpSendRequest(EMAIL)).toEqual(EMAIL);
+    expect(parseOtpSendRequest({ ...EMAIL, captchaToken: '   ' }, 'optional')).toEqual({ ...EMAIL, captchaToken: '   ' });
+    expect(parseOtpSendRequest({ ...EMAIL, captchaToken: '' }, 'optional')).toBeNull();
+  });
+});
+
 describe('parseOtpVerifyRequest', () => {
   it('keeps the channel, the identifier and the token', () => {
     expect(parseOtpVerifyRequest({ channel: 'email', identifier: 'mona@firm.example', token: '123456' })).toEqual({

@@ -2,14 +2,55 @@
 // setProjectActiveCore (archive/restore toggle). Code-uniqueness + client-usability
 // run inside the tx; the composite same-org FK is the DB backstop for a cross-org
 // client_id.
-import { projects } from '@metra/db';
+import { projects, type MetraDb } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
 import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
+import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
 import type { ProjectInput } from '../fields';
-import { assertClientUsable, isErr, PROJECT_REFUSALS, validate } from './validation';
+import { assertClientUsable, isErr, PROJECT_REFUSALS, validate, type Validated } from './validation';
+
+/** One header edit: the validated values, and which percentages the caller did not send. */
+interface ProjectHeaderEdit {
+  id: string;
+  values: Validated;
+  code: string;
+  keepAdvance: boolean;
+  keepRetention: boolean;
+}
+
+/** Writes the edited header, leaving a percentage the caller did not send as it was, and audits it. */
+async function writeProjectHeader(
+  tx: MetraDb,
+  edit: ProjectHeaderEdit,
+  audit: (entry: AuditEntry) => Promise<void>,
+): Promise<void> {
+  const { id, values: v, code, keepAdvance, keepRetention } = edit;
+  // Destructure the two percentages OUT and add them back only when the caller
+  // actually sent them. Setting a key to `undefined` is not enough — postgres.js
+  // rejects undefined values outright (UNDEFINED_VALUE), so the key must be
+  // absent from the object, not present-and-undefined.
+  const { advancePct, retentionPct, ...rest } = v;
+  await tx
+    .update(projects)
+    .set({
+      ...rest,
+      ...(keepAdvance ? {} : { advancePct }),
+      ...(keepRetention ? {} : { retentionPct }),
+      code,
+      updatedAt: new Date(),
+    })
+    .where(eq(projects.id, id));
+  await audit({
+    entity: 'project',
+    entityId: id,
+    action: 'update',
+    before: null,
+    after: { code, client_id: v.clientId, status: v.status },
+  });
+}
 
 export async function updateProjectCore(
   ctx: OrgContext,
@@ -52,28 +93,7 @@ export async function updateProjectCore(
         await assertClientUsable(tx, v.clientId);
       }
 
-      // Destructure the two percentages OUT and add them back only when the caller
-      // actually sent them. Setting a key to `undefined` is not enough — postgres.js
-      // rejects undefined values outright (UNDEFINED_VALUE), so the key must be
-      // absent from the object, not present-and-undefined.
-      const { advancePct, retentionPct, ...rest } = v;
-      await tx
-        .update(projects)
-        .set({
-          ...rest,
-          ...(keepAdvance ? {} : { advancePct }),
-          ...(keepRetention ? {} : { retentionPct }),
-          code,
-          updatedAt: new Date(),
-        })
-        .where(eq(projects.id, input.id));
-      await audit({
-        entity: 'project',
-        entityId: input.id,
-        action: 'update',
-        before: null,
-        after: { code, client_id: v.clientId, status: v.status },
-      });
+      await writeProjectHeader(tx, { id: input.id, values: v, code, keepAdvance, keepRetention }, audit);
     },
   );
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectRouteHandlerHeaders } from '@/test/route-handler-headers';
 
 // The rescue ledger route: a signed-in studio member only, the studio from the
 // session and checked against the one the island was rendered for, the
@@ -95,5 +96,16 @@ describe('GET /api/dashboard/rescue-ledger', () => {
     expect(response.status).toBe(500);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({ ok: false, error: 'generic', reference: 'ABC123' });
+  });
+
+  it('C6: the ledger, a 409 and a 429 all carry the route-handler security headers, still uncached', async () => {
+    const answers = [await get(), await get('?org=org-2')];
+    deps.studioReadVerdict.mockResolvedValue('refused');
+    answers.push(await get());
+    expect(answers.map((answer) => answer.status)).toEqual([200, 409, 429]);
+    for (const answer of answers) {
+      expect(answer.headers.get('cache-control')).toBe('no-store');
+      expectRouteHandlerHeaders(answer);
+    }
   });
 });

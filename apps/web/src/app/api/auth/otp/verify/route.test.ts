@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as doubles from '@/test/otp-route-doubles';
-import { otpPost } from '@/test/otp-route-doubles';
 
 // POST /api/auth/otp/verify (AC5): the verifyEmailOtp / verifyPhoneOtp answers
 // over a same-origin JSON route, plus where to go next. The real route, core,
@@ -11,6 +10,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/headers', async () => ({ cookies: async () => (await import('@/test/otp-route-doubles')).cookieStore }));
 vi.mock('@supabase/ssr', async () => ({ createServerClient: (await import('@/test/otp-route-doubles')).createServerClient }));
 vi.mock('@/lib/db/context', async () => ({ withUserContext: (await import('@/test/otp-route-doubles')).withUserContext }));
+vi.mock('@/lib/auth/sign-in-failures-db', () => ({ readSignInPauseSeconds: async () => null, recordWrongSignInCode: async () => null }));
 // The site app ships in PR S4; a test switches its landing on to prove the rule (AC8).
 const siteApp = vi.hoisted(() => ({ live: false }));
 vi.mock('@/lib/site/app-live', () => ({
@@ -28,7 +28,7 @@ const EMAIL_CODE = JSON.stringify({ channel: 'email', identifier: 'mona@firm.exa
 const REFERENCE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
 
 async function verify(body: string, headers?: Record<string, string | undefined>) {
-  const response = await POST(otpPost(PATH, body, headers));
+  const response = await POST(doubles.otpPost(PATH, body, headers));
   expect(response.headers.get('cache-control')).toBe('no-store');
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }

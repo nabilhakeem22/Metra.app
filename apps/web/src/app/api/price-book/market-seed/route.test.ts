@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectRouteHandlerHeaders } from '@/test/route-handler-headers';
 
 // The seed route: a cookie-authenticated POST, so it answers only this site's
 // pages, only a signed-in studio member, and the studio comes from the session.
@@ -60,5 +61,16 @@ describe('POST /api/price-book/market-seed', () => {
     expect(busy.status).toBe(503);
     expect(busy.headers.get('retry-after')).toBe('60');
     expect(await busy.json()).toEqual({ ok: false, error: 'market_book_busy' });
+  });
+
+  it('C6: the 200, the 403 and the 503 all carry the route-handler security headers, still uncached', async () => {
+    const answers = [await post(SAME_SITE), await post({ host: 'metra.app' })];
+    deps.seedNewStudioCore.mockResolvedValueOnce({ ok: false, error: 'market_book_busy' });
+    answers.push(await post(SAME_SITE));
+    expect(answers.map((answer) => answer.status)).toEqual([200, 403, 503]);
+    for (const answer of answers) {
+      expect(answer.headers.get('cache-control')).toBe('no-store');
+      expectRouteHandlerHeaders(answer);
+    }
   });
 });

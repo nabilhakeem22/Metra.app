@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 import { fromThisSite } from '@/lib/http/same-site';
 import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 
@@ -14,7 +15,7 @@ import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 export const dynamic = 'force-dynamic';
 
 const answer = (body: object, status: number, headers: Record<string, string> = {}) =>
-  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
+  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...ROUTE_HANDLER_HEADERS, ...headers } });
 
 /** How long a seed that met the market book being rebuilt should wait before it asks again (seconds). */
 const BUSY_RETRY_AFTER_SECONDS = '60';

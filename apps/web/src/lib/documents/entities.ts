@@ -20,8 +20,10 @@ export type DocumentEntity = 'client' | 'project';
 
 export interface DocumentEntitySpec {
   entity: DocumentEntity;
-  /** Gates upload and delete — the broad activity/document audience. */
+  /** Gates upload, and deleting one's OWN upload — the broad activity/document audience. */
   writeCapability: Capability;
+  /** Whoever may UPDATE this capability edits the parent record, and so may delete ANY of its documents (./delete-scope.ts). */
+  deleteAnyCapability: Capability;
   /** Gates minting a download URL — whoever may read the parent record. */
   readCapability: Capability;
   /** The parent row that must exist IN THIS ORG before a file is attached to it. */
@@ -32,12 +34,14 @@ export const DOCUMENT_ENTITIES: Record<DocumentEntity, DocumentEntitySpec> = {
   client: {
     entity: 'client',
     writeCapability: 'client_activity',
+    deleteAnyCapability: 'clients',
     readCapability: 'clients',
     parentTable: clients,
   },
   project: {
     entity: 'project',
     writeCapability: 'project_activity',
+    deleteAnyCapability: 'projects',
     readCapability: 'projects',
     parentTable: projects,
   },

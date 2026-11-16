@@ -2,6 +2,7 @@ import { engagementDocumentComments } from '@metra/db';
 import { asc, eq } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { can } from '@/lib/permissions/can';
 import { isUuid } from '@/lib/uuid';
 
 /** How many messages one thread read returns. A thread is a conversation, not a
@@ -20,15 +21,18 @@ export interface StudioDocumentComment {
 }
 
 /**
- * Read ONE document's thread, oldest first. RLS scopes the read to the caller's
- * org, so a foreign artifact id simply resolves to an empty thread — the same
- * result as a document nobody has commented on. Returns `[]` on a malformed id
- * rather than throwing.
+ * Read ONE document's thread, oldest first. A role without
+ * `engagements_design`/`read` (the cell the engagement page itself opens on) gets
+ * an empty thread and no query runs: the action is callable directly, so the page's
+ * own 404 is not the gate. RLS scopes the read to the caller's org, so a foreign
+ * artifact id simply resolves to an empty thread — the same result as a document
+ * nobody has commented on. Returns `[]` on a malformed id rather than throwing.
  */
 export async function listDocumentCommentsCore(
   ctx: OrgContext,
   artifactId: string,
 ): Promise<StudioDocumentComment[]> {
+  if (!can(ctx.role, 'engagements_design', 'read')) return [];
   if (!isUuid(artifactId)) return [];
   return withOrgContext(ctx, async (db) =>
     db

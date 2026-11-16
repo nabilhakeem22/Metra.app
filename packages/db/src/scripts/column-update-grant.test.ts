@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  grantedUpdateColumns,
-  tableLevelUpdateGrants,
-  updateRevokes,
-} from './design-engagement-grant';
+  DESIGN_ENGAGEMENTS_TABLE,
+  grantedUpdateColumnsOf,
+  tableLevelUpdateGrantsOf,
+  updateRevokesOf,
+} from './column-update-grant';
 
 // The three readings of roles.sql that the app-side drift test and the
 // database-side `verify-rls-applied` both depend on. Each case here is a
@@ -21,10 +22,16 @@ import {
 //       table privilege). The guard it defeated looked at the first match only.
 //
 // The real file is read at the bottom, so these fixtures cannot drift away from
-// the thing they describe.
+// the thing they describe. Every fixture here is `design_engagements`, the
+// table these readers were written for; the two tables security batch 3
+// narrowed the same way are column-update-grant-narrowed.test.ts.
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const ROLES_SQL = resolve(here, '../rls/roles.sql');
+
+const grantedUpdateColumns = (rolesSql: string) => grantedUpdateColumnsOf(rolesSql, DESIGN_ENGAGEMENTS_TABLE);
+const tableLevelUpdateGrants = (rolesSql: string) => tableLevelUpdateGrantsOf(rolesSql, DESIGN_ENGAGEMENTS_TABLE);
+const updateRevokes = (rolesSql: string) => updateRevokesOf(rolesSql, DESIGN_ENGAGEMENTS_TABLE);
 
 const SHIPPED = `
 -- A comment that says: grant all on public.design_engagements to metra_app.

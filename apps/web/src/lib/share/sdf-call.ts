@@ -34,8 +34,12 @@ export function normalizeRawToken(raw: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
-/** A token SDF call and nothing else: `select public.app_<name>(`, then arguments. */
-const TOKEN_SDF_CALL = /^\s*select\s+public\.app_[a-z0-9_]+\s*\(/i;
+/**
+ * A token SDF call and nothing else: `select public.app_<name>_by_token(`, then
+ * arguments. The suffix is part of the fence: this connection bypasses RLS and
+ * the revokes on the internal `public.app_*` helpers, which take a bare id.
+ */
+const TOKEN_SDF_CALL = /^\s*select\s+public\.app_[a-z0-9_]+_by_token\s*\(/i;
 
 /**
  * The literal text a built `SQL` opens with.

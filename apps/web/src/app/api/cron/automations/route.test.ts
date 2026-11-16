@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectRouteHandlerHeaders } from '@/test/route-handler-headers';
 
 // The route reads its secret through runtimeSecret(), which lives behind
 // `server-only`; off the Cloudflare runtime that helper reads process.env, so
@@ -69,5 +70,10 @@ describe('cron automations auth', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ orgsTotal: 0, orgsProcessed: 0, durationMs: 0, results: [] });
+  });
+
+  it('C6: the 401 and the 200 both carry the route-handler security headers', async () => {
+    expectRouteHandlerHeaders(await call());
+    expectRouteHandlerHeaders(await call(`Bearer ${SECRET}`));
   });
 });

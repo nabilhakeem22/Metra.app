@@ -40,6 +40,7 @@ export const RLS_APPLY_ORDER = [
   'functions/75-client-home.sql',
   'functions/80-site.sql',
   'functions/85-site-portal.sql',
+  'functions/90-sign-in.sql',
   'immutability.sql',
   'rom-issue-trigger.sql',
   'roles.sql',

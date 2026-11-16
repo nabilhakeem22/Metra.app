@@ -1,5 +1,4 @@
-// Barrel. Import order matters for the organizations<->_helpers circular ref:
-// enums first, then organizations, then org-scoped tables.
+// Barrel. Import order matters for the organizations<->_helpers circular ref: enums first, then organizations, then org-scoped tables.
 export * from './enums';
 export * from './accounts';
 export * from './organizations';
@@ -70,6 +69,7 @@ export * from './site-photos';
 export * from './site-material-receipts';
 export * from './site-notes';
 export * from './client-verification-codes';
+export * from './sign-in-failures';
 
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';

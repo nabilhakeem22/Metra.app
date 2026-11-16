@@ -2,16 +2,18 @@
 // it is unit-testable in plain vitest. Every response the API emits on an error
 // path is built here so the envelope (type/title/status[/detail]) stays uniform.
 import type { ActionCode } from '@/lib/actions/result';
+import { ROUTE_HANDLER_HEADERS } from '@/lib/http/route-handler-headers';
 import { ACTION_CODE_PROBLEM } from './action-code-problem';
 
 const PROBLEM_BASE = 'https://api.metra.app/problems/';
 const CONTENT_TYPE = 'application/problem+json';
 
 /** On EVERY v1 response, a 200 or a problem: never cached (each answer is one
- *  key's view of one studio) and never sniffed as anything but its declared type. */
+ *  key's view of one studio), plus what every route handler sets (never sniffed
+ *  as anything but its declared type, no Referer to another site). */
 export const API_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
   'cache-control': 'no-store',
-  'x-content-type-options': 'nosniff',
+  ...ROUTE_HANDLER_HEADERS,
 };
 
 /** The closed set of problem kinds the API surface can emit. */

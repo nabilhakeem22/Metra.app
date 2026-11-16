@@ -30,17 +30,11 @@ export async function buildContractHtml(
   const { locale } = opts;
   const dir = dirFor(locale);
   const showCost = opts.variant === 'internal';
-  const m = (v: string) => formatMoney(v, locale);
   const num = formatDocNumber('C', detail.number, docYear(null, detail.createdAt));
   const orgName = pickEscaped(opts.orgNameAr, opts.orgNameEn, locale);
   const clientName = pickEscaped(detail.clientNameAr, detail.clientNameEn, locale);
   const title = pickEscaped(detail.titleAr, detail.titleEn, locale);
   const revised = detail.revisedValue !== detail.originalValue;
-
-  // The label arrives ALREADY escaped (it comes from pickEscaped); the value does
-  // not. Escaping both was the F6 double-escape on the contract terms table.
-  const termRow = (escapedLabel: string, value: string) =>
-    `<tr><td>${escapedLabel}</td><td class="num">${esc(value)}</td></tr>`;
 
   return `<!doctype html>
 <html lang="${locale}" dir="${dir}">
@@ -78,7 +72,23 @@ ${PDF_CSP_META}
 
   ${pricedSectionsTableHtml(detail.sections, { locale, dir, showCost })}
 
-  <table class="totals">
+  ${contractTotalsHtml(detail, { locale, showCost, revised })}
+
+  ${contractTermsHtml(detail, locale)}
+
+  <div class="footer">${orgName} · ${num}</div>
+</body>
+</html>`;
+}
+
+/** The totals: subtotal to the original value, the revised value when variations moved it, the margin on the internal variant. */
+function contractTotalsHtml(
+  detail: ContractDetail,
+  layout: { locale: string; showCost: boolean; revised: boolean },
+): string {
+  const { locale, showCost, revised } = layout;
+  const m = (v: string) => formatMoney(v, locale);
+  return `<table class="totals">
     <tr><td>${pickEscaped('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
     <tr><td>${pickEscaped('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
     <tr><td>${pickEscaped('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
@@ -86,17 +96,20 @@ ${PDF_CSP_META}
     <tr class="grand"><td>${pickEscaped('قيمة العقد الأصلية', 'Original value', locale)}</td><td class="num">${m(detail.originalValue)}</td></tr>
     ${revised ? `<tr class="grand"><td>${pickEscaped('القيمة بعد التعديلات', 'Revised value', locale)}</td><td class="num">${m(detail.revisedValue)}</td></tr>` : ''}
     ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pickEscaped('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
-  </table>
+  </table>`;
+}
 
-  <table class="terms totals">
+/** The header terms: advance and retention always; the payment days and the two dates only when set. */
+function contractTermsHtml(detail: ContractDetail, locale: string): string {
+  // The label arrives ALREADY escaped (it comes from pickEscaped); the value does
+  // not. Escaping both was the F6 double-escape on the contract terms table.
+  const termRow = (escapedLabel: string, value: string) =>
+    `<tr><td>${escapedLabel}</td><td class="num">${esc(value)}</td></tr>`;
+  return `<table class="terms totals">
     ${termRow(pickEscaped('نسبة الدفعة المقدمة', 'Advance %', locale), formatPercent(detail.advancePct, locale))}
     ${termRow(pickEscaped('نسبة المحتجز', 'Retention %', locale), formatPercent(detail.retentionPct, locale))}
     ${detail.paymentTermsDays != null ? termRow(pickEscaped('مدة السداد (يوم)', 'Payment terms (days)', locale), String(detail.paymentTermsDays)) : ''}
     ${detail.startDate ? termRow(pickEscaped('تاريخ البدء', 'Start date', locale), detail.startDate) : ''}
     ${detail.endDate ? termRow(pickEscaped('تاريخ الانتهاء', 'End date', locale), detail.endDate) : ''}
-  </table>
-
-  <div class="footer">${orgName} · ${num}</div>
-</body>
-</html>`;
+  </table>`;
 }

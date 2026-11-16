@@ -84,7 +84,7 @@ export default tseslint.config(
       // BOTH SPELLINGS ARE BANNED. `no-restricted-imports` matches the SPECIFIER
       // STRING, not the file it resolves to, so the alias group alone left
       // `../test/doubles` — the form somebody working inside src/lib writes by
-      // accident — completely invisible. The three helpers are named because a
+      // accident — completely invisible. The four helpers are named because a
       // bare `**/test/*` would also catch unrelated directories called `test`.
       //
       // WHAT IS STILL NOT COVERED: a DYNAMIC import, in EITHER spelling —
@@ -108,6 +108,7 @@ export default tseslint.config(
                 '**/test/render-with-intl*',
                 '**/test/doubles*',
                 '**/test/documents-tab-contract*',
+                '**/test/recording-tx*',
               ],
               message:
                 'apps/web/src/test/* is TEST-ONLY (it imports vitest at module scope). ' +

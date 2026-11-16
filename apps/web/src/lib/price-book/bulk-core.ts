@@ -1,7 +1,7 @@
 // Bulk price update core. Piastre-exact: the multiply+round happens in SQL
 // (./bulk-apply). It writes a first-class price_changes header + one
 // price_change_line per touched item (A2 append-only), all in one transaction.
-import { priceChangeLines, priceChanges, sections } from '@metra/db';
+import { sections, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
@@ -9,6 +9,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { applyBulkPercent } from './bulk-apply';
+import { recordPriceChange } from './bulk-history';
 import { bulkPercentError } from './percent';
 
 export type PriceTarget = 'cost' | 'price' | 'both';
@@ -27,6 +28,22 @@ export interface BulkUpdateSummary {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The category's label as history freezes it, or the refusal under the category box when it is gone. */
+async function requireCategorySnapshot(tx: MetraDb, sectionId: string): Promise<string> {
+  // The section must exist in THIS org (RLS-scoped); one deleted meanwhile
+  // is said under the category. Its snapshot text is frozen onto the
+  // price_changes row (NOT an FK).
+  const [section] = await tx
+    .select({ key: sections.key, nameEn: sections.nameEn, nameAr: sections.nameAr })
+    .from(sections)
+    .where(eq(sections.id, sectionId))
+    .limit(1);
+  if (!section) failFields({ sectionId: { code: 'no_longer_exists' } });
+  const categorySnapshot =
+    section.key ?? section.nameEn ?? section.nameAr ?? sectionId;
+  return categorySnapshot;
+}
 
 /**
  * Applies `+pct%` to a category's cost and/or price, immediately. A pct that is
@@ -56,46 +73,12 @@ export async function bulkUpdatePricesCore(
     ctx,
     { capability: 'price_book', action: 'update' },
     async (tx, audit) => {
-      // The section must exist in THIS org (RLS-scoped); one deleted meanwhile
-      // is said under the category. Its snapshot text is frozen onto the
-      // price_changes row (NOT an FK).
-      const [section] = await tx
-        .select({ key: sections.key, nameEn: sections.nameEn, nameAr: sections.nameAr })
-        .from(sections)
-        .where(eq(sections.id, input.sectionId))
-        .limit(1);
-      if (!section) failFields({ sectionId: { code: 'no_longer_exists' } });
-      const categorySnapshot =
-        section.key ?? section.nameEn ?? section.nameAr ?? input.sectionId;
+      const categorySnapshot = await requireCategorySnapshot(tx, input.sectionId);
 
       const updated = await applyBulkPercent(tx, input.sectionId, input.pct, input.target);
 
-      const [header] = await tx
-        .insert(priceChanges)
-        .values({
-          orgId: ctx.orgId,
-          category: categorySnapshot,
-          pctChange: input.pct,
-          target: input.target,
-          effectiveDate,
-          appliedBy: ctx.userId,
-          itemCount: updated.length,
-        })
-        .returning({ id: priceChanges.id });
-
-      if (updated.length > 0) {
-        await tx.insert(priceChangeLines).values(
-          updated.map((r) => ({
-            orgId: ctx.orgId,
-            priceChangeId: header.id,
-            costItemId: r.id,
-            oldUnitCost: r.old_cost,
-            newUnitCost: r.new_cost,
-            oldUnitPrice: r.old_price,
-            newUnitPrice: r.new_price,
-          })),
-        );
-      }
+      const change = { categorySnapshot, pct: input.pct, target: input.target, effectiveDate, updated };
+      const header = await recordPriceChange(tx, ctx, change);
 
       await audit({
         entity: 'price_change',

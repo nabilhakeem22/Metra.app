@@ -76,6 +76,20 @@ create policy account_isolation on public.accounts
   )
   with check (false);
 
+-- sign_in_failures (0067, security batch 3, P2): wrong sign-in codes counted
+-- per identifier hash, BEFORE any session or org exists, so no org or member
+-- predicate can apply. The policy refuses every row to every role: the only
+-- way in is the two SECURITY DEFINER functions in functions/90-sign-in.sql,
+-- which run as their owner (BYPASSRLS, so `false` never blocks them), and
+-- metra_app holds no privilege on the table at all (roles.sql). The migration
+-- already enabled and forced RLS; repeated here so a re-run converges.
+alter table public.sign_in_failures enable row level security;
+alter table public.sign_in_failures force  row level security;
+drop policy if exists no_direct_access on public.sign_in_failures;
+create policy no_direct_access on public.sign_in_failures
+  using (false)
+  with check (false);
+
 -- memberships: read/most-writes require membership; WITH CHECK additionally
 -- permits inserting the caller's OWN row during a legitimate bootstrap.
 alter table public.memberships enable row level security;
@@ -97,6 +111,18 @@ create policy org_isolation on public.memberships
       )
     )
   );
+
+-- Security batch 3 (A5): the policy above says in which org a membership may
+-- be written, not WHICH ROLE. This trigger does (SQLSTATE MT150 otherwise; the
+-- rule is on enforce_membership_role_writer in functions/00-org-context.sql):
+-- only an owner or admin grants, changes or removes a role, only an owner
+-- touches owner, and a bootstrap insert takes `owner` in an empty studio or
+-- the role of the invitation claimed in the same transaction. It judges
+-- metra_app only; the connection role is not asked.
+drop trigger if exists trg_memberships_role_writer on public.memberships;
+create trigger trg_memberships_role_writer
+  before insert or update or delete on public.memberships
+  for each row execute function public.enforce_membership_role_writer();
 
 -- files
 alter table public.files enable row level security;

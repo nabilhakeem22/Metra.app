@@ -4,7 +4,7 @@
 //
 // WHY IT EXISTS. Two gates in this package read SQL text rather than a database —
 // `migration-catalogue.ts` (does any migration create what the schema declares?)
-// and `design-engagement-grant.ts` (what does roles.sql grant, and does anything
+// and `column-update-grant.ts` (what does roles.sql grant, and does anything
 // re-widen it?). Both were walked past through the same door in wave 7: a name
 // inside a `RAISE NOTICE '…'` satisfied the catalogue's check for an index that
 // had just been deleted (F2), `RAISE EXCEPTION '… constraint name(s) …'` put a

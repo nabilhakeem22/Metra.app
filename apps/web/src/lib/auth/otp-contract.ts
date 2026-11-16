@@ -29,9 +29,12 @@ export interface OtpIdentity {
 }
 
 export interface OtpSendRequest extends OtpIdentity {
-  /** The login page's Turnstile token; absent when the build has no site key. Supabase checks it (CAPTCHA on). */
+  /** The login page's Turnstile token; absent only when the build has no site key. Supabase checks it (CAPTCHA on). */
   captchaToken?: string;
 }
+
+/** Must a send carry a Turnstile token? `required` in a build whose login page shows the widget. */
+export type CaptchaRule = 'required' | 'optional';
 
 export interface OtpVerifyRequest extends OtpIdentity {
   token: string;
@@ -69,14 +72,19 @@ function parseOtpIdentity(body: unknown): OtpIdentity | null {
 
 /**
  * The send request, or null when the identity is malformed, or a captchaToken
- * is present but not a non-empty string of at most 2048 characters.
+ * is present but not a non-empty string of at most 2048 characters. Under the
+ * `required` rule a missing token, or one that is only whitespace, is null too:
+ * the login page of that build always sends one, so a request without it did
+ * not come from that page.
  */
-export function parseOtpSendRequest(body: unknown): OtpSendRequest | null {
+export function parseOtpSendRequest(body: unknown, captcha: CaptchaRule = 'optional'): OtpSendRequest | null {
   const identity = parseOtpIdentity(body);
   const captchaToken = fieldsOf(body)?.captchaToken;
   if (!identity) return null;
-  if (captchaToken === undefined) return identity;
-  return isBoundedString(captchaToken, MAX_CAPTCHA_TOKEN_LENGTH) && captchaToken !== '' ? { ...identity, captchaToken } : null;
+  if (captchaToken === undefined) return captcha === 'required' ? null : identity;
+  if (!isBoundedString(captchaToken, MAX_CAPTCHA_TOKEN_LENGTH) || captchaToken === '') return null;
+  if (captcha === 'required' && captchaToken.trim() === '') return null;
+  return { ...identity, captchaToken };
 }
 
 /**
