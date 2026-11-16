@@ -24,7 +24,10 @@
  */
 export const DRAFT_ANSWER_DEADLINE_MS = 20_000;
 
-/** Handed to `settle` in place of an answer: the call threw, rejected, or stayed silent past the deadline. */
+/**
+ * Handed to `settle` in place of an answer: the call threw, rejected, answered
+ * nothing, or stayed silent past the deadline.
+ */
 export const NO_ANSWER: unique symbol = Symbol('no answer');
 
 /**
@@ -35,6 +38,10 @@ export const NO_ANSWER: unique symbol = Symbol('no answer');
  * timing is pinned to the turn). An answer that comes after the deadline is
  * dropped, a rejection included, and no timer is left behind. A `settle` that
  * throws rejects the promise.
+ *
+ * An answer of null or undefined is no answer too: a server call can resolve
+ * with nothing where its type promises a result (the request was answered by
+ * something other than the action), and nothing was confirmed by that.
  */
 export function settleWithinDeadline<Answer, Settled>(
   call: () => Promise<Answer>,
@@ -55,7 +62,7 @@ export function settleWithinDeadline<Answer, Settled>(
     };
     const deadline = setTimeout(() => finish(NO_ANSWER), deadlineMs);
     try {
-      void call().then(finish, () => finish(NO_ANSWER));
+      void call().then((answer) => finish(answer ?? NO_ANSWER), () => finish(NO_ANSWER));
     } catch {
       finish(NO_ANSWER);
     }
