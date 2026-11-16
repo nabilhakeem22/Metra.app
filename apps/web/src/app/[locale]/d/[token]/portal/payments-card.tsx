@@ -56,7 +56,7 @@ export function PaymentsCard({
   const locale = useLocale();
   const milestoneLabel = useMilestoneLabel();
   // A code email's link opens its instalment's claim at once, while it can still be claimed.
-  const submission = usePaymentClaim(token, openOn && paymentClaimState(claim, openOn, new Set()).kind === 'claimable' ? openOn : null);
+  const submission = usePaymentClaim(token, claim, openOn && paymentClaimState(claim, openOn, new Set()).kind === 'claimable' ? openOn : null);
   const whatsappHref = useStudioWhatsappHref(studio.whatsappDigits, studio.deliveryRef, 'design');
   const overview = derivePaymentsOverview(schedule);
   if (!overview) return null;
@@ -80,7 +80,7 @@ export function PaymentsCard({
   const awaitsPayment = awaitsPaymentNow(schedule, claim, submission.claimedKinds);
 
   return (
-    <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
+    <section id="payments" className="scroll-mt-20 space-y-3 rounded-panel border bg-background p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-body font-semibold">{t('title')}</h2>
         <span className="text-caption text-muted-foreground">{t('designFee', { amount: money(overview.total) })}</span>

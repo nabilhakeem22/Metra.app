@@ -22,6 +22,7 @@ describe('shapeHome', () => {
       execution: {
         contract: {
           id: CONTRACT_ID,
+          number: 4,
           documentNumber: 'C-2026-0004',
           status: 'issued',
           signingOpen: true,

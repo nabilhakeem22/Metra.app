@@ -56,12 +56,12 @@ export function ContractSignPanel({
         <>
           <p className="text-body text-muted-foreground">{t('intro')}</p>
           <LinkNameField
-            ref={signing.nameRef}
+            ref={signing.box.nameRef}
             id={`sign-name-${contract.id}`}
             label={t('nameLabel')}
-            value={signing.name}
-            onChange={signing.setName}
-            error={signing.nameMissing ? t('nameRequired') : null}
+            value={signing.box.name}
+            onChange={signing.box.setName}
+            error={signing.box.nameMissing ? t('nameRequired') : null}
           />
           <Button variant="default" className="min-h-11 w-full" disabled={signing.pending} onClick={signing.start}>
             {signing.pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <PenLine className="size-4" aria-hidden />}
@@ -75,7 +75,7 @@ export function ContractSignPanel({
         title={t('confirmTitle', { number })}
         body={
           <>
-            <p>{t('confirmBody', { number, name: bidiIsolate(signerNameOf(signing.name) ?? '') })}</p>
+            <p>{t('confirmBody', { number, name: bidiIsolate(signerNameOf(signing.box.name) ?? '') })}</p>
             {codePanel}
           </>
         }

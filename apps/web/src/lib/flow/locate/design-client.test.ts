@@ -11,7 +11,7 @@ import { TRANSITIONS, type Trigger } from '@/lib/engagements/transitions';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { buildPhaseView } from '../build-view';
 import { DESIGN_PHASE } from '../phases/design';
-import { locateDesignForClient, type ClientDesignFacts } from './design-client';
+import { awaitedDesignFee, changesRequestedAtReview, locateDesignForClient, type ClientDesignFacts } from './design-client';
 import { locateDesignForStudio } from './design-studio';
 
 const HERO_KINDS: HeroKind[] = ['action', 'inProgress', 'delivered', 'closed'];
@@ -35,6 +35,8 @@ function deliveryAt(state: DesignState, heroKind: HeroKind, kind: MilestoneKind 
         ? [{ milestoneKind: kind, amountRemaining: '1000.0000', hasPendingClaim: fee === 'claimed', claimedAt: null }]
         : [],
     },
+    designDecision: null,
+    conceptDecision: null,
   };
 }
 
@@ -106,5 +108,91 @@ describe('locateDesignForClient', () => {
   it('refuses a milestone index past the journey (F8)', () => {
     const facts = { ...deliveryAt('survey', 'inProgress'), milestone: { index: 6, allComplete: false, closed: false } };
     expect(() => locateDesignForClient(facts)).toThrow(/not a journey milestone/);
+  });
+});
+
+describe('awaitedDesignFee', () => {
+  it('is the instalment exactly where the F5 rule gives the client the move, on a calm hero', () => {
+    for (const [, states, , kind] of MONEY_GATES) {
+      for (const state of states.filter((gateState) => !isTerminal(gateState))) {
+        const label = `${state}/${kind}`;
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'due')), label).toBe(kind);
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'claimed')), label).toBeNull();
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'paid')), label).toBeNull();
+        expect(awaitedDesignFee(deliveryAt(state, 'inProgress', kind, 'absent')), label).toBeNull();
+      }
+    }
+  });
+
+  it('agrees with the locator in every state, with every fee', () => {
+    for (const state of DESIGN_STATES.filter((designState) => !isTerminal(designState))) {
+      for (const fee of FEE_STATES) {
+        for (const kind of ['deposit', 'gate_a', 'gate_b', 'balance'] as const) {
+          const facts = deliveryAt(state, 'inProgress', kind, fee);
+          expect(locateDesignForClient(facts).whoseMove === 'client', `${state}/${kind}/${fee}`).toBe(awaitedDesignFee(facts) !== null);
+        }
+      }
+    }
+  });
+
+  it('asks for no fee on a finished or closed design, the balance a continued delivery still owes included', () => {
+    for (const state of ['closed_design_only', 'execution', 'abandoned'] as const) {
+      expect(awaitedDesignFee(deliveryAt(state, 'delivered', 'balance', 'due')), state).toBeNull();
+    }
+  });
+
+  it('names a partly paid instalment too: what is left is still owed', () => {
+    const facts = deliveryAt('design_proposal', 'inProgress', 'deposit', 'due');
+    const [row] = facts.paymentSchedule;
+    expect(awaitedDesignFee({ ...facts, paymentSchedule: [{ ...row, amount_cleared: '400.0000', status: 'partial' }] })).toBe('deposit');
+  });
+
+  describe('with a change request on file at the review stage (functional F1)', () => {
+    const AT = '2026-10-01T09:00:00.000Z';
+
+    it("awaits no fee at the concept review, and the move is the studio's", () => {
+      const facts = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(facts)).toBeNull();
+      expect(locateDesignForClient(facts).whoseMove).toBe('studio');
+    });
+
+    it("awaits no fee at the final approval, and the move is the studio's", () => {
+      const facts = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), designDecision: { kind: 'changes_requested' as const, at: AT } };
+      expect(awaitedDesignFee(facts)).toBeNull();
+      expect(locateDesignForClient(facts).whoseMove).toBe('studio');
+    });
+
+    it.each(['chosen', 'approved'] as const)('still awaits the fee on a concept answer of %s', (conceptDecision) => {
+      const facts = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), conceptDecision };
+      expect(awaitedDesignFee(facts)).toBe('gate_a');
+      expect(locateDesignForClient(facts).whoseMove).toBe('client');
+    });
+
+    it('still awaits the fee on an approved final design', () => {
+      const facts = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), designDecision: { kind: 'approved' as const, at: AT } };
+      expect(awaitedDesignFee(facts)).toBe('gate_b');
+      expect(locateDesignForClient(facts).whoseMove).toBe('client');
+    });
+
+    it('is one rule: a change request at its own review stage, not an approval or a choice, not another stage (N3)', () => {
+      const at = (state: DesignState, overrides: Partial<ClientDesignFacts>) => changesRequestedAtReview({ ...deliveryAt(state, 'inProgress'), ...overrides });
+      expect(at('concept_review', { conceptDecision: 'changes_requested' })).toBe(true);
+      expect(at('final_approval', { designDecision: { kind: 'changes_requested', at: AT } })).toBe(true);
+      expect(at('concept_review', { conceptDecision: 'chosen' })).toBe(false);
+      expect(at('concept_review', { conceptDecision: 'approved' })).toBe(false);
+      expect(at('final_approval', { designDecision: { kind: 'approved', at: AT } })).toBe(false);
+      expect(at('final_approval', { conceptDecision: 'changes_requested' })).toBe(false);
+      expect(at('concept_review', { designDecision: { kind: 'changes_requested', at: AT } })).toBe(false);
+      expect(at('design_3d', { conceptDecision: 'changes_requested', designDecision: { kind: 'changes_requested', at: AT } })).toBe(false);
+    });
+
+    it('reads each answer only at its own stage: an answer from another stage lifts no gate', () => {
+      const concept = { ...deliveryAt('final_approval', 'inProgress', 'gate_b', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(concept)).toBe('gate_b');
+      const design = { ...deliveryAt('concept_review', 'inProgress', 'gate_a', 'due'), designDecision: { kind: 'changes_requested' as const, at: AT } };
+      expect(awaitedDesignFee(design)).toBe('gate_a');
+      const proposal = { ...deliveryAt('design_proposal', 'inProgress', 'deposit', 'due'), conceptDecision: 'changes_requested' as const };
+      expect(awaitedDesignFee(proposal)).toBe('deposit');
+    });
   });
 });

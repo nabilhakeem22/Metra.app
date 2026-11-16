@@ -49,12 +49,15 @@ describe.each<TestLocale>(['ar-EG', 'en'])('the shared link card (%s)', (locale)
     renderWithIntl(<ShareLinkCard shared={{ kind: 'home', answer: { ok: false, error } }} />, { locale });
     expect(screen.getByRole('alert').textContent).toBe(at(`errors.${error}`));
     expect(screen.getByText(at('contracts.clientPage.issued.retry'))).toBeTruthy();
+    expect(screen.queryByText(at('contracts.clientPage.issued.body'))).toBeNull();
   });
 
   it.each(['client_home_unavailable', 'flow_not_enabled', 'contract_terminated'] as const)('a refusal that a retry cannot change, %s: the error alone (F3)', (error) => {
     renderWithIntl(<ShareLinkCard shared={{ kind: 'home', answer: { ok: false, error } }} />, { locale });
     expect(screen.getByRole('alert').textContent).toBe(at(`errors.${error}`));
     expect(screen.queryByText(at('contracts.clientPage.issued.retry'))).toBeNull();
+    expect(screen.queryByText(at('contracts.clientPage.issued.body'))).toBeNull();
+    expect(screen.queryByText(at('engagements.command.noEmailSignature'))).toBeNull();
   });
 
   it('a document link: the acknowledgement link label, as before', () => {

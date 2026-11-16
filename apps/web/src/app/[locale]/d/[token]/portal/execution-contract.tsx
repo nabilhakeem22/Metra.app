@@ -65,7 +65,7 @@ export function ExecutionContract({
   const chip = contract && contractChip(contract);
 
   return (
-    <section id="contract" aria-labelledby="home-contract-title" className="space-y-2 rounded-panel border bg-background p-4 shadow-sm">
+    <section id="contract" aria-labelledby="home-contract-title" className="scroll-mt-16 space-y-2 rounded-panel border bg-background p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="home-contract-title" className="text-body font-semibold">
           {t('title')}

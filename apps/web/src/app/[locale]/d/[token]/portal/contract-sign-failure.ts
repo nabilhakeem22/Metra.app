@@ -8,14 +8,14 @@
 // `contract_inactive`), is `wrong_state`, the page then showing where it
 // stands; the rest are the shared portal failures every link page says.
 import type { Translate } from '@/lib/actions/error-message';
-import type { SignContractAnswer } from '@/lib/client-home/code-answers';
+import type { NamedCodeAnswer } from '@/lib/client-home/code-answers';
 import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { describePortalFailure } from '@/lib/share/portal-failure';
 
 /** A refused signing as the section keeps it. */
 export type ShownSignFailure = ShownActFailure | { error: 'signing_closed' };
 
-export function signFailureOf(answer: Exclude<SignContractAnswer, { ok: true }>): ShownSignFailure {
+export function signFailureOf(answer: Exclude<NamedCodeAnswer, { ok: true }>): ShownSignFailure {
   switch (answer.error) {
     case 'signing_closed':
       return { error: 'signing_closed' };

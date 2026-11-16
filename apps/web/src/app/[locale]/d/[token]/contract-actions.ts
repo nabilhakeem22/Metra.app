@@ -1,6 +1,6 @@
 'use server';
 
-import { LINK_BRAKE_REFUSAL, type SignContractAnswer } from '@/lib/client-home/code-answers';
+import { LINK_BRAKE_REFUSAL, type NamedCodeAnswer } from '@/lib/client-home/code-answers';
 import { signContractWithCodeByToken } from '@/lib/client-home/code-acts';
 import { getHomeContract, getHomeContractSectionLines, getHomeContractSections } from '@/lib/client-home/contract';
 import type { ContractSectionLinesAnswer, ContractSectionsAnswer } from '@/lib/contracts/public';
@@ -42,8 +42,8 @@ const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure });
 export async function signContractInHome(
   token: string,
   input: { contractId: string; name: string; code: string },
-): Promise<SignContractAnswer> {
-  return answered('signContractInHome', failed, async (): Promise<SignContractAnswer> => {
+): Promise<NamedCodeAnswer> {
+  return answered('signContractInHome', failed, async (): Promise<NamedCodeAnswer> => {
     if (!(await portalActAllowed(token))) return LINK_BRAKE_REFUSAL;
     return signContractWithCodeByToken(token, {
       contractId: input?.contractId,

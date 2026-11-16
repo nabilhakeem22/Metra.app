@@ -71,12 +71,17 @@ export const ACT_OF_DESIGN_DECISION = {
   changes_requested: 'design_changes_requested',
 } as const satisfies Record<NonNullable<PublicDelivery['designDecision']>['kind'], string>;
 
-/** The refusals after which the decision ON FILE is the answer, not an error. */
-const SAVED_DECISION_REFUSALS: ReadonlySet<string> = new Set(['wrong_state', 'not_active']);
+/** The refusals that say the act's subject moved on or its delivery closed: the decision ON FILE is the answer, not an error. */
+const MOVED_ON_REFUSALS: ReadonlySet<string> = new Set(['wrong_state', 'not_active']);
+
+/** True when a client act's refusal says the page is behind: it should read itself again. */
+export function refusalSaysMovedOn(error: string): boolean {
+  return MOVED_ON_REFUSALS.has(error);
+}
 
 /** True when a write's refusal means "nothing saved by this tap; ask the snapshot". */
 export function answersFromSaved(result: { ok: boolean; code?: string; error?: string }): boolean {
-  return result.ok ? result.code === 'already' : SAVED_DECISION_REFUSALS.has(result.error ?? '');
+  return result.ok ? result.code === 'already' : refusalSaysMovedOn(result.error ?? '');
 }
 
 /** With nothing on file: still at the review stage reads `changed`, elsewhere `moved_on`. */

@@ -61,7 +61,7 @@ describe('a lookup that fails or stalls is the link own document', () => {
   it('a failed target read: null, one redacted line naming the step, no token or hash (S3, L5)', async () => {
     sdf.readSdfJson.mockRejectedValue(failedQuery());
     expect(await contractHomeRedirect(CONTRACT_RAW, contractOf(), 'en')).toBeNull();
-    expect(logged).toContain('contractHomeRedirect: lookup failed');
+    expect(logged).toContain('documentHomeRedirect: lookup failed');
     expect(logged).toContain('"step":"target"');
     expect(logged).toContain('57014');
     expect(logged).not.toContain(hashShareToken(CONTRACT_RAW));
@@ -71,7 +71,7 @@ describe('a lookup that fails or stalls is the link own document', () => {
   it('a failed check of the current contract: null, naming that step', async () => {
     sdf.readSdfJson.mockResolvedValueOnce(liveHomeTarget()).mockRejectedValueOnce(failedQuery());
     expect(await contractHomeRedirect(CONTRACT_RAW, contractOf(), 'en')).toBeNull();
-    expect(logged).toContain('"step":"current_contract"');
+    expect(logged).toContain('"step":"home_shows"');
   });
 
   it('a stalled read: null at the budget, not the database deadline, with DbDeadlineError in the line', async () => {

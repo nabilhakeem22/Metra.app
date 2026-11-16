@@ -6,13 +6,10 @@ import 'server-only';
 // - before the sign act, what signing covers: contractPayloadHash, the very
 //   hash /c's acknowledgement computes, or that the contract is signed already.
 import { loggableFailure } from '@/lib/actions/loggable-failure';
-import { settledWithin } from '@/lib/async/settled-within';
 import { contractPayloadHash } from '@/lib/contracts/public';
 import type { ContractDocument, PublicContract } from '@/lib/contracts/public-types';
 import { contractDocumentOf, readNamedContractSnapshot } from './contract';
-
-/** How long the page waits for its signing document before it says it could not show it (reliability R-L2). */
-export const SIGNING_DOCUMENT_WAIT_MS = 5_000;
+import { optionalPageRead } from './optional-read';
 
 /**
  * What signing `contractId` would come to, read before the act:
@@ -59,22 +56,11 @@ function signingDocumentOf(contract: PublicContract): ContractDocument {
 
 /**
  * The document the page awaiting the client's signature shows, read with the
- * page. A read that failed, or took longer than SIGNING_DOCUMENT_WAIT_MS, must
- * not hold or take the page down: it is logged once, redacted, and answers
- * null (the section then says it could not show the contract, and offers no
- * signing). Null too when the home's contract is no longer `contractId`.
+ * page. A read that failed or was slow (./optional-read.ts) answers null: the
+ * section then says it could not show the contract, and offers no signing. Null
+ * too when the home's contract is no longer `contractId`.
  */
 export async function readSigningDocument(rawToken: string, contractId: string): Promise<ContractDocument | null> {
-  const read = readNamedContractSnapshot(rawToken, contractId);
-  try {
-    if (!(await settledWithin(read, SIGNING_DOCUMENT_WAIT_MS))) {
-      console.error('client home signing document read failed:', { name: 'SigningDocumentWait', waitedMs: SIGNING_DOCUMENT_WAIT_MS });
-      return null;
-    }
-    const contract = await read;
-    return contract && signingDocumentOf(contract);
-  } catch (error) {
-    console.error('client home signing document read failed:', loggableFailure(error));
-    return null;
-  }
+  const contract = await optionalPageRead('client home signing document read failed:', readNamedContractSnapshot(rawToken, contractId));
+  return contract && signingDocumentOf(contract);
 }

@@ -65,15 +65,15 @@ function useNoticeText(studio: string, act: ClientCode['act']) {
 
 /**
  * The one-time code step of an act that binds the client ("I paid", signing
- * the contract), shared by every such act and worded for it (`code.act`):
+ * the contract, deciding a change order), shared by every such act and worded for it (`code.act`):
  * where the code will go, [Send the code] and [I already have a code], then
  * the six-digit box (Arabic-Indic digits become Latin as they are typed) with
  * a new code offered once the wait is over, and what went wrong in the
  * panel's own words. The box takes the code from the LATEST email, whether it
  * was asked for here or before a reload (H5 functional F1). A client with no
  * address on file is told so plainly, with the studio's WhatsApp, and no box
- * is shown: the studio records the payment, or the contract is signed on
- * paper, instead. The act's own Confirm is the caller's (it sends
+ * is shown: the studio records the payment, or the contract is signed or the
+ * change order decided on paper, instead. The act's own Confirm is the caller's (it sends
  * `code.proof()`). فصحى copy, Latin digits, logical CSS only.
  */
 export function ClientCodePanel({

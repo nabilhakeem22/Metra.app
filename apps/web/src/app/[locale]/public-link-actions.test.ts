@@ -9,7 +9,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'user-agent': 'probe/1' }) }));
 const respond = vi.fn(async () => ({ ok: true }));
 vi.mock('@/lib/proposals/public', () => ({ respondToProposalByToken: respond }));
-vi.mock('@/lib/variations/public', () => ({ respondToVariationByToken: respond }));
+vi.mock('@/lib/variations/public', () => ({ getVariationByToken: async () => null, respondToVariationByToken: respond }));
 vi.mock('@/lib/contracts/public', () => ({
   acknowledgeContractByToken: respond,
   getContractByToken: async () => null,

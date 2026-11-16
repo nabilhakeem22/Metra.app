@@ -5,6 +5,7 @@
 import { isRequestClaimable } from '@/lib/engagements/public/execution-requests';
 import type { PortalExecutionRequest } from '@/lib/engagements/public/execution-types';
 import type { ClientExecutionLocation, ClientExecutionReason } from '@/lib/flow/locate/execution-client';
+import type { StepLocation } from '@/lib/flow/types';
 import type { StatusTone } from '@/lib/ui/status-tone';
 import type { HomeExecution } from './types';
 
@@ -54,8 +55,8 @@ export function heroRequest(execution: HomeExecution): PortalExecutionRequest | 
   }
 }
 
-/** Whose move it is, as the client reads it: theirs is the brand "your move"; the studio's and the site's are waiting. */
-export function clientMoveTone(location: ClientExecutionLocation): StatusTone {
+/** Whose move it is, as the client reads it on both tabs: theirs is the brand "your move"; the studio's and the site's are waiting. */
+export function clientMoveTone(location: Pick<StepLocation, 'status' | 'whoseMove'>): StatusTone {
   if (location.status === 'complete') return 'done';
   if (location.status === 'closed' || location.whoseMove === null) return 'neutral';
   return location.whoseMove === 'client' ? 'yourMove' : 'waiting';

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { homeNamesSource } from '@/lib/client-home/names';
 import type { HomeFocus } from '@/lib/client-home/tab';
-import type { HomeAtExecution } from '@/lib/client-home/types';
+import type { HomeAtExecution, HomeChangeOrder } from '@/lib/client-home/types';
 import type { ContractDocument } from '@/lib/contracts/public-types';
 import { deliveryDisplayNames } from '@/lib/engagements/public/display-names';
 import { HomeTabs } from './home-tabs';
@@ -18,27 +18,31 @@ import { useFocusSection } from './portal/use-focus-section';
 
 /**
  * The client home's EXECUTION tab, read from ONE token SDF (./home-read.ts),
- * and the contract's document with it while it awaits the client's signature:
+ * and with it the contract's document while it awaits the client's signature
+ * and the change orders while some await the client's decision:
  * the studio bar, the greeting, the tab strip when the delivery began with a
  * design (a light delivery has only this tab), then the hero (where the
  * client stands and the one thing to do) and, in this order, the contract,
  * the change orders waiting for the client, and the payments. One column on a
  * phone, two from lg up. A `?focus=` link opens on its section, a request's
  * opens its "I've made this payment" on the code box, and a signing's
- * (`sign:<id>`) has its code box ready for the client's [Sign]. فصحى copy,
- * Latin digits, logical CSS only; nothing here is a fact of the studio's own
- * (lib/client-home/types.ts).
+ * (`sign:<id>`) or a change order's (`variation:<id>`) has its code box ready
+ * for the client's own press. فصحى copy, Latin digits, logical CSS only; nothing
+ * here is a fact of the studio's own (lib/client-home/types.ts).
  */
 export function ExecutionTabView({
   token,
   home,
   signingDocument,
+  changeOrders,
   focus,
 }: {
   token: string;
   home: HomeAtExecution;
   /** The contract awaiting the client's signature, read with the page; null in every other state, or when its read failed. */
   signingDocument: ContractDocument | null;
+  /** The change orders awaiting the client's decision, read with the page; null when none is open, or when their read failed. */
+  changeOrders: HomeChangeOrder[] | null;
   focus: HomeFocus | null;
 }) {
   const t = useTranslations('delivery');
@@ -107,11 +111,15 @@ export function ExecutionTabView({
                 }}
               />
             </div>
-            {execution.openVariationCount > 0 && (
-              <div className="order-3">
-                <ExecutionChangeOrders openCount={execution.openVariationCount} firmName={firmName} />
-              </div>
-            )}
+            <ExecutionChangeOrders
+              token={token}
+              orders={changeOrders}
+              openCount={execution.openVariationCount}
+              channel={home.codeChannel}
+              studio={studio}
+              openOn={focus?.section === 'variation' ? focus.id : null}
+              onChanged={() => router.refresh()}
+            />
           </div>
         </div>
         <footer className="pt-2 text-center text-caption text-muted-foreground">{t('poweredBy', { firm: firmName })}</footer>

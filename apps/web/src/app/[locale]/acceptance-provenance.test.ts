@@ -12,7 +12,7 @@ vi.mock('next/headers', () => ({
 }));
 const respond = vi.fn(async () => ({ ok: true }));
 vi.mock('@/lib/proposals/public', () => ({ respondToProposalByToken: respond }));
-vi.mock('@/lib/variations/public', () => ({ respondToVariationByToken: respond }));
+vi.mock('@/lib/variations/public', () => ({ getVariationByToken: async () => null, respondToVariationByToken: respond }));
 
 const { respondToProposal } = await import('./p/[token]/actions');
 const { respondToVariation } = await import('./v/[token]/actions');

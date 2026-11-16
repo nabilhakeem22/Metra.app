@@ -60,12 +60,13 @@ function contractOf(raw: unknown): HomeContract | null | undefined {
   if (raw === null || raw === undefined) return null;
   const row = asRow(raw);
   if (!row || typeof row.id !== 'string' || !isUuid(row.id)) return undefined;
-  const number = documentNumber('C', row.number, row.year);
+  const shownNumber = documentNumber('C', row.number, row.year);
   const extensionDays = wholeNumber(row.time_extension_days_total, 0);
-  if (!number || typeof row.status !== 'string' || !CONTRACT_STATUSES.has(row.status) || extensionDays === null) return undefined;
+  if (!shownNumber || typeof row.status !== 'string' || !CONTRACT_STATUSES.has(row.status) || extensionDays === null) return undefined;
   return {
     id: row.id,
-    documentNumber: number,
+    number: row.number as number,
+    documentNumber: shownNumber,
     status: row.status as PortalContractStatus,
     signingOpen: row.signing_open === true,
     signed: signedOf(row.signed),

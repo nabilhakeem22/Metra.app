@@ -18,7 +18,8 @@ import { contractPayloadHash } from '@/lib/contracts/public';
 import type { PublicContract } from '@/lib/contracts/public-types';
 import { hashShareToken } from '@/lib/share/token';
 import { contractDocumentOf } from './contract';
-import { SIGNING_DOCUMENT_WAIT_MS, SIGNING_SECTIONS_SHOWN, readContractToSign, readSigningDocument } from './contract-signing';
+import { SIGNING_SECTIONS_SHOWN, readContractToSign, readSigningDocument } from './contract-signing';
+import { OPTIONAL_READ_WAIT_MS } from './optional-read';
 
 const CONTRACT_ID = '0b6f8e0c-2c1d-4c55-9c1a-6a1c8f0d0001';
 const OTHER_ID = '0b6f8e0c-2c1d-4c55-9c1a-6a1c8f0d0002';
@@ -133,7 +134,7 @@ describe('readSigningDocument', () => {
     let fail: (error: Error) => void = () => undefined;
     sdf.readSdfJson.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)));
     const document = readSigningDocument('tok', CONTRACT_ID);
-    await vi.advanceTimersByTimeAsync(SIGNING_DOCUMENT_WAIT_MS - 1);
+    await vi.advanceTimersByTimeAsync(OPTIONAL_READ_WAIT_MS - 1);
     expect(logged).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(await document).toBeNull();

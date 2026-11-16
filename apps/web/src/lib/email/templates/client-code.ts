@@ -1,6 +1,6 @@
 // "Your verification code": the one-time code a CLIENT asked for on their
 // project page, before an act that binds them ("I paid", signing the
-// execution contract). Server-side, no
+// execution contract, deciding a change order). Server-side, no
 // next-intl context, so the copy is inlined. CLIENT register: Arabic is فصحى,
 // like every client-facing delivery surface. Latin digits, no dash, the
 // existing shell (no branding change).
@@ -9,9 +9,12 @@
 // client's own project page, the page the code is typed into. Every name and
 // number here came from the database (app_home_code_issue_by_token), never
 // from the browser: a link holder must not be able to put words of their own
-// into an email that reaches the client.
+// into an email that reaches the client. Nor a link of a studio's: the studio
+// names itself, and this email goes out under the platform's From, so a name
+// holding URL-like text is not printed (lib/format/url-like.ts).
 import { EMAIL_BRAND } from '@/lib/email/brand';
 import { NAME_MAX_CHARS, oneLine } from '@/lib/format/one-line';
+import { holdsUrlLikeText } from '@/lib/format/url-like';
 import type { CodePurpose } from '@/lib/client-home/code-answers';
 import { escapeHtml } from '@/lib/html/escape';
 import type { EmailContent } from './automation';
@@ -20,7 +23,7 @@ import { emailShell } from './shell';
 export interface ClientCodeEmailInput {
   code: string;
   purpose: CodePurpose;
-  /** The request's PR number, the contract's C number, or the delivery's DE number for a design instalment. */
+  /** The request's PR number, the contract's C number, the change order's VO number, or the delivery's DE number for a design instalment. */
   documentNumber: string;
   studioName: string;
   /** The client's project page, where the code is typed. */
@@ -30,6 +33,12 @@ export interface ClientCodeEmailInput {
 
 /** Ten minutes, as the database's CHECK holds it (client_verification_codes_life). */
 const VALID_MINUTES = 10;
+
+/** The studio as this email says it: one capped line, or "your studio" for a name holding URL-like text. */
+function studioWords(studioName: string, ar: boolean): string {
+  if (holdsUrlLikeText(studioName)) return ar ? 'الاستوديو الخاص بك' : 'your studio';
+  return oneLine(studioName, NAME_MAX_CHARS);
+}
 
 /** What the code is for, in the client's words. */
 function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): string {
@@ -42,13 +51,14 @@ function purposeOf(purpose: CodePurpose, documentNumber: string, ar: boolean): s
         : `to confirm that you paid a design fee instalment on ${documentNumber}`;
     case 'sign_contract':
       return ar ? `لتوقيع عقد التنفيذ ${documentNumber}` : `to sign execution contract ${documentNumber}`;
+    case 'decide_variation':
+      return ar ? `لاعتماد أمر التغيير ${documentNumber} أو رفضه` : `to approve or reject change order ${documentNumber}`;
   }
 }
 
 export function clientCodeEmailTemplate(input: ClientCodeEmailInput): EmailContent {
   const ar = input.locale.startsWith('ar');
-  // Studio-typed and unbounded: one capped line before it reaches the body.
-  const studio = oneLine(input.studioName, NAME_MAX_CHARS);
+  const studio = studioWords(input.studioName, ar);
   const purpose = purposeOf(input.purpose, input.documentNumber, ar);
 
   const subject = ar ? `رمز التحقق: ${input.code}` : `Your verification code: ${input.code}`;

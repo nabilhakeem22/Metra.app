@@ -17,6 +17,7 @@ describe('requestedFocus', () => {
   it('opens the contract, one change order, one request or the signing of one contract by its id', () => {
     expect(requestedFocus('contract')).toEqual({ section: 'contract' });
     expect(requestedFocus(`variation:${ID}`)).toEqual({ section: 'variation', id: ID.toLowerCase() });
+    expect(requestedFocus(`order:${ID}`)).toEqual({ section: 'order', id: ID.toLowerCase() });
     expect(requestedFocus(`request:${ID}`)).toEqual({ section: 'request', id: ID.toLowerCase() });
     expect(requestedFocus(`sign:${ID}`)).toEqual({ section: 'sign', id: ID.toLowerCase() });
   });
@@ -33,6 +34,9 @@ describe('requestedFocus', () => {
       'variation:',
       'variation:not-a-uuid',
       `variation:${ID}:x`,
+      'order:',
+      'order:not-a-uuid',
+      `order:${ID}:x`,
       `site:${ID}`,
       ['contract'],
       'instalment:',
@@ -64,12 +68,14 @@ describe('homeCodeActHref', () => {
     expect(homeCodeActHref('tok', { purpose: 'claim_request', target: id })).toBe(`/d/tok?tab=execution&focus=request:${id}`);
     expect(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'gate_a' })).toBe('/d/tok?tab=design&focus=instalment:gate_a');
     expect(homeCodeActHref('tok', { purpose: 'sign_contract', target: id })).toBe(`/d/tok?tab=execution&focus=sign:${id}`);
+    expect(homeCodeActHref('tok', { purpose: 'decide_variation', target: id })).toBe(`/d/tok?tab=execution&focus=variation:${id}`);
   });
 
   it('reads back as the focus it names', () => {
     const focusOf = (href: string) => requestedFocus(new URL(href, 'https://x.invalid').searchParams.get('focus') ?? undefined);
     expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_request', target: id }))).toEqual({ section: 'request', id });
     expect(focusOf(homeCodeActHref('tok', { purpose: 'sign_contract', target: id }))).toEqual({ section: 'sign', id });
+    expect(focusOf(homeCodeActHref('tok', { purpose: 'decide_variation', target: id }))).toEqual({ section: 'variation', id });
     expect(focusOf(homeCodeActHref('tok', { purpose: 'claim_design_payment', target: 'deposit' }))).toEqual({ section: 'instalment', kind: 'deposit' });
   });
 });

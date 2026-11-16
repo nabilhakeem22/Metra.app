@@ -5,19 +5,21 @@ import { Wordmark } from '@/components/brand/wordmark';
 import { LanguageSwitch } from './language-switch';
 
 /**
- * What a client sees when no delivery could be shown, in a card with the Metra
- * mark and the language switch (the token is in the path, so the switch works
- * here too). Which notice matters: `notFound` is permanent and tells the client
- * to ask their design team for a new link; `readFailed` is transient and tells
- * them their link is still valid.
+ * What a client sees when no delivery could be shown, or when a document link
+ * (/v, /c) could not read its document, in a card with the Metra mark and the
+ * language switch back to the same page (`switchHref`, its path without the
+ * locale; the token is in it, so the switch works here too). Which notice
+ * matters: `notFound` is permanent and tells the client to ask their design team
+ * for a new link; `readFailed` is transient and tells them their link is still
+ * valid.
  */
 export function DeliveryNotice({
   notice,
-  token,
+  switchHref,
   locale,
 }: {
   notice: 'notFound' | 'readFailed';
-  token: string;
+  switchHref: string;
   locale: string;
 }) {
   const t = useTranslations(`delivery.${notice}`);
@@ -31,7 +33,7 @@ export function DeliveryNotice({
           <h1 className="text-title font-semibold">{t('title')}</h1>
           <p className="text-body text-muted-foreground">{t('body')}</p>
         </div>
-        <LanguageSwitch token={token} locale={locale} tab={null} />
+        <LanguageSwitch href={switchHref} locale={locale} />
       </section>
     </div>
   );
