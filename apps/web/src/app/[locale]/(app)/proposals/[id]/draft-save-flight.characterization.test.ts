@@ -415,23 +415,10 @@ describe('createDraftSaveFlight, what the stories cannot say', () => {
     expect(on.journal.lines).toEqual(['0 persist#1', '0 save#1 d1 at r1']);
   });
 
-  // FOUND, NOT CHANGED: nothing clears `running` when the background save REJECTS.
-  it('a background save that rejects leaves the flight unable to save or to flush', async () => {
-    const on = builder('held');
-    on.flight.request();
-    on.flush(() => on.holdStep('final'));
-    on.held[0].step.reject(new Error('the background save rejected'));
-    await on.journal.turns(4);
-    on.flight.request();
-    on.flush(() => on.holdStep('final'));
-    await on.journal.turns(4);
-    expect(on.journal.lines).toEqual([
-      '0 persist#1',
-      '2 flush#1 rejected Error: the background save rejected',
-      '5 flush#2 rejected Error: the background save rejected',
-    ]);
-    expect(on.flight.flushing).toBe(false);
-  });
+  // RETIRED with the fix of what it pinned. The scenario "a background save that
+  // rejects leaves the flight unable to save or to flush" stood here as FOUND,
+  // NOT CHANGED. The flight now returns to idle, and the same steps are told
+  // with what they do now in draft-save-flight.idle.test.ts.
 });
 
 describe('createDraftSaveFlight, the grid', () => {

@@ -1,6 +1,8 @@
+import { DRAFT_ANSWER_DEADLINE_MS, NO_ANSWER, settleWithinDeadline } from './draft-answer-deadline';
 import { recoverLostCommit } from './lost-commit';
 import type { SaveDraft, SaveDraftResult } from './persist-draft';
 import type { ProposalDraftState } from './proposal-payload';
+import { unconfirmedAfter, type UnconfirmedSend } from './unconfirmed-sends';
 
 /**
  * The builder's single-flight save engine, free of React. ONE save at a time: a
@@ -8,8 +10,10 @@ import type { ProposalDraftState } from './proposal-payload';
  * running save, then runs its own final step as the one in flight, and ignores
  * background requests meanwhile. It also carries the revision each save is
  * edited from, the snapshots of what is stored and of what is being sent, the
- * draft of a send that never answered (it may have committed: lost-commit.ts),
- * and the clock of the first unsaved change.
+ * drafts of the sends that never answered (one may have committed: lost-commit.ts),
+ * and the clock of the first unsaved change. A save with no answer within the
+ * deadline (draft-answer-deadline.ts) is a send that never answered, so no save
+ * holds the flight for ever.
  */
 export interface DraftSaveFlight {
   /** Start a background save now, or queue exactly one more if one is running. */
@@ -18,9 +22,10 @@ export interface DraftSaveFlight {
   flush<T>(finalStep: () => Promise<T>): Promise<T>;
   /**
    * Send `draft` (whose snapshot is `snapshot`) through `save`. Refused as stale
-   * while an earlier send's answer was lost: if what is stored is that send, it
-   * was ours, so adopt it (through `onRecovered`) and send again, once. Answers
-   * the draft last sent.
+   * while earlier sends' answers were lost: if what is stored is one of them, it
+   * was ours, so adopt it (through `onRecovered`) and send again, once. If what
+   * is stored cannot be read, the answer is `uncertain`, not the refusal: whose
+   * commit it was is still unknown. Answers the draft last sent.
    */
   send(
     save: SaveDraft,
@@ -68,7 +73,7 @@ export function createDraftSaveFlight(
       }
       const started = persist();
       if (!started) return;
-      running = started.then(() => {
+      running = whenSettled(started, () => {
         running = null;
         if (!followUp || flushing) return;
         followUp = false;
@@ -95,7 +100,7 @@ export function createDraftSaveFlight(
       firstUnsavedAt = null;
       sending = snapshot;
       try {
-        return await sendRecovering(save, draft, onRecovered);
+        return await sendRecovering(save, { draft, snapshot }, onRecovered);
       } finally {
         sending = null;
       }
@@ -119,44 +124,64 @@ export function createDraftSaveFlight(
 }
 
 /**
- * The send of one flight, with a memory: the draft of a send that never answered
- * is kept, and when a later send is refused as stale that draft settles whose
- * commit it was (lost-commit.ts). It reads the revision to save against from
- * `flight` and adopts the recovered one onto it.
+ * Runs `afterwards` once a background save settles, rejected or not, so a save
+ * that throws cannot hold the flight for the life of the tab. What it answers
+ * never rejects: a flush and a leave store wait on it. The failure is raised
+ * again as the unhandled rejection it always was, not hidden here.
+ */
+function whenSettled(save: Promise<unknown>, afterwards: () => void): Promise<void> {
+  return save.then(afterwards, (cause: unknown) => {
+    void Promise.reject(cause);
+    afterwards();
+  });
+}
+
+/**
+ * The send of one flight, with a memory: the drafts of the sends that never
+ * answered are kept (unconfirmed-sends.ts), and when a later send is refused as
+ * stale they settle whose commit it was (lost-commit.ts). It reads the revision
+ * to save against from `flight` and adopts the recovered one onto it.
  */
 function createRecoveringSend(flight: Pick<DraftSaveFlight, 'revision'>) {
-  // The draft of a send that never answered: it may have committed.
-  let unconfirmed: ProposalDraftState | null = null;
+  // The sends since the last confirmed save that never answered, newest first:
+  // one of them may have committed.
+  let unconfirmed: readonly UnconfirmedSend[] = [];
 
-  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
-    try {
-      const result = await save(draft, flight.revision);
-      if (result.ok) unconfirmed = null;
-      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
-      return result;
-    } catch {
-      // The answer never came back, so the save may or may not have committed:
-      // exactly what `uncertain` says, and lost-commit.ts settles which.
-      unconfirmed = draft;
-      return { ok: false, error: 'uncertain' };
-    }
+  /** One save, answered within the deadline, and what its answer leaves unconfirmed. */
+  function sendOnce(save: SaveDraft, sent: UnconfirmedSend): Promise<SaveDraftResult> {
+    return settleWithinDeadline(
+      () => save(sent.draft, flight.revision),
+      DRAFT_ANSWER_DEADLINE_MS,
+      (answer) => {
+        // The answer never came back, so the save may or may not have committed:
+        // exactly what `uncertain` says, and lost-commit.ts settles which.
+        const result: SaveDraftResult = answer === NO_ANSWER ? { ok: false, error: 'uncertain' } : answer;
+        unconfirmed = unconfirmedAfter(unconfirmed, sent, result);
+        return result;
+      },
+    );
   }
 
   async function sendRecovering(
     save: SaveDraft,
-    draft: ProposalDraftState,
+    sent: UnconfirmedSend,
     onRecovered: (idsByKey: Map<string, string>) => void,
   ): Promise<{ result: SaveDraftResult; sent: ProposalDraftState }> {
-    const result = await sendOnce(save, draft);
-    if (result.ok || result.error !== 'draft_changed_elsewhere' || !unconfirmed) {
+    const { draft, snapshot } = sent;
+    const result = await sendOnce(save, sent);
+    const [latest, ...earlier] = unconfirmed.map((lost) => lost.draft);
+    if (result.ok || result.error !== 'draft_changed_elsewhere' || !latest) {
       return { result, sent: draft };
     }
-    const recovered = await recoverLostCommit(unconfirmed, draft);
+    const recovered = await recoverLostCommit(latest, draft, earlier);
+    // Nothing is forgotten here: the next send is refused again and reads again.
+    if (recovered === 'unreadable') return { result: { ok: false, error: 'uncertain' }, sent: draft };
     if (!recovered) return { result, sent: draft };
-    unconfirmed = null;
+    unconfirmed = [];
     flight.revision = recovered.revision;
     onRecovered(recovered.idsByKey);
-    return { result: await sendOnce(save, recovered.draft), sent: recovered.draft };
+    // The send again is the same send, re-keyed with the stored ids: same snapshot.
+    return { result: await sendOnce(save, { draft: recovered.draft, snapshot }), sent: recovered.draft };
   }
 
   return sendRecovering;

@@ -69,10 +69,16 @@ export function useDraftAutosave(input: {
       return { ok: false, error: 'draft_too_large' };
     }
     setSaving(true);
-    const { result, sent } = await flight.send(save, latest.current.draft, savedAs, (idsByKey) =>
-      latest.current.callbacks.onStored(idsByKey),
-    );
-    setSaving(false);
+    let answer: Awaited<ReturnType<typeof flight.send>>;
+    try {
+      answer = await flight.send(save, latest.current.draft, savedAs, (idsByKey) =>
+        latest.current.callbacks.onStored(idsByKey),
+      );
+    } finally {
+      // Also when the send rejects (a callback threw): "Saving" must not outlive it.
+      setSaving(false);
+    }
+    const { result, sent } = answer;
     if (!result.ok) {
       setFailure({ answer: { error: result.error, reference: result.reference }, snapshot: savedAs });
       latest.current.callbacks.onRefused(result, sent, explicit);
